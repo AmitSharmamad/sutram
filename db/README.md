@@ -14,6 +14,7 @@
   - password
   - created_at
   - updated_at
+  - is_active
 
 - portfolio
 
@@ -23,6 +24,7 @@
   - loss
   - created_at
   - updated_at
+  - is_active
 
 ### A portfolio can have multiple logs
 
@@ -46,6 +48,7 @@
   - config [ mode (LIGHT, DARK), etc... ]
   - created_at
   - updated_at
+  - is_active
 
 ---
 
@@ -61,6 +64,16 @@
   - close
   - low
   - volume
+  - created_at
+  - updated_at
+
+- stock_master
+
+  - id [ PK ]
+  - exchange [ NSE, BSE, etc... ]
+  - name
+  - symbol
+  - is_active
   - created_at
   - updated_at
 
@@ -87,6 +100,7 @@
   - max_trades
   - created_at
   - updated_at
+  - is_active
 
 - strategy_history
   - id [ PK ]
