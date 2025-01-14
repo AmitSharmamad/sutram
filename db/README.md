@@ -67,6 +67,16 @@
   - created_at
   - updated_at
 
+- stock_master
+
+  - id [ PK ]
+  - exchange [ NSE, BSE, etc... ]
+  - name
+  - symbol
+  - is_active
+  - created_at
+  - updated_at
+
 ---
 
 ## strategy management
