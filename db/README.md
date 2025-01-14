@@ -19,20 +19,17 @@
 - portfolio
 
   - id [ PK ]
-  - amount
-  - profit
-  - loss
+  - user_id [ user(id) ]
+  - capital
+  - returns
   - created_at
   - updated_at
-  - is_active
 
-### A portfolio can have multiple logs
+- setting
 
-- portfolio_log
-
-  - id [ PK ]
-  - portfolio_id
-  - action_type [ FUND_ADDED, FUND_WITHDRAWN, FUND_REFUNDED ]
+  - id
+  - user_id [ user(id) ]
+  - config [ json(mode (LIGHT, DARK), etc...) ]
   - created_at
   - updated_at
 
@@ -40,15 +37,10 @@
 
   - id
   - user_id [ user(id) ]
-
-- setting
-
-  - id
-  - user_id [ user(id) ]
-  - config [ mode (LIGHT, DARK), etc... ]
-  - created_at
-  - updated_at
-  - is_active
+  - type [ BT_DONE, LT_TRADE_ENTERED, LT_TRADE_EXITED, etc ]
+  - status [ DELIVER, DELIVERED ]
+  - receiver [ MOBILE, EMAIL ]
+  - content
 
 ---
 
@@ -91,7 +83,7 @@
   - description
   - symbol
   - instrument_type [ EQUITY, FUTURES, OPTIONS ]
-  - stock [ TATAMOTORS, etc... ]
+  - stock [ stock_master(id) ]
   - position_type [ BUY, SELL ]
   - entry_expression
   - exit_expression
@@ -111,7 +103,7 @@
 
 ---
 
-## backtesting engine
+## backtest engine
 
 ### A strategy can have multiple backtesting runs
 
@@ -256,4 +248,3 @@
   - broker_id [ broker (id) ]
   - token
   - expiry
-  - is_active
