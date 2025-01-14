@@ -49,15 +49,36 @@
 
 ---
 
+## stock management - data integration
+
+### Every stock has its own table
+
+- stock\_{SYMBOL} [ stock_AAPL, stock_TSLA ]
+
+  - timestamp [ PK ]
+  - open
+  - high
+  - close
+  - low
+  - volume
+  - created_at
+  - updated_at
+
+---
+
 ## strategy management
+
+### A User can have multiple strategies
 
 - strategy
 
   - id [ PK ]
+  - user_id [ user(id) ]
   - name
   - description
   - symbol
   - instrument_type [ EQUITY, FUTURES, OPTIONS ]
+  - stock [ TATAMOTORS, etc... ]
   - position_type [ BUY, SELL ]
   - entry_expression
   - exit_expression
@@ -76,23 +97,6 @@
 
 ---
 
-## stock management - data integration
-
-### Every stock has its own table
-
-- stock\_{SYMBOL} [ stock_AAPL, stock_TSLA ]
-
-  - timestamp [ PK ]
-  - open
-  - high
-  - close
-  - low
-  - volume
-  - created_at
-  - updated_at
-
----
-
 ## backtesting engine
 
 ### A strategy can have multiple backtesting runs
@@ -100,13 +104,13 @@
 - bt_run
 
   - id [ PK ]
-  - strategy_id
-  - state [ not_picked, started, in_progress, ended ]
+  - strategy_id [ strategy(id) ]
+  - state [ start, in_progress, ended ]
   - qty
   - period_start_time
   - period_end_time
-  - run_start_time
-  - run_stop_time
+  - started_time
+  - ended_time
   - created_at
   - updated_at
 
@@ -115,7 +119,7 @@
 - bt_position
 
   - id [ PK ]
-  - run_id
+  - run_id [ run(id) ]
   - state [ enter, entered, hold, exited ]
   - entry_price
   - entry_time
@@ -124,6 +128,8 @@
   - exit_reason
   - created_at
   - updated_at
+
+### A Position can have multiple logs
 
 - bt_position_log
 
@@ -136,15 +142,18 @@
 
 ## paper trading
 
-### A strategy can have multiple paper trading runs
+### A strategy can have multiple backtesting runs
 
 - pt_run
 
   - id [ PK ]
-  - strategy_id
-  - state [ not_picked, started, in_progress, ended ]
-  - start_time
-  - stop_time
+  - strategy_id [ strategy(id) ]
+  - state [ start, in_progress, ended ]
+  - qty
+  - period_start_time
+  - period_end_time
+  - started_time
+  - ended_time
   - created_at
   - updated_at
 
@@ -153,7 +162,7 @@
 - pt_position
 
   - id [ PK ]
-  - run_id
+  - run_id [ run(id) ]
   - state [ enter, entered, hold, exited ]
   - entry_price
   - entry_time
@@ -162,6 +171,8 @@
   - exit_reason
   - created_at
   - updated_at
+
+### A Position can have multiple logs
 
 - pt_position_log
 
@@ -174,15 +185,18 @@
 
 ## live trading
 
-### A strategy can have multiple paper trading runs
+### A strategy can have multiple backtesting runs
 
 - lt_run
 
   - id [ PK ]
-  - strategy_id
-  - state [ not_picked, started, in_progress, ended ]
-  - start_time
-  - stop_time
+  - strategy_id [ strategy(id) ]
+  - state [ start, in_progress, ended ]
+  - qty
+  - period_start_time
+  - period_end_time
+  - started_time
+  - ended_time
   - created_at
   - updated_at
 
@@ -191,7 +205,7 @@
 - lt_position
 
   - id [ PK ]
-  - run_id
+  - run_id [ run(id) ]
   - state [ enter, entered, hold, exited ]
   - entry_price
   - entry_time
@@ -200,6 +214,8 @@
   - exit_reason
   - created_at
   - updated_at
+
+### A Position can have multiple logs
 
 - lt_position_log
 
