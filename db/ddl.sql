@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS sutram_test_db.stock
 ENGINE = MergeTree()
 PRIMARY KEY (id);
 
-stock_AAPL
+CREATE TABLE IF NOT EXISTS sutram_test_db.stock_AAPL
 (
     timestamp DateTime,
     open Float32,
