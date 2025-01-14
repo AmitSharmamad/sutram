@@ -14,6 +14,7 @@
   - password
   - created_at
   - updated_at
+  - is_active
 
 - portfolio
 
@@ -23,6 +24,7 @@
   - loss
   - created_at
   - updated_at
+  - is_active
 
 ### A portfolio can have multiple logs
 
@@ -46,6 +48,7 @@
   - config [ mode (LIGHT, DARK), etc... ]
   - created_at
   - updated_at
+  - is_active
 
 ---
 
@@ -66,6 +69,7 @@
   - max_trades
   - created_at
   - updated_at
+  - is_active
 
 - strategy_history
   - id [ PK ]
@@ -77,6 +81,17 @@
 ---
 
 ## stock management - data integration
+
+### List of Stocks
+
+- stock
+  - id [ PK ]
+  - exchange [ BSE, NSE, etc]
+  - name
+  - symbol
+  - created_at
+  - modified_at
+  - is_active
 
 ### Every stock has its own table
 
