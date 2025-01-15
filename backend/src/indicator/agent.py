@@ -6,6 +6,7 @@ from langgraph.prebuilt import create_react_agent
 
 from indicator.ema import calculate_ema
 from indicator.sma import calculate_sma
+from indicator.tool import get_tools
 
 llm_url = "http://host.docker.internal:11434"
 
@@ -17,7 +18,7 @@ def start():
         base_url=llm_url,
     )
 
-    tools = [calculate_sma, calculate_ema]
+    tools = get_tools()
 
     expression = "ema(13) AND sma(10)"
 
