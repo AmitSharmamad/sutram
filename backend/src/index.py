@@ -1,5 +1,9 @@
+import os
+
+from dotenv import load_dotenv
+
 from stock.agent import start
 
-print("Hello Sutram!!!")
+load_dotenv()
 
 start()
