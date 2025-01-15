@@ -2,8 +2,6 @@ from langchain_ollama.chat_models import ChatOllama
 
 from env import Config, Env
 
-llm_url = "http://host.docker.internal:11434"
-
 
 class SutramAgent:
 
@@ -11,6 +9,7 @@ class SutramAgent:
     def new() -> ChatOllama:
 
         model = Config.get(Env.MODEL)
+        llm_url = Config.get(Env.LLM_URL)
 
         return ChatOllama(
             model=model,
