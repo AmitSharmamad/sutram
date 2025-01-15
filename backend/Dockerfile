@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 5678
 
-CMD [ "python", "backend/src/index.py"]
+CMD [ "python", "/app/src/index.py"]
