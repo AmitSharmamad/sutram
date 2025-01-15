@@ -10,4 +10,4 @@ class Config:
 
     @staticmethod
     def get(key: Env) -> str:
-        return str(os.getenv(str(key)))
+        return str(os.getenv(key.value))
