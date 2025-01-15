@@ -1,2 +1,6 @@
 langchain
 debugpy
+ollama
+langchain-community
+langchain-ollama
+langgraph
