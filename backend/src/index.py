@@ -6,6 +6,4 @@ from stock.agent import start
 
 load_dotenv()
 
-print("Hello Sutram!!!")
-
 start()
