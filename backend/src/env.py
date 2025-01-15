@@ -4,6 +4,7 @@ from enum import Enum
 
 class Env(Enum):
     MODEL = "MODEL"
+    LLM_URL = "LLM_URL"
 
 
 class Config:
