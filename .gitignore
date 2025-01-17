@@ -125,3 +125,4 @@ cython_debug/
 
 # Go ignore
 coverage.out
+main
