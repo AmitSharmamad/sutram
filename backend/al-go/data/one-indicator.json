@@ -1,0 +1,33 @@
+{
+  "type": "ExpressionStatement",
+  "returns": "bool",
+  "value": {
+    "type": "LogicalExpression",
+    "operator": "NA",
+    "returns": "bool",
+    "lhs": {
+      "type": "IndicatorExpression",
+      "operator": "CrossesAbove",
+      "returns": "bool",
+      "lhs": {
+        "type": "Indicator",
+        "name": "EMA",
+        "point": "close",
+        "returns": "float",
+        "value": {
+          "period": 5,
+          "offset": 0
+        }
+      },
+      "rhs": {
+        "type": "Number",
+        "name": "Number",
+        "point": "close",
+        "returns": "float",
+        "value": {
+          "value": 21000
+        }
+      }
+    }
+  }
+}
