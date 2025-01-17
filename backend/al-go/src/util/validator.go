@@ -8,7 +8,7 @@ import (
 
 func Validate(expression string) {
 
-	data := GetFileContent("data/schema.json")
+	data := GetFileContent("../data/schema.json")
 
 	schema := gojsonschema.NewStringLoader(string(data))
 
