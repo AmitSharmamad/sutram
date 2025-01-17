@@ -27,7 +27,7 @@ func main() {
 
 	Init()
 
-	path := "../data/many-indicators.json"
+	path := "../data/llm.json"
 
 	exp := util.GetFileContent(path)
 

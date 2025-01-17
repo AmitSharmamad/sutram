@@ -65,13 +65,16 @@
                 "type": {
                   "type": "string",
                   "enum": [
-                    "Indicator"
+                    "Indicator",
+                    "Number"
                   ]
                 },
                 "name": {
                   "type": "string",
                   "enum": [
-                    "EMA"
+                    "EMA",
+                    "SMA",
+                    "Number"
                   ]
                 },
                 "returns": {
@@ -109,12 +112,15 @@
                 "type": {
                   "type": "string",
                   "enum": [
+                    "Indicator",
                     "Number"
                   ]
                 },
                 "name": {
                   "type": "string",
                   "enum": [
+                    "EMA",
+                    "SMA",
                     "Number"
                   ]
                 },
@@ -179,13 +185,16 @@
                 "type": {
                   "type": "string",
                   "enum": [
-                    "Indicator"
+                    "Indicator",
+                    "Number"
                   ]
                 },
                 "name": {
                   "type": "string",
                   "enum": [
-                    "EMA"
+                    "EMA",
+                    "SMA",
+                    "Number"
                   ]
                 },
                 "returns": {
@@ -231,12 +240,15 @@
                 "type": {
                   "type": "string",
                   "enum": [
+                    "Indicator",
                     "Number"
                   ]
                 },
                 "name": {
                   "type": "string",
                   "enum": [
+                    "EMA",
+                    "SMA",
                     "Number"
                   ]
                 },

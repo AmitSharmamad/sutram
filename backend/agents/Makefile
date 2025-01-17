@@ -12,6 +12,7 @@ build:
 	docker build -t sutram .
 
 run:
+	clear
 	docker run -it -v .:/app/ -p 5678:5678 sutram
 
 brun: build run
