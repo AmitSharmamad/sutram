@@ -3,7 +3,10 @@ FROM golang:1.23
 WORKDIR /app
 
 # Copy the source code
-COPY . .
+COPY src src
+COPY data data
+COPY go.mod go.mod
+COPY go.sum go.sum
 
 # Build the application
 RUN go build -o main src/main.go
