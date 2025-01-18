@@ -24,7 +24,7 @@
     "trailing_stop_loss": 0.0,
     "type": "PERCENTAGE,ABSOLUTE"
   },
-  "test_params": {
+  "trade_params": {
     "capital": 1000000,
     "max_trades": 5,
     "entry_start_time": 1000000,
