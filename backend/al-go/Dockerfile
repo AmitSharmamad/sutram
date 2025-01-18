@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy the source code
 COPY src src
-COPY data data
+COPY ../data data
 COPY go.mod go.mod
 COPY go.sum go.sum
 

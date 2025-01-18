@@ -10,3 +10,5 @@ type Data struct {
 
 	volume int64
 }
+
+type StockData *[]Data
