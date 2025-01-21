@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+const (
+	NOT_ENTERED = "NOT_ENTERED"
+	ENTERED     = "ENTERED"
+	EXITED      = "EXITED"
+)
+
 type Position struct {
 	ID int `json:"id" db:"id"`
 
@@ -46,14 +52,21 @@ func (position *Position) TryExit(data data.StockData) bool {
 	return true
 }
 
-func (position *Position) Handle(data data.StockData) {
-	if position.State == "NOT_ENTERED" {
+func (position *Position) IsDone() bool {
+	return position.State == EXITED
+}
+
+func (position *Position) Eval(data data.StockData) {
+	switch position.State {
+	case NOT_ENTERED:
 		if position.TryEnter(data) {
-			position.State = "ENTERED"
+			position.State = ENTERED
 		}
-	} else if position.State == "ENTERED" {
+	case ENTERED:
 		if position.TryExit(data) {
-			position.State = "EXITED"
+			position.State = EXITED
 		}
+	default:
+		panic("Error in position Eval")
 	}
 }
