@@ -1,6 +1,9 @@
 build:
 	docker build -t sutram-go .
 
+web:
+	go run ./src/web/main.go
+
 run:
 	docker run -it -p 8080:8080 sutram-go
 
