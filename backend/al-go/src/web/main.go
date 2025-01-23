@@ -1,6 +1,14 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"algo/src/di"
+
+	"github.com/gin-gonic/gin"
+)
+
+func init() {
+	di.InitialiseDI()
+}
 
 func main() {
 	server := gin.Default()
@@ -11,5 +19,5 @@ func main() {
 		})
 	})
 
-	server.Run()
+	server.Run(":8080")
 }

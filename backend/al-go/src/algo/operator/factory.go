@@ -1,15 +1,22 @@
 package operator
 
-var funcs map[string]Operator
-
-func InitFactory() {
-	funcs = make(map[string]Operator, 0)
+type OperatorFactory struct {
+	operators map[string]Operator
 }
 
-func Register(key string, operator Operator) {
-	funcs[key] = operator
+func NewFactory() *OperatorFactory {
+	factory := &OperatorFactory{
+		operators: make(map[string]Operator),
+	}
+
+	factory.operators["CrossesAbove"] = &CrossesAbove{}
+	factory.operators["CrossesBelow"] = &CrossesBelow{}
+
+	return factory
 }
+
+var factory = NewFactory()
 
 func Get(key string) Operator {
-	return funcs[key]
+	return factory.operators[key]
 }
