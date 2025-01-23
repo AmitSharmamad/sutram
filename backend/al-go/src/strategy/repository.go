@@ -1,23 +1,62 @@
 package strategy
 
-import "algo/src/data"
+import (
+	"algo/src/core/db"
+	"database/sql"
+)
 
-func (strategy *Strategy) validate() {}
-
-func (strategy *Strategy) Create() {
-	strategy.validate()
-	/// save the strategy to the db
+type Repo struct {
+	Name string
+	DB   db.Database
 }
 
-func (strategy *Strategy) GetData() data.StockData {
-	return nil
+func NewRepo() *Repo {
+	return &Repo{
+		Name: "strategy",
+		// DB:   db,
+	}
 }
 
-func (strategy *Strategy) Update() {
-	strategy.validate()
-	/// update the strategy in the db
+func (repo *Repo) Insert(strategy *Strategy) (sql.Result, error) {
+	return repo.DB.Insert(
+		"INSERT INTO ? VALUES (?,?,?,?)",
+		repo.Name,
+		strategy.Name,
+	)
 }
 
-func (strategy *Strategy) Delete(id string) bool {
-	return true
+func (repo *Repo) Get(id string) (any, error) {
+	return repo.DB.Select(
+		`
+		SELECT * 
+		FROM ? 
+		WHERE id = '?';
+		`,
+		repo.Name,
+		id,
+	)
+}
+
+func (repo *Repo) GetLatest() (any, error) {
+	return repo.DB.Select(
+		`
+			SELECT * 
+			FROM ? 
+			ORDER BY DESC
+			LIMIT 1;
+		`,
+		repo.Name,
+	)
+}
+
+func (repo *Repo) GetAll(id string) ([]any, error) {
+	return repo.DB.Select("SELECT * FROM strategy;")
+}
+
+func (repo *Repo) Update(id string, strategy *Strategy) (sql.Result, error) {
+	return repo.DB.Update("UPDATE strategy SET ... WHERE id = {id}")
+}
+
+func (repo *Repo) Delete(query string) (sql.Result, error) {
+	return repo.DB.Delete("DELETE FROM strategy")
 }
