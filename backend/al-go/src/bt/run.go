@@ -1,36 +1,54 @@
 package bt
 
-import "time"
+import (
+	"algo/src/position"
+	"algo/src/strategy"
+	"time"
+)
 
-type BTRun struct {
-	ID              int       `json:"id" db:"id"`                               // Primary Key
-	StrategyID      int       `json:"strategy_id" db:"strategy_id"`             // Foreign key to strategy(id)
-	State           string    `json:"state" db:"state"`                         // possible values: "start", "in_progress", "ended"
-	Qty             float64   `json:"qty" db:"qty"`                             // Quantity for the run
-	PeriodStartTime time.Time `json:"period_start_time" db:"period_start_time"` // Start time of the period
-	PeriodEndTime   time.Time `json:"period_end_time" db:"period_end_time"`     // End time of the period
-	StartedTime     time.Time `json:"started_time" db:"started_time"`           // When the run started
-	EndedTime       time.Time `json:"ended_time" db:"ended_time"`               // When the run ended
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`               // Timestamp when the record was created
-	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`               // Timestamp when the record was last updated
+type Run struct {
+	ID              int       `json:"id" db:"id"`
+	StrategyID      string    `json:"strategy_id" db:"strategy_id"`
+	State           string    `json:"state" db:"state"`
+	Qty             float64   `json:"qty" db:"qty"`
+	PeriodStartTime time.Time `json:"period_start_time" db:"period_start_time"`
+	PeriodEndTime   time.Time `json:"period_end_time" db:"period_end_time"`
+	StartedTime     time.Time `json:"started_time" db:"started_time"`
+	EndedTime       time.Time `json:"ended_time" db:"ended_time"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
-func Get(id string) *BTRun {
-	return &BTRun{}
+func (run *Run) Run() {
+	/// get the data range from the strategy
+	s := strategy.Get(run.StrategyID)
+	s.GetEntryDataRange()
+
+	/// fetch the data
+	data := strategy.GetData()
+
+	/// start taking positions
+	/// begin from period start date and iterate till the end
+	for i := 0; i < len(*data); i++ {
+		position := run.GetPosition()
+		position.Eval(data)
+		position.IsDone()
+	}
+
 }
 
-func GetLatest() *BTRun {
-	return &BTRun{}
-}
-
-func Create(run *BTRun) *BTRun {
-	return &BTRun{}
-}
-
-func Update(run *BTRun) *BTRun {
-	return &BTRun{}
-}
-
-func Delete(id string) bool {
-	return true
+func (run *Run) GetPosition() *position.Position {
+	if run.State == "START" {
+		run.State = "IN_PROGRESS"
+		return position.NewPosition()
+	} else if run.State == "IN_PROGRESS" {
+		latest := position.GetLatest()
+		if latest.State == "EXITED" {
+			return position.NewPosition()
+		}
+		return latest
+	} else if run.State == "ENDED" {
+		panic("Run ended, but loop going on")
+	}
+	panic("Error in run get position")
 }

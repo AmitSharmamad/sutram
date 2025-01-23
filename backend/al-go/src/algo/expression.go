@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 )
 
+type IExpression interface {
+	Eval(data data.StockData)
+}
+
 type Expression struct {
 	Type  string             `json:"type"` /// ExpressionStatement
 	Value *LogicalExpression `json:"value"`
 }
 
-func NewExpressionStatement(expression string) *Expression {
+func (*Expression) Init() {}
+
+func NewExpressionStatement(expression string) IExpression {
 	var input *Expression = &Expression{}
 	err := json.Unmarshal([]byte(expression), input)
 	if err != nil {
@@ -19,7 +25,7 @@ func NewExpressionStatement(expression string) *Expression {
 	return input
 }
 
-func (expression *Expression) Eval(data *[]data.Data) {
+func (expression *Expression) Eval(data data.StockData) {
 	println("Evaluating input ", expression)
 	if expression.Type == "ExpressionStatement" {
 		if expression.Value.Type == "LogicalExpression" {

@@ -7,6 +7,10 @@ type SMA struct {
 	offset int
 }
 
+func NewSMA() *SMA {
+	return &SMA{}
+}
+
 func (indicator *SMA) Calculate(data *[]data.Data, config map[string]any, point string) float64 {
 	println("Executing SMA")
 

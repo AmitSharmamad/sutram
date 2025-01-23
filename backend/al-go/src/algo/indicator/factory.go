@@ -1,16 +1,23 @@
 package indicator
 
-var funcs map[string]*IndicatorCalculator
-
-func InitFactory() {
-	funcs = make(map[string]*IndicatorCalculator, 0)
+type IndicatorFactory struct {
+	indicators map[string]IndicatorCalculator
 }
 
-func Register(key string, calculator IndicatorCalculator) {
-	funcs[key] = &calculator
+func NewFactory() *IndicatorFactory {
+	factory := &IndicatorFactory{
+		indicators: make(map[string]IndicatorCalculator),
+	}
+
+	factory.indicators["SMA"] = &SMA{}
+	factory.indicators["EMA"] = &EMA{}
+	factory.indicators["Number"] = &IndNumber{}
+
+	return factory
 }
 
-func Get(key string) *IndicatorCalculator {
-	println("Getting indicator ", key)
-	return funcs[key]
+var factory = NewFactory()
+
+func Get(key string) IndicatorCalculator {
+	return factory.indicators[key]
 }

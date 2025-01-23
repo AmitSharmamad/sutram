@@ -5,6 +5,10 @@ import (
 	"algo/src/data"
 )
 
+type ILogicalExpression interface {
+	Handle(data data.StockData)
+}
+
 type LogicalExpression struct {
 	Type     string                         `json:"type"`     /// logicalexpression
 	Operator string                         `json:"operator"` /// AND / OR / NA
@@ -13,7 +17,7 @@ type LogicalExpression struct {
 	Rhs      *indicator.IndicatorExpression `json:"rhs"`
 }
 
-func (expression *LogicalExpression) Handle(data *[]data.Data) bool {
+func (expression *LogicalExpression) Handle(data data.StockData) bool {
 	println("Handling logical expression")
 
 	lhsValue := expression.Lhs.Handle(data)
