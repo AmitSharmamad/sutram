@@ -6,17 +6,32 @@
 
 package main
 
+import (
+	"algo/src/core/config"
+	"algo/src/core/db"
+)
+
 // Injectors from wire.go:
 
 func InitialiseDI() *DIContainer {
-	diContainer := NewDIContainer()
+	envProv := env.NewEnvProv()
+	root := env.NewRoot(envProv)
+	clickhouse := db.NewClickHouseProv(envProv)
+	postgres := db.NewPostgresProv()
+	dbFactory := db.NewFactoryProv(clickhouse, postgres)
+	dbRoot := db.NewRoot(dbFactory)
+	diContainer := NewDIContainer(root, dbRoot)
 	return diContainer
 }
 
 // wire.go:
 
-type DIContainer struct{}
+type DIContainer struct {
+	EnvRoot env.Root
+	DbRoot  db.Root
+}
 
-func NewDIContainer() *DIContainer {
+func NewDIContainer(env2 *env.Root, db2 *db.Root,
+) *DIContainer {
 	return &DIContainer{}
 }

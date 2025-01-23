@@ -17,17 +17,23 @@ const (
 	CLICKHOUSE_PASSWORD EnvProp = "CLICKHOUSE_PASSWORD"
 )
 
-func GetProp(property EnvProp) string {
+type EnvProv struct{}
+
+func NewEnvProv() *EnvProv {
+	prov := &EnvProv{}
+	prov.Init()
+	return prov
+}
+
+func (*EnvProv) GetProp(property EnvProp) string {
 	return os.Getenv(string(property))
 }
 
-func Init() {
-
-	// Load the .env file
+func (env *EnvProv) Init() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	println("PORT: " + GetProp(PORT))
+	println("PORT: " + env.GetProp(PORT))
 
 }
