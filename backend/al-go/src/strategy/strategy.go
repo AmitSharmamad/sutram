@@ -1,57 +1,77 @@
 package strategy
 
 import (
-	"algo/src/algo"
 	"algo/src/data"
+	"algo/src/util"
+	"time"
 )
 
+// Strategy represents the entire structure.
 type Strategy struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Position    Position    `json:"position"`
-	Entry       Entry       `json:"entry"`
-	Exit        Exit        `json:"exit"`
-	TestParams  TradeParams `json:"test_params"`
+	Name        string      `json:"name" db:"name"`
+	Description string      `json:"description" db:"description"`
+	Position    Position    `json:"position" db:"position"`
+	Entry       Expression  `json:"entry" db:"entry"`
+	Exit        Exit        `json:"exit" db:"exit"`
+	TradeParams TradeParams `json:"trade_params" db:"trade_params"`
+
+	Repo *Repo
 }
 
+// Position represents the "position" object.
 type Position struct {
-	Type        string   `json:"type"` // Type can be either "BUY" or "SELL".
-	Instruments []string `json:"instruments"`
-	Chart       Chart    `json:"chart"`
+	Type        string   `json:"type" db:"type"`               // Expected values: "BUY" or "SELL"
+	Instruments []string `json:"instruments" db:"instruments"` // List of instrument names
+	Chart       Chart    `json:"chart" db:"chart"`
 }
 
+// Chart represents the "chart" object within "position".
 type Chart struct {
-	Type      string `json:"type"`      // Type can be one of: "CANDLESTICK", "HEIKEN-ASHI", "RENKO".
-	Timeframe string `json:"timeframe"` // Timeframe can be one of: "1m", "3m", "5m", "10m", "15m", "30m", "1h", "1d".
-	Unknown   string `json:"unknown"`   // Unknown can be one of: "MIS", "CNC", "NRML".
-	Qty       int    `json:"qty"`
+	Type      string `json:"type" db:"type"`           // e.g., "CANDLESTICK", "HEIKEN-ASHI", "RENKO"
+	Timeframe string `json:"timeframe" db:"timeframe"` // e.g., "1m", "3m", "5m", "10m", "15m", "30m", "1h", "1d"
+	Unknown   string `json:"unknown" db:"unknown"`     // e.g., "MIS", "CNC", "NRML"
+	Qty       int    `json:"qty" db:"qty"`             // Quantity value
 }
 
-type Entry struct {
-	Expression algo.Expression `json:"expression"`
-	Prompt     string          `json:"prompt"`
+// Expression represents the "entry" object.
+type Expression struct {
+	Expression string `json:"expression" db:"expression"`
 }
 
+// Exit represents the "exit" object.
 type Exit struct {
-	Expression       algo.Expression `json:"expression"`
-	Prompt           string          `json:"prompt"`
-	TargetProfit     float64         `json:"target_profit"`
-	StopLoss         float64         `json:"stop_loss"`
-	TrailingStopLoss float64         `json:"trailing_stop_loss"`
-	Type             string          `json:"type"`
+	Expression       string  `json:"expression" db:"expression"`
+	TargetProfit     float64 `json:"target_profit" db:"target_profit"`
+	StopLoss         float64 `json:"stop_loss" db:"stop_loss"`
+	TrailingStopLoss float64 `json:"trailing_stop_loss" db:"trailing_stop_loss"`
+	Type             string  `json:"type" db:"type"` // e.g., "PERCENTAGE" or "ABSOLUTE"
 }
 
+// TradeParams represents the "trade_params" object.
 type TradeParams struct {
-	Capital        int64  `json:"capital"`
-	MaxTrades      int    `json:"max_trades"`
-	EntryStartTime int64  `json:"entry_start_time"`
-	EntryEndTime   int64  `json:"entry_end_time"`
-	StartDate      string `json:"start_date"`
-	EndDate        string `json:"end_date"`
+	Capital        float64 `json:"capital" db:"capital"`
+	MaxTrades      int     `json:"max_trades" db:"max_trades"`
+	EntryStartTime int64   `json:"entry_start_time" db:"entry_start_time"` // Could be Unix timestamp
+	EntryEndTime   int64   `json:"entry_end_time" db:"entry_end_time"`     // Could be Unix timestamp
+	// For date fields, you may choose to use time.Time if your JSON payload is in RFC3339 format.
+	StartDate time.Time `json:"start_date" db:"start_date"`
+	EndDate   time.Time `json:"end_date" db:"end_date"`
+}
+
+func (strategy *Strategy) Validate() {
+	path := "../data/llm.json"
+
+	exp := util.GetFileContent(path)
+
+	util.Validate(exp)
 }
 
 func Get(id string) *Strategy {
 	return &Strategy{}
+}
+
+func GetData() data.StockData {
+	return nil
 }
 
 func (strategy *Strategy) GetEntryDataRange() int {
