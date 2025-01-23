@@ -4,6 +4,9 @@ go 1.23
 
 require (
 	github.com/gin-gonic/gin v1.10.0
+	github.com/google/wire v0.6.0
+	github.com/jmoiron/sqlx v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 )
