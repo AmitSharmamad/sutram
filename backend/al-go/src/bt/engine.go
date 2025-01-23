@@ -21,8 +21,8 @@ type Run struct {
 
 func (run *Run) Run() {
 	/// get the data range from the strategy
-	strategy := strategy.Get(run.StrategyID)
-	strategy.GetEntryDataRange()
+	s := strategy.Get(run.StrategyID)
+	s.GetEntryDataRange()
 
 	/// fetch the data
 	data := strategy.GetData()

@@ -1,8 +1,14 @@
 build:
 	docker build -t sutram-go .
 
+engine:
+	clear
+	wire src/wire.go
+	go build -o algo src/main.go src/wire_gen.go
+	./algo
+
 web:
-	go run ./src/web/main.go
+	go run src/web/main.go
 
 run:
 	docker run -it -p 8080:8080 sutram-go
