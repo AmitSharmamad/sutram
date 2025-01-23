@@ -1,8 +1,10 @@
 package main
 
 import (
-	"algo/src/algo/indicator"
-	"algo/src/algo/operator"
+	"algo/src/algo"
+	"algo/src/data"
+	"algo/src/di"
+	"algo/src/util"
 	"fmt"
 	"os"
 )
@@ -18,36 +20,27 @@ func Print() {
 	}
 }
 
+func init() {
+	di.InitialiseDI()
+}
+
 func main() {
 
 	println("running ...")
 
-	InitialiseDI()
+	Print()
 
-	/*
-		env.Init()
+	path := "../data/llm.json"
 
-		Print()
+	exp := util.GetFileContent(path)
 
-		Init()
+	util.Validate(exp)
 
-		path := "../data/llm.json"
+	expression := algo.NewExpressionStatement(exp)
 
-		exp := util.GetFileContent(path)
+	data := make([]data.Data, 0)
 
-		util.Validate(exp)
+	expression.Eval(&data)
 
-		expression := algo.NewExpressionStatement(exp)
-
-		data := make([]data.Data, 0)
-
-		expression.Eval(&data)
-
-		println()
-	*/
-}
-
-func Init() {
-	indicator.Init()
-	operator.Init()
+	println()
 }
