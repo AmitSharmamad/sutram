@@ -14,8 +14,6 @@ type Strategy struct {
 	Entry       Expression  `json:"entry" db:"entry"`
 	Exit        Exit        `json:"exit" db:"exit"`
 	TradeParams TradeParams `json:"trade_params" db:"trade_params"`
-
-	Repo *Repo
 }
 
 // Position represents the "position" object.

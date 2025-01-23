@@ -44,5 +44,5 @@ func (indicator *Indicator) handle(data *[]data.Data) float64 {
 
 	calculator := Get(indicator.Name)
 
-	return (*calculator).Calculate(data, config, indicator.Point)
+	return (calculator).Calculate(data, config, indicator.Point)
 }

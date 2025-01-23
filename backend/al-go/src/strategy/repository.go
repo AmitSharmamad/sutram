@@ -7,18 +7,20 @@ import (
 
 type Repo struct {
 	Name string
-	DB   db.Database
+	db   db.Database
 }
 
-func NewRepo() *Repo {
+func NewRepoProv(
+	factory *db.DBFactory,
+) *Repo {
 	return &Repo{
 		Name: "strategy",
-		// DB:   db,
+		db:   factory.Get("clickhouse"),
 	}
 }
 
 func (repo *Repo) Insert(strategy *Strategy) (sql.Result, error) {
-	return repo.DB.Insert(
+	return repo.db.Insert(
 		"INSERT INTO ? VALUES (?,?,?,?)",
 		repo.Name,
 		strategy.Name,
@@ -26,7 +28,7 @@ func (repo *Repo) Insert(strategy *Strategy) (sql.Result, error) {
 }
 
 func (repo *Repo) Get(id string) (any, error) {
-	return repo.DB.Select(
+	return repo.db.Select(
 		`
 		SELECT * 
 		FROM ? 
@@ -38,7 +40,7 @@ func (repo *Repo) Get(id string) (any, error) {
 }
 
 func (repo *Repo) GetLatest() (any, error) {
-	return repo.DB.Select(
+	return repo.db.Select(
 		`
 			SELECT * 
 			FROM ? 
@@ -50,13 +52,13 @@ func (repo *Repo) GetLatest() (any, error) {
 }
 
 func (repo *Repo) GetAll(id string) ([]any, error) {
-	return repo.DB.Select("SELECT * FROM strategy;")
+	return repo.db.Select("SELECT * FROM strategy;")
 }
 
 func (repo *Repo) Update(id string, strategy *Strategy) (sql.Result, error) {
-	return repo.DB.Update("UPDATE strategy SET ... WHERE id = {id}")
+	return repo.db.Update("UPDATE strategy SET ... WHERE id = {id}")
 }
 
 func (repo *Repo) Delete(query string) (sql.Result, error) {
-	return repo.DB.Delete("DELETE FROM strategy")
+	return repo.db.Delete("DELETE FROM strategy")
 }

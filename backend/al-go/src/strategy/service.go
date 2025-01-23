@@ -6,7 +6,7 @@ type Service struct {
 	Repo *Repo
 }
 
-func NewService(repo *Repo) *Service {
+func NewServiceProv(repo *Repo) *Service {
 	return &Service{
 		Repo: repo,
 	}
