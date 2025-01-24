@@ -1,23 +1,27 @@
 package main
 
-import (
-	"algo/src/di"
-
-	"github.com/gin-gonic/gin"
-)
-
-func init() {
-	di.InitialiseDI()
-}
-
 func main() {
-	server := gin.Default()
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
 
-	server.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(200, gin.H{
-			"message": "hello",
-		})
-	})
+	println("starting web")
 
-	server.Run(":8080")
+	container := BuildContainer()
+
+	println(container)
+
+	println("running web")
+
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
+	println("")
 }
