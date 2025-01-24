@@ -3,11 +3,6 @@ package main
 func main() {
 	println("")
 	println("")
-	println("")
-	println("")
-	println("")
-	println("")
-	println("")
 
 	println("starting web")
 
@@ -15,13 +10,10 @@ func main() {
 
 	println(container)
 
+	// container.ConfigRoot.Start()
+
 	println("running web")
 
-	println("")
-	println("")
-	println("")
-	println("")
-	println("")
 	println("")
 	println("")
 }
