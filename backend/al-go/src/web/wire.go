@@ -29,7 +29,17 @@ func NewWebContainer(
 	}
 }
 
-func BuildContainer() *WebContainer {
+func NewEngine(
+	engine *gin.Engine,
+) interface{} {
+	return func() *gin.Engine {
+		return engine
+	}
+}
+
+func BuildContainer(
+	engine *gin.Engine,
+) *WebContainer {
 	panic(
 		wire.Build(
 			NewWebContainer,

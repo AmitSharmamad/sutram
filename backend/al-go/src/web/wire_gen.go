@@ -12,14 +12,12 @@ import (
 	"algo/src/di"
 	"algo/src/strategy"
 	"algo/src/web/config"
-	"algo/src/web/router"
 	"github.com/gin-gonic/gin"
 )
 
 // Injectors from wire.go:
 
-func BuildContainer() *WebContainer {
-	engine := router.NewEngine()
+func BuildContainer(engine *gin.Engine) *WebContainer {
 	envProv := env.NewEnvProv()
 	clickhouse := db.NewClickHouseProv(envProv)
 	postgres := db.NewPostgresProv()
@@ -27,8 +25,8 @@ func BuildContainer() *WebContainer {
 	repo := strategy.NewRepoProv(dbFactory)
 	service := strategy.NewServiceProv(repo)
 	controller := strategy.NewControllerProv(service)
-	strategyRouter := strategy.RegisterRoutesProv(engine, controller)
-	root := strategy.NewRootProv(strategyRouter)
+	router := strategy.RegisterRoutesProv(engine, controller)
+	root := strategy.NewRootProv(router)
 	diContainer := di.NewDIContainer(root)
 	server := config.NewServer()
 	webContainer := NewWebContainer(diContainer, server, engine)
@@ -52,5 +50,13 @@ func NewWebContainer(
 		DiContainer: DiContainer,
 		ConfigRoot:  ConfigRoot,
 		Engine:      Engine,
+	}
+}
+
+func NewEngine(
+	engine *gin.Engine,
+) interface{} {
+	return func() *gin.Engine {
+		return engine
 	}
 }

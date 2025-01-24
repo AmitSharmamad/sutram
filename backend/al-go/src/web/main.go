@@ -1,14 +1,20 @@
 package main
 
+import "github.com/gin-gonic/gin"
+
 func main() {
 	println("")
 	println("")
 
 	println("starting web")
 
-	container := BuildContainer()
+	engine := gin.Default()
+
+	container := BuildContainer(engine)
 
 	println(container)
+
+	engine.Run(":9999")
 
 	// container.ConfigRoot.Start()
 
