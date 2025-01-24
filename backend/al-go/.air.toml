@@ -1,0 +1,13 @@
+root = "."
+
+[build]
+cmd = "make r"
+include = ["*.go"]
+exclude = ["tmp", "vendor"]
+exclude_file = ["src/web/wire_gen.go"]
+
+[color]
+main = "yellow"
+watcher = "cyan"
+build = "green"
+log = "white"

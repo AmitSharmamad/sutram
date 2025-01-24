@@ -1,6 +1,3 @@
-//go:build wireinject
-// +build wireinject
-
 package di
 
 import (
@@ -12,34 +9,16 @@ import (
 	"github.com/google/wire"
 )
 
-type DIContainer struct {
-	EnvRoot      env.Root
-	DbRoot       db.Root
-	StrategyRoot strategy.Root
-}
+type DIContainer struct{}
 
-func NewDIContainer(
-	env *env.Root,
-	db *db.Root,
-	bt *bt.Root,
-	strategy *strategy.Root,
-) *DIContainer {
+func NewDIContainer() *DIContainer {
 	return &DIContainer{}
 }
 
-func InitialiseDI() *DIContainer {
-
-	wire.Build(
-		NewDIContainer,
-
-		env.Set,
-
-		db.Set,
-
-		bt.Set,
-
-		strategy.Set,
-	)
-
-	return &DIContainer{}
-}
+var Set = wire.NewSet(
+	NewDIContainer,
+	env.Set,
+	db.Set,
+	bt.Set,
+	strategy.Set,
+)
