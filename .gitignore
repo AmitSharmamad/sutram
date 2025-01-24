@@ -126,3 +126,8 @@ cython_debug/
 # Go ignore
 coverage.out
 main
+
+# sutram-go
+algo
+web
+main
