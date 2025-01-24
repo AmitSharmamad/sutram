@@ -4,11 +4,19 @@ build:
 di:
 	wire src/di/wire.go
 
-web:
+d:
+	air
+
+b:
+	@wire src/web/wire.go
+	@echo "\n"
+	@go build -o web src/web/wire_gen.go src/web/main.go
+	@echo "\n"
+	@./web
+
+r:
 	clear
-	make di
-	go build -tags wireinject -o web src/web/main.go
-	./web
+	make b
 
 run:
 	docker run -it -p 8080:8080 sutram-go
