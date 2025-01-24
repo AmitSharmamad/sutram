@@ -14,7 +14,9 @@ func NewControllerProv(
 	}
 }
 
-func (*Controller) GetStrategies(ctx *gin.Context)   {}
+func (*Controller) GetStrategies(ctx *gin.Context) {
+	ctx.SecureJSON(200, true)
+}
 func (*Controller) GetStrategy(ctx *gin.Context)     {}
 func (*Controller) GetStrategyRuns(ctx *gin.Context) {}
 func (*Controller) GetStrategyRun(ctx *gin.Context)  {}

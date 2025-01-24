@@ -7,23 +7,50 @@
 package main
 
 import (
+	"algo/src/core/config"
+	"algo/src/core/db"
 	"algo/src/di"
+	"algo/src/strategy"
+	"algo/src/web/config"
+	"algo/src/web/router"
+	"github.com/gin-gonic/gin"
 )
 
 // Injectors from wire.go:
 
 func BuildContainer() *WebContainer {
-	diContainer := di.NewDIContainer()
-	webContainer := NewWebContainer(diContainer)
+	engine := router.NewEngine()
+	envProv := env.NewEnvProv()
+	clickhouse := db.NewClickHouseProv(envProv)
+	postgres := db.NewPostgresProv()
+	dbFactory := db.NewFactoryProv(clickhouse, postgres)
+	repo := strategy.NewRepoProv(dbFactory)
+	service := strategy.NewServiceProv(repo)
+	controller := strategy.NewControllerProv(service)
+	strategyRouter := strategy.RegisterRoutesProv(engine, controller)
+	root := strategy.NewRootProv(strategyRouter)
+	diContainer := di.NewDIContainer(root)
+	server := config.NewServer()
+	webContainer := NewWebContainer(diContainer, server, engine)
 	return webContainer
 }
 
 // wire.go:
 
-type WebContainer struct{}
+type WebContainer struct {
+	DiContainer *di.DIContainer
+	ConfigRoot  *config.Server
+	Engine      *gin.Engine
+}
 
 func NewWebContainer(
-	*di.DIContainer,
+	DiContainer *di.DIContainer,
+	ConfigRoot *config.Server,
+	Engine *gin.Engine,
 ) *WebContainer {
-	return &WebContainer{}
+	return &WebContainer{
+		DiContainer: DiContainer,
+		ConfigRoot:  ConfigRoot,
+		Engine:      Engine,
+	}
 }

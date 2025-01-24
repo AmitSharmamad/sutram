@@ -2,14 +2,12 @@ package strategy
 
 import "github.com/google/wire"
 
-type Root struct {
-	Controller *Controller
-}
+type Root struct{}
 
-func NewRootProv(controller *Controller) *Root {
-	return &Root{
-		Controller: controller,
-	}
+func NewRootProv(
+	router *Router,
+) *Root {
+	return &Root{}
 }
 
 var Set = wire.NewSet(

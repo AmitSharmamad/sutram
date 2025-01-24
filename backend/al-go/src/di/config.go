@@ -11,7 +11,9 @@ import (
 
 type DIContainer struct{}
 
-func NewDIContainer() *DIContainer {
+func NewDIContainer(
+	StrategyRoot *strategy.Root,
+) *DIContainer {
 	return &DIContainer{}
 }
 
