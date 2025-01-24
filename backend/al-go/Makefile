@@ -10,9 +10,9 @@ d:
 b:
 	@wire src/web/wire.go
 	@echo "\n"
-	@go build -o web src/web/wire_gen.go src/web/main.go
+	@go build -o s-web src/web/wire_gen.go src/web/main.go
 	@echo "\n"
-	@./web
+	@./s-web
 
 r:
 	clear
