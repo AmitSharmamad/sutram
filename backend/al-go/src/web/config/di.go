@@ -17,8 +17,5 @@ func NewServer() *Server {
 
 var Set = wire.NewSet(
 	NewServer,
-
-	router.NewEngine,
-
 	router.HealthCheck,
 )
