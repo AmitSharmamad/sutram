@@ -1,10 +1,6 @@
 package main
 
 import (
-	"algo/src/algo"
-	"algo/src/data"
-	"algo/src/di"
-	"algo/src/util"
 	"fmt"
 	"os"
 )
@@ -21,26 +17,31 @@ func Print() {
 }
 
 func init() {
-	di.InitialiseDI()
 }
 
 func main() {
 
-	println("running ...")
-
 	Print()
 
-	path := "../data/llm.json"
+	// di.InitialiseDI()
 
-	exp := util.GetFileContent(path)
+	/*
+		println("running ...")
 
-	util.Validate(exp)
+		Print()
 
-	expression := algo.NewExpressionStatement(exp)
+		path := "../data/llm.json"
 
-	data := make([]data.Data, 0)
+		exp := util.GetFileContent(path)
 
-	expression.Eval(&data)
+		util.Validate(exp)
 
-	println()
+		expression := algo.NewExpressionStatement(exp)
+
+		data := make([]data.Data, 0)
+
+		expression.Eval(&data)
+
+		println()
+	*/
 }
