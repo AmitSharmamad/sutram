@@ -131,3 +131,7 @@ main
 algo
 s-web
 main
+
+# sutram-db
+mount
+ohlcv_data.csv
