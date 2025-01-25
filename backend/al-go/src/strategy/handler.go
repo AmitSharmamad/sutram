@@ -1,6 +1,10 @@
 package strategy
 
-import "github.com/gin-gonic/gin"
+import (
+	"algo/src/data"
+
+	"github.com/gin-gonic/gin"
+)
 
 type Controller struct {
 	service *Service
@@ -17,8 +21,10 @@ func NewControllerProv(
 func (*Controller) GetStrategies(ctx *gin.Context) {
 	ctx.SecureJSON(200, true)
 }
+
 func (this *Controller) GetStrategy(ctx *gin.Context) {
-	results, err := this.service.repo.db.Select("SELECT COUNT(*) FROM sutram.stock_TESLA;")
+	var data []data.Data
+	_, err := this.service.repo.db.SelectOne("SELECT * FROM sutram.stock_TESLA LIMIT 10;", &data)
 	if err != nil {
 		println("from inside the error ", err.Error())
 		ctx.JSON(200, gin.H{
@@ -26,9 +32,11 @@ func (this *Controller) GetStrategy(ctx *gin.Context) {
 		})
 		return
 	}
-	println(err)
+
+	// r, _ := json.Marshal(data)
+
 	ctx.JSON(200, gin.H{
-		"message": results,
+		"message": data,
 	})
 }
 func (*Controller) GetStrategyRuns(ctx *gin.Context) {}

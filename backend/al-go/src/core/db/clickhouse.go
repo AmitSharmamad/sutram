@@ -7,11 +7,12 @@ import (
 	"log"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/jmoiron/sqlx"
 )
 
 type Clickhouse struct {
 	env *env.EnvProv
-	db  *sql.DB
+	db  *sqlx.DB
 }
 
 func NewClickHouseProv(env *env.EnvProv) *Clickhouse {
@@ -24,8 +25,8 @@ func NewClickHouseProv(env *env.EnvProv) *Clickhouse {
 	return db
 }
 
-func (clickhouse *Clickhouse) Connect() {
-	envProv := clickhouse.env
+func (this *Clickhouse) Connect() {
+	envProv := this.env
 
 	host := envProv.GetProp(env.CLICKHOUSE_HOST)
 	port := envProv.GetProp(env.CLICKHOUSE_PORT)
@@ -42,9 +43,9 @@ func (clickhouse *Clickhouse) Connect() {
 
 	println("from inside clickhouse")
 
-	db, err := sql.Open("clickhouse", connectionString)
+	db, err := sqlx.Open("clickhouse", connectionString)
 
-	clickhouse.db = db
+	this.db = db
 
 	if err != nil {
 		log.Fatalf("Error creating connection pool: %v", err)
@@ -63,31 +64,51 @@ func (clickhouse *Clickhouse) Connect() {
 	fmt.Println("Successfully connected to ClickHouse!")
 }
 
-func (ch *Clickhouse) Close() {
-	ch.db.Close()
+func (this *Clickhouse) Close() {
+	this.db.Close()
 }
 
-func (ch *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
-	return ch.db.Exec(query)
+func (this *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
+	return this.db.Exec(query)
 }
 
-func (ch *Clickhouse) SelectOne(query string, args ...any) (any, error) {
+func (this *Clickhouse) SelectOne(query string, args ...any) (any, error) {
+	data := args[0]
+	err := this.db.Select(data, query)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("%#v\n", data)
+	return data, nil
+}
+
+func (this *Clickhouse) Select(query string, args ...any) ([]any, error) {
 	// TODO: do this
-	results, err := ch.db.Exec("SELECT COUNT(*) FROM sutram.stock_TESLA;")
-	println(results)
-	return nil, err
+	results, err := this.db.Query("SELECT close FROM sutram.stock_TESLA;", args)
+	return []any{results}, err
 }
 
-func (ch *Clickhouse) Select(query string, args ...any) ([]any, error) {
-	// TODO: do this
-	_, err := ch.db.Exec("SELECT VERSION();")
-	return []any{""}, err
+func (this *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
+	return this.db.Exec(query)
 }
 
-func (ch *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
-	return ch.db.Exec(query)
+func (this *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
+	return this.db.Exec(query)
 }
 
-func (ch *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
-	return ch.db.Exec(query)
+func readResults(rows *sql.Rows) []any {
+
+	var final []any
+
+	for rows.Next() {
+		var d any
+		err := rows.Scan(&d)
+		if err != nil {
+			panic(err.Error())
+		}
+		final = append(final, d)
+	}
+
+	return final
+
 }
