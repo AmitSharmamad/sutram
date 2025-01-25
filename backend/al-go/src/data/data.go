@@ -1,14 +1,19 @@
 package data
 
+import "time"
+
 type Data struct {
-	timestamp int64
+	Timestamp time.Time `json:"timestamp" db:"timestamp"`
 
-	open  float64
-	high  float64
-	close float64
-	low   float64
+	Open  float64 `json:"open" db:"open"`
+	High  float64 `json:"high" db:"high"`
+	Close float64 `json:"close" db:"close"`
+	Low   float64 `json:"low" db:"low"`
 
-	volume int64
+	Volume int64 `json:"volume" db:"volume"`
+
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type StockData *[]Data
