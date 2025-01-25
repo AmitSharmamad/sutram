@@ -15,5 +15,5 @@ var Set = wire.NewSet(
 	NewRepoProv,
 	NewServiceProv,
 	NewControllerProv,
-	RegisterRoutesProv,
+	NewRoutesProv,
 )

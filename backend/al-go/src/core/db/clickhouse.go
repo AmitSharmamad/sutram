@@ -1,10 +1,11 @@
 package db
 
 import (
-	env "algo/src/core/config"
 	"database/sql"
 	"fmt"
 	"log"
+
+	env "algo/src/core/config"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jmoiron/sqlx"
@@ -72,20 +73,9 @@ func (this *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
 	return this.db.Exec(query)
 }
 
-func (this *Clickhouse) SelectOne(query string, args ...any) (any, error) {
-	data := args[0]
-	err := this.db.Select(data, query)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("%#v\n", data)
-	return data, nil
-}
-
-func (this *Clickhouse) Select(query string, args ...any) ([]any, error) {
-	// TODO: do this
-	results, err := this.db.Query("SELECT close FROM sutram.stock_TESLA;", args)
-	return []any{results}, err
+func (this *Clickhouse) Select(model any, query string, args ...any) (any, error) {
+	err := this.db.Select(model, query)
+	return model, err
 }
 
 func (this *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
@@ -94,21 +84,4 @@ func (this *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
 
 func (this *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
 	return this.db.Exec(query)
-}
-
-func readResults(rows *sql.Rows) []any {
-
-	var final []any
-
-	for rows.Next() {
-		var d any
-		err := rows.Scan(&d)
-		if err != nil {
-			panic(err.Error())
-		}
-		final = append(final, d)
-	}
-
-	return final
-
 }
