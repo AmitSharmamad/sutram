@@ -8,10 +8,10 @@ func NewRoutesProv(
 	engine *gin.Engine,
 	controller *Controller,
 ) *Router {
-	api := engine.Group("/user")
+	user := engine.Group("/user")
 	{
-		api.GET("", controller.Get)
-		api.POST("", controller.Create)
+		user.GET("", controller.Get)
+		user.POST("", controller.Create)
 	}
 
 	return &Router{}

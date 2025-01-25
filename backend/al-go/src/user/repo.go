@@ -1,8 +1,9 @@
 package user
 
-import "algo/src/core/db"
-
-type Users []User
+import (
+	"algo/src/core/db"
+	"algo/src/shared"
+)
 
 type Repo struct {
 	Name string
@@ -38,11 +39,21 @@ func (this *Repo) Create(user *User) (bool, error) {
 
 func (this *Repo) GetAll() {}
 
-func (this *Repo) Get() (Users, error) {
-	var users Users
+func (this *Repo) Get() (shared.Users, error) {
+	var users shared.Users
 	err := this.db.Select(
 		&users,
 		"SELECT * FROM sutram.user LIMIT 1;",
+	)
+	return users, err
+}
+
+func (this *Repo) GetUsername(username string) (shared.Users, error) {
+	var users shared.Users
+	err := this.db.Select(
+		&users,
+		"SELECT * FROM sutram.user WHERE username = $1;",
+		username,
 	)
 	return users, err
 }
