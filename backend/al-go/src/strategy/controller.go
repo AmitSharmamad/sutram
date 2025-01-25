@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,27 +18,22 @@ func NewControllerProv(
 	}
 }
 
-func (*Controller) GetStrategies(ctx *gin.Context) {
-	ctx.SecureJSON(200, true)
+func (this *Controller) GetStrategies(ctx *gin.Context) {
+	strategies, err := this.service.GetAll()
+	if err != nil {
+		panic(err)
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"result": true,
+		"data":   strategies,
+	})
 }
 
 func (this *Controller) GetStrategy(ctx *gin.Context) {
-	// var data stock.StockData
-	// _, err := this.service.repo.db.Select("SELECT * FROM sutram.stock_TESLA LIMIT 10;", &data)
-	// if err != nil {
-	// 	println("from inside the error ", err.Error())
-	// 	ctx.JSON(200, gin.H{
-	// 		"message": "error",
-	// 	})
-	// 	return
-	// }
-	//
-	// // r, _ := json.Marshal(data)
-	//
-	// ctx.JSON(200, gin.H{
-	// 	"message": data,
-	// })
 }
+
 func (*Controller) GetStrategyRuns(ctx *gin.Context) {}
-func (*Controller) GetStrategyRun(ctx *gin.Context)  {}
-func (*Controller) Run(ctx *gin.Context)             {}
+
+func (*Controller) GetStrategyRun(ctx *gin.Context) {}
+
+func (*Controller) Run(ctx *gin.Context) {}

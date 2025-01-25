@@ -23,3 +23,7 @@ func (this *Service) Get(id string) *Strategy {
 func (strategy *Service) GetData() stock.StockData {
 	return nil
 }
+
+func (this *Service) GetAll() (Strategies, error) {
+	return this.repo.GetAll()
+}
