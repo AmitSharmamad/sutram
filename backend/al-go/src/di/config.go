@@ -1,6 +1,7 @@
 package di
 
 import (
+	"algo/src/auth"
 	"algo/src/bt"
 	env "algo/src/core/config"
 	"algo/src/core/db"
@@ -16,6 +17,7 @@ type DIContainer struct{}
 
 func NewDIContainer(
 	StrategyRoot *strategy.Root,
+	AuthRoot *auth.Root,
 ) *DIContainer {
 	return &DIContainer{}
 }
@@ -29,4 +31,5 @@ var Set = wire.NewSet(
 	stock.Set,
 	template.Set,
 	user.Set,
+	auth.Set,
 )

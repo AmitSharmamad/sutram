@@ -1,6 +1,10 @@
 package user
 
-import "github.com/google/wire"
+import (
+	"algo/src/shared"
+
+	"github.com/google/wire"
+)
 
 type Root struct{}
 
@@ -13,6 +17,7 @@ func NewRootProv(
 var Set = wire.NewSet(
 	NewRootProv,
 	NewRepoProv,
+	wire.Bind(new(shared.UserService), new(*Service)),
 	NewServiceProv,
 	NewControllerProv,
 	NewRoutesProv,

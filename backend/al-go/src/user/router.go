@@ -14,11 +14,5 @@ func NewRoutesProv(
 		user.POST("", controller.Create)
 	}
 
-	auth := engine.Group("/")
-	{
-		auth.POST("/login", controller.Login)
-		auth.POST("/logout", controller.Logout)
-	}
-
 	return &Router{}
 }

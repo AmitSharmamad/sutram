@@ -6,6 +6,7 @@ import (
 	"time"
 
 	env "algo/src/core/config"
+	"algo/src/shared"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -25,15 +26,15 @@ func NewServiceProv(
 	}
 }
 
-func (this *Service) Get() (Users, error) {
+func (this *Service) Get() (shared.Users, error) {
 	return this.repo.Get()
 }
 
-func (this *Service) GetByUsername(username string) (User, error) {
+func (this *Service) GetByUsername(username string) (shared.User, error) {
 	res, _ := this.repo.GetUsername(username)
 
 	if len(res) != 1 {
-		return User{}, errors.New("User not found with the username")
+		return shared.User{}, errors.New("User not found with the username")
 	}
 
 	return res[0], nil
