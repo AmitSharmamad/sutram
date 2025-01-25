@@ -60,11 +60,14 @@ func (this *Controller) Login(ctx *gin.Context) {
 			"result": false,
 			"data":   err,
 		})
+		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"result": true,
-		"data":   user,
+		"data": &LoginRes{
+			Token: this.service.GetToken(&user),
+		},
 	})
 }
 

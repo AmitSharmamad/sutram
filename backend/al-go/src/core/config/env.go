@@ -15,6 +15,8 @@ const (
 	CLICKHOUSE_PORT     EnvProp = "CLICKHOUSE_PORT"
 	CLICKHOUSE_USERNAME EnvProp = "CLICKHOUSE_USERNAME"
 	CLICKHOUSE_PASSWORD EnvProp = "CLICKHOUSE_PASSWORD"
+
+	JWT_SIGNING_SECRET EnvProp = "JWT_SIGNING_SECRET"
 )
 
 type EnvProv struct{}
@@ -35,5 +37,4 @@ func (env *EnvProv) Init() {
 	}
 
 	println("PORT: " + env.GetProp(PORT))
-
 }

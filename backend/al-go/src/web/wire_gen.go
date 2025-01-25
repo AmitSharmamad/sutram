@@ -43,7 +43,7 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	templateRouter := template.NewRoutesProv(engine, templateController)
 	templateRoot := template.NewRootProv(templateRouter)
 	userRepo := user.NewRepoProv(dbFactory)
-	userService := user.NewServiceProv(userRepo)
+	userService := user.NewServiceProv(envProv, userRepo)
 	userController := user.NewControllerProv(userService)
 	userRouter := user.NewRoutesProv(engine, userController)
 	userRoot := user.NewRootProv(userRouter)
