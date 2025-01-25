@@ -12,6 +12,7 @@ type Database interface {
 	Close()
 
 	Insert(query string, args ...any) (sql.Result, error)
+	SelectOne(query string, args ...any) (any, error)
 	Select(query string, args ...any) ([]any, error)
 	Update(query string, args ...any) (sql.Result, error)
 	Delete(query string, args ...any) (sql.Result, error)

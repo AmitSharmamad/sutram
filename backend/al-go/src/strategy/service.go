@@ -3,13 +3,21 @@ package strategy
 import "algo/src/data"
 
 type Service struct {
-	Repo *Repo
+	repo *Repo
 }
 
 func NewServiceProv(repo *Repo) *Service {
 	return &Service{
-		Repo: repo,
+		repo: repo,
 	}
+}
+
+func (this *Service) Get(id string) *Strategy {
+	strategy, err := this.repo.Get(id)
+	if err != nil {
+		panic("")
+	}
+	return strategy
 }
 
 func (strategy *Service) GetData() data.StockData {
