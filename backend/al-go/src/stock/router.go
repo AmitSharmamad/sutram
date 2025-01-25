@@ -9,7 +9,7 @@ func RegisterRoutesProv(
 	controller *Controller,
 ) *Router {
 
-	api := engine.Group("/template")
+	api := engine.Group("/stock")
 	{
 		api.GET("/", controller.Get)
 	}

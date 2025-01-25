@@ -4,7 +4,9 @@ import (
 	"algo/src/bt"
 	env "algo/src/core/config"
 	"algo/src/core/db"
+	"algo/src/stock"
 	"algo/src/strategy"
+	"algo/src/template"
 
 	"github.com/google/wire"
 )
@@ -23,4 +25,6 @@ var Set = wire.NewSet(
 	db.Set,
 	bt.Set,
 	strategy.Set,
+	stock.Set,
+	template.Set,
 )
