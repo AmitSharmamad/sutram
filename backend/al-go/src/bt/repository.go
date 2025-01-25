@@ -18,15 +18,17 @@ func (this *Repo) Create() *Run {
 	// TODO: do this
 	this.db.Insert("INSERT INTO bt_run VALUES ()")
 
-	res, err := this.db.Select("SELECT FROM bt_run WHERE id = '{id}'")
+	return nil
 
-	if err != nil {
-		panic("")
-	}
-
-	v, _ := res[0].(Run)
-
-	return &v
+	// res, err := this.db.Select("SELECT FROM bt_run WHERE id = '{id}'")
+	//
+	// if err != nil {
+	// 	panic("")
+	// }
+	//
+	// v, _ := res[0].(Run)
+	//
+	// return &v
 }
 
 func (*Repo) Get() {

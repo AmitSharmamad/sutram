@@ -9,3 +9,7 @@ func NewServiceProv(repo *Repo) *Service {
 		repo: repo,
 	}
 }
+
+func (this *Service) Get(id string) (any, error) {
+	return this.repo.Select()
+}

@@ -28,35 +28,38 @@ func (repo *Repo) Insert(strategy *Strategy) (sql.Result, error) {
 }
 
 func (repo *Repo) Get(id string) (*Strategy, error) {
-	results, err := repo.db.Select(
-		`
-		SELECT * 
-		FROM ? 
-		WHERE id = '?';
-		`,
-		repo.Name,
-		id,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return results[0].(*Strategy), nil
+	// results, err := repo.db.Select(
+	// 	`
+	// 	SELECT *
+	// 	FROM ?
+	// 	WHERE id = '?';
+	// 	`,
+	// 	repo.Name,
+	// 	id,
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return results[0].(*Strategy), nil
+	return nil, nil
 }
 
 func (repo *Repo) GetLatest() (any, error) {
-	return repo.db.Select(
-		`
-			SELECT * 
-			FROM ? 
-			ORDER BY DESC
-			LIMIT 1;
-		`,
-		repo.Name,
-	)
+	return nil, nil
+	// return repo.db.Select(
+	// 	`
+	// 		SELECT *
+	// 		FROM ?
+	// 		ORDER BY DESC
+	// 		LIMIT 1;
+	// 	`,
+	// 	repo.Name,
+	// )
 }
 
 func (repo *Repo) GetAll(id string) ([]any, error) {
-	return repo.db.Select("SELECT * FROM strategy;")
+	return nil, nil
+	// return repo.db.Select("SELECT * FROM strategy;")
 }
 
 func (repo *Repo) Update(id string, strategy *Strategy) (sql.Result, error) {
