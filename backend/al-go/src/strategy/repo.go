@@ -1,9 +1,12 @@
 package strategy
 
 import (
-	"algo/src/core/db"
 	"database/sql"
+
+	"algo/src/core/db"
 )
+
+type Strategies []Strategy
 
 type Repo struct {
 	Name string
@@ -19,7 +22,7 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Insert(strategy *Strategy) (sql.Result, error) {
+func (repo *Repo) Create(strategy *Strategy) (sql.Result, error) {
 	return repo.db.Insert(
 		"INSERT INTO ? VALUES (?,?,?,?)",
 		repo.Name,
@@ -57,9 +60,10 @@ func (repo *Repo) GetLatest() (any, error) {
 	// )
 }
 
-func (repo *Repo) GetAll(id string) ([]any, error) {
-	return nil, nil
-	// return repo.db.Select("SELECT * FROM strategy;")
+func (this *Repo) GetAll() (Strategies, error) {
+	var strategies Strategies
+	this.db.Select(&strategies, "SELECT * FROM strategy LIMIT 10;")
+	return strategies, nil
 }
 
 func (repo *Repo) Update(id string, strategy *Strategy) (sql.Result, error) {
