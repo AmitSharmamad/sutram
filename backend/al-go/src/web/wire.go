@@ -5,36 +5,26 @@ package main
 
 import (
 	"algo/src/di"
+	"algo/src/stock"
+	"algo/src/strategy"
+	"algo/src/template"
 	"algo/src/web/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
-type WebContainer struct {
-	DiContainer *di.DIContainer
-	ConfigRoot  *config.Server
-	Engine      *gin.Engine
-}
+type WebContainer struct{}
 
 func NewWebContainer(
 	DiContainer *di.DIContainer,
 	ConfigRoot *config.Server,
 	Engine *gin.Engine,
+	StrategyRoot *strategy.Root,
+	StockRoot *stock.Root,
+	TemplateRoot *template.Root,
 ) *WebContainer {
-	return &WebContainer{
-		DiContainer: DiContainer,
-		ConfigRoot:  ConfigRoot,
-		Engine:      Engine,
-	}
-}
-
-func NewEngine(
-	engine *gin.Engine,
-) interface{} {
-	return func() *gin.Engine {
-		return engine
-	}
+	return &WebContainer{}
 }
 
 func BuildContainer(

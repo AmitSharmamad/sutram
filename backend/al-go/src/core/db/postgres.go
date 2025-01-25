@@ -18,11 +18,7 @@ func (*Postgres) Insert(query string, args ...any) (sql.Result, error) {
 	return nil, nil
 }
 
-func (*Postgres) SelectOne(query string, args ...any) (any, error) {
-	return nil, nil
-}
-
-func (*Postgres) Select(query string, args ...any) ([]any, error) {
+func (*Postgres) Select(model []any, query string, args ...any) ([]any, error) {
 	return nil, nil
 }
 

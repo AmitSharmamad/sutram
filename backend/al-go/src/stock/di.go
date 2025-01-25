@@ -12,4 +12,8 @@ func NewRootProv(
 
 var Set = wire.NewSet(
 	NewRootProv,
+	NewRepoProv,
+	NewServiceProv,
+	NewControllerProv,
+	NewRoutesProv,
 )
