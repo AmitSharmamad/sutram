@@ -7,6 +7,7 @@
 package main
 
 import (
+	"algo/src/auth"
 	"algo/src/core/config"
 	"algo/src/core/db"
 	"algo/src/di"
@@ -30,7 +31,14 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	controller := strategy.NewControllerProv(service)
 	router := strategy.NewRoutesProv(engine, controller)
 	root := strategy.NewRootProv(router)
-	diContainer := di.NewDIContainer(root)
+	authRepo := auth.NewRepoProv(dbFactory)
+	authService := auth.NewServiceProv(envProv, authRepo)
+	userRepo := user.NewRepoProv(dbFactory)
+	userService := user.NewServiceProv(envProv, userRepo)
+	authController := auth.NewControllerProv(authService, userService)
+	authRouter := auth.NewRoutesProv(engine, authController)
+	authRoot := auth.NewRootProv(authRouter)
+	diContainer := di.NewDIContainer(root, authRoot)
 	server := config.NewServer()
 	stockRepo := stock.NewRepoProv(dbFactory)
 	stockService := stock.NewServiceProv(stockRepo)
@@ -42,12 +50,10 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	templateController := template.NewControllerProv(templateService)
 	templateRouter := template.NewRoutesProv(engine, templateController)
 	templateRoot := template.NewRootProv(templateRouter)
-	userRepo := user.NewRepoProv(dbFactory)
-	userService := user.NewServiceProv(envProv, userRepo)
 	userController := user.NewControllerProv(userService)
 	userRouter := user.NewRoutesProv(engine, userController)
 	userRoot := user.NewRootProv(userRouter)
-	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot, userRoot)
+	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot, userRoot, authRoot)
 	return webContainer
 }
 
@@ -63,6 +69,7 @@ func NewWebContainer(
 	StockRoot *stock.Root,
 	TemplateRoot *template.Root,
 	UserRoot *user.Root,
+	AuthRoot *auth.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
