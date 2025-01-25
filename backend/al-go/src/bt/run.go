@@ -29,7 +29,7 @@ func (run *Run) Run() {
 
 	/// start taking positions
 	/// begin from period start date and iterate till the end
-	for i := 0; i < len(*data); i++ {
+	for i := 0; i < len(data); i++ {
 		position := run.GetPosition()
 		position.Eval(data)
 		position.IsDone()

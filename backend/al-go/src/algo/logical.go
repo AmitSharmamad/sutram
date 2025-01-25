@@ -2,11 +2,11 @@ package algo
 
 import (
 	"algo/src/algo/indicator"
-	"algo/src/data"
+	"algo/src/stock"
 )
 
 type ILogicalExpression interface {
-	Handle(data data.StockData)
+	Handle(data stock.StockData)
 }
 
 type LogicalExpression struct {
@@ -17,7 +17,7 @@ type LogicalExpression struct {
 	Rhs      *indicator.IndicatorExpression `json:"rhs"`
 }
 
-func (expression *LogicalExpression) Handle(data data.StockData) bool {
+func (expression *LogicalExpression) Handle(data stock.StockData) bool {
 	println("Handling logical expression")
 
 	lhsValue := expression.Lhs.Handle(data)
