@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/jmoiron/sqlx"
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 type Clickhouse struct {
 	env *env.EnvProv
-	db  *sqlx.DB
+	db  *sql.DB
 }
 
 func NewClickHouseProv(env *env.EnvProv) *Clickhouse {
-	return &Clickhouse{
+	db := &Clickhouse{
 		env: env,
 	}
+
+	db.Connect()
+
+	return db
 }
 
 func (clickhouse *Clickhouse) Connect() {
@@ -29,9 +33,16 @@ func (clickhouse *Clickhouse) Connect() {
 	username := envProv.GetProp(env.CLICKHOUSE_USERNAME)
 	password := envProv.GetProp(env.CLICKHOUSE_PASSWORD)
 
-	connectionString := "tcp://" + host + ":" + port + "?username" + username + "&password" + password
+	println(host)
+	println(port)
+	println(username)
+	println(password)
 
-	db, err := sqlx.Open("clickhouse", connectionString)
+	connectionString := "tcp://" + host + ":" + port + "?username=" + "admin" + "&password=admin"
+
+	println("from inside clickhouse")
+
+	db, err := sql.Open("clickhouse", connectionString)
 
 	clickhouse.db = db
 
@@ -39,7 +50,7 @@ func (clickhouse *Clickhouse) Connect() {
 		log.Fatalf("Error creating connection pool: %v", err)
 	}
 
-	defer db.Close()
+	// defer db.Close()
 
 	// Ping the database to verify connectivity.
 	if err := db.Ping(); err != nil {
@@ -60,10 +71,17 @@ func (ch *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
 	return ch.db.Exec(query)
 }
 
+func (ch *Clickhouse) SelectOne(query string, args ...any) (any, error) {
+	// TODO: do this
+	results, err := ch.db.Exec("SELECT COUNT(*) FROM sutram.stock_TESLA;")
+	println(results)
+	return nil, err
+}
+
 func (ch *Clickhouse) Select(query string, args ...any) ([]any, error) {
-	var results []any
-	err := ch.db.Select(&results, query)
-	return results, err
+	// TODO: do this
+	_, err := ch.db.Exec("SELECT VERSION();")
+	return []any{""}, err
 }
 
 func (ch *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
