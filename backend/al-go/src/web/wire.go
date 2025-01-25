@@ -8,6 +8,7 @@ import (
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
+	"algo/src/user"
 	"algo/src/web/config"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +24,7 @@ func NewWebContainer(
 	StrategyRoot *strategy.Root,
 	StockRoot *stock.Root,
 	TemplateRoot *template.Root,
+	UserRoot *user.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }

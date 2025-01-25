@@ -7,6 +7,7 @@ import (
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
+	"algo/src/user"
 
 	"github.com/google/wire"
 )
@@ -27,4 +28,5 @@ var Set = wire.NewSet(
 	strategy.Set,
 	stock.Set,
 	template.Set,
+	user.Set,
 )
