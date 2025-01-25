@@ -1,13 +1,13 @@
 package indicator
 
-import "algo/src/data"
+import "algo/src/stock"
 
 type EMA struct {
 	period int
 	offset int
 }
 
-func (indicator *EMA) Calculate(data *[]data.Data, config map[string]any, point string) float64 {
+func (indicator *EMA) Calculate(data stock.StockData, config map[string]any, point string) float64 {
 	println("Executing EMA")
 
 	println(data)
