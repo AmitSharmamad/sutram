@@ -49,3 +49,23 @@ func (this *Controller) Create(ctx *gin.Context) {
 		"data":   users,
 	})
 }
+
+func (this *Controller) Login(ctx *gin.Context) {
+	req := LoginReq{}
+	ctx.Bind(&req)
+
+	user, err := this.service.GetByUsername(req.Username)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"result": false,
+			"data":   err,
+		})
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"result": true,
+		"data":   user,
+	})
+}
+
+func (this *Controller) Logout(ctx *gin.Context) {}

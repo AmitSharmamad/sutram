@@ -47,6 +47,16 @@ func (this *Repo) Get() (Users, error) {
 	return users, err
 }
 
+func (this *Repo) GetUsername(username string) (Users, error) {
+	var users Users
+	err := this.db.Select(
+		&users,
+		"SELECT * FROM sutram.user WHERE username = $1;",
+		username,
+	)
+	return users, err
+}
+
 func (this *Repo) Update() {}
 
 func (this *Repo) Delete() {}
