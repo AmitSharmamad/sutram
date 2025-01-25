@@ -12,7 +12,7 @@ type Database interface {
 	Close()
 
 	Insert(query string, args ...any) (sql.Result, error)
-	Select(model any, query string, args ...any) (any, error)
+	Select(model any, query string, args ...any) error
 	Update(query string, args ...any) (sql.Result, error)
 	Delete(query string, args ...any) (sql.Result, error)
 }

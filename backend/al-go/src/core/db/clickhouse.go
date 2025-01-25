@@ -70,12 +70,12 @@ func (this *Clickhouse) Close() {
 }
 
 func (this *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
-	return this.db.Exec(query)
+	return this.db.Exec(query, args...)
 }
 
-func (this *Clickhouse) Select(model any, query string, args ...any) (any, error) {
+func (this *Clickhouse) Select(model any, query string, args ...any) error {
 	err := this.db.Select(model, query)
-	return model, err
+	return err
 }
 
 func (this *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
