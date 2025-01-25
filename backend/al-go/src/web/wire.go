@@ -4,6 +4,7 @@
 package main
 
 import (
+	"algo/src/auth"
 	"algo/src/di"
 	"algo/src/stock"
 	"algo/src/strategy"
@@ -25,6 +26,7 @@ func NewWebContainer(
 	StockRoot *stock.Root,
 	TemplateRoot *template.Root,
 	UserRoot *user.Root,
+	AuthRoot *auth.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }

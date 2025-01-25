@@ -74,7 +74,7 @@ func (this *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
 }
 
 func (this *Clickhouse) Select(model any, query string, args ...any) error {
-	err := this.db.Select(model, query)
+	err := this.db.Select(model, query, args...)
 	return err
 }
 
