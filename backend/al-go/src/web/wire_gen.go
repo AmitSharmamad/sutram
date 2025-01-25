@@ -13,6 +13,7 @@ import (
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
+	"algo/src/user"
 	"algo/src/web/config"
 	"github.com/gin-gonic/gin"
 )
@@ -41,7 +42,12 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	templateController := template.NewControllerProv(templateService)
 	templateRouter := template.NewRoutesProv(engine, templateController)
 	templateRoot := template.NewRootProv(templateRouter)
-	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot)
+	userRepo := user.NewRepoProv(dbFactory)
+	userService := user.NewServiceProv(userRepo)
+	userController := user.NewControllerProv(userService)
+	userRouter := user.NewRoutesProv(engine, userController)
+	userRoot := user.NewRootProv(userRouter)
+	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot, userRoot)
 	return webContainer
 }
 
@@ -56,6 +62,7 @@ func NewWebContainer(
 	StrategyRoot *strategy.Root,
 	StockRoot *stock.Root,
 	TemplateRoot *template.Root,
+	UserRoot *user.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
