@@ -2,11 +2,11 @@ package indicator
 
 import (
 	"algo/src/algo/operator"
-	"algo/src/data"
+	"algo/src/stock"
 )
 
 type IndicatorCalculator interface {
-	Calculate(data *[]data.Data, config map[string]any, point string) float64
+	Calculate(data stock.StockData, config map[string]any, point string) float64
 }
 
 type IndicatorExpression struct {
@@ -25,7 +25,7 @@ type Indicator struct {
 	Returns string         `json:"returns"`
 }
 
-func (expression *IndicatorExpression) Handle(data *[]data.Data) bool {
+func (expression *IndicatorExpression) Handle(data stock.StockData) bool {
 	println("Handling indicator expression")
 
 	lhsValue := expression.Lhs.handle(data)
@@ -36,7 +36,7 @@ func (expression *IndicatorExpression) Handle(data *[]data.Data) bool {
 	)
 }
 
-func (indicator *Indicator) handle(data *[]data.Data) float64 {
+func (indicator *Indicator) handle(data stock.StockData) float64 {
 
 	println("Handling indicator", indicator)
 

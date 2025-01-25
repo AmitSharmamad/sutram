@@ -1,7 +1,7 @@
 package position
 
 import (
-	"algo/src/data"
+	"algo/src/stock"
 	"time"
 )
 
@@ -44,11 +44,11 @@ type PositionLog struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
-func (position *Position) TryEnter(data data.StockData) bool {
+func (position *Position) TryEnter(data stock.StockData) bool {
 	return true
 }
 
-func (position *Position) TryExit(data data.StockData) bool {
+func (position *Position) TryExit(data stock.StockData) bool {
 	return true
 }
 
@@ -56,7 +56,7 @@ func (position *Position) IsDone() bool {
 	return position.State == EXITED
 }
 
-func (position *Position) Eval(data data.StockData) {
+func (position *Position) Eval(data stock.StockData) {
 	switch position.State {
 	case NOT_ENTERED:
 		if position.TryEnter(data) {

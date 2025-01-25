@@ -1,8 +1,8 @@
-package data
+package stock
 
 import "time"
 
-type Data struct {
+type Stock struct {
 	Timestamp time.Time `json:"timestamp" db:"timestamp"`
 
 	Open  float64 `json:"open" db:"open"`
@@ -16,4 +16,4 @@ type Data struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-type StockData *[]Data
+type StockData []Stock
