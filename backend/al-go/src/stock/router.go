@@ -4,14 +4,16 @@ import "github.com/gin-gonic/gin"
 
 type Router struct{}
 
-func RegisterRoutesProv(
+func NewRoutesProv(
 	engine *gin.Engine,
 	controller *Controller,
 ) *Router {
-
-	api := engine.Group("/template")
+	api := engine.Group("/stock")
 	{
+		// GET all stocks
 		api.GET("/", controller.Get)
+		// GET a stock
+		api.GET("/:id", controller.Get)
 	}
 
 	println(api)

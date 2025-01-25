@@ -12,8 +12,8 @@ b:
 	@./s-web
 
 r:
-	clear
-	make b
+	@clear
+	@make b
 
 build:
 	docker build -t sutram-go .

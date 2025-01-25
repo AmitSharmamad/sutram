@@ -10,7 +10,9 @@ import (
 	"algo/src/core/config"
 	"algo/src/core/db"
 	"algo/src/di"
+	"algo/src/stock"
 	"algo/src/strategy"
+	"algo/src/template"
 	"algo/src/web/config"
 	"github.com/gin-gonic/gin"
 )
@@ -25,38 +27,35 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	repo := strategy.NewRepoProv(dbFactory)
 	service := strategy.NewServiceProv(repo)
 	controller := strategy.NewControllerProv(service)
-	router := strategy.RegisterRoutesProv(engine, controller)
+	router := strategy.NewRoutesProv(engine, controller)
 	root := strategy.NewRootProv(router)
 	diContainer := di.NewDIContainer(root)
 	server := config.NewServer()
-	webContainer := NewWebContainer(diContainer, server, engine)
+	stockRepo := stock.NewRepoProv(dbFactory)
+	stockService := stock.NewServiceProv(stockRepo)
+	stockController := stock.NewControllerProv(stockService)
+	stockRouter := stock.NewRoutesProv(engine, stockController)
+	stockRoot := stock.NewRootProv(stockRouter)
+	templateRepo := template.NewRepoProv(dbFactory)
+	templateService := template.NewServiceProv(templateRepo)
+	templateController := template.NewControllerProv(templateService)
+	templateRouter := template.NewRoutesProv(engine, templateController)
+	templateRoot := template.NewRootProv(templateRouter)
+	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot)
 	return webContainer
 }
 
 // wire.go:
 
-type WebContainer struct {
-	DiContainer *di.DIContainer
-	ConfigRoot  *config.Server
-	Engine      *gin.Engine
-}
+type WebContainer struct{}
 
 func NewWebContainer(
 	DiContainer *di.DIContainer,
 	ConfigRoot *config.Server,
 	Engine *gin.Engine,
+	StrategyRoot *strategy.Root,
+	StockRoot *stock.Root,
+	TemplateRoot *template.Root,
 ) *WebContainer {
-	return &WebContainer{
-		DiContainer: DiContainer,
-		ConfigRoot:  ConfigRoot,
-		Engine:      Engine,
-	}
-}
-
-func NewEngine(
-	engine *gin.Engine,
-) interface{} {
-	return func() *gin.Engine {
-		return engine
-	}
+	return &WebContainer{}
 }
