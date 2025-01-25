@@ -1,7 +1,7 @@
 package strategy
 
 import (
-	"algo/src/data"
+	"algo/src/stock"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +23,7 @@ func (*Controller) GetStrategies(ctx *gin.Context) {
 }
 
 func (this *Controller) GetStrategy(ctx *gin.Context) {
-	var data []data.Data
+	var data stock.StockData
 	_, err := this.service.repo.db.SelectOne("SELECT * FROM sutram.stock_TESLA LIMIT 10;", &data)
 	if err != nil {
 		println("from inside the error ", err.Error())

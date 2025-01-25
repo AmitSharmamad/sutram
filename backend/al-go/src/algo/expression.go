@@ -1,12 +1,12 @@
 package algo
 
 import (
-	"algo/src/data"
+	"algo/src/stock"
 	"encoding/json"
 )
 
 type IExpression interface {
-	Eval(data data.StockData)
+	Eval(data stock.StockData)
 }
 
 type Expression struct {
@@ -25,7 +25,7 @@ func NewExpressionStatement(expression string) IExpression {
 	return input
 }
 
-func (expression *Expression) Eval(data data.StockData) {
+func (expression *Expression) Eval(data stock.StockData) {
 	println("Evaluating input ", expression)
 	if expression.Type == "ExpressionStatement" {
 		if expression.Value.Type == "LogicalExpression" {

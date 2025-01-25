@@ -1,6 +1,6 @@
 package strategy
 
-import "algo/src/data"
+import "algo/src/stock"
 
 type Service struct {
 	repo *Repo
@@ -20,6 +20,6 @@ func (this *Service) Get(id string) *Strategy {
 	return strategy
 }
 
-func (strategy *Service) GetData() data.StockData {
+func (strategy *Service) GetData() stock.StockData {
 	return nil
 }

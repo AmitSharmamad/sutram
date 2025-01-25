@@ -1,7 +1,7 @@
 package strategy
 
 import (
-	"algo/src/data"
+	"algo/src/stock"
 	"algo/src/util"
 	"time"
 )
@@ -68,7 +68,7 @@ func Get(id string) *Strategy {
 	return &Strategy{}
 }
 
-func GetData() data.StockData {
+func GetData() stock.StockData {
 	return nil
 }
 
@@ -76,7 +76,7 @@ func (strategy *Strategy) GetEntryDataRange() int {
 	return 0
 }
 
-func (strategy *Strategy) TryEnter(data data.StockData) bool {
+func (strategy *Strategy) TryEnter(data stock.StockData) bool {
 	/// eval entry expression
 	return true
 }
@@ -85,7 +85,7 @@ func (strategy *Strategy) GetExitDataRange() int {
 	return 0
 }
 
-func (strategy *Strategy) TryExit(data data.StockData) bool {
+func (strategy *Strategy) TryExit(data stock.StockData) bool {
 	/// eval exit expression
 	return true
 }
