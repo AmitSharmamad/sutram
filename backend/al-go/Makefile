@@ -1,6 +1,3 @@
-build:
-	docker build -t sutram-go .
-
 di:
 	wire src/di/wire.go
 
@@ -17,6 +14,9 @@ b:
 r:
 	clear
 	make b
+
+build:
+	docker build -t sutram-go .
 
 run:
 	docker run -it -p 8080:8080 sutram-go
