@@ -11,6 +11,8 @@ run:
 		--name sutramdb \
 		clickhouse/clickhouse-server
 
+clean:
+	rm -rf mount
 
 gen:
 	go run ./dev/main.go

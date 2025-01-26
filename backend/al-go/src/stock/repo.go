@@ -27,7 +27,7 @@ func (this *Repo) Select() (any, error) {
 
 	this.db.Select(
 		&data,
-		"SELECT * FROM "+this.TableName(id)+" LIMIT 1;",
+		"SELECT * FROM "+this.TableName(id)+" LIMIT 10;",
 	)
 
 	println(data)
