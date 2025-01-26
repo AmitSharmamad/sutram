@@ -14,6 +14,7 @@ b:
 r:
 	@clear
 	@make b
+	# @make d
 
 build:
 	docker build -t sutram-go .
