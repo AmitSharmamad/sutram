@@ -1,0 +1,24 @@
+services:
+  al-go:
+    build:
+      context: ./backend/al-go
+      dockerfile: Dockerfile
+    container_name: sutram-al-go
+    ports:
+      - 8080:8080
+
+  sutramdb:
+    image: clickhouse/clickhouse-server
+    container_name: sutramdb
+    environment:
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_PASSWORD=admin
+    ports:
+      - 8123:8123
+      - 9000:9000
+    volumes:
+      - .db/mount/data:/var/lib/clickhouse
+      - .db/mount/logs:/var/log/clickhouse-server
+      - .db.sql:/docker-entrypoint-initdb.d
+    restart: unless-stopped
