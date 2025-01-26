@@ -1,8 +1,10 @@
-b:
+.PHONY: build && run
+
+build:
 	docker-compose build
 
-r:
+run:
 	docker-compose up -d
 
-br:
-	docker-compose up --build
+deploy:
+	docker-compose up --build -d
