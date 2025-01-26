@@ -6,6 +6,8 @@ services:
     container_name: sutram-al-go
     ports:
       - 8080:8080
+    networks:
+      - sutram-network  # Connect to sutram-network
 
   sutramdb:
     image: clickhouse/clickhouse-server
@@ -22,3 +24,9 @@ services:
       - .db/mount/logs:/var/log/clickhouse-server
       - .db.sql:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    networks:
+      - sutram-network  # Connect to sutram-network
+
+networks:
+  sutram-network:
+    driver: bridge  # Use bridge driver for the network
