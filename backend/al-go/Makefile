@@ -1,29 +1,23 @@
-di:
-	wire src/di/wire.go
-
-d:
-	air
-
-b:
-	@wire src/web/wire.go
-	@echo "\n"
-	@go build -o s-web src/web/wire_gen.go src/web/main.go
-	@echo "\n"
-	@./s-web
-
-r:
-	@clear
-	@make b
+### prod
 
 build:
+	go mod download
+	wire src/web/wire.go
+	go build -o s-web src/web/wire_gen.go src/web/main.go
+
+### local
+
+dbuild:
 	docker build -t sutram-go .
 
-run:
-	docker run -it -p 8080:8080 sutram-go
+drun:
+	docker run -it -p 9999:9999 sutram-go
 
-t:
+### testing
+
+test:
 	go test ./...
 
-c:
+coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out
