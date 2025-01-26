@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "lsof -ti tcp:9999 | xargs kill -9; make r"
+cmd = "lsof -ti tcp:9999 | xargs kill -9; make run"
 include = ["*.go"]
 exclude = []
 exclude_file = ["src/web/wire_gen.go"]
