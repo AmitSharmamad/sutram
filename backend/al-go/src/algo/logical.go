@@ -28,11 +28,12 @@ func (expression *LogicalExpression) Handle(data stock.StockData) bool {
 
 	rhsValue := expression.Rhs.Handle(data)
 
-	if expression.Operator == "AND" {
+	switch expression.Operator {
+	case "AND":
 		return lhsValue && rhsValue
-	} else if expression.Operator == "OR" {
+	case "OR":
 		return lhsValue || rhsValue
+	default:
+		panic("invalid operator")
 	}
-
-	return false
 }

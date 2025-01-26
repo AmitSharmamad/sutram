@@ -26,8 +26,8 @@ func NewClickHouseProv(env *env.EnvProv) *Clickhouse {
 	return db
 }
 
-func (this *Clickhouse) Connect() {
-	envProv := this.env
+func (clickhouse *Clickhouse) Connect() {
+	envProv := clickhouse.env
 
 	host := envProv.GetProp(env.CLICKHOUSE_HOST)
 	port := envProv.GetProp(env.CLICKHOUSE_PORT)
@@ -46,7 +46,7 @@ func (this *Clickhouse) Connect() {
 
 	db, err := sqlx.Open("clickhouse", connectionString)
 
-	this.db = db
+	clickhouse.db = db
 
 	if err != nil {
 		log.Fatalf("Error creating connection pool: %v", err)
@@ -65,23 +65,24 @@ func (this *Clickhouse) Connect() {
 	fmt.Println("Successfully connected to ClickHouse!")
 }
 
-func (this *Clickhouse) Close() {
-	this.db.Close()
+func (clickhouse *Clickhouse) Close() {
+	clickhouse.db.Close()
 }
 
-func (this *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
-	return this.db.Exec(query, args...)
+func (clickhouse *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
+	result, err := clickhouse.db.Exec(query, args...)
+	return result, err
 }
 
-func (this *Clickhouse) Select(model any, query string, args ...any) error {
-	err := this.db.Select(model, query, args...)
+func (clickhouse *Clickhouse) Select(model any, query string, args ...any) error {
+	err := clickhouse.db.Select(model, query, args...)
 	return err
 }
 
-func (this *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
-	return this.db.Exec(query)
+func (clickhouse *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
+	return clickhouse.db.Exec(query, args...)
 }
 
-func (this *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
-	return this.db.Exec(query)
+func (clickhouse *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
+	return clickhouse.db.Exec(query, args...)
 }

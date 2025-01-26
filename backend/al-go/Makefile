@@ -5,6 +5,13 @@ build:
 	wire src/web/wire.go
 	go build -o s-web src/web/wire_gen.go src/web/main.go
 
+run:
+	go build -o s-web src/web/wire_gen.go src/web/main.go 
+	./s-web
+
+debug:
+	air
+
 ### local
 
 dbuild:

@@ -68,20 +68,30 @@ CREATE TABLE IF NOT EXISTS strategy (
     user_id UUID,
     name String,
     description String,
-    symbol String,
-    instrument_type Enum('EQUITY' = 1, 'FUTURES' = 2, 'OPTIONS' = 3),
-    stock_id UUID,
-    position_type Enum('BUY' = 1, 'SELL' = 2),
+    position_type Enum8('BUY' = 1, 'SELL' = 2), 
+    instruments Array(String),
+    chart_type Enum8('CANDLESTICK' = 1, 'HEIKEN-ASHI' = 2, 'RENKO' = 3),
+    chart_timeframe Enum8('1m' = 1, '3m' = 2, '5m' = 3, '10m' = 4, '15m' = 5, '30m' = 6, '1h' = 7, '1d' = 8),
+    chart_unknown String,
+    qty Int32,
     entry_expression String,
     exit_expression String,
+    target_profit Decimal64(2),
     stop_loss Decimal64(2),
     trailing_stop_loss Decimal64(2),
-    max_trades UInt32,
+    exit_type Enum8('PERCENTAGE' = 1, 'ABSOLUTE' = 2),
+    capital Decimal64(2),
+    max_trades Int32,
+    entry_start_time DateTime64(3),
+    entry_end_time DateTime64(3),
+    start_date Date,
+    end_date Date,
     created_at DateTime DEFAULT now(),
     updated_at DateTime DEFAULT now(),
     is_active Boolean DEFAULT true,
     PRIMARY KEY (id)
-) ENGINE = MergeTree;
+) ENGINE = MergeTree
+ORDER BY id;
 
 CREATE TABLE IF NOT EXISTS strategy_history (
     id UUID DEFAULT generateUUIDv4(),
