@@ -1,23 +1,20 @@
 package algo
 
 import (
-	"algo/src/stock"
 	"encoding/json"
+
+	"algo/src/stock"
 )
 
-type IExpression interface {
-	Eval(data stock.StockData)
-}
-
 type Expression struct {
-	Type  string             `json:"type"` /// ExpressionStatement
+	Type  string             `json:"type"`
 	Value *LogicalExpression `json:"value"`
 }
 
 func (*Expression) Init() {}
 
-func NewExpressionStatement(expression string) IExpression {
-	var input *Expression = &Expression{}
+func NewExpressionStatement(expression string) *Expression {
+	input := &Expression{}
 	err := json.Unmarshal([]byte(expression), input)
 	if err != nil {
 		panic(err)
