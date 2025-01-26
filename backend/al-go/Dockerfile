@@ -1,31 +1,30 @@
 FROM golang:1.23-bookworm AS builder
 
-ENV GOINSECURE=*.github.com
-
 WORKDIR /app
-RUN apt-get update && apt-get install -y ca-certificates
 
-# Copy the source code
+RUN go install github.com/google/wire/cmd/wire@latest
+
 COPY src src
 COPY go.mod go.mod
 COPY go.sum go.sum
+COPY Makefile Makefile
 
-# RUN go mod download
-
-# Build the application
-RUN go build -o ./main src/main.go
+RUN make build
 
 FROM debian:bookworm-slim
 
 RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+  ca-certificates && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
 
 # Copy the binary to the production image from the builder stage.
-COPY --from=builder /app/main /app/main
+COPY --from=builder /app/s-web s-web
+COPY .env .env
 
 # Expose the port your application listens on
-EXPOSE 8080
+EXPOSE 9999
 
 # Command to run your application
-CMD ["/app/main"]
+CMD ["/app/s-web"]
