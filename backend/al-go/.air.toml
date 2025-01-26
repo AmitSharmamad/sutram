@@ -1,10 +1,22 @@
 root = "."
+tmp_dir = "tmp"
 
 [build]
 cmd = "make r"
 include = ["*.go"]
-exclude = ["tmp", "vendor"]
+exclude = []
 exclude_file = ["src/web/wire_gen.go"]
+
+[misc]
+clean_on_exit = true
+
+[log]
+# Show log time
+time = false
+# Only show main log (silences watcher, build, runner)
+main_only = false
+# silence all logs produced by air 
+silent = false
 
 [color]
 main = "yellow"
