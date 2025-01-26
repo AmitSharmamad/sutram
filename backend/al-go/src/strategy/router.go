@@ -1,8 +1,6 @@
 package strategy
 
 import (
-	"algo/src/shared"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,14 +12,12 @@ func NewRoutesProv(
 	engine *gin.Engine,
 	controller *Controller,
 ) *Router {
-	api := engine.Group("/strategy", shared.TokenValidator())
+	api := engine.Group("/strategy")
 	{
-		api.GET("", controller.GetStrategies)
-		api.GET("/:id", controller.GetStrategy)
-		api.GET("/:id/run", controller.GetStrategyRuns)
-		api.GET("/:id/run/:runId", controller.GetStrategyRun)
+		api.GET("", controller.GetAll)
+		api.GET("/:id", controller.Get)
 
-		api.POST("/:strategyId/run", controller.Run)
+		api.POST("", controller.Create)
 	}
 
 	return &Router{}

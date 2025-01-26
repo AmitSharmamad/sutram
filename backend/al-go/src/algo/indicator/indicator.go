@@ -27,11 +27,17 @@ type Indicator struct {
 	Returns string         `json:"returns"`
 }
 
+type Prices []float64
+
+type IndicatorCalculator interface {
+	Calculate(prices Prices, config map[string]any, point string) float64
+}
+
 func (expression *IndicatorExpression) Handle(data stock.StockData) bool {
 	println("Handling indicator expression")
 
-	lhsValue := expression.Lhs.handle(data)
-	rhsValue := expression.Rhs.handle(data)
+	lhsValue := expression.Lhs.Handle(data)
+	rhsValue := expression.Rhs.Handle(data)
 
 	return operator.Get(expression.Operator).Operate(
 		lhsValue, rhsValue,

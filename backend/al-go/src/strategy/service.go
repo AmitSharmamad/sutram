@@ -1,6 +1,11 @@
 package strategy
 
-import "algo/src/stock"
+import (
+	"fmt"
+
+	"algo/src/stock"
+	"algo/src/util"
+)
 
 type Service struct {
 	repo *Repo
@@ -14,9 +19,7 @@ func NewServiceProv(repo *Repo) *Service {
 
 func (this *Service) Get(id string) *Strategy {
 	strategy, err := this.repo.Get(id)
-	if err != nil {
-		panic("")
-	}
+	fmt.Printf("%+v\n", err)
 	return strategy
 }
 
@@ -26,4 +29,25 @@ func (strategy *Service) GetData() stock.StockData {
 
 func (this *Service) GetAll() (Strategies, error) {
 	return this.repo.GetAll()
+}
+
+func (this *Service) Validate(strategy *Strategy) bool {
+	validEntry := util.Validate(strategy.EntryExpression)
+	validExit := util.Validate(strategy.ExitExpression)
+
+	if !validEntry {
+		return false
+	}
+
+	if !validExit {
+		return false
+	}
+
+	// TODO: do rest of the validation
+
+	return true
+}
+
+func (this *Service) Create(strategy *Strategy) (bool, error) {
+	return this.repo.Create(strategy)
 }

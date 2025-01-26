@@ -43,7 +43,7 @@ func (this *Repo) Get() (shared.Users, error) {
 	var users shared.Users
 	err := this.db.Select(
 		&users,
-		"SELECT * FROM sutram.user LIMIT 1;",
+		"SELECT * FROM sutram.user LIMIT 10;",
 	)
 	return users, err
 }

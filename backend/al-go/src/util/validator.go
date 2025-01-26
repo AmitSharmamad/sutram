@@ -6,8 +6,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func Validate(expression string) {
-
+func Validate(expression string) bool {
 	data := GetFileContent("../data/schema.json")
 
 	schema := gojsonschema.NewStringLoader(string(data))
@@ -17,14 +16,11 @@ func Validate(expression string) {
 	value := gojsonschema.NewStringLoader(expression)
 
 	result, err := gojsonschema.Validate(schema, value)
-
 	if err != nil {
 		panic(err)
 	}
 
-	if result.Valid() {
-		fmt.Println("The document is valid")
-	} else {
+	if !result.Valid() {
 		fmt.Printf("The document is not valid. see errors :\n")
 		for _, desc := range result.Errors() {
 			// fmt.Printf("- %s\n", desc)
@@ -32,4 +28,5 @@ func Validate(expression string) {
 		}
 	}
 
+	return result.Valid()
 }
