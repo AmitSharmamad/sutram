@@ -5,7 +5,11 @@ services:
       dockerfile: Dockerfile
     container_name: sutram-al-go
     ports:
-      - 8080:8080
+      - 9999:9999
+    networks:
+      - sutram-network
+    depends_on:
+      - sutramdb
 
   sutramdb:
     image: clickhouse/clickhouse-server
@@ -18,7 +22,27 @@ services:
       - 8123:8123
       - 9000:9000
     volumes:
-      - .db/mount/data:/var/lib/clickhouse
-      - .db/mount/logs:/var/log/clickhouse-server
-      - .db.sql:/docker-entrypoint-initdb.d
+      - ./db/mount/data:/var/lib/clickhouse/
+      - ./db/mount/logs:/var/log/clickhouse-server/
+      - ./db/sql:/docker-entrypoint-initdb.d/
     restart: unless-stopped
+    networks:
+      - sutram-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+networks:
+  sutram-network:
+    driver: bridge
