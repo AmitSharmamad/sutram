@@ -1,9 +1,12 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	web "algo/src/web/config"
+
+	"github.com/gin-gonic/gin"
+)
 
 func main() {
-
 	println("")
 	println("")
 
@@ -13,6 +16,8 @@ func main() {
 
 	container := BuildContainer(engine)
 
+	web.RegisterMiddleware(engine)
+
 	println(container)
 
 	engine.Run(":9999")
@@ -21,5 +26,4 @@ func main() {
 
 	println("")
 	println("")
-
 }

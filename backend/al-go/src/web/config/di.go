@@ -1,21 +1,16 @@
-package config
+package web
 
 import (
-	"algo/src/web/router"
-
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
-type Server struct {
-	Engine *gin.Engine
-}
+type Root struct{}
 
-func NewServer() *Server {
-	return &Server{}
+func NewRoot() *Root {
+	return new(Root)
 }
 
 var Set = wire.NewSet(
-	NewServer,
-	router.HealthCheck,
+	NewRoot,
+	// HealthCheck,
 )

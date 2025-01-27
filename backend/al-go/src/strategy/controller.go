@@ -52,7 +52,8 @@ func (*Controller) GetRuns(ctx *gin.Context) {}
 func (*Controller) GetRun(ctx *gin.Context) {}
 
 func (controller *Controller) Create(ctx *gin.Context) {
-	strategy := &Strategy{}
+	strategy := new(Strategy)
+
 	ctx.Bind(strategy)
 
 	isValid := controller.service.Validate(strategy)
@@ -74,10 +75,7 @@ func (controller *Controller) Create(ctx *gin.Context) {
 
 	s := controller.service.Get("")
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data":   s,
-	})
+	shared.SuccessResp(ctx, s)
 }
 
 func (*Controller) Run(ctx *gin.Context) {}
