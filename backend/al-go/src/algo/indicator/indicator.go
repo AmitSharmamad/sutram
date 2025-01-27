@@ -5,12 +5,6 @@ import (
 	"algo/src/stock"
 )
 
-type Prices []float64
-
-type IndicatorCalculator interface {
-	Calculate(prices Prices, config map[string]any, point string) float64
-}
-
 type IndicatorExpression struct {
 	Type     string     `json:"type"`     /// IndicatorExpression
 	Operator string     `json:"operator"` /// CrossesAbove / CrossesBelow
@@ -44,7 +38,7 @@ func (expression *IndicatorExpression) Handle(data stock.StockData) bool {
 	)
 }
 
-func (indicator *Indicator) handle(data stock.StockData) float64 {
+func (indicator *Indicator) Handle(data stock.StockData) float64 {
 	println("Handling indicator", indicator)
 
 	config := make(map[string]any, 0)
