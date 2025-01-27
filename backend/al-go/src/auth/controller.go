@@ -23,11 +23,11 @@ func NewControllerProv(
 	}
 }
 
-func (this *Controller) Login(ctx *gin.Context) {
+func (controller *Controller) Login(ctx *gin.Context) {
 	req := LoginReq{}
 	ctx.Bind(&req)
 
-	user, err := this.userService.GetByUsername(req.Username)
+	user, err := controller.userService.GetByUsername(req.Username)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"result": false,
@@ -39,9 +39,9 @@ func (this *Controller) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"result": true,
 		"data": &LoginRes{
-			Token: this.authService.GetToken(&user),
+			Token: controller.authService.GetToken(&user),
 		},
 	})
 }
 
-func (this *Controller) Logout(ctx *gin.Context) {}
+func (controller *Controller) Logout(ctx *gin.Context) {}

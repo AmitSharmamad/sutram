@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"algo/src/core/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,8 +13,9 @@ type Router struct{}
 func NewRoutesProv(
 	engine *gin.Engine,
 	controller *Controller,
+	authMiddleware *http.AuthMiddleware,
 ) *Router {
-	api := engine.Group("/strategy")
+	api := engine.Group("/strategy", authMiddleware.Auth())
 	{
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)

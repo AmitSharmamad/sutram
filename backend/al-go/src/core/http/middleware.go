@@ -4,12 +4,29 @@ import (
 	"log"
 	"time"
 
+	"algo/src/shared"
+
 	"github.com/gin-gonic/gin"
 )
 
-func Logger() gin.HandlerFunc {
+type AuthMiddleware struct {
+	authService shared.AuthService
+}
+
+func NewAuthMiddleware(
+	authService shared.AuthService,
+) *AuthMiddleware {
+	return &AuthMiddleware{
+		authService: authService,
+	}
+}
+
+func (middleware *AuthMiddleware) Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		t := time.Now()
+
+		println("Validating the token")
+		middleware.authService.ValidateToken("")
 
 		// Set example variable
 		c.Set("example", "12345")

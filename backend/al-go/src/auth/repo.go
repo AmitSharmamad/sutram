@@ -16,8 +16,8 @@ func NewRepoProv(
 	}
 }
 
-func (this *Repo) Insert()    {}
-func (this *Repo) SelectOne() {}
-func (this *Repo) Select()    {}
-func (this *Repo) Update()    {}
-func (this *Repo) Delete()    {}
+func (repo *Repo) Insert()    {}
+func (repo *Repo) SelectOne() {}
+func (repo *Repo) Select()    {}
+func (repo *Repo) Update()    {}
+func (repo *Repo) Delete()    {}
