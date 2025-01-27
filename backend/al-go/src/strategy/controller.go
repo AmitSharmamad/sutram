@@ -1,12 +1,9 @@
 package strategy
 
 import (
-	"net/http"
-
 	"algo/src/shared"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 type Controller struct {
@@ -24,37 +21,34 @@ func NewControllerProv(
 	}
 }
 
-func (controller *Controller) GetAll(ctx *gin.Context) {
-	strategies, err := controller.service.GetAll()
+func (controller *Controller) GetAll(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	strategies, err := controller.service.GetAll(ctx)
 	if err != nil {
 		panic(err)
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data":   strategies,
-	})
+
+	shared.SuccessResp(gctx, strategies)
 }
 
-func (controller *Controller) Get(ctx *gin.Context) {
-	id := ctx.Param("id")
+func (controller *Controller) Get(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id := gctx.Param("id")
 	println(id)
 
-	strategy := controller.service.Get(id)
+	strategy := controller.service.Get(ctx, id)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data":   strategy,
-	})
+	shared.SuccessResp(gctx, strategy)
 }
 
-func (*Controller) GetRuns(ctx *gin.Context) {}
+func (controller *Controller) Create(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
 
-func (*Controller) GetRun(ctx *gin.Context) {}
-
-func (controller *Controller) Create(ctx *gin.Context) {
 	strategy := new(Strategy)
 
-	ctx.Bind(strategy)
+	gctx.Bind(strategy)
 
 	isValid := controller.service.Validate(strategy)
 
@@ -62,20 +56,9 @@ func (controller *Controller) Create(ctx *gin.Context) {
 		panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
 	}
 
-	user, err := controller.userService.GetByUsername("amit")
-	if err != nil {
-		panic(shared.NewBadRequest("Invalid User", "INVALID_USER"))
-	}
+	controller.service.Create(ctx, strategy)
 
-	userID, _ := uuid.Parse(user.ID)
+	s := controller.service.Get(ctx, "")
 
-	strategy.UserID = userID
-
-	controller.service.Create(strategy)
-
-	s := controller.service.Get("")
-
-	shared.SuccessResp(ctx, s)
+	shared.SuccessResp(gctx, s)
 }
-
-func (*Controller) Run(ctx *gin.Context) {}
