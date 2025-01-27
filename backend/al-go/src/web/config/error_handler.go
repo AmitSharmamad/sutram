@@ -19,6 +19,12 @@ func GlobalErrorHandler(ctx *gin.Context) {
 			case shared.BadRequestError:
 				BadReqResp(ctx, err.Message, err.Code)
 
+			case shared.UnauthorizedError:
+				UnauthorizedResp(ctx, err.Message, err.Code)
+
+			case shared.ForbiddenError:
+				ForbiddenResp(ctx, err.Message, err.Code)
+
 			default:
 				InternalServerErrorResp(ctx, "Internal Server Error", "INTERNAL_SERVER_ERROR")
 			}

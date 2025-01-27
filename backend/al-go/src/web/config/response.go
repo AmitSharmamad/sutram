@@ -24,6 +24,14 @@ func BadReqResp(ctx *gin.Context, msg string, code string) {
 	ctx.IndentedJSON(http.StatusBadRequest, Error(msg, code))
 }
 
+func UnauthorizedResp(ctx *gin.Context, msg string, code string) {
+	ctx.IndentedJSON(http.StatusUnauthorized, nil)
+}
+
+func ForbiddenResp(ctx *gin.Context, msg string, code string) {
+	ctx.IndentedJSON(http.StatusForbidden, nil)
+}
+
 func InternalServerErrorResp(ctx *gin.Context, msg string, code string) {
 	ctx.IndentedJSON(http.StatusBadRequest, Error(msg, code))
 }
