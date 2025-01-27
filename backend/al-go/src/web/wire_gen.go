@@ -10,6 +10,7 @@ import (
 	"algo/src/auth"
 	"algo/src/core/config"
 	"algo/src/core/db"
+	"algo/src/core/http"
 	"algo/src/di"
 	"algo/src/stock"
 	"algo/src/strategy"
@@ -31,15 +32,15 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	userRepo := user.NewRepoProv(dbFactory)
 	userService := user.NewServiceProv(envProv, userRepo)
 	controller := strategy.NewControllerProv(service, userService)
-	router := strategy.NewRoutesProv(engine, controller)
-	root := strategy.NewRootProv(router)
 	authRepo := auth.NewRepoProv(dbFactory)
 	authService := auth.NewServiceProv(envProv, authRepo)
+	authMiddleware := http.NewAuthMiddleware(authService)
+	router := strategy.NewRoutesProv(engine, controller, authMiddleware)
+	root := strategy.NewRootProv(router)
 	authController := auth.NewControllerProv(authService, userService)
 	authRouter := auth.NewRoutesProv(engine, authController)
 	authRoot := auth.NewRootProv(authRouter)
 	diContainer := di.NewDIContainer(root, authRoot)
-	server := config.NewServer()
 	stockRepo := stock.NewRepoProv(dbFactory)
 	stockService := stock.NewServiceProv(stockRepo)
 	stockController := stock.NewControllerProv(stockService)
@@ -53,7 +54,9 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	userController := user.NewControllerProv(userService)
 	userRouter := user.NewRoutesProv(engine, userController)
 	userRoot := user.NewRootProv(userRouter)
-	webContainer := NewWebContainer(diContainer, server, engine, root, stockRoot, templateRoot, userRoot, authRoot)
+	httpRoot := http.NewRoot(authMiddleware)
+	webRoot := web.NewRoot()
+	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, webRoot)
 	return webContainer
 }
 
@@ -63,13 +66,14 @@ type WebContainer struct{}
 
 func NewWebContainer(
 	DiContainer *di.DIContainer,
-	ConfigRoot *config.Server,
 	Engine *gin.Engine,
 	StrategyRoot *strategy.Root,
 	StockRoot *stock.Root,
 	TemplateRoot *template.Root,
 	UserRoot *user.Root,
 	AuthRoot *auth.Root,
+	HTTPRoot *http.Root,
+	WebRoot *web.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
