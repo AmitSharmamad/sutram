@@ -2,6 +2,7 @@ package http
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"algo/src/shared"
@@ -22,25 +23,42 @@ func NewAuthMiddleware(
 }
 
 func (middleware *AuthMiddleware) Auth() gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ctx *gin.Context) {
 		t := time.Now()
 
 		println("Validating the token")
-		middleware.authService.ValidateToken("")
 
-		// Set example variable
-		c.Set("example", "12345")
+		authorization := ctx.GetHeader("Authorization")
 
-		// before request
+		if len(strings.TrimSpace(authorization)) == 0 {
+			println("No auth token")
+			panic(shared.NewUnauthorizedError("Unauthorized", "Unauthorized"))
+		}
 
-		c.Next()
+		values := strings.Split(authorization, " ")
 
-		// after request
+		if len(values) != 2 || values[0] != "Bearer" {
+			println("Incorrect auth token format")
+			panic(shared.NewUnauthorizedError("Unauthorized", "Unauthorized"))
+		}
+
+		token := values[1]
+
+		user, err := middleware.authService.ValidateToken(token)
+		if err != nil {
+			println("Error in decoding the token")
+			panic(shared.NewUnauthorizedError("Unauthorized", "Unauthorized"))
+		}
+
+		ctx.Set("user_id", user.ID)
+
+		ctx.Next()
+
 		latency := time.Since(t)
 		log.Print(latency)
 
 		// access the status we are sending
-		status := c.Writer.Status()
+		status := ctx.Writer.Status()
 		log.Println(status)
 	}
 }

@@ -1,24 +1,17 @@
-http://localhost:9999
-
-# @lang=lua
-> {%
-local json = vim.json.decode(response.body)
-json.data = "overwritten"
-response.body = vim.json.encode(json)
-%}
-
 ### Get All strategies
 
-GET http://localhost:9999/strategy
-
+GET {{URL}}/strategy
+Authorization: Bearer {{TOKEN}}
 
 ### Get strategy by id
 
-GET http://localhost:9999/strategy/af462bf5-6bec-4927-9d19-85613e697f66
+GET {{URL}}/strategy/af462bf5-6bec-4927-9d19-85613e697f66
+Authorization: Bearer {{TOKEN}}
 
 ### Create a strategy
 
-POST http://localhost:9999/strategy
+POST {{URL}}/strategy
+Authorization: Bearer {{TOKEN}}
 Content-Type: application/json
 
 {
