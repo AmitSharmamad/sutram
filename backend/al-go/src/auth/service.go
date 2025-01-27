@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,10 +26,9 @@ func NewServiceProv(
 	}
 }
 
-func (this *Service) GetToken(user *shared.User) string {
-	mySigningKey := []byte(this.env.GetProp(env.JWT_SIGNING_SECRET))
+func (service *Service) GetToken(user *shared.User) string {
+	signingKey := []byte(service.env.GetProp(env.JWT_SIGNING_SECRET))
 
-	// Create the Claims
 	claims := &jwt.MapClaims{
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		"iss":      "sutram",
@@ -36,10 +36,9 @@ func (this *Service) GetToken(user *shared.User) string {
 		"username": user.Username,
 	}
 
-	// Generate the JWT
 	jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	token, err := jwt.SignedString(mySigningKey)
+	token, err := jwt.SignedString(signingKey)
 	if err != nil {
 		panic(err)
 	}
@@ -47,4 +46,28 @@ func (this *Service) GetToken(user *shared.User) string {
 	fmt.Printf("JWT Token: %v\n", token)
 
 	return token
+}
+
+func (service *Service) ValidateToken(token string) (*shared.User, error) {
+	secret := service.env.GetProp(env.JWT_SIGNING_SECRET)
+
+	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return secret, nil
+	})
+	if err != nil {
+		return nil, errors.New("INVALID TOKEN")
+	}
+
+	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
+		fmt.Println("Token is valid")
+		return &shared.User{
+			ID:       claims["user_id"].(string),
+			Username: claims["username"].(string),
+		}, nil
+	} else {
+		return nil, errors.New("INVALID TOKEN")
+	}
 }

@@ -52,52 +52,30 @@ func (*Controller) GetRuns(ctx *gin.Context) {}
 func (*Controller) GetRun(ctx *gin.Context) {}
 
 func (controller *Controller) Create(ctx *gin.Context) {
-	strategy := &Strategy{}
+	strategy := new(Strategy)
+
 	ctx.Bind(strategy)
 
 	isValid := controller.service.Validate(strategy)
 
 	if !isValid {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"result": false,
-			"error":  "Invalid expression(s)",
-		})
-		return
+		panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
 	}
 
 	user, err := controller.userService.GetByUsername("amit")
 	if err != nil {
-		// println("coming insided error uuid", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"result": false,
-			"error":  "Invalid user",
-		})
-		return
+		panic(shared.NewBadRequest("Invalid User", "INVALID_USER"))
 	}
 
 	userID, _ := uuid.Parse(user.ID)
 
 	strategy.UserID = userID
 
-	new, err := controller.service.Create(strategy)
-
-	if err != nil || !new {
-		println("coming insided error create", err, new)
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"result": true,
-			"error":  err,
-		})
-		return
-	}
+	controller.service.Create(strategy)
 
 	s := controller.service.Get("")
 
-	println("coming here")
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data":   s,
-	})
+	shared.SuccessResp(ctx, s)
 }
 
 func (*Controller) Run(ctx *gin.Context) {}
