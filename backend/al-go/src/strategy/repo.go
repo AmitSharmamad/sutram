@@ -1,9 +1,10 @@
 package strategy
 
 import (
-	"database/sql"
+	"context"
 
 	"algo/src/core/db"
+	"algo/src/shared"
 )
 
 type Strategies []Strategy
@@ -22,20 +23,23 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Create(strategy *Strategy) (bool, error) {
+func (repo *Repo) Create(ctx context.Context, strategy *Strategy) (bool, error) {
+	userID := shared.FromReqCtx[string](ctx, shared.UserID)
+
 	_, err := repo.db.Insert(
 		`
-		INSERT INTO sutram.strategy (
+		INSERT INTO $1 (
             user_id, name, description, position_type, instruments, 
             chart_type, chart_timeframe, chart_unknown, qty, entry_expression, 
             exit_expression, target_profit, stop_loss, trailing_stop_loss, 
             exit_type, capital, max_trades, entry_start_time, entry_end_time, 
             start_date, end_date, created_at, is_active
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+             $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
         )
 		`,
-		strategy.UserID,
+		repo.Name,
+		userID,
 		strategy.Name,
 		strategy.Description,
 		strategy.PositionType,
@@ -65,47 +69,69 @@ func (repo *Repo) Create(strategy *Strategy) (bool, error) {
 	return true, nil
 }
 
-func (repo *Repo) Get(id string) (*Strategy, error) {
+func (repo *Repo) Get(
+	ctx context.Context,
+	id string,
+) (*Strategy, error) {
+	userID := shared.FromReqCtx[string](ctx, shared.UserID)
+
 	var strategies Strategies
+
 	err := repo.db.Select(
 		&strategies,
 		`
 		SELECT *
-		FROM sutram.strategy
-		WHERE id = $2;
+		FROM $1
+		WHERE user_id = $2 
+		AND id = $3;
 		`,
 		repo.Name,
+		userID,
 		id,
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	return &strategies[0], nil
 }
 
-func (repo *Repo) GetLatest() (any, error) {
-	return nil, nil
-	// return repo.db.Select(
-	// 	`
-	// 		SELECT *
-	// 		FROM ?
-	// 		ORDER BY DESC
-	// 		LIMIT 1;
-	// 	`,
-	// 	repo.Name,
-	// )
-}
+func (repo *Repo) GetLatest(
+	ctx context.Context,
+) (*Strategy, error) {
+	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-func (this *Repo) GetAll() (Strategies, error) {
 	var strategies Strategies
-	this.db.Select(&strategies, "SELECT * FROM sutram.strategy LIMIT 1;")
+
+	err := repo.db.Select(
+		&strategies,
+		`
+			SELECT *
+			FROM $1
+			WHERE user_id = $2
+			ORDER BY timestamp DESC
+			LIMIT 1;
+		`,
+		repo.Name,
+		userID,
+	)
+
+	return &strategies[0], err
+}
+
+func (repo *Repo) GetAll(
+	ctx context.Context,
+) (Strategies, error) {
+	userID := shared.FromReqCtx[string](ctx, shared.UserID)
+
+	var strategies Strategies
+
+	repo.db.Select(
+		&strategies,
+		"SELECT * FROM $1 WHERE user_id = $2;",
+		repo.Name,
+		userID,
+	)
+
 	return strategies, nil
-}
-
-func (repo *Repo) Update(id string, strategy *Strategy) (sql.Result, error) {
-	return repo.db.Update("UPDATE strategy SET ... WHERE id = {id}")
-}
-
-func (repo *Repo) Delete(query string) (sql.Result, error) {
-	return repo.db.Delete("DELETE FROM strategy")
 }

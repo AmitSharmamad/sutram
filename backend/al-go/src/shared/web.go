@@ -26,10 +26,14 @@ func SuccessResp(ctx *gin.Context, data interface{}) {
 
 /// 4xx status codes
 
-type BadRequestError struct {
+type HTTPError struct {
 	Message string
 	Code    string
 }
+
+// 400
+
+type BadRequestError HTTPError
 
 func NewBadRequest(msg string, code string) *BadRequestError {
 	return &BadRequestError{
@@ -39,6 +43,36 @@ func NewBadRequest(msg string, code string) *BadRequestError {
 }
 
 func (e *BadRequestError) Error() string {
+	return e.Message
+}
+
+// 401
+
+type UnauthorizedError HTTPError
+
+func NewUnauthorizedError(msg string, code string) *UnauthorizedError {
+	return &UnauthorizedError{
+		Message: msg,
+		Code:    code,
+	}
+}
+
+func (e *UnauthorizedError) Error() string {
+	return e.Message
+}
+
+// 403
+
+type ForbiddenError HTTPError
+
+func NewForbiddenError(msg string, code string) *ForbiddenError {
+	return &ForbiddenError{
+		Message: msg,
+		Code:    code,
+	}
+}
+
+func (e *ForbiddenError) Error() string {
 	return e.Message
 }
 
