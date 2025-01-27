@@ -1,0 +1,29 @@
+package main
+
+import (
+	"fmt"
+
+	"algo/src/shared"
+
+	"github.com/gin-gonic/gin"
+)
+
+func GlobalErrorHandler(ctx *gin.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			// Log the error (you might want to use a logging library)
+			fmt.Println("Recovered from panic:", err)
+
+			switch err := err.(type) {
+
+			case shared.BadRequestError:
+				BadReqResp(ctx, err.Message, err.Code)
+
+			default:
+				InternalServerErrorResp(ctx, "Internal Server Error", "INTERNAL_SERVER_ERROR")
+			}
+
+		}
+	}()
+	ctx.Next()
+}
