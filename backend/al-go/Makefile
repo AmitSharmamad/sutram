@@ -11,6 +11,9 @@ run:
 	./s-web
 
 debug:
+	lsof -ti tcp:9090 | xargs kill -9
+	# wire src/web/wire.go
+	go build -gcflags="all=-N -l" -o s-web src/web/wire_gen.go src/web/main.go 
 	air
 
 ### local
