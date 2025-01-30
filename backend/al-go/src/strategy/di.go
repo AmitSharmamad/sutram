@@ -1,6 +1,10 @@
 package strategy
 
-import "github.com/google/wire"
+import (
+	"algo/src/shared"
+
+	"github.com/google/wire"
+)
 
 type Root struct{}
 
@@ -14,6 +18,7 @@ var Set = wire.NewSet(
 	NewRootProv,
 	NewRepoProv,
 	NewServiceProv,
+	wire.Bind(new(shared.StrategyService), new(*Service)),
 	NewControllerProv,
 	NewRoutesProv,
 )

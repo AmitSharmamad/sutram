@@ -1,4 +1,4 @@
-package stock
+package shared
 
 import "time"
 
@@ -17,3 +17,7 @@ type Stock struct {
 }
 
 type StockData []Stock
+
+type StockService interface {
+	Get(name string, lastNRecords int) *StockData
+}

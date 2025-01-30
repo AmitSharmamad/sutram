@@ -1,10 +1,33 @@
 package bt
 
-import (
-	"algo/src/position"
-	"algo/src/strategy"
-	"time"
+type RunState string
+
+const (
+	Start      RunState = "START"
+	InProgress RunState = "IN_PROGRESS"
+	Ended      RunState = "ENDED"
 )
+
+// type Run shared.Run
+//
+// type Runs []Run
+//
+// type Position shared.Position
+//
+// type Positions []Position
+//
+// type RunPosition struct {
+// 	Run       *Run       `json:"run"`
+// 	Positions *Positions `json:"positions"`
+// }
+//
+// type RunPositions []RunPosition
+//
+// type PositionLog shared.PositionLog
+//
+// type PositionLogs []PositionLog
+
+/*
 
 type Run struct {
 	ID              int       `json:"id" db:"id"`
@@ -34,7 +57,6 @@ func (run *Run) Run() {
 		position.Eval(data)
 		position.IsDone()
 	}
-
 }
 
 func (run *Run) GetPosition() *position.Position {
@@ -52,3 +74,5 @@ func (run *Run) GetPosition() *position.Position {
 	}
 	panic("Error in run get position")
 }
+
+*/

@@ -2,9 +2,8 @@ package strategy
 
 import (
 	"context"
-	"fmt"
 
-	"algo/src/stock"
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -20,7 +19,7 @@ func NewServiceProv(repo *Repo) *Service {
 
 func (service *Service) Create(
 	ctx context.Context,
-	strategy *Strategy,
+	strategy *shared.Strategy,
 ) (bool, error) {
 	return service.repo.Create(ctx, strategy)
 }
@@ -28,23 +27,25 @@ func (service *Service) Create(
 func (service *Service) Get(
 	ctx context.Context,
 	id string,
-) *Strategy {
+) *shared.Strategy {
 	strategy, err := service.repo.Get(ctx, id)
-	fmt.Printf("%+v\n", err)
+	if err != nil {
+		panic("")
+	}
 	return strategy
 }
 
-func (strategy *Service) GetData() stock.StockData {
+func (strategy *Service) GetData() shared.StockData {
 	return nil
 }
 
 func (service *Service) GetAll(
 	ctx context.Context,
-) (Strategies, error) {
+) (*shared.Strategies, error) {
 	return service.repo.GetAll(ctx)
 }
 
-func (service *Service) Validate(strategy *Strategy) bool {
+func (service *Service) Validate(strategy *shared.Strategy) bool {
 	validEntry := util.Validate(strategy.EntryExpression)
 	validExit := util.Validate(strategy.ExitExpression)
 

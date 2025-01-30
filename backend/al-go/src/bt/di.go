@@ -2,8 +2,7 @@ package bt
 
 import "github.com/google/wire"
 
-type Root struct {
-}
+type Root struct{}
 
 func NewRoot(*Controller) *Root {
 	return &Root{}
@@ -11,7 +10,13 @@ func NewRoot(*Controller) *Root {
 
 var Set = wire.NewSet(
 	NewRoot,
-	NewRepo,
-	NewService,
-	NewController,
+
+	NewRunRepoProv,
+	NewPositionRepoProv,
+	NewPositionLogRepoProv,
+
+	NewServiceProv,
+	NewControllerProv,
+
+	NewEngineProv,
 )

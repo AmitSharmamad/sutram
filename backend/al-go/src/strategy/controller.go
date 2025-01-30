@@ -46,7 +46,7 @@ func (controller *Controller) Get(gctx *gin.Context) {
 func (controller *Controller) Create(gctx *gin.Context) {
 	ctx := shared.GetReqCtx(gctx)
 
-	strategy := new(Strategy)
+	strategy := new(shared.Strategy)
 
 	gctx.Bind(strategy)
 
