@@ -41,12 +41,15 @@ func (engine *Engine) Run(run *shared.Run) {
 	start := dataRange
 	end := len(data)
 
+	counter := 0
+
 	for i := start; i < end; i++ {
 		engine.HandlePosition(
 			id,
 			strategy,
-			data[start:start+dataRange],
+			data[counter:start],
 		)
+		counter++
 	}
 
 	engine.service.UpdateRunStatus(id, Ended)
@@ -71,7 +74,7 @@ func (engine *Engine) GetLatestPosition(
 	id uuid.UUID,
 ) *shared.Position {
 	position := engine.service.GetLatestPosition(id)
-	if position.IsDone() {
+	if position == nil || position.IsDone() {
 		// create a new position
 		position = engine.service.CreatePosition(id)
 	}
