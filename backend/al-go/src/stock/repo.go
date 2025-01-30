@@ -1,8 +1,6 @@
 package stock
 
-import (
-	"algo/src/core/db"
-)
+import "algo/src/core/db"
 
 type Repo struct {
 	Name string
@@ -16,35 +14,4 @@ func NewRepoProv(
 		Name: "strategy",
 		db:   factory.Get("clickhouse"),
 	}
-}
-
-func (this *Repo) Insert() {}
-
-func (this *Repo) Select() (any, error) {
-	id := "TESLA"
-
-	var data StockData
-
-	this.db.Select(
-		&data,
-		"SELECT * FROM "+this.TableName(id)+" LIMIT 10;",
-	)
-
-	println(data)
-
-	return data, nil
-}
-func (this *Repo) Update() {}
-func (this *Repo) Delete() {}
-
-func (this *Repo) TableName(id string) string {
-	return "sutram.stock_TESLA"
-}
-
-func (this *Repo) Model() []interface{} {
-	var stocks []interface{}
-
-	stocks = append(stocks, Stock{})
-
-	return stocks
 }

@@ -2,7 +2,7 @@ package indicator
 
 import (
 	"algo/src/algo/operator"
-	"algo/src/stock"
+	"algo/src/shared"
 )
 
 type IndicatorExpression struct {
@@ -27,7 +27,7 @@ type IndicatorCalculator interface {
 	Calculate(prices Prices, config map[string]any, point string) float64
 }
 
-func (expression *IndicatorExpression) Handle(data stock.StockData) bool {
+func (expression *IndicatorExpression) Handle(data shared.StockData) bool {
 	println("Handling indicator expression")
 
 	lhsValue := expression.Lhs.Handle(data)
@@ -38,7 +38,7 @@ func (expression *IndicatorExpression) Handle(data stock.StockData) bool {
 	)
 }
 
-func (indicator *Indicator) Handle(data stock.StockData) float64 {
+func (indicator *Indicator) Handle(data shared.StockData) float64 {
 	println("Handling indicator", indicator)
 
 	config := make(map[string]any, 0)
@@ -50,7 +50,7 @@ func (indicator *Indicator) Handle(data stock.StockData) float64 {
 	return (calculator).Calculate(prices, config, indicator.Point)
 }
 
-func GetPrices(data stock.StockData, point string) Prices {
+func GetPrices(data shared.StockData, point string) Prices {
 	var results Prices
 
 	for _, d := range data {

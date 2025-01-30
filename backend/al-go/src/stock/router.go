@@ -10,10 +10,7 @@ func NewRoutesProv(
 ) *Router {
 	api := engine.Group("/stock")
 	{
-		// GET all stocks
 		api.GET("/", controller.Get)
-		// GET a stock
-		api.GET("/:id", controller.Get)
 	}
 
 	println(api)

@@ -14,17 +14,4 @@ func NewControllerProv(
 	}
 }
 
-func (controller *Controller) GetAll(ctx *gin.Context) {
-	println("coming here")
-}
-
-func (controller *Controller) Get(ctx *gin.Context) {
-	data, err := controller.service.Get("")
-	if err != nil {
-		panic(err)
-	}
-
-	ctx.JSON(200, gin.H{
-		"data": data,
-	})
-}
+func (controller *Controller) Get(ctx *gin.Context) {}
