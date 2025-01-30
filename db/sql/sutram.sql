@@ -6,7 +6,6 @@ CREATE USER IF NOT EXISTS test IDENTIFIED WITH plaintext_password BY 'test';
 
 GRANT ALL ON sutram.* TO test;
 
-
 -- User Management Tables
 CREATE TABLE IF NOT EXISTS user (
     id UUID DEFAULT generateUUIDv4(),
@@ -34,7 +33,7 @@ CREATE TABLE IF NOT EXISTS portfolio (
 CREATE TABLE IF NOT EXISTS setting (
     id UUID DEFAULT generateUUIDv4(),
     user_id UUID,
-    config String, -- JSON encoded string
+    config String,
     created_at DateTime DEFAULT now(),
     updated_at DateTime DEFAULT now(),
     PRIMARY KEY (id)
@@ -43,9 +42,9 @@ CREATE TABLE IF NOT EXISTS setting (
 CREATE TABLE IF NOT EXISTS notification (
     id UUID DEFAULT generateUUIDv4(),
     user_id UUID,
-    type Enum('BT_DONE' = 1, 'LT_TRADE_ENTERED' = 2, 'LT_TRADE_EXITED' = 3),
-    status Enum('DELIVER' = 1, 'DELIVERED' = 2),
-    receiver Enum('MOBILE' = 1, 'EMAIL' = 2),
+    type String,
+    status String,
+    receiver String,
     content String,
     PRIMARY KEY (id)
 ) ENGINE = MergeTree;
@@ -53,7 +52,7 @@ CREATE TABLE IF NOT EXISTS notification (
 -- Stock Management Tables
 CREATE TABLE IF NOT EXISTS stock_master (
     id UUID DEFAULT generateUUIDv4(),
-    exchange Enum('NSE' = 1, 'BSE' = 2),
+    exchange String,
     name String,
     symbol String,
     is_active Boolean DEFAULT true,
@@ -68,22 +67,22 @@ CREATE TABLE IF NOT EXISTS strategy (
     user_id UUID,
     name String,
     description String,
-    position_type Enum8('BUY' = 1, 'SELL' = 2), 
+    position_type String,
     instruments Array(String),
-    chart_type Enum8('CANDLESTICK' = 1, 'HEIKEN-ASHI' = 2, 'RENKO' = 3),
-    chart_timeframe Enum8('1m' = 1, '3m' = 2, '5m' = 3, '10m' = 4, '15m' = 5, '30m' = 6, '1h' = 7, '1d' = 8),
+    chart_type String,
+    chart_timeframe String,
     chart_unknown String,
     qty Int32,
-    entry_expression String,
-    exit_expression String,
+    entry_expression JSON,
+    exit_expression JSON,
     target_profit Decimal64(2),
     stop_loss Decimal64(2),
     trailing_stop_loss Decimal64(2),
-    exit_type Enum8('PERCENTAGE' = 1, 'ABSOLUTE' = 2),
+    exit_type String,
     capital Decimal64(2),
     max_trades Int32,
-    entry_start_time DateTime64(3),
-    entry_end_time DateTime64(3),
+    entry_start_time DateTime,
+    entry_end_time DateTime,
     start_date Date,
     end_date Date,
     created_at DateTime DEFAULT now(),
@@ -106,7 +105,7 @@ CREATE TABLE IF NOT EXISTS strategy_history (
 CREATE TABLE IF NOT EXISTS bt_run (
     id UUID DEFAULT generateUUIDv4(),
     strategy_id UUID,
-    state Enum('start' = 1, 'in_progress' = 2, 'ended' = 3),
+    state String,
     qty UInt32,
     period_start_time DateTime,
     period_end_time DateTime,
@@ -120,7 +119,7 @@ CREATE TABLE IF NOT EXISTS bt_run (
 CREATE TABLE IF NOT EXISTS bt_position (
     id UUID DEFAULT generateUUIDv4(),
     run_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     entry_price Decimal64(2),
     entry_time DateTime,
     exit_price Decimal64(2),
@@ -134,7 +133,7 @@ CREATE TABLE IF NOT EXISTS bt_position (
 CREATE TABLE IF NOT EXISTS bt_position_log (
     id UUID DEFAULT generateUUIDv4(),
     position_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     created_at DateTime DEFAULT now(),
     PRIMARY KEY (id)
 ) ENGINE = MergeTree;
@@ -143,7 +142,7 @@ CREATE TABLE IF NOT EXISTS bt_position_log (
 CREATE TABLE IF NOT EXISTS pt_run (
     id UUID DEFAULT generateUUIDv4(),
     strategy_id UUID,
-    state Enum('start' = 1, 'in_progress' = 2, 'ended' = 3),
+    state String,
     qty UInt32,
     period_start_time DateTime,
     period_end_time DateTime,
@@ -157,7 +156,7 @@ CREATE TABLE IF NOT EXISTS pt_run (
 CREATE TABLE IF NOT EXISTS pt_position (
     id UUID DEFAULT generateUUIDv4(),
     run_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     entry_price Decimal64(2),
     entry_time DateTime,
     exit_price Decimal64(2),
@@ -171,7 +170,7 @@ CREATE TABLE IF NOT EXISTS pt_position (
 CREATE TABLE IF NOT EXISTS pt_position_log (
     id UUID DEFAULT generateUUIDv4(),
     position_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     created_at DateTime DEFAULT now(),
     PRIMARY KEY (id)
 ) ENGINE = MergeTree;
@@ -180,7 +179,7 @@ CREATE TABLE IF NOT EXISTS pt_position_log (
 CREATE TABLE IF NOT EXISTS lt_run (
     id UUID DEFAULT generateUUIDv4(),
     strategy_id UUID,
-    state Enum('start' = 1, 'in_progress' = 2, 'ended' = 3),
+    state String,
     qty UInt32,
     period_start_time DateTime,
     period_end_time DateTime,
@@ -194,7 +193,7 @@ CREATE TABLE IF NOT EXISTS lt_run (
 CREATE TABLE IF NOT EXISTS lt_position (
     id UUID DEFAULT generateUUIDv4(),
     run_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     entry_price Decimal64(2),
     entry_time DateTime,
     exit_price Decimal64(2),
@@ -208,7 +207,7 @@ CREATE TABLE IF NOT EXISTS lt_position (
 CREATE TABLE IF NOT EXISTS lt_position_log (
     id UUID DEFAULT generateUUIDv4(),
     position_id UUID,
-    state Enum('enter' = 1, 'entered' = 2, 'hold' = 3, 'exited' = 4),
+    state String,
     created_at DateTime DEFAULT now(),
     PRIMARY KEY (id)
 ) ENGINE = MergeTree;
@@ -219,7 +218,7 @@ CREATE TABLE IF NOT EXISTS broker (
     name String,
     client_id String,
     client_secret String,
-    auth_type Enum('oauth2.0' = 1),
+    auth_type String,
     PRIMARY KEY (id)
 ) ENGINE = MergeTree;
 

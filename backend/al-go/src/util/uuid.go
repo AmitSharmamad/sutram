@@ -2,7 +2,11 @@ package util
 
 import "github.com/google/uuid"
 
-func NewUUID() string {
-	id := uuid.New()
-	return id.String()
+func NewUUID() uuid.UUID {
+	return uuid.New()
+}
+
+func Parse(id string) uuid.UUID {
+	i, _ := uuid.Parse(id)
+	return i
 }

@@ -1,11 +1,15 @@
 package shared
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Users []User
 
 type User struct {
-	ID          string    `json:"id" db:"id"`
+	ID          uuid.UUID `json:"id" db:"id"`
 	Name        string    `json:"name" db:"name" binding:"required"`
 	Username    string    `json:"username" db:"username"`
 	Email       string    `json:"email" db:"email"`

@@ -5,6 +5,8 @@ import (
 
 	"algo/src/shared"
 	"algo/src/util"
+
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -20,13 +22,17 @@ func NewServiceProv(repo *Repo) *Service {
 func (service *Service) Create(
 	ctx context.Context,
 	strategy *shared.Strategy,
-) (bool, error) {
-	return service.repo.Create(ctx, strategy)
+) (*shared.Strategy, error) {
+	strategy.ID = util.NewUUID()
+	strategy.EntryExpression = string(strategy.EntryExpression)
+	strategy.ExitExpression = string(strategy.ExitExpression)
+	err := service.repo.Create(ctx, strategy)
+	return strategy, err
 }
 
 func (service *Service) Get(
 	ctx context.Context,
-	id string,
+	id uuid.UUID,
 ) *shared.Strategy {
 	strategy, err := service.repo.Get(ctx, id)
 	if err != nil {

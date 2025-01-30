@@ -19,8 +19,8 @@ func NewRepoProv(
 	}
 }
 
-func (this *Repo) Create(user *User) (bool, error) {
-	res, err := this.db.Insert(
+func (repo *Repo) Create(user *User) (bool, error) {
+	res, err := repo.db.Insert(
 		"INSERT INTO sutram.user (name, username, email, password) VALUES ($1, $2, $3, $4)",
 		user.Name,
 		user.Username,
@@ -37,20 +37,20 @@ func (this *Repo) Create(user *User) (bool, error) {
 	return true, nil
 }
 
-func (this *Repo) GetAll() {}
+func (repo *Repo) GetAll() {}
 
-func (this *Repo) Get() (shared.Users, error) {
+func (repo *Repo) Get() (shared.Users, error) {
 	var users shared.Users
-	err := this.db.Select(
+	err := repo.db.Select(
 		&users,
 		"SELECT * FROM sutram.user LIMIT 10;",
 	)
 	return users, err
 }
 
-func (this *Repo) GetUsername(username string) (shared.Users, error) {
+func (repo *Repo) GetUsername(username string) (shared.Users, error) {
 	var users shared.Users
-	err := this.db.Select(
+	err := repo.db.Select(
 		&users,
 		"SELECT * FROM sutram.user WHERE username = $1;",
 		username,
@@ -58,6 +58,6 @@ func (this *Repo) GetUsername(username string) (shared.Users, error) {
 	return users, err
 }
 
-func (this *Repo) Update() {}
+func (repo *Repo) Update() {}
 
-func (this *Repo) Delete() {}
+func (repo *Repo) Delete() {}

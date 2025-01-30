@@ -5,6 +5,8 @@ import (
 
 	"algo/src/core/db"
 	"algo/src/shared"
+
+	"github.com/google/uuid"
 )
 
 type Repo struct {
@@ -21,55 +23,45 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) (bool, error) {
+func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
 	_, err := repo.db.Insert(
 		`
-		INSERT INTO $1 (
-            user_id, name, description, position_type, instruments, 
-            chart_type, chart_timeframe, chart_unknown, qty, entry_expression, 
-            exit_expression, target_profit, stop_loss, trailing_stop_loss, 
-            exit_type, capital, max_trades, entry_start_time, entry_end_time, 
-            start_date, end_date, created_at, is_active
-        ) VALUES (
-             $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
-        )
+		INSERT INTO sutram.strategy (
+				id, user_id, name, description, entry_expression, 
+        exit_expression
+    ) VALUES (
+          $2, $3, $4, $5, $6
+    );
 		`,
-		repo.Name,
+		// repo.Name,
+		strategy.ID,
 		userID,
 		strategy.Name,
 		strategy.Description,
-		strategy.PositionType,
-		strategy.Instruments,
-		strategy.ChartType,
-		strategy.ChartTimeframe,
-		strategy.ChartUnknown,
-		strategy.Qty,
+		// strategy.PositionType,
+		// strategy.Instruments,
+		// strategy.ChartType,
+		// strategy.ChartTimeframe,
+		// strategy.ChartUnknown,
+		// strategy.Qty,
 		strategy.EntryExpression,
 		strategy.ExitExpression,
-		strategy.TargetProfit,
-		strategy.StopLoss,
-		strategy.TrailingStopLoss,
-		strategy.ExitType,
-		strategy.Capital,
-		strategy.MaxTrades,
-		strategy.EntryStartTime,
-		strategy.EntryEndTime,
-		strategy.StartDate,
-		strategy.EndDate,
-		strategy.CreatedAt,
-		strategy.IsActive,
+		// strategy.TargetProfit,
+		// strategy.StopLoss,
+		// strategy.TrailingStopLoss,
+		// strategy.ExitType,
+		// strategy.Capital,
+		// strategy.MaxTrades,
+		// strategy.IsActive,
 	)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err
 }
 
 func (repo *Repo) Get(
 	ctx context.Context,
-	id string,
+	id uuid.UUID,
 ) (*shared.Strategy, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
