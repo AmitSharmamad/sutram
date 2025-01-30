@@ -8,22 +8,38 @@ import (
 
 type Controller struct {
 	service *Service
+	engine  *Engine
 }
 
 func NewControllerProv(
 	service *Service,
+	engine *Engine,
 ) *Controller {
 	return &Controller{
 		service: service,
+		engine:  engine,
 	}
 }
 
-func (controller *Controller) Run(gctx *gin.Context) {
-	strategyID := gctx.Query("strategy")
+func (controller *Controller) CreateRun(gctx *gin.Context) {
+	run := shared.NewRun()
 
-	run := controller.service.CreateRun(strategyID)
+	gctx.Bind(run)
+
+	// validate the run input
+
+	run = controller.service.CreateRun(run)
 
 	shared.SuccessResp(gctx, run)
+}
+
+func (controller *Controller) Start(gctx *gin.Context) {
+	id := gctx.Param("id")
+	run, err := controller.service.GetRun(id)
+	if err != nil {
+		panic("")
+	}
+	controller.engine.Run(run)
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}
