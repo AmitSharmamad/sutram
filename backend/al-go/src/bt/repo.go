@@ -21,14 +21,27 @@ func NewRunRepoProv(
 	}
 }
 
-func (repo *RunRepo) Create(strategyID string) error {
+func (repo *RunRepo) Create(run *shared.Run) error {
 	_, err := repo.db.Insert(`
-		INSERT INTO $1
-		VALUES (
-			$2
+		INSERT INTO $1 (
+			id, strategy_id, state, qty, period_start_time, period_end_time
 		)
-		`, repo.Name,
-		strategyID,
+		VALUES (
+    		$2,
+    		$3,
+    		$4,
+    		$5,
+    		$6,
+    		$7
+		)
+		`,
+		repo.Name,
+		run.ID,
+		run.StrategyID,
+		run.State,
+		run.Qty,
+		run.PeriodStartTime,
+		run.PeriodEndTime,
 	)
 	return err
 }
