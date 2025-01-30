@@ -3,6 +3,8 @@ package bt
 import (
 	"algo/src/shared"
 	"algo/src/util"
+
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -23,7 +25,7 @@ func NewServiceProv(
 	}
 }
 
-func (service *Service) UpdateRunStatus(id string, status RunState) {
+func (service *Service) UpdateRunStatus(id uuid.UUID, status RunState) {
 	service.runRepo.UpdateStatus(id, status)
 }
 
@@ -38,13 +40,13 @@ func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 	return run
 }
 
-func (service *Service) CreatePosition(runID string) *shared.Position {
+func (service *Service) CreatePosition(runID uuid.UUID) *shared.Position {
 	position := shared.NewPosition()
 	service.positionRepo.Create(position)
 	return position
 }
 
-func (service *Service) GetLatestPosition(runID string) *shared.Position {
+func (service *Service) GetLatestPosition(runID uuid.UUID) *shared.Position {
 	position, err := service.positionRepo.GetLatest(runID)
 	if err != nil {
 		panic("")

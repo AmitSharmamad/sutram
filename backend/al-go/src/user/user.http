@@ -1,6 +1,6 @@
 ### Create a user
 
-POST http://localhost:9999/user
+POST {{URL}}/user
 Content-Type: application/json
 
 {
@@ -9,3 +9,7 @@ Content-Type: application/json
     "username": "amit",
     "password": "REDACTED_PASSWORD"
 }
+
+### Get users
+
+GET {{URL}}/user

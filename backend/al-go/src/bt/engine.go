@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"algo/src/shared"
+
+	"github.com/google/uuid"
 )
 
 type Engine struct {
@@ -51,7 +53,7 @@ func (engine *Engine) Run(run *shared.Run) {
 }
 
 func (engine *Engine) HandlePosition(
-	runID string,
+	runID uuid.UUID,
 	strategy *shared.Strategy,
 	data shared.StockData,
 ) {
@@ -66,7 +68,7 @@ func (engine *Engine) HandlePosition(
 }
 
 func (engine *Engine) GetLatestPosition(
-	id string,
+	id uuid.UUID,
 ) *shared.Position {
 	position := engine.service.GetLatestPosition(id)
 	if position.IsDone() {
