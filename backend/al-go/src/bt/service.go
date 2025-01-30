@@ -25,11 +25,11 @@ func (service *Service) UpdateRunStatus(id string, status RunState) {
 }
 
 func (service *Service) CreateRun(strategyID string) *shared.Run {
-	// create a run
 	err := service.runRepo.Create(strategyID)
 	if err != nil {
 		panic("")
 	}
+
 	run, err := service.runRepo.Get("")
 	if err != nil {
 		panic("")
@@ -38,8 +38,14 @@ func (service *Service) CreateRun(strategyID string) *shared.Run {
 	return run
 }
 
-func (service *Service) GetRunPosition(id string) *shared.Position {
-	position, err := service.positionRepo.GetLatest(id)
+func (service *Service) CreatePosition(runID string) *shared.Position {
+	position := shared.NewPosition()
+	service.positionRepo.Create(position)
+	return position
+}
+
+func (service *Service) GetLatestPosition(runID string) *shared.Position {
+	position, err := service.positionRepo.GetLatest(runID)
 	if err != nil {
 		panic("")
 	}
@@ -66,10 +72,18 @@ func (service *Service) GetRun(id string) (*shared.Run, *shared.Positions) {
 	return run, positions
 }
 
+func (service *Service) UpdatePosition(position *shared.Position) {
+	// update the position value
+}
+
 func (service *Service) GetRunLogs(id string) *shared.PositionLogs {
 	logs, err := service.positionLogRepo.GetByPositionID(id)
 	if err != nil {
 		panic("Error fetching the data")
 	}
 	return logs
+}
+
+func (service *Service) CreateLog(log *shared.PositionLog) {
+	service.positionLogRepo.Create(log)
 }
