@@ -86,7 +86,18 @@ func NewPositionRepoProv(
 	}
 }
 
-func (repo *PositionRepo) GetLatest(id string) (*shared.Position, error) {
+func (repo *PositionRepo) Create(position *shared.Position) {
+	repo.db.Insert(`
+		INSERT INTO $1
+		VALUES (
+			$2
+		)
+		`,
+		repo.Name,
+	)
+}
+
+func (repo *PositionRepo) GetLatest(runID string) (*shared.Position, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT *
@@ -98,7 +109,7 @@ func (repo *PositionRepo) GetLatest(id string) (*shared.Position, error) {
 	return &positions[0], err
 }
 
-func (repo *PositionRepo) GetByRunID(id string) (*shared.Positions, error) {
+func (repo *PositionRepo) GetByRunID(runID string) (*shared.Positions, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT * 
@@ -106,7 +117,7 @@ func (repo *PositionRepo) GetByRunID(id string) (*shared.Positions, error) {
 		WHERE run_id = $2
 		`,
 		repo.Name,
-		id,
+		runID,
 	)
 	return &positions, err
 }
@@ -125,6 +136,17 @@ func NewPositionLogRepoProv(
 		Name: "sutram.bt_position_log",
 		db:   factory.Get("clickhouse"),
 	}
+}
+
+func (repo *PositionLogRepo) Create(log *shared.PositionLog) {
+	repo.db.Insert(`
+		INSERT INTO $1
+		VALUES (
+			$2
+		)
+		`,
+		repo.Name,
+	)
 }
 
 func (repo *PositionLogRepo) GetByPositionID(id string) (*shared.PositionLogs, error) {

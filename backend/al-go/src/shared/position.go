@@ -31,6 +31,10 @@ type Run struct {
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
+func NewRun() *Run {
+	return new(Run)
+}
+
 type PositionType string
 
 const (
@@ -70,6 +74,10 @@ type Position struct {
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
+func NewPosition() *Position {
+	return new(Position)
+}
+
 func (position *Position) TryEnter(data *StockData) bool {
 	return true
 }
@@ -82,7 +90,10 @@ func (position *Position) IsDone() bool {
 	return position.State == Exited
 }
 
-func (position *Position) Eval(data *StockData) {
+func (position *Position) Eval(
+	strategy *Strategy,
+	data *StockData,
+) {
 	switch position.State {
 	case NotEntered:
 		if position.TryEnter(data) {
@@ -102,9 +113,17 @@ type RunPosition struct {
 	Positions *Positions `json:"positions"`
 }
 
+func NewRunPosition() *RunPosition {
+	return new(RunPosition)
+}
+
 type PositionLog struct {
 	ID         string    `json:"id" db:"id"`
 	PositionID int64     `json:"position_id" db:"position_id"`
 	State      string    `json:"state" db:"state"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+}
+
+func NewPositionLog() *PositionLog {
+	return new(PositionLog)
 }

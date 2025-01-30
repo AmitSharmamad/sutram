@@ -26,27 +26,54 @@ func NewEngineProv(
 func (engine *Engine) Run(run *shared.Run) {
 	ctx := context.Background()
 
-	/// get the data range from the strategy
-	s := engine.strategyService.Get(ctx, run.StrategyID)
+	strategy := engine.strategyService.Get(ctx, run.StrategyID)
 
-	dataRange := s.GetEntryDataRange()
+	dataRange := strategy.GetEntryDataRange()
 
-	/// fetch the data
-	data := engine.stockService.Get("", dataRange)
+	data := *engine.stockService.Get("", dataRange)
 
 	id := run.ID
 
 	engine.service.UpdateRunStatus(id, InProgress)
 
-	/// start taking positions
-	/// begin from period start date and iterate till the end
-	for i := 0; i < len(*data); i++ {
-		position := engine.service.GetRunPosition(id)
-		position.Eval(data)
-		position.IsDone()
+	start := dataRange
+	end := len(data)
+
+	for i := start; i < end; i++ {
+		engine.HandlePosition(
+			id,
+			strategy,
+			data[start:start+dataRange],
+		)
 	}
 
 	engine.service.UpdateRunStatus(id, Ended)
+}
+
+func (engine *Engine) HandlePosition(
+	runID string,
+	strategy *shared.Strategy,
+	data shared.StockData,
+) {
+	position := engine.GetLatestPosition(runID)
+	currPos := position.State
+	position.Eval(strategy, &data)
+	updatedPos := position.State
+	engine.service.CreateLog(shared.NewPositionLog())
+	if currPos != updatedPos {
+		engine.service.UpdatePosition(position)
+	}
+}
+
+func (engine *Engine) GetLatestPosition(
+	id string,
+) *shared.Position {
+	position := engine.service.GetLatestPosition(id)
+	if position.IsDone() {
+		// create a new position
+		position = engine.service.CreatePosition(id)
+	}
+	return position
 }
 
 /*
