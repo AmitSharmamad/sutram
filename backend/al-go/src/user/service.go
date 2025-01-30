@@ -26,12 +26,12 @@ func NewServiceProv(
 	}
 }
 
-func (this *Service) Get() (shared.Users, error) {
-	return this.repo.Get()
+func (service *Service) Get() (shared.Users, error) {
+	return service.repo.Get()
 }
 
-func (this *Service) GetByUsername(username string) (shared.User, error) {
-	res, _ := this.repo.GetUsername(username)
+func (service *Service) GetByUsername(username string) (shared.User, error) {
+	res, _ := service.repo.GetUsername(username)
 
 	if len(res) != 1 {
 		return shared.User{}, errors.New("User not found with the username")
@@ -40,12 +40,12 @@ func (this *Service) GetByUsername(username string) (shared.User, error) {
 	return res[0], nil
 }
 
-func (this *Service) Create(user *User) (bool, error) {
-	return this.repo.Create(user)
+func (service *Service) Create(user *User) (bool, error) {
+	return service.repo.Create(user)
 }
 
-func (this *Service) GetToken(user *User) string {
-	mySigningKey := []byte(this.env.GetProp(env.JWT_SIGNING_SECRET))
+func (service *Service) GetToken(user *User) string {
+	mySigningKey := []byte(service.env.GetProp(env.JWT_SIGNING_SECRET))
 
 	// Create the Claims
 	claims := &jwt.MapClaims{

@@ -1,7 +1,7 @@
 package user
 
 import (
-	"net/http"
+	"algo/src/shared"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,34 +18,28 @@ func NewControllerProv(
 	}
 }
 
-func (this *Controller) Get(ctx *gin.Context) {
-	users, err := this.service.Get()
+func (controller *Controller) Get(gctx *gin.Context) {
+	users, err := controller.service.Get()
 	if err != nil {
 		panic(err)
 	}
 
-	ctx.JSON(200, gin.H{
-		"result": true,
-		"data":   users,
-	})
+	shared.SuccessResp(gctx, users)
 }
 
-func (this *Controller) Create(ctx *gin.Context) {
+func (controller *Controller) Create(gctx *gin.Context) {
 	user := User{}
-	ctx.Bind(&user)
+	gctx.Bind(&user)
 
-	_, err := this.service.Create(&user)
+	_, err := controller.service.Create(&user)
 	if err != nil {
 		panic(err)
 	}
 
-	users, err := this.service.Get()
+	users, err := controller.service.Get()
 	if err != nil {
 		panic(err)
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data":   users,
-	})
+	shared.SuccessResp(gctx, users)
 }

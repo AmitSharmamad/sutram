@@ -29,6 +29,7 @@ func NewWebContainer(
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
 	WebRoot *web.Root,
+	// BTRoot *bt.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
