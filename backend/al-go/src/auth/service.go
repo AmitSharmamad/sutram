@@ -7,6 +7,7 @@ import (
 
 	env "algo/src/core/config"
 	"algo/src/shared"
+	"algo/src/util"
 
 	"github.com/golang-jwt/jwt"
 )
@@ -64,7 +65,7 @@ func (service *Service) ValidateToken(token string) (*shared.User, error) {
 	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
 		fmt.Println("Token is valid")
 		return &shared.User{
-			ID:       claims["user_id"].(string),
+			ID:       util.Parse(claims["user_id"].(string)),
 			Username: claims["username"].(string),
 		}, nil
 	} else {
