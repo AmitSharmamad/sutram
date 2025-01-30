@@ -3,6 +3,8 @@ package bt
 import (
 	"algo/src/core/db"
 	"algo/src/shared"
+
+	"github.com/google/uuid"
 )
 
 // --------- Run Repo --------- //
@@ -72,7 +74,7 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 	return &runs[0], err
 }
 
-func (repo *RunRepo) UpdateStatus(id string, status RunState) error {
+func (repo *RunRepo) UpdateStatus(id uuid.UUID, status RunState) error {
 	_, err := repo.db.Update(`
 		UPDATE $1
 		SET status = $2
@@ -110,7 +112,7 @@ func (repo *PositionRepo) Create(position *shared.Position) {
 	)
 }
 
-func (repo *PositionRepo) GetLatest(runID string) (*shared.Position, error) {
+func (repo *PositionRepo) GetLatest(runID uuid.UUID) (*shared.Position, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT *

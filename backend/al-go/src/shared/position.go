@@ -2,6 +2,8 @@ package shared
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -21,8 +23,8 @@ type PositionLogs []PositionLog
 type RunPositions []RunPosition
 
 type Run struct {
-	ID              string    `json:"id" db:"id"`
-	StrategyID      string    `json:"strategy_id" db:"strategy_id"`
+	ID              uuid.UUID `json:"id" db:"id"`
+	StrategyID      uuid.UUID `json:"strategy_id" db:"strategy_id"`
 	State           RunState  `json:"state" db:"state"`
 	Qty             float64   `json:"qty" db:"qty"`
 	PeriodStartTime time.Time `json:"period_start_time" db:"period_start_time"`

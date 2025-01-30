@@ -60,5 +60,5 @@ func (strategy *Strategy) Validate() {
 }
 
 type StrategyService interface {
-	Get(ctx context.Context, id string) *Strategy
+	Get(ctx context.Context, id uuid.UUID) *Strategy
 }

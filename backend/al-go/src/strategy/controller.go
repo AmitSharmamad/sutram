@@ -1,9 +1,12 @@
 package strategy
 
 import (
+	"fmt"
+
 	"algo/src/shared"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Controller struct {
@@ -35,8 +38,7 @@ func (controller *Controller) GetAll(gctx *gin.Context) {
 func (controller *Controller) Get(gctx *gin.Context) {
 	ctx := shared.GetReqCtx(gctx)
 
-	id := gctx.Param("id")
-	println(id)
+	id, _ := uuid.Parse(gctx.Param("id"))
 
 	strategy := controller.service.Get(ctx, id)
 
@@ -56,9 +58,14 @@ func (controller *Controller) Create(gctx *gin.Context) {
 		panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
 	}
 
-	controller.service.Create(ctx, strategy)
+	fmt.Printf("%+v\n", strategy)
 
-	s := controller.service.Get(ctx, "")
+	strategy, err := controller.service.Create(ctx, strategy)
+	if err != nil {
+		panic(err)
+	}
+
+	s := controller.service.Get(ctx, strategy.ID)
 
 	shared.SuccessResp(gctx, s)
 }
