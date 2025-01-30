@@ -1,0 +1,11 @@
+### Create a run
+
+POST {{URL}}/bt/run
+Content-Type: application/json
+
+{
+  "strategy_id": "",
+  "qty": 10,
+  "period_start_date": "",
+  "period_end_date": ""
+}

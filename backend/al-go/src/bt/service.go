@@ -1,6 +1,9 @@
 package bt
 
-import "algo/src/shared"
+import (
+	"algo/src/shared"
+	"algo/src/util"
+)
 
 type Service struct {
 	runRepo         *RunRepo
@@ -24,16 +27,13 @@ func (service *Service) UpdateRunStatus(id string, status RunState) {
 	service.runRepo.UpdateStatus(id, status)
 }
 
-func (service *Service) CreateRun(strategyID string) *shared.Run {
-	err := service.runRepo.Create(strategyID)
+func (service *Service) CreateRun(run *shared.Run) *shared.Run {
+	run.ID = util.NewUUID()
+	err := service.runRepo.Create(run)
 	if err != nil {
 		panic("")
 	}
 
-	run, err := service.runRepo.Get("")
-	if err != nil {
-		panic("")
-	}
 	// TODO: emit an event to asynchronously run the strategy back testing
 	return run
 }

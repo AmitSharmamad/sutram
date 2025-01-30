@@ -5,10 +5,12 @@ import (
 )
 
 const (
-	NotEntered = "NOT_ENTERED"
-	Entered    = "ENTERED"
-	Exited     = "EXITED"
+	NotEntered RunState = "NOT_ENTERED"
+	Entered    RunState = "ENTERED"
+	Exited     RunState = "EXITED"
 )
+
+type RunState string
 
 type Runs []Run
 
@@ -21,7 +23,7 @@ type RunPositions []RunPosition
 type Run struct {
 	ID              string    `json:"id" db:"id"`
 	StrategyID      string    `json:"strategy_id" db:"strategy_id"`
-	State           string    `json:"state" db:"state"`
+	State           RunState  `json:"state" db:"state"`
 	Qty             float64   `json:"qty" db:"qty"`
 	PeriodStartTime time.Time `json:"period_start_time" db:"period_start_time"`
 	PeriodEndTime   time.Time `json:"period_end_time" db:"period_end_time"`
@@ -64,7 +66,7 @@ func (run *Run) GetPositionType() PositionType {
 type Position struct {
 	ID         string    `json:"id" db:"id"`
 	RunID      int64     `json:"run_id" db:"run_id"`
-	State      string    `json:"state" db:"state"`
+	State      RunState  `json:"state" db:"state"`
 	EntryPrice float64   `json:"entry_price" db:"entry_price"`
 	EntryTime  time.Time `json:"entry_time" db:"entry_time"`
 	ExitPrice  float64   `json:"exit_price" db:"exit_price"`

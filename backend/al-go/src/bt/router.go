@@ -10,7 +10,8 @@ func NewRoutesProv(
 ) *Router {
 	api := engine.Group("/bt")
 	{
-		api.POST("/run", controller.Run)
+		api.POST("/run", controller.CreateRun)
+		api.POST("/run/:id/start", controller.Start)
 		api.POST("/run/:id/pause", controller.Pause)
 		api.POST("/run/:id/resume", controller.Resume)
 

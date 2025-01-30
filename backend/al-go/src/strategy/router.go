@@ -15,7 +15,7 @@ func NewRoutesProv(
 	controller *Controller,
 	authMiddleware *http.AuthMiddleware,
 ) *Router {
-	api := engine.Group("/strategy", authMiddleware.Auth())
+	api := engine.Group("/strategy")
 	{
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)
