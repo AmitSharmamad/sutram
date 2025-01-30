@@ -1,7 +1,10 @@
 package shared
 
 import (
+	"context"
 	"time"
+
+	"algo/src/util"
 
 	"github.com/google/uuid"
 )
@@ -32,4 +35,30 @@ type Strategy struct {
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 	IsActive         bool      `json:"is_active" db:"is_active"`
+}
+
+type Strategies []Strategy
+
+func (strategy *Strategy) GetEntryDataRange() int {
+	return 0
+}
+
+func (strategy *Strategy) TryEnter(data StockData) bool {
+	return true
+}
+
+func (strategy *Strategy) TryExit(data StockData) bool {
+	return true
+}
+
+func (strategy *Strategy) Validate() {
+	path := "../data/llm.json"
+
+	exp := util.GetFileContent(path)
+
+	util.Validate(exp)
+}
+
+type StrategyService interface {
+	Get(ctx context.Context, id string) *Strategy
 }

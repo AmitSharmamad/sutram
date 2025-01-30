@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	"algo/src/algo/indicator"
-	"algo/src/stock"
+	"algo/src/shared"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEMA_calculate(t *testing.T) {
 	// Test case 1: Empty data
-	data := stock.StockData{}
+	data := shared.StockData{}
 	config := map[string]any{}
 	point := "close"
 	ema := &indicator.EMA{}

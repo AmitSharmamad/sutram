@@ -7,8 +7,6 @@ import (
 	"algo/src/shared"
 )
 
-type Strategies []Strategy
-
 type Repo struct {
 	Name string
 	db   db.Database
@@ -23,7 +21,7 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Create(ctx context.Context, strategy *Strategy) (bool, error) {
+func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) (bool, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
 	_, err := repo.db.Insert(
@@ -72,10 +70,10 @@ func (repo *Repo) Create(ctx context.Context, strategy *Strategy) (bool, error) 
 func (repo *Repo) Get(
 	ctx context.Context,
 	id string,
-) (*Strategy, error) {
+) (*shared.Strategy, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	var strategies Strategies
+	var strategies shared.Strategies
 
 	err := repo.db.Select(
 		&strategies,
@@ -98,10 +96,10 @@ func (repo *Repo) Get(
 
 func (repo *Repo) GetLatest(
 	ctx context.Context,
-) (*Strategy, error) {
+) (*shared.Strategy, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	var strategies Strategies
+	var strategies shared.Strategies
 
 	err := repo.db.Select(
 		&strategies,
@@ -121,10 +119,10 @@ func (repo *Repo) GetLatest(
 
 func (repo *Repo) GetAll(
 	ctx context.Context,
-) (Strategies, error) {
+) (*shared.Strategies, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	var strategies Strategies
+	var strategies shared.Strategies
 
 	repo.db.Select(
 		&strategies,
@@ -133,5 +131,5 @@ func (repo *Repo) GetAll(
 		userID,
 	)
 
-	return strategies, nil
+	return &strategies, nil
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/google/wire"
 )
 
+type User shared.User
+
 type Root struct{}
 
 func NewRootProv(

@@ -1,5 +1,7 @@
 package stock
 
+import "algo/src/shared"
+
 type Service struct {
 	repo *Repo
 }
@@ -10,6 +12,6 @@ func NewServiceProv(repo *Repo) *Service {
 	}
 }
 
-func (this *Service) Get(id string) (any, error) {
-	return this.repo.Select()
+func (service *Service) Get(name string, lastNRecords int) *shared.StockData {
+	return nil
 }
