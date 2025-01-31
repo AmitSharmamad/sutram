@@ -24,37 +24,21 @@ func NewRepoProv(
 }
 
 func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
-	userID := shared.FromReqCtx[string](ctx, shared.UserID)
+	userID := shared.FromReqCtx[uuid.UUID](ctx, shared.UserID)
+
+	strategy.UserID = userID
 
 	_, err := repo.db.Insert(
 		`
 		INSERT INTO sutram.strategy (
-				id, user_id, name, description, entry_expression, 
-        exit_expression
+			id, user_id, name, description, entry_expression, 
+      exit_expression
     ) VALUES (
-          $2, $3, $4, $5, $6
+    	:id, :user_id, :name, :description, :entry_expression,
+    	:exit_expression
     );
 		`,
-		// repo.Name,
-		strategy.ID,
-		userID,
-		strategy.Name,
-		strategy.Description,
-		// strategy.PositionType,
-		// strategy.Instruments,
-		// strategy.ChartType,
-		// strategy.ChartTimeframe,
-		// strategy.ChartUnknown,
-		// strategy.Qty,
-		strategy.EntryExpression,
-		strategy.ExitExpression,
-		// strategy.TargetProfit,
-		// strategy.StopLoss,
-		// strategy.TrailingStopLoss,
-		// strategy.ExitType,
-		// strategy.Capital,
-		// strategy.MaxTrades,
-		// strategy.IsActive,
+		strategy,
 	)
 	return err
 }

@@ -21,11 +21,10 @@ func NewRepoProv(
 
 func (repo *Repo) Create(user *User) (bool, error) {
 	res, err := repo.db.Insert(
-		"INSERT INTO sutram.user (name, username, email, password) VALUES ($1, $2, $3, $4)",
-		user.Name,
-		user.Username,
-		user.Email,
-		user.Password,
+		`INSERT INTO sutram.user (name, username, email, password) VALUES (
+		:name, :username, :email, :password
+		)`,
+		user,
 	)
 	if err != nil {
 		return false, err
