@@ -1,9 +1,7 @@
-package algo
+package shared
 
 import (
 	"encoding/json"
-
-	"algo/src/shared"
 )
 
 type Expression struct {
@@ -22,7 +20,7 @@ func NewExpressionStatement(expression string) *Expression {
 	return input
 }
 
-func (expression *Expression) Eval(data shared.StockData) bool {
+func (expression *Expression) Eval(data StockData) bool {
 	println("Evaluating input ", expression)
 	if expression.Type == "ExpressionStatement" {
 		if expression.Value.Type == "LogicalExpression" {

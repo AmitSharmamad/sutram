@@ -1,4 +1,4 @@
-package indicator
+package shared
 
 type IndicatorFactory struct {
 	indicators map[string]IndicatorCalculator
@@ -16,8 +16,8 @@ func NewFactory() *IndicatorFactory {
 	return factory
 }
 
-var factory = NewFactory()
+var indFactory = NewFactory()
 
-func Get(key string) IndicatorCalculator {
-	return factory.indicators[key]
+func GetIndFactory(key string) IndicatorCalculator {
+	return indFactory.indicators[key]
 }

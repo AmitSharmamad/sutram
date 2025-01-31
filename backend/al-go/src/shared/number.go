@@ -1,4 +1,4 @@
-package indicator
+package shared
 
 type IndNumber struct {
 	Value float64

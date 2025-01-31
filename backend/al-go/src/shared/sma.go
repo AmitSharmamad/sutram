@@ -1,4 +1,4 @@
-package indicator
+package shared
 
 type SMA struct {
 	period int
