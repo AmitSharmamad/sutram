@@ -4,8 +4,8 @@ POST {{URL}}/bt/run
 Content-Type: application/json
 
 {
-  "strategy_id": "",
+  "strategy_id": "c524747e-cb18-4f2e-86df-77b19dc6d23a",
   "qty": 10,
-  "period_start_date": "",
-  "period_end_date": ""
+  "period_start_date": "2025-01-26T15:45:23Z",
+  "period_end_date": "2025-01-26T15:45:23Z"
 }

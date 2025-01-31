@@ -69,20 +69,20 @@ func (clickhouse *Clickhouse) Close() {
 	clickhouse.db.Close()
 }
 
-func (clickhouse *Clickhouse) Insert(query string, args ...any) (sql.Result, error) {
-	result, err := clickhouse.db.Exec(query, args...)
+func (clickhouse *Clickhouse) Insert(query string, values interface{}) (sql.Result, error) {
+	result, err := clickhouse.db.NamedExec(query, values)
 	return result, err
 }
 
 func (clickhouse *Clickhouse) Select(model any, query string, args ...any) error {
-	err := clickhouse.db.Select(model, query, args...)
+	err := clickhouse.db.Get(model, query, args...)
 	return err
 }
 
-func (clickhouse *Clickhouse) Update(query string, args ...any) (sql.Result, error) {
-	return clickhouse.db.Exec(query, args...)
+func (clickhouse *Clickhouse) Update(query string, values interface{}) (sql.Result, error) {
+	return clickhouse.db.NamedExec(query, values)
 }
 
-func (clickhouse *Clickhouse) Delete(query string, args ...any) (sql.Result, error) {
-	return clickhouse.db.Exec(query, args...)
+func (clickhouse *Clickhouse) Delete(query string, values interface{}) (sql.Result, error) {
+	return clickhouse.db.NamedExec(query, values)
 }

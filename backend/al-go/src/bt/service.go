@@ -33,7 +33,7 @@ func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 	run.ID = util.NewUUID()
 	err := service.runRepo.Create(run)
 	if err != nil {
-		panic("")
+		panic(err)
 	}
 
 	// TODO: emit an event to asynchronously run the strategy back testing
@@ -49,7 +49,7 @@ func (service *Service) CreatePosition(runID uuid.UUID) *shared.Position {
 func (service *Service) GetLatestPosition(runID uuid.UUID) *shared.Position {
 	position, err := service.positionRepo.GetLatest(runID)
 	if err != nil {
-		panic("")
+		panic(err)
 	}
 	return position
 }
