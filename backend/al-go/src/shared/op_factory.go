@@ -1,10 +1,10 @@
-package operator
+package shared
 
 type OperatorFactory struct {
 	operators map[string]Operator
 }
 
-func NewFactory() *OperatorFactory {
+func NewOperatorFactory() *OperatorFactory {
 	factory := &OperatorFactory{
 		operators: make(map[string]Operator),
 	}
@@ -15,8 +15,8 @@ func NewFactory() *OperatorFactory {
 	return factory
 }
 
-var factory = NewFactory()
+var opFactory = NewOperatorFactory()
 
-func Get(key string) Operator {
-	return factory.operators[key]
+func GetOperator(key string) Operator {
+	return opFactory.operators[key]
 }

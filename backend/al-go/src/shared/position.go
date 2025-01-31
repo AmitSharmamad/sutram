@@ -3,8 +3,6 @@ package shared
 import (
 	"time"
 
-	"algo/src/shared/algo"
-
 	"github.com/google/uuid"
 )
 
@@ -88,7 +86,7 @@ func (position *Position) TryEnter(
 	strategy *Strategy,
 	data *StockData,
 ) bool {
-	return algo.NewExpressionStatement(strategy.EntryExpression).Eval(data)
+	return NewExpressionStatement(strategy.EntryExpression).Eval(*data)
 }
 
 func (position *Position) TryExit(
@@ -96,7 +94,7 @@ func (position *Position) TryExit(
 	data *StockData,
 ) bool {
 	// TODO: also check for stop loss, update trailing stop loss
-	return algo.NewExpressionStatement(strategy.ExitExpression).Eval(data)
+	return NewExpressionStatement(strategy.ExitExpression).Eval(*data)
 }
 
 func (position *Position) IsDone() bool {

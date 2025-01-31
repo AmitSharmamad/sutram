@@ -1,9 +1,4 @@
-package indicator
-
-import (
-	"algo/src/algo/operator"
-	"algo/src/shared"
-)
+package shared
 
 type IndicatorExpression struct {
 	Type     string     `json:"type"`     /// IndicatorExpression
@@ -27,30 +22,30 @@ type IndicatorCalculator interface {
 	Calculate(prices Prices, config map[string]any, point string) float64
 }
 
-func (expression *IndicatorExpression) Handle(data shared.StockData) bool {
+func (expression *IndicatorExpression) Handle(data StockData) bool {
 	println("Handling indicator expression")
 
 	lhsValue := expression.Lhs.Handle(data)
 	rhsValue := expression.Rhs.Handle(data)
 
-	return operator.Get(expression.Operator).Operate(
+	return GetOperator(expression.Operator).Operate(
 		lhsValue, rhsValue,
 	)
 }
 
-func (indicator *Indicator) Handle(data shared.StockData) float64 {
+func (indicator *Indicator) Handle(data StockData) float64 {
 	println("Handling indicator", indicator)
 
 	config := make(map[string]any, 0)
 
-	calculator := Get(indicator.Name)
+	calculator := GetIndFactory(indicator.Name)
 
 	prices := GetPrices(data, indicator.Point)
 
 	return (calculator).Calculate(prices, config, indicator.Point)
 }
 
-func GetPrices(data shared.StockData, point string) Prices {
+func GetPrices(data StockData, point string) Prices {
 	var results Prices
 
 	for _, d := range data {
