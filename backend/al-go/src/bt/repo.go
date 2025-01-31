@@ -25,25 +25,20 @@ func NewRunRepoProv(
 
 func (repo *RunRepo) Create(run *shared.Run) error {
 	_, err := repo.db.Insert(`
-		INSERT INTO $1 (
-			id, strategy_id, state, qty, period_start_time, period_end_time
+		INSERT INTO sutram.bt_run (
+			id, strategy_id, state, qty, 
+			period_start_time, period_end_time
 		)
 		VALUES (
-    		$2,
-    		$3,
-    		$4,
-    		$5,
-    		$6,
-    		$7
+			:id,
+    	:strategy_id,
+    	:state,
+    	:qty,
+    	:period_start_time,
+    	:period_end_time
 		)
 		`,
-		repo.Name,
-		run.ID,
-		run.StrategyID,
-		run.State,
-		run.Qty,
-		run.PeriodStartTime,
-		run.PeriodEndTime,
+		run,
 	)
 	return err
 }

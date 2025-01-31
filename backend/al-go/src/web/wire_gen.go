@@ -8,6 +8,7 @@ package main
 
 import (
 	"algo/src/auth"
+	"algo/src/bt"
 	"algo/src/core/config"
 	"algo/src/core/db"
 	"algo/src/core/http"
@@ -56,7 +57,15 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	userRoot := user.NewRootProv(userRouter)
 	httpRoot := http.NewRoot(authMiddleware)
 	webRoot := web.NewRoot()
-	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, webRoot)
+	runRepo := bt.NewRunRepoProv(dbFactory)
+	positionRepo := bt.NewPositionRepoProv(dbFactory)
+	positionLogRepo := bt.NewPositionLogRepoProv(dbFactory)
+	btService := bt.NewServiceProv(runRepo, positionRepo, positionLogRepo)
+	btEngine := bt.NewEngineProv(btService, service, stockService)
+	btController := bt.NewControllerProv(btService, btEngine)
+	btRouter := bt.NewRoutesProv(engine, btController)
+	btRoot := bt.NewRoot(btRouter)
+	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, webRoot, btRoot)
 	return webContainer
 }
 
@@ -74,7 +83,7 @@ func NewWebContainer(
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
 	WebRoot *web.Root,
-
+	BTRoot *bt.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }

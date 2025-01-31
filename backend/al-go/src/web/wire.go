@@ -5,6 +5,7 @@ package main
 
 import (
 	"algo/src/auth"
+	"algo/src/bt"
 	"algo/src/core/http"
 	"algo/src/di"
 	"algo/src/stock"
@@ -29,7 +30,7 @@ func NewWebContainer(
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
 	WebRoot *web.Root,
-	// BTRoot *bt.Root,
+	BTRoot *bt.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
