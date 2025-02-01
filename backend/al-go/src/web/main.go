@@ -14,9 +14,9 @@ func main() {
 
 	engine := gin.Default()
 
-	container := BuildContainer(engine)
-
 	web.RegisterMiddleware(engine)
+
+	container := BuildContainer(engine)
 
 	println(container)
 
