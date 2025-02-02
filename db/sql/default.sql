@@ -6,7 +6,7 @@ INSERT INTO sutram.user (
   'system',
   'system@sutram.com',
   '-',
-  'amit',
+  'system',
   true
 );
 
