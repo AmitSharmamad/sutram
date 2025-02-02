@@ -3,6 +3,8 @@ package shared
 import (
 	"time"
 
+	"algo/src/util"
+
 	"github.com/google/uuid"
 )
 
@@ -31,8 +33,7 @@ type Run struct {
 	PeriodEndTime   time.Time `json:"period_end_time" db:"period_end_time"`
 	StartedTime     time.Time `json:"started_time" db:"started_time"`
 	EndedTime       time.Time `json:"ended_time" db:"ended_time"`
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
+	Audit
 }
 
 func NewRun() *Run {
@@ -66,8 +67,8 @@ func (run *Run) GetPositionType() PositionType {
 }
 
 type Position struct {
-	ID         string    `json:"id" db:"id"`
-	RunID      int64     `json:"run_id" db:"run_id"`
+	ID         uuid.UUID `json:"id" db:"id"`
+	RunID      uuid.UUID `json:"run_id" db:"run_id"`
 	State      RunState  `json:"state" db:"state"`
 	EntryPrice float64   `json:"entry_price" db:"entry_price"`
 	EntryTime  time.Time `json:"entry_time" db:"entry_time"`
@@ -78,8 +79,12 @@ type Position struct {
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
-func NewPosition() *Position {
-	return new(Position)
+func NewPosition(runID uuid.UUID) *Position {
+	return &Position{
+		ID:    util.NewUUID(),
+		RunID: runID,
+		State: "NOT_ENTERED",
+	}
 }
 
 func (position *Position) TryEnter(
@@ -129,12 +134,16 @@ func NewRunPosition() *RunPosition {
 }
 
 type PositionLog struct {
-	ID         string    `json:"id" db:"id"`
-	PositionID int64     `json:"position_id" db:"position_id"`
-	State      string    `json:"state" db:"state"`
+	ID         uuid.UUID `json:"id" db:"id"`
+	PositionID uuid.UUID `json:"position_id" db:"position_id"`
+	State      RunState  `json:"state" db:"state"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
-func NewPositionLog() *PositionLog {
-	return new(PositionLog)
+func NewPositionLog(positionID uuid.UUID, state RunState) *PositionLog {
+	return &PositionLog{
+		ID:         util.NewUUID(),
+		PositionID: positionID,
+		State:      state,
+	}
 }

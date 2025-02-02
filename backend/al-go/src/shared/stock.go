@@ -13,7 +13,6 @@ type Stock struct {
 	Volume int64 `json:"volume" db:"volume"`
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type StockData []Stock

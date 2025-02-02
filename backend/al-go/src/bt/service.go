@@ -25,12 +25,13 @@ func NewServiceProv(
 	}
 }
 
-func (service *Service) UpdateRunStatus(id uuid.UUID, status RunState) {
-	service.runRepo.UpdateStatus(id, status)
+func (service *Service) UpdateState(run *shared.Run) {
+	service.runRepo.UpdateState(run)
 }
 
 func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 	run.ID = util.NewUUID()
+
 	err := service.runRepo.Create(run)
 	if err != nil {
 		panic(err)
@@ -41,7 +42,7 @@ func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 }
 
 func (service *Service) CreatePosition(runID uuid.UUID) *shared.Position {
-	position := shared.NewPosition()
+	position := shared.NewPosition(runID)
 	service.positionRepo.Create(position)
 	return position
 }
@@ -63,15 +64,15 @@ func (service *Service) GetRuns(strategyID string) shared.Runs {
 }
 
 func (service *Service) GetRun(id string) (*shared.Run, *shared.Positions) {
-	run, err := service.runRepo.Get(id)
-	if err != nil {
-		panic("Error fetching the data")
-	}
-	positions, err := service.positionRepo.GetByRunID(id)
-	if err != nil {
-		panic("Error fetching the data")
-	}
-	return run, positions
+	run, _ := service.runRepo.Get(id)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// positions, err := service.positionRepo.GetByRunID(id)
+	// if err != nil {
+	// 	panic("Error fetching the data")
+	// }
+	return run, nil
 }
 
 func (service *Service) UpdatePosition(position *shared.Position) {

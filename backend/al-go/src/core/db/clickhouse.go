@@ -75,7 +75,7 @@ func (clickhouse *Clickhouse) Insert(query string, values interface{}) (sql.Resu
 }
 
 func (clickhouse *Clickhouse) Select(model any, query string, args ...any) error {
-	err := clickhouse.db.Get(model, query, args...)
+	err := clickhouse.db.Select(model, query, args...)
 	return err
 }
 
