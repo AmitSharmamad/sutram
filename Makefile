@@ -6,5 +6,8 @@ build:
 run:
 	docker-compose up -d
 
+down:
+	docker-compose down
+
 deploy:
 	docker-compose up --build -d

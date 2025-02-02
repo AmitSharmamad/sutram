@@ -24,7 +24,7 @@ COPY --from=builder /app/s-web s-web
 COPY .env .env
 
 # Expose the port your application listens on
-EXPOSE 9999
+EXPOSE 9090
 
 # Command to run your application
 CMD ["/app/s-web"]
