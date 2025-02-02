@@ -33,23 +33,60 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 		`
 		INSERT INTO sutram.strategy (
 			id, 
-			user_id, 
-			name, 
-			description, 
+			user_id,
+
+			name,
+			description,
 			position_type,
 			instruments,
 			chart_type,
 			chart_timeframe,
 			chart_unknown,
+			qty,
+
 			entry_expression,
+
       exit_expression,
     	target_profit,
     	stop_loss,
     	trailing_stop_loss,
     	exit_type,
+
+    	capital,
+    	max_trades,
+    	entry_start_time,
+    	entry_end_time,
+    	start_date,
+    	end_date,
+    	is_active
     ) VALUES (
-    	:id, :user_id, :name, :description, :entry_expression,
-    	:exit_expression
+			:id, 
+			:user_id, 
+
+			:name, 
+			:description, 
+			:position_type,
+			:instruments,
+			:chart_type,
+			:chart_timeframe,
+			:chart_unknown,
+			:qty,
+
+			:entry_expression,
+
+    	:exit_expression,
+    	:target_profit,
+    	:stop_loss,
+    	:trailing_stop_loss,
+    	:exit_type,
+
+    	:capital,
+    	:max_trades,
+    	:entry_start_time,
+    	:entry_end_time,
+    	:start_date,
+    	:end_date,
+    	:is_active
     );
 		`,
 		strategy,
