@@ -60,22 +60,21 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 	var runs shared.Runs
 	err := repo.db.Select(&runs, `
 		SELECT * 
-		FROM $1
-		WHERE strategy_id = $2;
+		FROM sutram.bt_run
+		WHERE id = $1;
 		`,
-		repo.Name,
 		id,
 	)
 	return &runs[0], err
 }
 
-func (repo *RunRepo) UpdateStatus(id uuid.UUID, status RunState) error {
+func (repo *RunRepo) UpdateState(run *shared.Run) error {
 	_, err := repo.db.Update(`
-		UPDATE $1
-		SET status = $2
-		WHERE id = $3;
+		UPDATE sutram.bt_run
+		SET status = :state
+		WHERE id = :id
 		`,
-		repo.Name,
+		run,
 	)
 	return err
 }
@@ -96,26 +95,31 @@ func NewPositionRepoProv(
 	}
 }
 
-func (repo *PositionRepo) Create(position *shared.Position) {
-	repo.db.Insert(`
-		INSERT INTO $1
-		VALUES (
-			$2
+func (repo *PositionRepo) Create(position *shared.Position) error {
+	_, err := repo.db.Insert(`
+		INSERT INTO sutram.bt_position (
+			id, run_id, state
+		) VALUES (
+			:id, :run_id, :state
 		)
 		`,
-		repo.Name,
+		position,
 	)
+	return err
 }
 
 func (repo *PositionRepo) GetLatest(runID uuid.UUID) (*shared.Position, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT *
-		FROM $1
-		ORDER BY created_date DESC;
+		FROM sutram.bt_position
+		WHERE run_id = $1;
 		`,
-		repo.Name,
+		runID,
 	)
+	if len(positions) == 0 {
+		return nil, err
+	}
 	return &positions[0], err
 }
 
@@ -150,12 +154,13 @@ func NewPositionLogRepoProv(
 
 func (repo *PositionLogRepo) Create(log *shared.PositionLog) {
 	repo.db.Insert(`
-		INSERT INTO $1
-		VALUES (
-			$2
+		INSERT INTO sutram.bt_position_log (
+			id, position_id, state
+		) VALUES (
+			:id, :position_id, :state
 		)
 		`,
-		repo.Name,
+		log,
 	)
 }
 

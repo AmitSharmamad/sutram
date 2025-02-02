@@ -17,10 +17,10 @@ func NewRoutesProv(
 ) *Router {
 	api := engine.Group("/strategy")
 	{
+		api.POST("", controller.Create)
+
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)
-
-		api.POST("", controller.Create)
 	}
 
 	return &Router{}
