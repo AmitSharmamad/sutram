@@ -9,3 +9,8 @@ Content-Type: application/json
   "period_start_date": "2025-01-26T15:45:23Z",
   "period_end_date": "2025-01-26T15:45:23Z"
 }
+
+
+### Run
+
+POST {{URL}}/bt/run/d6619652-5bd0-4ecc-b56c-43c4acb4d640/start

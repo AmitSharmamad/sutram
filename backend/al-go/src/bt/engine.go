@@ -20,39 +20,47 @@ func NewEngineProv(
 	stockService shared.StockService,
 ) *Engine {
 	return &Engine{
+		service:         service,
 		strategyService: strategyService,
 		stockService:    stockService,
 	}
 }
 
-func (engine *Engine) Run(run *shared.Run) {
-	ctx := context.Background()
-
+func (engine *Engine) Run(ctx context.Context, run *shared.Run) {
 	strategy := engine.strategyService.Get(ctx, run.StrategyID)
 
-	dataRange := strategy.GetEntryDataRange()
+	// dataRange := strategy.GetEntryDataRange()
+	dataRange := 1000
 
-	data := *engine.stockService.Get("", dataRange)
+	data := engine.stockService.Get("TESLA", dataRange)
 
 	id := run.ID
 
-	engine.service.UpdateRunStatus(id, InProgress)
+	run.State = "IN_PROGRESS"
 
-	start := dataRange
-	end := len(data)
+	engine.service.UpdateState(run)
+
+	start := 100
+	end := 200
 
 	counter := 0
 
+	println(start)
+	println(end)
+
 	for i := start; i < end; i++ {
+		println(start, end)
 		engine.HandlePosition(
 			id,
 			strategy,
-			data[counter:start],
+			(*data)[counter:start],
 		)
 		counter++
 	}
 
-	engine.service.UpdateRunStatus(id, Ended)
+	run.State = "ENDED"
+
+	engine.service.UpdateState(run)
 }
 
 func (engine *Engine) HandlePosition(
@@ -64,7 +72,10 @@ func (engine *Engine) HandlePosition(
 	currPos := position.State
 	position.Eval(strategy, &data)
 	updatedPos := position.State
-	engine.service.CreateLog(shared.NewPositionLog())
+	engine.service.CreateLog(shared.NewPositionLog(
+		position.ID,
+		position.State,
+	))
 	if currPos != updatedPos {
 		engine.service.UpdatePosition(position)
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"algo/src/core/logger"
 	"algo/src/shared"
 
 	"github.com/gin-gonic/gin"
@@ -23,12 +24,12 @@ func NewAuthMiddleware(
 }
 
 func (middleware *AuthMiddleware) Auth() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
+	return func(gctx *gin.Context) {
 		t := time.Now()
 
-		println("Validating the token")
+		logger.Log("validating the token")
 
-		authorization := ctx.GetHeader("Authorization")
+		authorization := gctx.GetHeader("Authorization")
 
 		if len(strings.TrimSpace(authorization)) == 0 {
 			println("No auth token")
@@ -50,15 +51,15 @@ func (middleware *AuthMiddleware) Auth() gin.HandlerFunc {
 			panic(shared.NewUnauthorizedError("Unauthorized", "Unauthorized"))
 		}
 
-		ctx.Set("user_id", user.ID)
+		gctx.Set("user_id", user.ID)
 
-		ctx.Next()
+		gctx.Next()
 
 		latency := time.Since(t)
 		log.Print(latency)
 
 		// access the status we are sending
-		status := ctx.Writer.Status()
+		status := gctx.Writer.Status()
 		log.Println(status)
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"algo/src/core/db"
 	"algo/src/shared"
+	"algo/src/util"
 
 	"github.com/google/uuid"
 )
@@ -24,15 +25,28 @@ func NewRepoProv(
 }
 
 func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
-	userID := shared.FromReqCtx[uuid.UUID](ctx, shared.UserID)
+	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	strategy.UserID = userID
+	strategy.UserID = util.Parse(userID)
 
 	_, err := repo.db.Insert(
 		`
 		INSERT INTO sutram.strategy (
-			id, user_id, name, description, entry_expression, 
-      exit_expression
+			id, 
+			user_id, 
+			name, 
+			description, 
+			position_type,
+			instruments,
+			chart_type,
+			chart_timeframe,
+			chart_unknown,
+			entry_expression,
+      exit_expression,
+    	target_profit,
+    	stop_loss,
+    	trailing_stop_loss,
+    	exit_type,
     ) VALUES (
     	:id, :user_id, :name, :description, :entry_expression,
     	:exit_expression
@@ -55,11 +69,10 @@ func (repo *Repo) Get(
 		&strategies,
 		`
 		SELECT *
-		FROM $1
-		WHERE user_id = $2 
-		AND id = $3;
+		FROM sutram.strategy
+		WHERE user_id = $1
+		AND id = $2;
 		`,
-		repo.Name,
 		userID,
 		id,
 	)
@@ -102,8 +115,7 @@ func (repo *Repo) GetAll(
 
 	repo.db.Select(
 		&strategies,
-		"SELECT * FROM $1 WHERE user_id = $2;",
-		repo.Name,
+		"SELECT * FROM sutram.strategy WHERE user_id = $1;",
 		userID,
 	)
 

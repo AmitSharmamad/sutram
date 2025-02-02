@@ -13,22 +13,22 @@ import (
 )
 
 type Service struct {
-	env  *env.EnvProv
-	repo *Repo
+	secret string
+	repo   *Repo
 }
 
 func NewServiceProv(
-	env *env.EnvProv,
+	envProv *env.EnvProv,
 	repo *Repo,
 ) *Service {
 	return &Service{
-		env:  env,
-		repo: repo,
+		secret: envProv.GetProp(env.JWT_SIGNING_SECRET),
+		repo:   repo,
 	}
 }
 
 func (service *Service) GetToken(user *shared.User) string {
-	signingKey := []byte(service.env.GetProp(env.JWT_SIGNING_SECRET))
+	secret := service.secret
 
 	claims := &jwt.MapClaims{
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
@@ -39,7 +39,7 @@ func (service *Service) GetToken(user *shared.User) string {
 
 	jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	token, err := jwt.SignedString(signingKey)
+	token, err := jwt.SignedString(secret)
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +50,7 @@ func (service *Service) GetToken(user *shared.User) string {
 }
 
 func (service *Service) ValidateToken(token string) (*shared.User, error) {
-	secret := service.env.GetProp(env.JWT_SIGNING_SECRET)
+	secret := service.secret
 
 	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

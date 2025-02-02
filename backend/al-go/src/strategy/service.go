@@ -24,8 +24,6 @@ func (service *Service) Create(
 	strategy *shared.Strategy,
 ) (*shared.Strategy, error) {
 	strategy.ID = util.NewUUID()
-	strategy.EntryExpression = string(strategy.EntryExpression)
-	strategy.ExitExpression = string(strategy.ExitExpression)
 	err := service.repo.Create(ctx, strategy)
 	return strategy, err
 }
