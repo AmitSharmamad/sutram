@@ -3,13 +3,16 @@ services:
     build:
       context: ./backend/al-go
       dockerfile: Dockerfile
+    env_file:
+      - backend/al-go/.env
     container_name: sutram-al-go
     ports:
-      - 9999:9999
+      - 9090:9090
     networks:
       - sutram-network
     depends_on:
-      - sutramdb
+      sutramdb:
+        condition: service_healthy  # <-- Waits for ClickHouse to be ready
 
   sutramdb:
     image: clickhouse/clickhouse-server
@@ -45,4 +48,5 @@ services:
 
 networks:
   sutram-network:
+    name: sutram-network
     driver: bridge
