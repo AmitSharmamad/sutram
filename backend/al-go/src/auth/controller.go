@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"net/http"
-
 	"algo/src/shared"
 
 	"github.com/gin-gonic/gin"
@@ -23,24 +21,18 @@ func NewControllerProv(
 	}
 }
 
-func (controller *Controller) Login(ctx *gin.Context) {
+func (controller *Controller) Login(gctx *gin.Context) {
 	req := LoginReq{}
-	ctx.Bind(&req)
+	gctx.Bind(&req)
 
 	user, err := controller.userService.GetByUsername(req.Username)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"result": false,
-			"data":   err,
-		})
+		shared.NewBadRequest("", "")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"result": true,
-		"data": &LoginRes{
-			Token: controller.authService.GetToken(&user),
-		},
+	shared.SuccessResp(gctx, &LoginRes{
+		Token: controller.authService.GetToken(&user),
 	})
 }
 

@@ -4,8 +4,8 @@ POST {{URL}}/login
 Content-Type: application/json
 
 {
-    "username": "amit",
-    "password": "amit"
+    "username": "system",
+    "password": "system"
 }
 
 ### logout

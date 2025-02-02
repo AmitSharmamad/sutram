@@ -13,5 +13,5 @@ func NewServiceProv(repo *Repo) *Service {
 }
 
 func (service *Service) Get(name string, lastNRecords int) *shared.StockData {
-	return nil
+	return service.repo.Get(lastNRecords)
 }

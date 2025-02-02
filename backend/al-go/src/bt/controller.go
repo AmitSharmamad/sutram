@@ -34,12 +34,14 @@ func (controller *Controller) CreateRun(gctx *gin.Context) {
 }
 
 func (controller *Controller) Start(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
 	id := gctx.Param("id")
 	run, err := controller.service.GetRun(id)
 	if err != nil {
-		panic("")
+		panic(err)
 	}
-	controller.engine.Run(run)
+	println(run)
+	controller.engine.Run(ctx, run)
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}
