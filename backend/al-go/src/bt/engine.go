@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"algo/src/shared"
+	"algo/src/util"
 
 	"github.com/google/uuid"
 )
@@ -29,10 +30,16 @@ func NewEngineProv(
 func (engine *Engine) Run(ctx context.Context, run *shared.Run) {
 	strategy := engine.strategyService.Get(ctx, run.StrategyID)
 
-	// dataRange := strategy.GetEntryDataRange()
-	dataRange := 1000
+	entryDataRange := strategy.GetEntryDataRange()
+	exitDataRange := strategy.GetExitDataRange()
 
-	data := engine.stockService.Get("TESLA", dataRange)
+	dataRange := util.Max(entryDataRange, exitDataRange)
+
+	println("Fetching the data for the range ", dataRange)
+
+	instrument := strategy.Instruments[0]
+
+	data := engine.stockService.Get(instrument, dataRange)
 
 	id := run.ID
 
