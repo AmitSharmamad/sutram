@@ -17,3 +17,7 @@ func (indicator *IndNumber) Calculate(
 
 	return 0.0
 }
+
+func (number *IndNumber) GetDataRange() int32 {
+	return 0
+}

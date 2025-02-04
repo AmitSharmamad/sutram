@@ -39,5 +39,9 @@ func (indicator *SMA) Calculate(
 		sum += prices[i]
 	}
 
-	return sum / float64(period)
+	return Round(sum / float64(period))
+}
+
+func (sma *SMA) GetDataRange() int32 {
+	return int32(sma.period)
 }
