@@ -1,5 +1,7 @@
 package shared
 
+import "algo/src/util"
+
 type ILogicalExpression interface {
 	Handle(data StockData)
 }
@@ -31,4 +33,16 @@ func (expression *LogicalExpression) Handle(data StockData) bool {
 	default:
 		panic("invalid operator")
 	}
+}
+
+func (expression *LogicalExpression) GetDataRange() int32 {
+	lhsValue := expression.Lhs.GetDataRange()
+
+	if expression.Operator == "NA" {
+		return lhsValue
+	}
+
+	rhsValue := expression.Rhs.GetDataRange()
+
+	return util.Max(lhsValue, rhsValue)
 }

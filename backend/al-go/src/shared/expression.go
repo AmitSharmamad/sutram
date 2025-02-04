@@ -29,3 +29,12 @@ func (expression *Expression) Eval(data StockData) bool {
 	}
 	return false
 }
+
+func (expression *Expression) GetDataRange() int32 {
+	if expression.Type == "ExpressionStatement" {
+		if expression.Value.Type == "LogicalExpression" {
+			return expression.Value.GetDataRange()
+		}
+	}
+	return 0
+}

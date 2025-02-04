@@ -39,5 +39,9 @@ func (indicator *EMA) Calculate(
 		ema = (prices[i]-ema)*multiplier + ema
 	}
 
-	return ema
+	return Round(ema)
+}
+
+func (ema *EMA) GetDataRange() int32 {
+	return 0
 }
