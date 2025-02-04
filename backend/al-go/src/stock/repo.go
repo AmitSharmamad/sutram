@@ -19,7 +19,7 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Get(lastNRecords int) *shared.StockData {
+func (repo *Repo) Get(lastNRecords int32) *shared.StockData {
 	var data shared.StockData
 	repo.db.Select(&data, `
 		SELECT close 

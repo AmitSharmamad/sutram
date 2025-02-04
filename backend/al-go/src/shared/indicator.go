@@ -1,5 +1,9 @@
 package shared
 
+import (
+	"algo/src/util"
+)
+
 type IndicatorExpression struct {
 	Type     string     `json:"type"`     /// IndicatorExpression
 	Operator string     `json:"operator"` /// CrossesAbove / CrossesBelow
@@ -20,6 +24,7 @@ type Prices []float64
 
 type IndicatorCalculator interface {
 	Calculate(prices Prices, config map[string]any, point string) float64
+	GetDataRange() int32
 }
 
 func (expression *IndicatorExpression) Handle(data StockData) bool {
@@ -33,6 +38,12 @@ func (expression *IndicatorExpression) Handle(data StockData) bool {
 	)
 }
 
+func (expression *IndicatorExpression) GetDataRange() int32 {
+	lhsValue := expression.Lhs.GetDataRange()
+	rhsValue := expression.Rhs.GetDataRange()
+	return util.Max(lhsValue, rhsValue)
+}
+
 func (indicator *Indicator) Handle(data StockData) float64 {
 	println("Handling indicator", indicator)
 
@@ -43,6 +54,11 @@ func (indicator *Indicator) Handle(data StockData) float64 {
 	prices := GetPrices(data, indicator.Point)
 
 	return (calculator).Calculate(prices, config, indicator.Point)
+}
+
+func (indicator *Indicator) GetDataRange() int32 {
+	calculator := GetIndFactory(indicator.Name)
+	return calculator.GetDataRange()
 }
 
 func GetPrices(data StockData, point string) Prices {

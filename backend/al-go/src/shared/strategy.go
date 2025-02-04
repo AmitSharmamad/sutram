@@ -47,9 +47,16 @@ type Strategy struct {
 
 type Strategies []Strategy
 
-func (strategy *Strategy) GetEntryDataRange() int {
-	// TODO: handle this
-	return 1000
+func (strategy *Strategy) GetEntryDataRange() int32 {
+	return NewExpressionStatement(
+		strategy.EntryExpression,
+	).GetDataRange()
+}
+
+func (strategy *Strategy) GetExitDataRange() int32 {
+	return NewExpressionStatement(
+		strategy.ExitExpression,
+	).GetDataRange()
 }
 
 func (strategy *Strategy) TryEnter(data StockData) bool {

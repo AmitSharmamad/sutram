@@ -18,5 +18,5 @@ type Stock struct {
 type StockData []Stock
 
 type StockService interface {
-	Get(name string, lastNRecords int) *StockData
+	Get(name string, lastNRecords int32) *StockData
 }
