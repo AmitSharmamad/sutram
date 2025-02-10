@@ -1,5 +1,7 @@
 package shared
 
+import "algo/src/util"
+
 type EMA struct {
 	period int
 	offset int
@@ -39,7 +41,7 @@ func (indicator *EMA) Calculate(
 		ema = (prices[i]-ema)*multiplier + ema
 	}
 
-	return Round(ema)
+	return util.Round(ema)
 }
 
 func (ema *EMA) GetDataRange() int32 {
