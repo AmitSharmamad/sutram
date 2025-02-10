@@ -1,5 +1,7 @@
 package shared
 
+import "algo/src/util"
+
 type SMA struct {
 	period int
 	offset int
@@ -39,7 +41,7 @@ func (indicator *SMA) Calculate(
 		sum += prices[i]
 	}
 
-	return Round(sum / float64(period))
+	return util.Round(sum / float64(period))
 }
 
 func (sma *SMA) GetDataRange() int32 {
