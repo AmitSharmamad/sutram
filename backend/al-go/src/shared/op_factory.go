@@ -11,6 +11,13 @@ func NewOperatorFactory() *OperatorFactory {
 
 	factory.operators["CrossesAbove"] = &CrossesAbove{}
 	factory.operators["CrossesBelow"] = &CrossesBelow{}
+	factory.operators["UpBy"] = &UpBy{}
+	factory.operators["DownBy"] = &DownBy{}
+	factory.operators["EqualTo"] = &EqualTo{}
+	factory.operators["LowerThan"] = &LowerThan{}
+	factory.operators["HigherThan"] = &HigherThan{}
+	factory.operators["LowerThanEqualTo"] = &LowerThanEqualTo{}
+	factory.operators["HigherThanEqualTo"] = &HigherThanEqualTo{}
 
 	return factory
 }
