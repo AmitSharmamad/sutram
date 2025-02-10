@@ -1,7 +1,12 @@
 package shared
 
-type DownBy struct{}
+type DownBy RaiseBy
 
 func (o *DownBy) Operate(lhs float64, rhs float64) bool {
-	return lhs < rhs
+	if o.Type == PERCENTAGE {
+		return lhs < rhs*(1-o.Value/100)
+	} else if o.Type == ABSOLUTE {
+		return lhs < rhs-o.Value
+	}
+	return false
 }
