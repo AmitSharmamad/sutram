@@ -1,6 +1,7 @@
 package di
 
 import (
+	"algo/src/algo"
 	"algo/src/auth"
 	"algo/src/bt"
 	env "algo/src/core/config"
@@ -34,4 +35,5 @@ var Set = wire.NewSet(
 	user.Set,
 	auth.Set,
 	http.Set,
+	algo.Set,
 )
