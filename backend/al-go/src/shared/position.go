@@ -41,41 +41,8 @@ func NewPosition(runID uuid.UUID) *Position {
 	}
 }
 
-func (position *Position) TryEnter(
-	strategy *Strategy,
-	data *StockData,
-) bool {
-	return NewExpressionStatement(strategy.EntryExpression).Eval(*data)
-}
-
-func (position *Position) TryExit(
-	strategy *Strategy,
-	data *StockData,
-) bool {
-	// TODO: also check for stop loss, update trailing stop loss
-	return NewExpressionStatement(strategy.ExitExpression).Eval(*data)
-}
-
 func (position *Position) IsDone() bool {
 	return position.State == Exited
-}
-
-func (position *Position) Eval(
-	strategy *Strategy,
-	data *StockData,
-) {
-	switch position.State {
-	case NotEntered:
-		if position.TryEnter(strategy, data) {
-			position.State = Entered
-		}
-	case Entered:
-		if position.TryExit(strategy, data) {
-			position.State = Exited
-		}
-	default:
-		panic("Error in position Eval")
-	}
 }
 
 type RunPosition struct {
