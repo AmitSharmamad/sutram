@@ -10,9 +10,10 @@ import (
 )
 
 type Engine struct {
-	service         *Service
-	strategyService shared.StrategyService
-	stockService    shared.StockService
+	service           *Service
+	strategyService   shared.StrategyService
+	stockService      shared.StockService
+	expressionService shared.ExpressionService
 }
 
 func NewEngineProv(
@@ -77,7 +78,19 @@ func (engine *Engine) HandlePosition(
 ) {
 	position := engine.GetLatestPosition(runID)
 	currPos := position.State
-	position.Eval(strategy, &data)
+	switch position.State {
+	case shared.NotEntered:
+		if engine.expressionService.Eval(strategy.EntryExpression, data) {
+			position.State = shared.Entered
+		}
+	case shared.Entered:
+		if engine.expressionService.Eval(strategy.ExitExpression, data) {
+			position.State = shared.Exited
+		}
+	default:
+		panic("Error in position Eval")
+	}
+
 	updatedPos := position.State
 	engine.service.CreateLog(shared.NewPositionLog(
 		position.ID,
