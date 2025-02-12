@@ -1,4 +1,4 @@
-package shared
+package indicator
 
 import "algo/src/util"
 
