@@ -33,6 +33,9 @@ debug:
 
 ### local
 
+client:
+	go run src/web/client.go
+
 dbuild:
 	docker build -t sutram-go .
 
