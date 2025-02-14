@@ -17,12 +17,12 @@
 
 build:
 	go mod download
-	wire src/web/wire.go
-	go build -o s-web src/web/wire_gen.go src/web/main.go
+	wire cmd/web/wire.go
+	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
 
 run:
-	wire src/web/wire.go
-	go build -o s-web src/web/wire_gen.go src/web/main.go 
+	wire cmd/web/wire.go
+	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
 	./s-web
 
 debug:

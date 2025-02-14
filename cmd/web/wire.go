@@ -12,7 +12,6 @@ import (
 	"algo/src/strategy"
 	"algo/src/template"
 	"algo/src/user"
-	web "algo/src/web/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -29,7 +28,6 @@ func NewWebContainer(
 	UserRoot *user.Root,
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
-	WebRoot *web.Root,
 	BTRoot *bt.Root,
 ) *WebContainer {
 	return &WebContainer{}
@@ -42,7 +40,6 @@ func BuildContainer(
 		wire.Build(
 			NewWebContainer,
 			di.Set,
-			web.Set,
 		),
 	)
 }
