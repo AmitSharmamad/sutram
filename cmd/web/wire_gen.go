@@ -17,7 +17,6 @@ import (
 	"algo/src/strategy"
 	"algo/src/template"
 	"algo/src/user"
-	"algo/src/web/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,7 +55,6 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	userRouter := user.NewRoutesProv(engine, userController)
 	userRoot := user.NewRootProv(userRouter)
 	httpRoot := http.NewRoot(authMiddleware)
-	webRoot := web.NewRoot()
 	runRepo := bt.NewRunRepoProv(dbFactory)
 	positionRepo := bt.NewPositionRepoProv(dbFactory)
 	positionLogRepo := bt.NewPositionLogRepoProv(dbFactory)
@@ -65,7 +63,7 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	btController := bt.NewControllerProv(btService, btEngine)
 	btRouter := bt.NewRoutesProv(engine, btController)
 	btRoot := bt.NewRoot(btRouter)
-	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, webRoot, btRoot)
+	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, btRoot)
 	return webContainer
 }
 
@@ -82,7 +80,6 @@ func NewWebContainer(
 	UserRoot *user.Root,
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
-	WebRoot *web.Root,
 	BTRoot *bt.Root,
 ) *WebContainer {
 	return &WebContainer{}

@@ -1,7 +1,7 @@
 package main
 
 import (
-	web "algo/src/web/config"
+	"algo/src/web"
 	"algo/src/web/websocket"
 
 	"github.com/gin-gonic/gin"
