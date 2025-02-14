@@ -1,45 +1,10 @@
-# .PHONY: build && run
-#
-# build:
-# 	docker-compose build
-#
-# run:
-# 	docker-compose up -d
-#
-# deploy:
-# 	docker-compose up --build -d
-
-### prod
+.PHONY: build && run
 
 build:
-	go mod download
-	wire src/web/wire.go
-	go build -o s-web src/web/wire_gen.go src/web/main.go
+	docker-compose build
 
 run:
-	wire src/web/wire.go
-	go build -o s-web src/web/wire_gen.go src/web/main.go 
-	./s-web
+	docker-compose up -d
 
-debug:
-	lsof -ti tcp:9090 | xargs kill -9
-	# wire src/web/wire.go
-	go build -gcflags="all=-N -l" -o s-web src/web/wire_gen.go src/web/main.go 
-	air
-
-### local
-
-dbuild:
-	docker build -t sutram-go .
-
-drun:
-	docker run -it -p 9999:9999 sutram-go
-
-### testing
-
-test:
-	go test ./...
-
-coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out
+deploy:
+	docker-compose up --build -d
