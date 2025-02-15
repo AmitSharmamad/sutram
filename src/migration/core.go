@@ -11,12 +11,13 @@ import (
 
 // OHLCV represents a single candlestick data point
 type OHLCV struct {
-	Timestamp time.Time
-	Open      float64
-	High      float64
-	Low       float64
-	Close     float64
-	Volume    int64
+	Instrument string
+	Timestamp  time.Time
+	Open       float64
+	High       float64
+	Low        float64
+	Close      float64
+	Volume     int64
 }
 
 // CSVMapper maps CSV column names to their respective field names
