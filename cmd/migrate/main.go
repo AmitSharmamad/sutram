@@ -14,7 +14,7 @@ func main() {
 	// Create data source configuration
 	source := migration.DataSource{
 		Provider: provider,
-		FilePath: "data/historical/1.csv",
+		FilePath: "data/historical",
 	}
 
 	// Initialize database handler

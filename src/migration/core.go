@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -105,67 +106,79 @@ func ParseCSVRow(row map[string]string, mapper CSVMapper) (*OHLCV, error) {
 	return data, nil
 }
 
-// ReadCSVInChunks reads a CSV file in chunks and processes each chunk
-func ReadCSVInChunks(filePath string, chunkSize int, headers []string) (chan []map[string]string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("opening file: %w", err)
-	}
-
-	reader := csv.NewReader(file)
-	// Read and validate headers
-	fileHeaders, err := reader.Read()
-	if err != nil {
-		file.Close()
-		return nil, fmt.Errorf("reading headers: %w", err)
-	}
-
-	// Create header map for quick lookups
-	headerMap := make(map[string]int)
-	for i, h := range fileHeaders {
-		headerMap[h] = i
-	}
-
-	// Validate required headers exist
-	for _, required := range headers {
-		if _, exists := headerMap[required]; !exists {
-			file.Close()
-			return nil, fmt.Errorf("required header not found: %s", required)
-		}
-	}
-
+// ReadCSVInChunks reads CSV files in a directory in chunks and processes each chunk
+func ReadCSVInChunks(dirPath string, chunkSize int, headers []string) (chan []map[string]string, error) {
 	chunks := make(chan []map[string]string)
 
 	go func() {
-		defer file.Close()
 		defer close(chunks)
 
-		chunk := make([]map[string]string, 0, chunkSize)
+		println("walking files in dir ", dirPath)
 
-		for {
-			record, err := reader.Read()
-			if err == io.EOF {
-				if len(chunk) > 0 {
-					chunks <- chunk
-				}
-				break
-			}
+		err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				// Log error but continue processing
-				fmt.Printf("Error reading row: %v\n", err)
-				continue
+				return err
 			}
+			if !info.IsDir() && filepath.Ext(path) == ".csv" {
+				file, err := os.Open(path)
+				if err != nil {
+					return fmt.Errorf("opening file: %w", err)
+				}
+				defer file.Close()
 
-			row := make(map[string]string)
-			for header, idx := range headerMap {
-				row[header] = record[idx]
-			}
+				reader := csv.NewReader(file)
+				// Read and validate headers
+				fileHeaders, err := reader.Read()
+				if err != nil {
+					return fmt.Errorf("reading headers: %w", err)
+				}
 
-			chunk = append(chunk, row)
-			if len(chunk) >= chunkSize {
-				chunks <- chunk
-				chunk = make([]map[string]string, 0, chunkSize)
+				// Create header map for quick lookups
+				headerMap := make(map[string]int)
+				for i, h := range fileHeaders {
+					headerMap[h] = i
+				}
+
+				// Validate required headers exist
+				for _, required := range headers {
+					if _, exists := headerMap[required]; !exists {
+						return fmt.Errorf("required header not found: %s", required)
+					}
+				}
+
+				chunk := make([]map[string]string, 0, chunkSize)
+
+				for {
+					record, err := reader.Read()
+					if err == io.EOF {
+						if len(chunk) > 0 {
+							chunks <- chunk
+						}
+						break
+					}
+					if err != nil {
+						// Log error but continue processing
+						fmt.Printf("Error reading row: %v\n", err)
+						continue
+					}
+
+					row := make(map[string]string)
+					for header, idx := range headerMap {
+						row[header] = record[idx]
+					}
+
+					chunk = append(chunk, row)
+					if len(chunk) >= chunkSize {
+						chunks <- chunk
+						chunk = make([]map[string]string, 0, chunkSize)
+					}
+				}
 			}
+			return nil
+		})
+
+		if err != nil {
+			fmt.Printf("Error walking directory: %v\n", err)
 		}
 	}()
 
