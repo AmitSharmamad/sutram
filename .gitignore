@@ -133,6 +133,5 @@ s-web
 s-migrate
 main
 
-# sutram-db
-mount
-ohlcv_data.csv
+# data
+data/historical
