@@ -9,9 +9,11 @@ type OHLCVHandler interface {
 	HandleBatch([]*OHLCV) error
 }
 
+var size = 1000
+
 // Migrate processes a CSV file using the provided data provider
 func Migrate(source DataSource, handler OHLCVHandler) error {
-	chunks, err := ReadCSVInChunks(source.FilePath, 1000, source.Provider.GetHeaders())
+	chunks, err := ReadCSVInChunks(source.FilePath, size, source.Provider.GetHeaders())
 	if err != nil {
 		return fmt.Errorf("setting up CSV reader: %w", err)
 	}

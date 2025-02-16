@@ -15,7 +15,6 @@ type DataFeedsProvider struct {
 
 // NewDataFeedsProvider creates a new provider with column mapping and time formats
 func NewDataFeedsProvider() *DataFeedsProvider {
-
 	columnMap := map[string]string{
 		"date":   "Date", // Assuming these are the column names in your CSV
 		"time":   "Time", // Adjust these according to your actual CSV headers
@@ -24,11 +23,12 @@ func NewDataFeedsProvider() *DataFeedsProvider {
 		"low":    "Low",
 		"close":  "Close",
 		"volume": "Volume",
+		"ticker": "Ticker",
 	}
 
 	return &DataFeedsProvider{
 		ColumnMap:  columnMap,
-		DateFormat: "2006-01-02",
+		DateFormat: "02/01/2006",
 		TimeFormat: "15:04:05",
 	}
 }
@@ -71,6 +71,8 @@ func (v *DataFeedsProvider) MapToOHLCV(row map[string]string) (*OHLCV, error) {
 			date.Location(),
 		)
 	}
+
+	data.Instrument = row[v.ColumnMap["ticker"]]
 
 	// Parse OHLCV values
 	data.Open, err = strconv.ParseFloat(row[v.ColumnMap["open"]], 64)

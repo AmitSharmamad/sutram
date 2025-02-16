@@ -15,21 +15,28 @@
 
 ### prod
 
-build:
-	go mod download
-	wire cmd/web/wire.go
-	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
-
-run:
+webb:
 	wire cmd/web/wire.go
 	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
 	./s-web
 
-debug:
+webr:
+	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
+	./s-web
+
+webd:
 	lsof -ti tcp:9090 | xargs kill -9
 	# wire src/web/wire.go
 	go build -gcflags="all=-N -l" -o s-web src/web/wire_gen.go src/web/main.go 
 	air
+
+migrateb:
+	go build -o s-migrate cmd/migrate/main.go
+	./s-migrate
+
+migrated:
+	go build -gcflags="all=-N -l" -o s-migrate cmd/migrate/main.go
+	./s-migrate
 
 ### local
 
