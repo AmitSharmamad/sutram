@@ -12,7 +12,7 @@ func NewFactoryProv(
 		dbs: make(map[string]Database),
 	}
 	factory.dbs[string(CLICKHOUSE)] = clickhouse
-	// factory.dbs[string(POSTGRES)] = postgres
+	factory.dbs[string(POSTGRES)] = postgres
 	return factory
 }
 

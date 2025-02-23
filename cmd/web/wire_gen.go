@@ -25,7 +25,7 @@ import (
 func BuildContainer(engine *gin.Engine) *WebContainer {
 	envProv := env.NewEnvProv()
 	clickhouse := db.NewClickHouseProv(envProv)
-	postgres := db.NewPostgresProv()
+	postgres := db.NewPostgresProv(envProv)
 	dbFactory := db.NewFactoryProv(clickhouse, postgres)
 	repo := strategy.NewRepoProv(dbFactory)
 	service := strategy.NewServiceProv(repo)

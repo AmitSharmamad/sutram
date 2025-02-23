@@ -15,14 +15,14 @@ func NewRepoProv(
 ) *Repo {
 	return &Repo{
 		Name: "strategy",
-		db:   factory.Get("clickhouse"),
+		db:   factory.Get("postgres"),
 	}
 }
 
 func (repo *Repo) Create(user *User) (bool, error) {
 	res, err := repo.db.Insert(
-		`INSERT INTO sutram.user (name, username, email, password) VALUES (
-		:name, :username, :email, :password
+		`INSERT INTO "user" (name, username, email, password, phone_number) VALUES (
+		:name, :username, :email, :password, :phone_number
 		)`,
 		user,
 	)
@@ -42,7 +42,7 @@ func (repo *Repo) Get() (shared.Users, error) {
 	var users shared.Users
 	err := repo.db.Select(
 		&users,
-		"SELECT * FROM sutram.user LIMIT 10;",
+		"SELECT * FROM \"user\" LIMIT 10;",
 	)
 	return users, err
 }
