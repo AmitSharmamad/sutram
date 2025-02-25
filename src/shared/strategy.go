@@ -7,20 +7,21 @@ import (
 	"algo/src/util"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type Strategy struct {
 	ID     uuid.UUID `json:"id" db:"id"`
 	UserID uuid.UUID `json:"user_id" db:"user_id"`
 	// Position
-	Name           string   `json:"name" db:"name"`
-	Description    string   `json:"description" db:"description"`
-	PositionType   string   `json:"position_type" db:"position_type"`
-	Instruments    []string `json:"instruments" db:"instruments"`
-	ChartType      string   `json:"chart_type" db:"chart_type"`
-	ChartTimeframe string   `json:"chart_timeframe" db:"chart_timeframe"`
-	ChartUnknown   string   `json:"chart_unknown" db:"chart_unknown"`
-	Qty            int32    `json:"qty" db:"qty"`
+	Name           string         `json:"name" db:"name"`
+	Description    string         `json:"description" db:"description"`
+	PositionType   string         `json:"position_type" db:"position_type"`
+	Instruments    pq.StringArray `json:"instruments" db:"instruments"`
+	ChartType      string         `json:"chart_type" db:"chart_type"`
+	ChartTimeframe string         `json:"chart_timeframe" db:"chart_timeframe"`
+	ChartUnknown   string         `json:"chart_unknown" db:"chart_unknown"`
+	Qty            int32          `json:"qty" db:"qty"`
 
 	// Entry Condition
 	EntryExpression string `json:"entry_expression" db:"entry_expression"`

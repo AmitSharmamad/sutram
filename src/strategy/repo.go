@@ -19,8 +19,8 @@ func NewRepoProv(
 	factory *db.DBFactory,
 ) *Repo {
 	return &Repo{
-		Name: "sutram.strategy",
-		db:   factory.Get("clickhouse"),
+		Name: "strategy",
+		db:   factory.Get("postgres"),
 	}
 }
 
@@ -31,7 +31,7 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 
 	_, err := repo.db.Insert(
 		`
-		INSERT INTO sutram.strategy (
+		INSERT INTO strategy (
 			id, 
 			user_id,
 
@@ -45,21 +45,20 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			qty,
 
 			entry_expression,
+			exit_expression,
+			target_profit,
+			stop_loss,
+			trailing_stop_loss,
+			exit_type,
 
-      exit_expression,
-    	target_profit,
-    	stop_loss,
-    	trailing_stop_loss,
-    	exit_type,
-
-    	capital,
-    	max_trades,
-    	entry_start_time,
-    	entry_end_time,
-    	start_date,
-    	end_date,
-    	is_active
-    ) VALUES (
+			capital,
+			max_trades,
+			entry_start_time,
+			entry_end_time,
+			start_date,
+			end_date,
+			is_active
+		) VALUES (
 			:id, 
 			:user_id, 
 
@@ -73,21 +72,20 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			:qty,
 
 			:entry_expression,
+			:exit_expression,
+			:target_profit,
+			:stop_loss,
+			:trailing_stop_loss,
+			:exit_type,
 
-    	:exit_expression,
-    	:target_profit,
-    	:stop_loss,
-    	:trailing_stop_loss,
-    	:exit_type,
-
-    	:capital,
-    	:max_trades,
-    	:entry_start_time,
-    	:entry_end_time,
-    	:start_date,
-    	:end_date,
-    	:is_active
-    );
+			:capital,
+			:max_trades,
+			:entry_start_time,
+			:entry_end_time,
+			:start_date,
+			:end_date,
+			:is_active
+		);
 		`,
 		strategy,
 	)
@@ -106,7 +104,7 @@ func (repo *Repo) Get(
 		&strategies,
 		`
 		SELECT *
-		FROM sutram.strategy
+		FROM strategy
 		WHERE user_id = $1
 		AND id = $2;
 		`,
@@ -152,7 +150,7 @@ func (repo *Repo) GetAll(
 
 	repo.db.Select(
 		&strategies,
-		"SELECT * FROM sutram.strategy WHERE user_id = $1;",
+		"SELECT * FROM strategy WHERE user_id = $1;",
 		userID,
 	)
 
