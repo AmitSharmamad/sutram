@@ -17,6 +17,19 @@ type Stock struct {
 
 type StockData []Stock
 
+type StockColumn struct {
+	Timestamp []time.Time `json:"timestamps" db:"timestamp"`
+
+	Open  []float64 `json:"opens" db:"open"`
+	High  []float64 `json:"highs" db:"high"`
+	Close []float64 `json:"closes" db:"close"`
+	Low   []float64 `json:"lows" db:"low"`
+
+	Volume []int64 `json:"volumes" db:"volume"`
+
+	CreatedAt []time.Time `json:"created_ats" db:"created_at"`
+}
+
 type StockService interface {
 	Get(name string, lastNRecords int32) *StockData
 }

@@ -73,6 +73,11 @@ func (postgres *Postgres) Select(model any, query string, args ...any) error {
 	return err
 }
 
+func (postgres *Postgres) Get(model any, query string, args ...any) error {
+	err := postgres.db.Get(model, query, args...)
+	return err
+}
+
 func (postgres *Postgres) Update(query string, values interface{}) (sql.Result, error) {
 	return postgres.db.NamedExec(query, values)
 }
