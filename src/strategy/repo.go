@@ -148,11 +148,15 @@ func (repo *Repo) GetAll(
 
 	var strategies shared.Strategies
 
-	repo.db.Select(
+	err := repo.db.Select(
 		&strategies,
 		"SELECT * FROM strategy WHERE user_id = $1;",
 		userID,
 	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &strategies, nil
 }
