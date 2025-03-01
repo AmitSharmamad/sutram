@@ -30,6 +30,19 @@ type StockColumn struct {
 	CreatedAt []time.Time `json:"created_ats" db:"created_at"`
 }
 
+type DateRange string
+
+const (
+    LastDay      DateRange = "last_day"
+    LastWeek     DateRange = "last_week"
+    LastMonth    DateRange = "last_month"
+    Last6Months  DateRange = "last_6_months"
+    LastYear     DateRange = "last_year"
+    YearToDate   DateRange = "year_to_date"
+    Last3Years   DateRange = "last_3_years"
+    Last5Years   DateRange = "last_5_years"
+)
+
 type StockService interface {
-	Get(name string, lastNRecords int32) *StockData
+	Get(name string, dateRangeStr string, lastNRecords int32) *StockData
 }

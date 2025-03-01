@@ -20,12 +20,13 @@ func NewControllerProv(
 
 func (controller *Controller) Get(gctx *gin.Context) {
 	instrumentName := gctx.Query("instrument")
+	dateRangeStr := gctx.Query("dateRange")
 
 	if instrumentName == "" {
 		panic("instrument name is required")
 	}
 
-	stockData := controller.service.Get(instrumentName, 600)
+	stockData := controller.service.Get(instrumentName, dateRangeStr, 600)
 	out := controller.service.Converter(*stockData)
 
 	shared.SuccessResp(gctx, out)

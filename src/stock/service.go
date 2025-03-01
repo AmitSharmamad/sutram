@@ -57,14 +57,48 @@ func (service *Service) Converter(sd shared.StockData) *shared.StockColumn {
 	return columns
 }
 
-func (service *Service) Get(name string, lastNRecords int32) *shared.StockData {
+func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange {
+
+	var dateRange shared.DateRange
+
+	switch dateRangeStr {
+	case "last_day":
+		dateRange = shared.LastDay
+	case "last_week":
+		dateRange = shared.LastWeek
+	case "last_month":
+		dateRange = shared.LastMonth
+	case "last_6_months":
+		dateRange = shared.Last6Months
+	case "last_year":
+		dateRange = shared.LastYear
+	case "year_to_date":
+		dateRange = shared.YearToDate
+	case "last_3_years":
+		dateRange = shared.Last3Years
+	case "last_5_years":
+		dateRange = shared.Last5Years
+	default:
+		// Default to LastMonth
+		dateRange = shared.LastMonth
+	}
+
+	return dateRange
+}
+
+func (service *Service) Get(
+	name string,
+	dateRangeStr string,
+	lastNRecords int32,
+) *shared.StockData {
 
 	instrumentId, err := service.repo.GetInstrumentId(name)
 	if err != nil {
 		panic(err)
 	}
+	dateRange := service.ConvertToDateRange(dateRangeStr)
 
-	stockData, err := service.repo.Get(instrumentId, lastNRecords)
+	stockData, err := service.repo.Get(instrumentId, dateRange, lastNRecords)
 	if err != nil {
 		panic(err)
 	}
