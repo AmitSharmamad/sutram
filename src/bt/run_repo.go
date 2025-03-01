@@ -15,23 +15,25 @@ func NewRunRepoProv(
 ) *RunRepo {
 	return &RunRepo{
 		Name: "sutram.bt_run",
-		db:   factory.Get("clickhouse"),
+		db:   factory.Get("postgres"),
+
 	}
 }
 
 func (repo *RunRepo) Create(run *shared.Run) error {
 	_, err := repo.db.Insert(`
-		INSERT INTO sutram.bt_run (
-			id, strategy_id, state, qty, 
+		INSERT INTO run (
+			id, strategy_id, instrument, state, qty,
 			period_start_time, period_end_time
 		)
 		VALUES (
 			:id,
-    	:strategy_id,
-    	:state,
-    	:qty,
-    	:period_start_time,
-    	:period_end_time
+			:strategy_id,
+			:instrument,
+			:state,
+			:qty,
+			:period_start_time,
+			:period_end_time
 		)
 		`,
 		run,
@@ -42,11 +44,10 @@ func (repo *RunRepo) Create(run *shared.Run) error {
 func (repo *RunRepo) GetByStrategyID(id string) (shared.Runs, error) {
 	var runs shared.Runs
 	err := repo.db.Select(&runs, `
-		SELECT * 
-		FROM $1
-		WHERE strategy_id = $2;
+		SELECT id, strategy_id, instrument, run_group_id, type
+		FROM run
+		WHERE strategy_id = $1;
 		`,
-		repo.Name,
 		id,
 	)
 	return runs, err

@@ -40,7 +40,7 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) {
 
 	instrument := strategy.Instruments[0]
 
-	data := engine.stockService.Get(instrument, dataRange)
+	data := engine.stockService.Get(instrument, "", dataRange)
 
 	id := run.ID
 
