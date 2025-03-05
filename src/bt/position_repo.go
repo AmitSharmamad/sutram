@@ -23,7 +23,7 @@ func NewPositionRepoProv(
 
 func (repo *PositionRepo) Create(position *shared.Position) error {
 	_, err := repo.db.Insert(`
-		INSERT INTO sutram.bt_position (
+		INSERT INTO position (
 			id, run_id, state
 		) VALUES (
 			:id, :run_id, :state
@@ -38,7 +38,7 @@ func (repo *PositionRepo) GetLatest(runID uuid.UUID) (*shared.Position, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT *
-		FROM sutram.bt_position
+		FROM position
 		WHERE run_id = $1;
 		`,
 		runID,

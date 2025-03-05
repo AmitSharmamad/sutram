@@ -33,16 +33,19 @@ type StockColumn struct {
 type DateRange string
 
 const (
-    LastDay      DateRange = "last_day"
-    LastWeek     DateRange = "last_week"
-    LastMonth    DateRange = "last_month"
-    Last6Months  DateRange = "last_6_months"
-    LastYear     DateRange = "last_year"
-    YearToDate   DateRange = "year_to_date"
-    Last3Years   DateRange = "last_3_years"
-    Last5Years   DateRange = "last_5_years"
+	LastDay     DateRange = "last_day"
+	LastWeek    DateRange = "last_week"
+	LastMonth   DateRange = "last_month"
+	Last6Months DateRange = "last_6_months"
+	LastYear    DateRange = "last_year"
+	YearToDate  DateRange = "year_to_date"
+	Last3Years  DateRange = "last_3_years"
+	Last5Years  DateRange = "last_5_years"
+	All         DateRange = ""
 )
 
 type StockService interface {
+	Converter(sd StockData) *StockColumn
 	Get(name string, dateRangeStr string, lastNRecords int32) *StockData
+	ConvertToDateRange(dateRangeStr string) DateRange
 }

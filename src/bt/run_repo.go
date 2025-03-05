@@ -57,7 +57,7 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 	var runs shared.Runs
 	err := repo.db.Select(&runs, `
 		SELECT * 
-		FROM sutram.bt_run
+		FROM run
 		WHERE id = $1;
 		`,
 		id,
