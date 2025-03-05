@@ -82,4 +82,8 @@ func (strategy *Strategy) Validate() {
 
 type StrategyService interface {
 	Get(ctx context.Context, id uuid.UUID) *Strategy
+	Create(ctx context.Context, strategy *Strategy,) (*Strategy, error)
+	GetData() StockData
+	GetAll(ctx context.Context) (*Strategies, error)
+	Validate(strategy *Strategy) bool
 }

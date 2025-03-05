@@ -61,13 +61,15 @@ func (repo *Repo) Get(instrumentId int32, dateRange shared.DateRange, lastNRecor
             query += " AND timestamp >= now() - INTERVAL '3 years'"
         case shared.Last5Years:
             query += " AND timestamp >= now() - INTERVAL '5 years'"
+        case shared.All:
+            println(query)
     }
 
     // Add ordering and limit
-    query += " ORDER BY timestamp DESC LIMIT $2"
+    query += " ORDER BY timestamp DESC"
 
     // Execute the query
-    err := repo.db.Select(&data, query, instrumentId, lastNRecords)
+    err := repo.db.Select(&data, query, instrumentId)
 
     return &data, err
 }

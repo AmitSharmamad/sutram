@@ -78,6 +78,8 @@ func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange
 		dateRange = shared.Last3Years
 	case "last_5_years":
 		dateRange = shared.Last5Years
+	case "":
+		dateRange = shared.All
 	default:
 		// Default to LastMonth
 		dateRange = shared.LastMonth
