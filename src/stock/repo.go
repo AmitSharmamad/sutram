@@ -66,7 +66,7 @@ func (repo *Repo) Get(instrumentId int32, dateRange shared.DateRange, lastNRecor
     }
 
     // Add ordering and limit
-    query += " ORDER BY timestamp DESC"
+    query += " ORDER BY timestamp ASC"
 
     // Execute the query
     err := repo.db.Select(&data, query, instrumentId)

@@ -13,7 +13,7 @@ type User struct {
 	Email       string    `json:"email" db:"email"`
 	PhoneNumber string    `json:"phone_number" db:"phone_number"`
 	Password    string    `json:"password" db:"password"`
-	Verified    string    `json:"verified" db:"verified"`
+	Verified    bool      `json:"verified" db:"verified"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
 
 	Audit
