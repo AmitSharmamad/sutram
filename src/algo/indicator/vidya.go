@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -55,4 +56,9 @@ func (indicator *VIDYA) Calculate(
 
 func (v *VIDYA) GetDataRange() int32 {
 	return int32(v.period * 2)
+}
+
+func (indicator *VIDYA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

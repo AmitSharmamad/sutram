@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -96,4 +97,9 @@ func (stc *STC) GetDataRange() int32 {
 		maxPeriod = stc.cycleLength
 	}
 	return int32(maxPeriod + stc.cycleLength)
+}
+
+func (indicator *STC) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

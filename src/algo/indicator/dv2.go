@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -58,4 +59,9 @@ func (dv2 *DV2) GetDataRange() int32 {
 		return int32(dv2.rsiPeriod)
 	}
 	return int32(dv2.emaPeriod)
+}
+
+func (indicator *DV2) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

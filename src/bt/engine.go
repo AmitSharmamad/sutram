@@ -14,17 +14,20 @@ type Engine struct {
 	strategyService   shared.StrategyService
 	stockService      shared.StockService
 	expressionService shared.ExpressionService
+	indicatorService  shared.IndicatorService
 }
 
 func NewEngineProv(
 	service *Service,
 	strategyService shared.StrategyService,
 	stockService shared.StockService,
+	indicatorService  shared.IndicatorService,
 ) *Engine {
 	return &Engine{
 		service:         service,
 		strategyService: strategyService,
 		stockService:    stockService,
+		indicatorService: indicatorService,
 	}
 }
 

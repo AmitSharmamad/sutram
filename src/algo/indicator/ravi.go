@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -60,4 +61,9 @@ func (ravi *RAVI) GetDataRange() int32 {
 		return int32(ravi.longPeriod)
 	}
 	return int32(ravi.shortPeriod)
+}
+
+func (indicator *RAVI) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }
