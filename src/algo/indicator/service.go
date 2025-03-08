@@ -14,6 +14,7 @@ func NewServiceProv() *Service {
 func (s *Service) GetIndicatorData(
 	ctx context.Context,
 	name string,
+	period int,
 	data *shared.StockData,
 ) []float64 {
 
@@ -21,7 +22,7 @@ func (s *Service) GetIndicatorData(
 	println(calculator)
 	var results []float64
 	config := make(map[string]any, 0)
-	config["period"] = 14
+	config["period"] = period
 
 	results = (calculator).CalculateAll(*data, config, "close")
 	return results

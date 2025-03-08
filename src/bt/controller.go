@@ -41,7 +41,8 @@ func (controller *Controller) Start(gctx *gin.Context) {
 		panic(err)
 	}
 	println(run)
-	controller.engine.Run(ctx, run)
+	indicators := controller.engine.Run(ctx, run)
+	shared.SuccessResp(gctx, indicators)
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}

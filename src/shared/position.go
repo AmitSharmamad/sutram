@@ -25,11 +25,11 @@ type Position struct {
 	ID         uuid.UUID `json:"id" db:"id"`
 	RunID      uuid.UUID `json:"run_id" db:"run_id"`
 	State      RunState  `json:"state" db:"state"`
-	EntryPrice float64   `json:"entry_price" db:"entry_price"`
-	EntryTime  time.Time `json:"entry_time" db:"entry_time"`
-	ExitPrice  float64   `json:"exit_price" db:"exit_price"`
-	ExitTime   time.Time `json:"exit_time" db:"exit_time"`
-	ExitReason string    `json:"exit_reason" db:"exit_reason"`
+	EntryPrice *float64   `json:"entry_price" db:"entry_price"`
+	EntryTime  *time.Time `json:"entry_time" db:"entry_time"`
+	ExitPrice  *float64   `json:"exit_price" db:"exit_price"`
+	ExitTime   *time.Time `json:"exit_time" db:"exit_time"`
+	ExitReason *string    `json:"exit_reason" db:"exit_reason"`
 	Audit
 }
 

@@ -16,8 +16,8 @@ func NewPositionRepoProv(
 	factory *db.DBFactory,
 ) *PositionRepo {
 	return &PositionRepo{
-		Name: "sutram.bt_position",
-		db:   factory.Get("clickhouse"),
+		Name: "position",
+		db:   factory.Get("postgres"),
 	}
 }
 
@@ -39,7 +39,8 @@ func (repo *PositionRepo) GetLatest(runID uuid.UUID) (*shared.Position, error) {
 	err := repo.db.Select(&positions, `
 		SELECT *
 		FROM position
-		WHERE run_id = $1;
+		WHERE run_id = $1
+		ORDER BY created_at DESC;
 		`,
 		runID,
 	)
@@ -60,4 +61,20 @@ func (repo *PositionRepo) GetByRunID(runID string) (*shared.Positions, error) {
 		runID,
 	)
 	return &positions, err
+}
+
+func (repo *PositionRepo) Update(position *shared.Position) error {
+	_, err := repo.db.Update(`
+		UPDATE position
+		SET
+			state = :state,
+			entry_price = :entry_price,
+			entry_time = :entry_time,
+			exit_price = :exit_price,
+			exit_time = :exit_time
+		WHERE id = :id
+		`,
+		position,
+	)
+	return err
 }

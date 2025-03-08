@@ -30,6 +30,11 @@ type StockColumn struct {
 	CreatedAt []time.Time `json:"created_ats" db:"created_at"`
 }
 
+type StockIndicator struct {
+	StockColumn
+	Indicators map[string][]float64 `json:"indicators" db:"indicators"`
+}
+
 type DateRange string
 
 const (
