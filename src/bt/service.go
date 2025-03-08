@@ -77,6 +77,11 @@ func (service *Service) GetRun(id string) (*shared.Run, *shared.Positions) {
 
 func (service *Service) UpdatePosition(position *shared.Position) {
 	// update the position value
+	err := service.positionRepo.Update(position)
+	if err != nil {
+		panic(err)
+	}
+
 }
 
 func (service *Service) GetRunLogs(id string) *shared.PositionLogs {
