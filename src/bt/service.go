@@ -75,6 +75,13 @@ func (service *Service) GetRun(id string) (*shared.Run, *shared.Positions) {
 	return run, nil
 }
 
+func (service *Service) UpdateRunState(run *shared.Run) {
+	err := service.runRepo.UpdateState(run)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (service *Service) UpdatePosition(position *shared.Position) {
 	// update the position value
 	err := service.positionRepo.Update(position)
@@ -94,4 +101,20 @@ func (service *Service) GetRunLogs(id string) *shared.PositionLogs {
 
 func (service *Service) CreateLog(log *shared.PositionLog) {
 	service.positionLogRepo.Create(log)
+}
+
+func (service *Service) GetPositions(runID uuid.UUID) shared.Positions {
+	positions, err := service.positionRepo.GetByRunID(runID.String())
+	if err != nil {
+		panic("Error fetching positions")
+	}
+	return *positions
+}
+
+
+
+func (service *Service) SaveRunMetrics(metrics *shared.RunMetrics) {
+	// TODO: Implement metrics storage
+	// For now just log the metrics
+	println("Saving run metrics:", metrics.ID.String())
 }

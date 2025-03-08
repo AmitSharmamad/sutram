@@ -54,10 +54,9 @@ func (repo *PositionRepo) GetByRunID(runID string) (*shared.Positions, error) {
 	var positions shared.Positions
 	err := repo.db.Select(&positions, `
 		SELECT * 
-		FROM $1
-		WHERE run_id = $2
+		FROM position
+		WHERE run_id = $1
 		`,
-		repo.Name,
 		runID,
 	)
 	return &positions, err
@@ -71,7 +70,8 @@ func (repo *PositionRepo) Update(position *shared.Position) error {
 			entry_price = :entry_price,
 			entry_time = :entry_time,
 			exit_price = :exit_price,
-			exit_time = :exit_time
+			exit_time = :exit_time,
+			exit_reason = :exit_reason
 		WHERE id = :id
 		`,
 		position,

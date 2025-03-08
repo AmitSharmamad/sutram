@@ -67,8 +67,8 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 
 func (repo *RunRepo) UpdateState(run *shared.Run) error {
 	_, err := repo.db.Update(`
-		UPDATE sutram.bt_run
-		SET status = :state
+		UPDATE run
+		SET state = :state
 		WHERE id = :id
 		`,
 		run,
