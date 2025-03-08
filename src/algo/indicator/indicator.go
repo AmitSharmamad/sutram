@@ -26,6 +26,7 @@ type Prices []float64
 
 type IndicatorCalculator interface {
 	Calculate(prices Prices, config map[string]any, point string) float64
+	CalculateAll(data shared.StockData, config map[string]any, point string) []float64
 	GetDataRange() int32
 }
 

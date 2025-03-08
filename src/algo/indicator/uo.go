@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -101,4 +102,9 @@ func (uo *UO) GetDataRange() int32 {
 		maxPeriod = uo.period3
 	}
 	return int32(maxPeriod)
+}
+
+func (indicator *UO) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

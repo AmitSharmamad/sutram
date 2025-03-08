@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -53,4 +54,9 @@ func (indicator *VWAP) Calculate(
 
 func (vwap *VWAP) GetDataRange() int32 {
 	return int32(vwap.period)
+}
+
+func (indicator *VWAP) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

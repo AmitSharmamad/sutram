@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -81,4 +82,9 @@ func (indicator *QQE) Calculate(
 
 func (qqe *QQE) GetDataRange() int32 {
 	return int32(qqe.rsiPeriod * 2)
+}
+
+func (indicator *QQE) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

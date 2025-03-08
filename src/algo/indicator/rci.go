@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"sort"
 )
@@ -73,4 +74,9 @@ func (indicator *RCI) Calculate(
 
 func (rci *RCI) GetDataRange() int32 {
 	return int32(rci.period)
+}
+
+func (indicator *RCI) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

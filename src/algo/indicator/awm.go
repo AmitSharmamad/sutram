@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -76,6 +77,10 @@ func (awm *AWM) GetDataRange() int32 {
 	return int32(awm.period * 2)
 }
 
+func (indicator *AWM) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
+}
 type AnchoredWMA struct {
 	period int
 	anchor float64
@@ -143,4 +148,9 @@ func (indicator *AnchoredWMA) Calculate(
 
 func (awma *AnchoredWMA) GetDataRange() int32 {
 	return int32(awma.period)
+}
+
+func (indicator *AnchoredWMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

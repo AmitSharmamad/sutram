@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -43,4 +44,9 @@ func (indicator *WMA) Calculate(
 
 func (wma *WMA) GetDataRange() int32 {
 	return int32(wma.period)
+}
+
+func (indicator *WMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }
