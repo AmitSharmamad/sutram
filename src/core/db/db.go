@@ -15,6 +15,7 @@ type Database interface {
 
 	Insert(query string, values interface{}) (sql.Result, error)
 	Select(model any, query string, args ...any) error
+	Get(model any, query string, args ...any) error
 	Update(query string, values interface{}) (sql.Result, error)
 	Delete(query string, values interface{}) (sql.Result, error)
 }

@@ -14,6 +14,7 @@ func NewRoutesProv(
 		api.POST("/run/:id/start", controller.Start)
 		api.POST("/run/:id/pause", controller.Pause)
 		api.POST("/run/:id/resume", controller.Resume)
+		api.POST("/run/:id/metrics", controller.GetMetrics)
 
 		api.GET("/run", controller.GetAllRuns)
 		api.GET("/run/:id", controller.GetRun)

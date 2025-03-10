@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -54,4 +55,9 @@ func (indicator *ZLEMA) Calculate(
 
 func (zlema *ZLEMA) GetDataRange() int32 {
 	return int32(zlema.period)
+}
+
+func (indicator *ZLEMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

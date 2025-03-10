@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -77,4 +78,17 @@ func (indicator *TSI) Calculate(
 
 func (tsi *TSI) GetDataRange() int32 {
 	return int32(tsi.slowPeriod + tsi.fastPeriod)
+}
+
+func (indicator *TSI) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	prices := GetPrices(data, point)
+
+	for i := 0; i < len(data); i++ {
+		windowPrices := prices[:i+1]
+		result := indicator.Calculate(windowPrices, config, point)
+		results = append(results, result)
+	}
+
+	return results
 }

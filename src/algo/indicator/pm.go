@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -57,4 +58,9 @@ func (pm *PM) GetDataRange() int32 {
 		return int32(pm.longPeriod)
 	}
 	return int32(pm.shortPeriod)
+}
+
+func (indicator *PM) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

@@ -17,6 +17,40 @@ type Stock struct {
 
 type StockData []Stock
 
+type StockColumn struct {
+	Timestamp []time.Time `json:"timestamps" db:"timestamp"`
+
+	Open  []float64 `json:"opens" db:"open"`
+	High  []float64 `json:"highs" db:"high"`
+	Close []float64 `json:"closes" db:"close"`
+	Low   []float64 `json:"lows" db:"low"`
+
+	Volume []int64 `json:"volumes" db:"volume"`
+
+	CreatedAt []time.Time `json:"created_ats" db:"created_at"`
+}
+
+type StockIndicator struct {
+	StockColumn
+	Indicators map[string][]float64 `json:"indicators" db:"indicators"`
+}
+
+type DateRange string
+
+const (
+	LastDay     DateRange = "last_day"
+	LastWeek    DateRange = "last_week"
+	LastMonth   DateRange = "last_month"
+	Last6Months DateRange = "last_6_months"
+	LastYear    DateRange = "last_year"
+	YearToDate  DateRange = "year_to_date"
+	Last3Years  DateRange = "last_3_years"
+	Last5Years  DateRange = "last_5_years"
+	All         DateRange = ""
+)
+
 type StockService interface {
-	Get(name string, lastNRecords int32) *StockData
+	Converter(sd StockData) *StockColumn
+	Get(name string, dateRangeStr string, lastNRecords int32) *StockData
+	ConvertToDateRange(dateRangeStr string) DateRange
 }

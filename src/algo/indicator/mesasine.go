@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -58,4 +59,9 @@ func (indicator *MesaSineWave) Calculate(
 
 func (msw *MesaSineWave) GetDataRange() int32 {
 	return int32(msw.period)
+}
+
+func (indicator *MesaSineWave) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }
