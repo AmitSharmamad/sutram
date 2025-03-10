@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -42,4 +43,9 @@ func (indicator *ForceIndex) Calculate(
 
 func (fi *ForceIndex) GetDataRange() int32 {
 	return int32(fi.period)
+}
+
+func (indicator *ForceIndex) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

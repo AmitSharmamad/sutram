@@ -52,11 +52,12 @@ func (controller *Controller) Create(gctx *gin.Context) {
 
 	gctx.Bind(strategy)
 
-	isValid := controller.service.Validate(strategy)
+	// TODO: Work on the validation logic
+	// isValid := controller.service.Validate(strategy)
 
-	if !isValid {
-		panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
-	}
+	// if !isValid {
+	// 	panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
+	// }
 
 	fmt.Printf("%+v\n", strategy)
 

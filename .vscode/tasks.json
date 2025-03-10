@@ -1,0 +1,12 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "wire cmd/web/wire.go && go build -o s-web cmd/web/wire_gen.go cmd/web/main.go",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

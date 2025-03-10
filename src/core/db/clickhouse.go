@@ -79,6 +79,11 @@ func (clickhouse *Clickhouse) Select(model any, query string, args ...any) error
 	return err
 }
 
+func (clickhouse *Clickhouse) Get(model any, query string, args ...any) error {
+	err := clickhouse.db.Get(model, query, args...)
+	return err
+}
+
 func (clickhouse *Clickhouse) Update(query string, values interface{}) (sql.Result, error) {
 	return clickhouse.db.NamedExec(query, values)
 }

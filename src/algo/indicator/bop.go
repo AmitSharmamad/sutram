@@ -1,6 +1,9 @@
 package indicator
 
-import "algo/src/util"
+import (
+	"algo/src/shared"
+	"algo/src/util"
+)
 
 type BopIndicator struct {
 	scalar float64
@@ -35,4 +38,9 @@ func (indicator *BopIndicator) Calculate(
 
 func (indicator *BopIndicator) GetDataRange() int32 {
 	return 1
+}
+
+func (indicator *BopIndicator) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }

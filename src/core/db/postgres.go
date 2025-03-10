@@ -1,31 +1,87 @@
 package db
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+	"log"
 
-type Postgres struct{}
+	env "algo/src/core/config"
 
-func NewPostgresProv() *Postgres {
-	return &Postgres{}
+	_ "github.com/lib/pq"
+	"github.com/jmoiron/sqlx"
+)
+
+type Postgres struct {
+	env *env.EnvProv
+	db  *sqlx.DB
 }
 
-func (*Postgres) Connect() {
+func NewPostgresProv(env *env.EnvProv) *Postgres {
+	db := &Postgres{
+		env: env,
+	}
+
+	db.Connect()
+
+	return db
 }
 
-func (*Postgres) Close() {
+func (postgres *Postgres) Connect() {
+	envProv := postgres.env
+
+	host := envProv.GetProp(env.POSTGRES_HOST)
+	port := envProv.GetProp(env.POSTGRES_PORT)
+	dbname := envProv.GetProp(env.POSTGRES_DBNAME)
+	username := envProv.GetProp(env.POSTGRES_USERNAME)
+	password := envProv.GetProp(env.POSTGRES_PASSWORD)
+
+	// PostgreSQL connection string format
+	connectionString := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, username, password, dbname,
+	)
+
+	db, err := sqlx.Open("postgres", connectionString)
+
+	postgres.db = db
+
+	if err != nil {
+		log.Fatalf("Error creating connection pool: %v", err)
+	}
+
+	// Ping the database to verify connectivity
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Error connecting to PostgreSQL: %v", err)
+	}
+
+	fmt.Println("Successfully connected to PostgreSQL!")
 }
 
-func (*Postgres) Insert(query string, args ...any) (sql.Result, error) {
-	return nil, nil
+func (postgres *Postgres) Close() {
+	if postgres.db != nil {
+		postgres.db.Close()
+	}
 }
 
-func (*Postgres) Select(model []any, query string, args ...any) ([]any, error) {
-	return nil, nil
+func (postgres *Postgres) Insert(query string, values interface{}) (sql.Result, error) {
+	result, err := postgres.db.NamedExec(query, values)
+	return result, err
 }
 
-func (*Postgres) Update(query string, args ...any) (sql.Result, error) {
-	return nil, nil
+func (postgres *Postgres) Select(model any, query string, args ...any) error {
+	err := postgres.db.Select(model, query, args...)
+	return err
 }
 
-func (*Postgres) Delete(query string, args ...any) (sql.Result, error) {
-	return nil, nil
+func (postgres *Postgres) Get(model any, query string, args ...any) error {
+	err := postgres.db.Get(model, query, args...)
+	return err
+}
+
+func (postgres *Postgres) Update(query string, values interface{}) (sql.Result, error) {
+	return postgres.db.NamedExec(query, values)
+}
+
+func (postgres *Postgres) Delete(query string, values interface{}) (sql.Result, error) {
+	return postgres.db.NamedExec(query, values)
 }

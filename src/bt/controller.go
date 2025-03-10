@@ -41,12 +41,28 @@ func (controller *Controller) Start(gctx *gin.Context) {
 		panic(err)
 	}
 	println(run)
-	controller.engine.Run(ctx, run)
+	indicators := controller.engine.Run(ctx, run)
+	shared.SuccessResp(gctx, indicators)
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}
 
 func (controller *Controller) Resume(gctx *gin.Context) {}
+
+func (controller *Controller) GetMetrics(gctx *gin.Context) {
+	id := gctx.Param("id")
+
+	run, err := controller.service.GetRun(id)
+	if err != nil {
+		panic(err)
+	}
+	metrics := controller.engine.CalculateRunMetrics(run)
+	response := map[string]interface{}{}
+	response["id"] = id
+	response["metrics"] = metrics
+	response["status"] = "work in progress"
+	shared.SuccessResp(gctx, response)
+}
 
 func (controller *Controller) GetAllRuns(gctx *gin.Context) {
 	strategyID := gctx.Query("strategy")

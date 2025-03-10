@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"algo/src/shared"
 	"algo/src/util"
 	"math"
 )
@@ -76,4 +77,9 @@ func (indicator *ADX) Calculate(
 
 func (adx *ADX) GetDataRange() int32 {
 	return int32(adx.period * 2)
+}
+
+func (indicator *ADX) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
+	var results []float64
+	return results
 }
