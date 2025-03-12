@@ -44,7 +44,7 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 
 	instrument := strategy.Instruments[0]
 
-	data := engine.stockService.Get(instrument, "", dataRange)
+	data := engine.stockService.Get(instrument, "", "", dataRange)
 	stockDataColumn := engine.stockService.Converter(*data)
 	println(stockDataColumn.Close)
 	closeData := stockDataColumn.Close
