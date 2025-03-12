@@ -88,9 +88,40 @@ func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange
 	return dateRange
 }
 
+func (service *Service) ConvertToGranularity(granularityStr string) shared.StockGranularity {
+
+	var granularity shared.StockGranularity
+
+	switch granularityStr {
+	case "1m":
+		granularity = shared.StockGranularity1m
+	case "3m":
+		granularity = shared.StockGranularity3m
+	case "5m":
+		granularity = shared.StockGranularity5m
+	case "15m":
+		granularity = shared.StockGranularity15m
+	case "30m":
+		granularity = shared.StockGranularity30m
+	case "1h":
+		granularity = shared.StockGranularity1h
+	case "3h":
+		granularity = shared.StockGranularity3h
+	case "1d":
+		granularity = shared.StockGranularity1d
+	case "1M":
+		granularity = shared.StockGranularity1M
+	default:
+		granularity = shared.StockGranularity1m
+	}
+
+	return granularity
+}
+
 func (service *Service) Get(
 	name string,
 	dateRangeStr string,
+	granularityStr string,
 	lastNRecords int32,
 ) *shared.StockData {
 
@@ -99,8 +130,9 @@ func (service *Service) Get(
 		panic(err)
 	}
 	dateRange := service.ConvertToDateRange(dateRangeStr)
+	granularity := service.ConvertToGranularity(granularityStr)
 
-	stockData, err := service.repo.Get(instrumentId, dateRange, lastNRecords)
+	stockData, err := service.repo.Get(instrumentId, dateRange, granularity, lastNRecords)
 	if err != nil {
 		panic(err)
 	}
