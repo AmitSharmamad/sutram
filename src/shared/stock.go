@@ -49,8 +49,24 @@ const (
 	All         DateRange = ""
 )
 
+type StockGranularity string
+
+const (
+	StockGranularity1m StockGranularity = "1m"
+	StockGranularity3m StockGranularity = "3m"
+	StockGranularity5m StockGranularity = "5m"
+	StockGranularity15m StockGranularity = "15m"
+	StockGranularity30m StockGranularity = "30m"
+	StockGranularity1h StockGranularity = "1h"
+	StockGranularity3h StockGranularity = "3h"
+	StockGranularity1d StockGranularity = "1d"
+	StockGranularity1M StockGranularity = "1M"
+)
+
+
 type StockService interface {
 	Converter(sd StockData) *StockColumn
-	Get(name string, dateRangeStr string, lastNRecords int32) *StockData
+	Get(name string, dateRangeStr string, granularityStr string, lastNRecords int32) *StockData
 	ConvertToDateRange(dateRangeStr string) DateRange
+	ConvertToGranularity(granularityStr string) StockGranularity
 }
