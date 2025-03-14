@@ -114,8 +114,6 @@ func (service *Service) GetPositions(runID uuid.UUID) shared.Positions {
 	return *positions
 }
 
-
-
 func (service *Service) SaveRunMetrics(metrics *shared.RunMetrics) {
 	println("Saving run metrics:", metrics.ID.String())
 	err := service.runMetricsRepo.Create(metrics)

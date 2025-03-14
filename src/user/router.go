@@ -12,7 +12,7 @@ func NewRoutesProv(
 ) *Router {
 	user := engine.Group("/user")
 	{
-		user.GET("", controller.Get)
+		user.GET("", controller.GetAll)
 		user.POST("", controller.Create)
 	}
 

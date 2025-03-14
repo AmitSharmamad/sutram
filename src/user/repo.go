@@ -3,6 +3,7 @@ package user
 import (
 	"algo/src/core/db"
 	"algo/src/shared"
+	"fmt"
 
 	"github.com/lib/pq"
 )
@@ -44,14 +45,21 @@ func (repo *Repo) Create(user *User) (bool, error) {
 	return true, nil
 }
 
-func (repo *Repo) GetAll() {}
-
-func (repo *Repo) Get() (shared.Users, error) {
+func (repo *Repo) GetAll(offset int, limit int) (shared.Users, error) {
 	var users shared.Users
+
+	query := fmt.Sprintf(`
+        SELECT *
+        FROM "user"
+		ORDER BY created_at DESC
+		LIMIT %d OFFSET %d
+    `, limit, offset)
+
 	err := repo.db.Select(
 		&users,
-		"SELECT * FROM \"user\" LIMIT 10;",
+		query,
 	)
+
 	return users, err
 }
 
