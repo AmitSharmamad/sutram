@@ -31,17 +31,18 @@ type RunType string
 type Runs []Run
 
 type Run struct {
-	ID              uuid.UUID `json:"id" db:"id"`
-	StrategyID      uuid.UUID `json:"strategy_id" db:"strategy_id"`
-	Instrument      string    `json:"instrument" db:"instrument"`
-	RunGroupId      uuid.UUID `json:"run_group_id" db:"run_group_id"`
-	State           RunState  `json:"state" db:"state"`
-	RunType         RunType   `json:"run_type" db:"type"`
-	Qty             float64   `json:"qty" db:"qty"`
-	PeriodStartTime time.Time `json:"period_start_time" db:"period_start_time"`
-	PeriodEndTime   time.Time `json:"period_end_time" db:"period_end_time"`
-	StartedTime     time.Time `json:"started_time" db:"started_time"`
-	EndedTime       time.Time `json:"ended_time" db:"ended_time"`
+	ID              uuid.UUID  `json:"id" db:"id"`
+	RunGroupID      *uuid.UUID `json:"run_group_id" db:"run_group_id"`
+	StrategyID      uuid.UUID  `json:"strategy_id" db:"strategy_id"`
+	Exchange        string     `json:"exchange" db:"exchange"`
+	Instrument      string     `json:"instrument" db:"instrument"`
+	RunType         RunType    `json:"type" db:"type"`
+	State           RunState   `json:"state" db:"state"`
+	Qty             int        `json:"qty" db:"qty"`
+	PeriodStartTime time.Time  `json:"period_start_time" db:"period_start_time"`
+	PeriodEndTime   time.Time  `json:"period_end_time" db:"period_end_time"`
+	StartedTime     *time.Time  `json:"started_time" db:"started_time"`
+	EndedTime       *time.Time  `json:"ended_time" db:"ended_time"`
 	Audit
 }
 

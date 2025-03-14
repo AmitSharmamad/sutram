@@ -12,6 +12,7 @@ var Set = wire.NewSet(
 	NewRoot,
 
 	NewRunRepoProv,
+	NewRunMetricsRepoProv,
 	NewPositionRepoProv,
 	NewPositionLogRepoProv,
 
