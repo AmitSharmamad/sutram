@@ -20,7 +20,6 @@ type Strategy struct {
 	Instruments    pq.StringArray `json:"instruments" db:"instruments"`
 	ChartType      string         `json:"chart_type" db:"chart_type"`
 	ChartTimeframe string         `json:"chart_timeframe" db:"chart_timeframe"`
-	ChartUnknown   string         `json:"chart_unknown" db:"chart_unknown"`
 	Qty            int32          `json:"qty" db:"qty"`
 
 	// Entry Condition

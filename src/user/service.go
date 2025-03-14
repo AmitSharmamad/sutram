@@ -26,8 +26,8 @@ func NewServiceProv(
 	}
 }
 
-func (service *Service) Get() (shared.Users, error) {
-	return service.repo.Get()
+func (service *Service) GetAll( offset int, limit int) (shared.Users, error) {
+	return service.repo.GetAll(offset, limit)
 }
 
 func (service *Service) GetByUsername(username string) (shared.User, error) {
