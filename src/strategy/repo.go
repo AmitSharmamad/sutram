@@ -98,10 +98,10 @@ func (repo *Repo) Get(
 ) (*shared.Strategy, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	var strategies shared.Strategies
+	var strategy shared.Strategy
 
-	err := repo.db.Select(
-		&strategies,
+	err := repo.db.Get(
+		&strategy,
 		`
 		SELECT *
 		FROM strategy
@@ -111,13 +111,9 @@ func (repo *Repo) Get(
 		userID,
 		id,
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	return &strategies[0], nil
+	return &strategy, err
 }
-
 func (repo *Repo) GetLatest(
 	ctx context.Context,
 ) (*shared.Strategy, error) {
