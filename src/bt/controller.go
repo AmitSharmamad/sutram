@@ -2,6 +2,7 @@ package bt
 
 import (
 	"algo/src/shared"
+	"algo/src/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +20,19 @@ func NewControllerProv(
 		service: service,
 		engine:  engine,
 	}
+}
+
+func (controller *Controller) DoBacktest(gctx *gin.Context) {
+
+	ctx := shared.GetReqCtx(gctx)
+	// strategyIDStr := gctx.DefaultQuery("strategyID", "")
+	strategyIDStr := "0fe92b52-458f-4e1c-92b9-314f4ccb2fa3"
+
+	// convert the strategyID to a uuid
+	strategyID := util.Parse(strategyIDStr)
+	dummy := controller.engine.Start(ctx, strategyID)
+
+	shared.SuccessResp(gctx, dummy)
 }
 
 func (controller *Controller) CreateRun(gctx *gin.Context) {

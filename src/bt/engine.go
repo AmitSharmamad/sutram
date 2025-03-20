@@ -32,6 +32,42 @@ func NewEngineProv(
 	}
 }
 
+
+func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string {
+
+	strategy := engine.strategyService.Get(ctx, strategyID)
+
+	// get the instruments for the strategy
+	instruments := strategy.Instruments
+
+	// for each of the instruments in the strategy:
+	// 1. create a run
+	// 2. emit an event to asynchronously run the strategy back testing
+	for _, instrument := range instruments {
+		runObj := shared.Run{}
+
+		runObj.Instrument = instrument
+		runObj.StrategyID = strategyID
+		runObj.RunGroupID = nil
+		runObj.Exchange = "MCX"
+		runObj.RunType = shared.BackTest
+		runObj.State = shared.NotStarted
+		runObj.Qty = 10
+		runObj.PeriodStartTime = nil
+		runObj.PeriodEndTime = nil
+		runObj.StartedTime = nil
+		runObj.EndedTime = nil
+
+		run := engine.service.CreateRun(&runObj)
+		println(util.ToString(run.ID))
+
+		// TODO: emit an event to asynchronously run the strategy back testing
+	}
+
+	return instruments
+
+}
+
 func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockIndicator {
 	strategy := engine.strategyService.Get(ctx, run.StrategyID)
 
@@ -61,7 +97,7 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 	}
 
 	for i := 50; i < len(stockIndicator.Close); i++ {
-		position := engine.GetLatestPosition(run.ID)
+		position := engine.GetLatestPosition(run.ID, strategy)
 		currPos := position.State
 		switch currPos {
 		case "NOT_ENTERED":
@@ -74,8 +110,8 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 				fmt.Printf("close -> %.6f", stockIndicator.Close[i])
 				fmt.Printf("ema14[i] -> %.6f ema50[i] -> %.6f\n", ema14[i], ema50[i])
 				position.State = shared.Entered
-				position.EntryPrice = &stockIndicator.Close[i]
-				position.EntryTime = &stockIndicator.Timestamp[i]
+				position.EntryPriceSignal = &stockIndicator.Close[i]
+				position.EntryTimeSignal = &stockIndicator.Timestamp[i]
 				// TODO: Make Order(Buy if LONG, else Sell)
 			}
 
@@ -88,8 +124,8 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 
 			if exit_condition {
 				position.State = shared.Exited
-				position.ExitPrice = &stockIndicator.Close[i]
-				position.ExitTime = &stockIndicator.Timestamp[i]
+				position.ExitPriceSignal = &stockIndicator.Close[i]
+				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
 				// TODO: Make the Exit Reason Dynamic
 				exitReason := "HIT_PROFIT|HIT_STOP_LOSS|MANUAL"
 				position.ExitReason = &exitReason
@@ -167,7 +203,7 @@ func (engine *Engine) HandlePosition(
 	strategy *shared.Strategy,
 	data shared.StockData,
 ) {
-	position := engine.GetLatestPosition(runID)
+	position := engine.GetLatestPosition(runID, strategy)
 	currPos := position.State
 	switch position.State {
 	case shared.NotEntered:
@@ -194,11 +230,14 @@ func (engine *Engine) HandlePosition(
 
 func (engine *Engine) GetLatestPosition(
 	id uuid.UUID,
+	strategy *shared.Strategy,
 ) *shared.Position {
 	position := engine.service.GetLatestPosition(id)
 	if position == nil || position.IsDone() {
+		// NOTE: direction is position is equivalent to strategy.PositionType
+		direction := strategy.PositionType
 		// create a new position
-		position = engine.service.CreatePosition(id)
+		position = engine.service.CreatePosition(id, direction)
 	}
 	return position
 }
@@ -237,19 +276,19 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 	// Calculate metrics from positions
 	for i, pos := range positions {
 		// Skip incomplete positions
-		if pos.EntryPrice == nil || pos.ExitPrice == nil || pos.EntryTime == nil || pos.ExitTime == nil {
+		if pos.EntryPriceSignal == nil || pos.ExitPriceSignal == nil || pos.EntryTimeSignal == nil || pos.ExitTimeSignal == nil {
 			continue
 		}
 
 		// Position size and P&L calculations
-		positionSize := *pos.EntryPrice
+		positionSize := *pos.EntryPriceSignal
 		if positionSize > maxPositionSize {
 			maxPositionSize = positionSize
 		}
 		totalPositionSize += positionSize
 
 		// Calculate position P&L
-		pnl := *pos.ExitPrice - *pos.EntryPrice
+		pnl := *pos.ExitPriceSignal - *pos.EntryPriceSignal
 		totalPnL += pnl
 
 		// Calculate daily return for this position (simplified)
@@ -276,7 +315,7 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		}
 
 		// Trade duration
-		duration := pos.ExitTime.Sub(*pos.EntryTime)
+		duration := pos.ExitTimeSignal.Sub(*pos.EntryTimeSignal)
 		totalTradeDuration += duration.Hours()
 	}
 
@@ -292,7 +331,7 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		// P&L and return metrics
 		// If we have initial capital information from the strategy or run, use it
 		// For now, we'll use the first position's entry price as a proxy for initial capital
-		initialCapital := positions[0].EntryPrice
+		initialCapital := positions[0].EntryPriceSignal
 		if initialCapital != nil && *initialCapital > 0 {
 			metrics.TotalReturnPCT = (totalPnL / *initialCapital) * 100
 			

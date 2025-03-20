@@ -41,7 +41,6 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			instruments,
 			chart_type,
 			chart_timeframe,
-			chart_unknown,
 			qty,
 
 			entry_expression,
@@ -68,7 +67,6 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			:instruments,
 			:chart_type,
 			:chart_timeframe,
-			:chart_unknown,
 			:qty,
 
 			:entry_expression,
