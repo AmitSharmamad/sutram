@@ -39,8 +39,8 @@ type Run struct {
 	RunType         RunType    `json:"type" db:"type"`
 	State           RunState   `json:"state" db:"state"`
 	Qty             int        `json:"qty" db:"qty"`
-	PeriodStartTime time.Time  `json:"period_start_time" db:"period_start_time"`
-	PeriodEndTime   time.Time  `json:"period_end_time" db:"period_end_time"`
+	PeriodStartTime *time.Time  `json:"period_start_time" db:"period_start_time"`
+	PeriodEndTime   *time.Time  `json:"period_end_time" db:"period_end_time"`
 	StartedTime     *time.Time  `json:"started_time" db:"started_time"`
 	EndedTime       *time.Time  `json:"ended_time" db:"ended_time"`
 	Audit
