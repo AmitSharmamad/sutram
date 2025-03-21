@@ -33,9 +33,9 @@ webd:
 	air
 
 migrateb:
-	wire cmd/migrate/wire.go
-	go build -o s-migrate cmd/migrate/wire_gen.go cmd/migrate/main.go
-	./s-migrate
+	@wire cmd/migrate/wire.go
+	@go build -o s-migrate cmd/migrate/wire_gen.go cmd/migrate/main.go
+	@./s-migrate
 
 migrated:
 	wire cmd/migrate/wire.go

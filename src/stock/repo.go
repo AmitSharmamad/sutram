@@ -120,10 +120,9 @@ func (repo *Repo) Insert(instruments []*shared.OHLCV) error {
 		INSERT INTO sutram.instrument (
 			id, symbol, open, high, low, close, volume, timestamp, created_at, updated_at
 		) VALUES (
-		:id, :instrument, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
+			:id, :instrument, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
 		)`,
 		instruments,
 	)
-	fmt.Printf("%+v\n", err)
 	return err
 }

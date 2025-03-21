@@ -33,7 +33,6 @@ func Migrate(source DataSource, handler OHLCVHandler) error {
 		}
 
 		if len(records) > 0 {
-			fmt.Printf("%+v\n", records[0])
 			if err := handler.HandleBatch(source.InstrumentMaster, records); err != nil {
 				log.Printf("Error handling batch: %v", err)
 			}
