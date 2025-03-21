@@ -71,6 +71,21 @@ func (repo *PositionRepo) Update(position *shared.Position) error {
 			entry_time_signal = :entry_time_signal,
 			exit_price_signal = :exit_price_signal,
 			exit_time_signal = :exit_time_signal,
+
+			entry_price_order = :entry_price_order,
+			entry_time_order = :entry_time_order,
+			exit_price_order = :exit_price_order,
+			exit_time_order = :exit_time_order,
+
+			profit_loss_absolute = :profit_loss_absolute,
+			profit_loss_percentage = :profit_loss_percentage,
+
+			entry_fees = :entry_fees,
+			exit_fees = :exit_fees,
+			transaction_cost = :transaction_cost,
+
+			net_profit_loss = :net_profit_loss,
+
 			exit_reason = :exit_reason
 		WHERE id = :id
 		`,

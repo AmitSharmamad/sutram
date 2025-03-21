@@ -44,7 +44,10 @@ func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 	return run
 }
 
-func (service *Service) CreatePosition(runID uuid.UUID, direction string) *shared.Position {
+func (service *Service) CreatePosition(
+	runID uuid.UUID,
+	direction shared.Direction,
+) *shared.Position {
 	position := shared.NewPosition(runID, direction)
 	service.positionRepo.Create(position)
 	return position

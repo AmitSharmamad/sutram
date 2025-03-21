@@ -25,8 +25,7 @@ func NewControllerProv(
 func (controller *Controller) DoBacktest(gctx *gin.Context) {
 
 	ctx := shared.GetReqCtx(gctx)
-	// strategyIDStr := gctx.DefaultQuery("strategyID", "")
-	strategyIDStr := "0fe92b52-458f-4e1c-92b9-314f4ccb2fa3"
+	strategyIDStr := gctx.Query("strategy_id")
 
 	// convert the strategyID to a uuid
 	strategyID := util.Parse(strategyIDStr)

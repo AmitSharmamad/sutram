@@ -22,3 +22,7 @@ func fromUnix(timestamp int64) string {
 	t := time.Unix(timestamp, 0)
 	return t.Format("2023-03-26 00:30:00")
 }
+
+func GetTime() time.Time {
+	return time.Now()
+}
