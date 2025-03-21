@@ -1,8 +1,6 @@
 package stock
 
 import (
-	"fmt"
-
 	"algo/src/core/db"
 	"algo/src/shared"
 )
@@ -33,21 +31,32 @@ Expiry         time.Time `json:"expiry" db:"expiry"`
 */
 
 func (r *MasterRepo) Insert(master *shared.InstrumentMaster) error {
-	_, err := r.db.GetDb().NamedQuery(`
+	_, err := r.db.GetDB().Exec(`
 		INSERT INTO sutram.instrument_master (
-			id, exchange, segment, instrument, instrument_id
+			id, exchange, segment, instrument
 		) VALUES (
-			:id, :exchange, :segment, :instrument, :instrument_id
-		)
+			?, ?, ?, ?
+		);
 		`,
-		master,
+		master.ID, master.Exchange, master.Segment, master.Instrument,
 	)
-	fmt.Printf("%+v\n", err)
 	return err
 }
 
-func (r *MasterRepo) GetInstrument(name string) (uint64, error) {
-	rows, err := r.db.GetDb().NamedQuery("SELECT id FROM sutram.instrument WHERE symbol = :symbol;", struct{ symbol string }{symbol: name})
-	fmt.Printf("coming from here %+v\n", rows)
-	return 1, err
+func (r *MasterRepo) GetInstrument(name string) (*shared.InstrumentMaster, error) {
+	master := make([]shared.InstrumentMaster, 0)
+	err := r.db.Select(&master, "SELECT * FROM sutram.instrument_master WHERE instrument = $1 LIMIT 1", name)
+	if len(master) == 0 {
+		return nil, nil
+	}
+	return &master[0], err
+}
+
+func (r *MasterRepo) GetLatestID() (uint64, error) {
+	ids := make([]uint64, 0)
+	err := r.db.Select(&ids, "SELECT id FROM sutram.instrument_master ORDER BY id DESC LIMIT 1;")
+	if len(ids) > 0 {
+		return ids[0], err
+	}
+	return 0, err
 }
