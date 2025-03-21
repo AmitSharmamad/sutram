@@ -1,6 +1,10 @@
 package db
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"github.com/jmoiron/sqlx"
+)
 
 type DB string
 
@@ -12,6 +16,8 @@ const (
 type Database interface {
 	Connect()
 	Close()
+
+	GetDb() *sqlx.DB
 
 	Insert(query string, values interface{}) (sql.Result, error)
 	Select(model any, query string, args ...any) error

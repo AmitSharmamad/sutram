@@ -12,5 +12,4 @@ func NewRoot() *Root {
 
 var Set = wire.NewSet(
 	NewRoot,
-	// HealthCheck,
 )
