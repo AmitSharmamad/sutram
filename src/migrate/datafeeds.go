@@ -1,9 +1,11 @@
-package migration
+package migrate
 
 import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"algo/src/shared"
 )
 
 // DataFeedsProvider implements DataProvider interface for DataFeeds's CSV format
@@ -23,7 +25,8 @@ func NewDataFeedsProvider() *DataFeedsProvider {
 		"low":    "Low",
 		"close":  "Close",
 		"volume": "Volume",
-		"ticker": "Ticker",
+		"symbol": "Ticker",
+		// "symbol": "Symbol", // Add this line for the symbol column
 	}
 
 	return &DataFeedsProvider{
@@ -41,8 +44,8 @@ func (v *DataFeedsProvider) GetHeaders() []string {
 	return headers
 }
 
-func (v *DataFeedsProvider) MapToOHLCV(row map[string]string) (*OHLCV, error) {
-	data := &OHLCV{}
+func (v *DataFeedsProvider) MapToOHLCV(row map[string]string) (*shared.OHLCV, error) {
+	data := &shared.OHLCV{}
 	var err error
 
 	// Parse timestamp based on configuration
@@ -72,7 +75,9 @@ func (v *DataFeedsProvider) MapToOHLCV(row map[string]string) (*OHLCV, error) {
 		)
 	}
 
-	data.Instrument = row[v.ColumnMap["ticker"]]
+	data.Instrument = row[v.ColumnMap["symbol"]] // Update to use the symbol column
+
+	// data.Instrument = row[v.ColumnMap["ticker"]]
 
 	// Parse OHLCV values
 	data.Open, err = strconv.ParseFloat(row[v.ColumnMap["open"]], 64)
