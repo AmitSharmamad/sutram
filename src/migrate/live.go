@@ -1,7 +1,9 @@
-package migration
+package migrate
+
+import "algo/src/shared"
 
 type OHLCVSingleHandler interface {
-	HandleSingle(*OHLCV) error
+	HandleSingle(*shared.OHLCV) error
 }
 
 // Handle processes a single data point using the provided data provider

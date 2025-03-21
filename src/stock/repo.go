@@ -1,9 +1,10 @@
 package stock
 
 import (
+	"fmt"
+
 	"algo/src/core/db"
 	"algo/src/shared"
-	"fmt"
 )
 
 type Repo struct {
@@ -54,9 +55,9 @@ func (repo *Repo) Get(
 		intervalValue, intervalUnit = "5", "MINUTE"
 	case shared.StockGranularity15m:
 		intervalValue, intervalUnit = "15", "MINUTE"
-    case shared.StockGranularity30m:
+	case shared.StockGranularity30m:
 		intervalValue, intervalUnit = "30", "MINUTE"
-    case shared.StockGranularity1h:
+	case shared.StockGranularity1h:
 		intervalValue, intervalUnit = "1", "HOUR"
 	case shared.StockGranularity3h:
 		intervalValue, intervalUnit = "3", "HOUR"
@@ -112,4 +113,17 @@ func (repo *Repo) Get(
 	// Execute the query without limit
 	err := repo.db.Select(&data, query, instrumentId)
 	return &data, err
+}
+
+func (repo *Repo) Insert(instruments []*shared.OHLCV) error {
+	_, err := repo.db.Insert(`
+		INSERT INTO sutram.instrument (
+			id, symbol, open, high, low, close, volume, timestamp, created_at, updated_at
+		) VALUES (
+		:id, :instrument, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
+		)`,
+		instruments,
+	)
+	fmt.Printf("%+v\n", err)
+	return err
 }

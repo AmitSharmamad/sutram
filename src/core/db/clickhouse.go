@@ -69,6 +69,10 @@ func (clickhouse *Clickhouse) Close() {
 	clickhouse.db.Close()
 }
 
+func (clickhouse *Clickhouse) GetDb() *sqlx.DB {
+	return clickhouse.db
+}
+
 func (clickhouse *Clickhouse) Insert(query string, values interface{}) (sql.Result, error) {
 	result, err := clickhouse.db.NamedExec(query, values)
 	return result, err

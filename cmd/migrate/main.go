@@ -1,40 +1,39 @@
 package main
 
 import (
-	"algo/src/migration"
 	"fmt"
 	"log"
+
+	"algo/src/migrate"
+	"algo/src/shared"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	engine := gin.Default()
+
+	container := BuildContainer(engine)
+
 	// Configure DataFeeds provider
+
 	// Initialize provider with date/time formats
-	provider := migration.NewDataFeedsProvider()
+	provider := migrate.NewDataFeedsProvider()
 
 	// Create data source configuration
-	source := migration.DataSource{
+	source := migrate.DataSource{
 		Provider: provider,
 		FilePath: "data/historical",
+		InstrumentMaster: shared.InstrumentMaster{
+			Exchange: shared.MCX,
+			Segment:  shared.FNO,
+		},
 	}
 
-	// Initialize database handler
-	handler := &DBHandler{}
-
 	// Start migration
-	if err := migration.Migrate(source, handler); err != nil {
+	if err := migrate.Migrate(source, container.dbHandler); err != nil {
 		log.Fatalf("Error during migration: %v", err)
 	}
 
 	fmt.Println("Migration completed successfully")
-}
-
-// DBHandler implements OHLCVHandler interface for database operations
-type DBHandler struct {
-	// TODO: Add database connection/configuration
-}
-
-func (h *DBHandler) HandleBatch(data []*migration.OHLCV) error {
-	// TODO: Implement database batch insert
-	fmt.Printf("Processing batch of %d records\n", len(data))
-	return nil
 }
