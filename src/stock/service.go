@@ -1,17 +1,23 @@
 package stock
 
 import (
-	"algo/src/shared"
 	"time"
+
+	"algo/src/shared"
 )
 
 type Service struct {
-	repo *Repo
+	masterRepo *MasterRepo
+	repo       *Repo
 }
 
-func NewServiceProv(repo *Repo) *Service {
+func NewServiceProv(
+	masterRepo *MasterRepo,
+	repo *Repo,
+) *Service {
 	return &Service{
-		repo: repo,
+		masterRepo: masterRepo,
+		repo:       repo,
 	}
 }
 
@@ -58,7 +64,6 @@ func (service *Service) Converter(sd shared.StockData) *shared.StockColumn {
 }
 
 func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange {
-
 	var dateRange shared.DateRange
 
 	switch dateRangeStr {
@@ -89,7 +94,6 @@ func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange
 }
 
 func (service *Service) ConvertToGranularity(granularityStr string) shared.StockGranularity {
-
 	var granularity shared.StockGranularity
 
 	switch granularityStr {
@@ -124,7 +128,6 @@ func (service *Service) Get(
 	granularityStr string,
 	lastNRecords int32,
 ) *shared.StockData {
-
 	instrumentId, err := service.repo.GetInstrumentId(name)
 	if err != nil {
 		panic(err)
@@ -138,4 +141,52 @@ func (service *Service) Get(
 	}
 
 	return stockData
+}
+
+func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.OHLCV) error {
+	// Insert the master record
+	latestID, err := s.masterRepo.GetInstrument(master.Symbol)
+	if err != nil {
+		println(err)
+	}
+
+	master.ID = latestID + 1
+
+	s.masterRepo.Insert(&master)
+
+	s.repo.Insert(instruments)
+
+	return nil
+}
+
+type InstrumentService struct {
+	masterRepo *MasterRepo
+	repo       *Repo
+}
+
+func NewInstrumentServiceProv(
+	masterRepo *MasterRepo,
+	repo *Repo,
+) *InstrumentService {
+	return &InstrumentService{
+		masterRepo: masterRepo,
+		repo:       repo,
+	}
+}
+
+func (service *InstrumentService) InsertMaster(
+	master *shared.InstrumentMaster,
+) error {
+	// master.ID = util.NewUUID()
+	// master.InstrumentID = 1
+	service.masterRepo.Insert(master)
+	println("added to master")
+	return nil
+}
+
+func (service *InstrumentService) InsertData(
+	instruments []shared.OHLCV,
+) error {
+	// service.repo.Insert(instruments)
+	return nil
 }
