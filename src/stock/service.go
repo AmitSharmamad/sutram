@@ -1,6 +1,7 @@
 package stock
 
 import (
+	"fmt"
 	"time"
 
 	"algo/src/shared"
@@ -144,15 +145,35 @@ func (service *Service) Get(
 }
 
 func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.OHLCV) error {
-	// Insert the master record
-	latestID, err := s.masterRepo.GetInstrument(master.Symbol)
-	if err != nil {
-		println(err)
+	uniqueInstruments := make(map[string]struct{})
+
+	for _, instrument := range instruments {
+		uniqueInstruments[instrument.Instrument] = struct{}{}
 	}
 
-	master.ID = latestID + 1
-
-	s.masterRepo.Insert(&master)
+	for instrument := range uniqueInstruments {
+		m, err := s.masterRepo.GetInstrument(instrument)
+		if err != nil {
+			fmt.Printf("error in getting instrument %+v\n", err)
+		}
+		if m == nil {
+			fmt.Printf("%s, %+v, %t\n", instrument, m, m == nil)
+			latestID, err := s.masterRepo.GetLatestID()
+			if err != nil {
+				panic("error in getting instrument id")
+			}
+			id := latestID + 1
+			s.masterRepo.Insert(&shared.InstrumentMaster{
+				ID:             id,
+				Exchange:       master.Exchange,
+				Segment:        master.Segment,
+				Symbol:         instrument,
+				Instrument:     instrument,
+				InstrumentID:   id,
+				InstrumentName: instrument,
+			})
+		}
+	}
 
 	s.repo.Insert(instruments)
 
@@ -172,21 +193,4 @@ func NewInstrumentServiceProv(
 		masterRepo: masterRepo,
 		repo:       repo,
 	}
-}
-
-func (service *InstrumentService) InsertMaster(
-	master *shared.InstrumentMaster,
-) error {
-	// master.ID = util.NewUUID()
-	// master.InstrumentID = 1
-	service.masterRepo.Insert(master)
-	println("added to master")
-	return nil
-}
-
-func (service *InstrumentService) InsertData(
-	instruments []shared.OHLCV,
-) error {
-	// service.repo.Insert(instruments)
-	return nil
 }

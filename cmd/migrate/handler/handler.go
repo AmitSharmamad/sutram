@@ -4,7 +4,6 @@ import (
 	"algo/src/shared"
 )
 
-// DBHandler implements OHLCVHandler interface for database operations
 type DBHandler struct {
 	stockService shared.StockService
 }

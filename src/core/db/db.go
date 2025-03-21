@@ -17,11 +17,13 @@ type Database interface {
 	Connect()
 	Close()
 
-	GetDb() *sqlx.DB
+	GetDB() *sqlx.DB
 
 	Insert(query string, values interface{}) (sql.Result, error)
 	Select(model any, query string, args ...any) error
 	Get(model any, query string, args ...any) error
 	Update(query string, values interface{}) (sql.Result, error)
 	Delete(query string, values interface{}) (sql.Result, error)
+
+	NamedQuery(query string, arg interface{}) (*sqlx.Rows, error)
 }

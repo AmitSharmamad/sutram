@@ -26,8 +26,12 @@ func NewPostgresProv(env *env.EnvProv) *Postgres {
 	return db
 }
 
-func (postgres *Postgres) GetDb() *sqlx.DB {
+func (postgres *Postgres) GetDB() *sqlx.DB {
 	return postgres.db
+}
+
+func (postgres *Postgres) NamedQuery(query string, arg interface{}) (*sqlx.Rows, error) {
+	return postgres.db.NamedQuery(query, arg)
 }
 
 func (postgres *Postgres) Connect() {
