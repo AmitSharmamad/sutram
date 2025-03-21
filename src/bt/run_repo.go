@@ -72,7 +72,10 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 func (repo *RunRepo) UpdateState(run *shared.Run) error {
 	_, err := repo.db.Update(`
 		UPDATE run
-		SET state = :state
+		SET
+			state = :state,
+			started_time = :started_time,
+			ended_time = :ended_time
 		WHERE id = :id
 		`,
 		run,

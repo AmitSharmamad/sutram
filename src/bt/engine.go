@@ -3,6 +3,7 @@ package bt
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"algo/src/shared"
 	"algo/src/util"
@@ -32,7 +33,6 @@ func NewEngineProv(
 	}
 }
 
-
 func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string {
 
 	strategy := engine.strategyService.Get(ctx, strategyID)
@@ -41,8 +41,15 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string 
 	instruments := strategy.Instruments
 
 	// for each of the instruments in the strategy:
-	// 1. create a run
-	// 2. emit an event to asynchronously run the strategy back testing
+	// 1. Create a run
+	// 2. Asynchronously run the run
+
+	var wg sync.WaitGroup
+
+	// waiting for all the run functions to finish
+	wg.Add(len(instruments))
+
+	runs := []shared.Run{}
 	for _, instrument := range instruments {
 		runObj := shared.Run{}
 
@@ -58,29 +65,38 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string 
 		runObj.StartedTime = nil
 		runObj.EndedTime = nil
 
+		runs = append(runs, runObj)
 		run := engine.service.CreateRun(&runObj)
-		println(util.ToString(run.ID))
 
-		// TODO: emit an event to asynchronously run the strategy back testing
+		// Execute run asynchronously as goroutine
+		go engine.Run(ctx, run, &wg)
 	}
+
+	println(runs)
 
 	return instruments
 
 }
 
-func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockIndicator {
+func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGroup) *shared.StockIndicator {
+	defer wg.Done()
+
 	strategy := engine.strategyService.Get(ctx, run.StrategyID)
 
-	entryDataRange := strategy.GetEntryDataRange()
-	exitDataRange := strategy.GetExitDataRange()
+	// Update the Run Start Time
+	startTime := util.GetTime()
+	run.StartedTime = &startTime
 
-	dataRange := util.Max(entryDataRange, exitDataRange)
+	// entryDataRange := strategy.GetEntryDataRange()
+	// exitDataRange := strategy.GetExitDataRange()
 
-	println("Fetching the data for the range ", dataRange)
+	// dataRange := util.Max(entryDataRange, exitDataRange)
 
-	instrument := strategy.Instruments[0]
+	// println("Fetching the data for the range ", dataRange)
 
-	data := engine.stockService.Get(instrument, "", "", dataRange)
+	instrument := run.Instrument
+
+	data := engine.stockService.Get(instrument, "", "", 1000) // Remove hardcoded values
 	stockDataColumn := engine.stockService.Converter(*data)
 	println(stockDataColumn.Close)
 	closeData := stockDataColumn.Close
@@ -112,25 +128,84 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 				position.State = shared.Entered
 				position.EntryPriceSignal = &stockIndicator.Close[i]
 				position.EntryTimeSignal = &stockIndicator.Timestamp[i]
+
+				// NOTE: Simulate Order - Remove once the order is implemented
+				position.EntryPriceOrder = &stockIndicator.Close[i]
+				position.EntryTimeOrder = &stockIndicator.Timestamp[i]
+
 				// TODO: Make Order(Buy if LONG, else Sell)
 			}
 
 		case "ENTERED":
-			// check if the exit expression is true
+			// Exit logic using if-else conditions to ensure mutual exclusivity
+
+			// Check all exit conditions in priority order
+			currentPrice := stockIndicator.Close[i]
+			var stopLossPrice float64
+			var targetProfitPrice float64
+
+			// NOTE: Remove hardcoded values and replace 'EntryPriceSignal' with 'EntryPriceOrder'
+			stopLossPrice = *position.EntryPriceSignal * (1 - 0.01)
+			targetProfitPrice = *position.EntryPriceSignal * (1 + 0.02)
 			exit_condition := (ema14[i] < ema50[i]) && (ema14[i-1] < ema50[i-1])
 
-			// TODO: Check the Risk Metric Conditions(Stop Loss, Trailing Stop, etc.)
-			// TODO: Check the Profit Conditions for Exit
-
-			if exit_condition {
+			// Apply exit logic in priority order with if-else
+			if currentPrice < stopLossPrice {
+				// Stop Loss (highest priority)
 				position.State = shared.Exited
 				position.ExitPriceSignal = &stockIndicator.Close[i]
 				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
-				// TODO: Make the Exit Reason Dynamic
-				exitReason := "HIT_PROFIT|HIT_STOP_LOSS|MANUAL"
+				exitReason := "HIT_STOP_LOSS"
+				position.ExitReason = &exitReason
+			} else if currentPrice >= targetProfitPrice {
+				// Target Profit (second priority)
+				position.State = shared.Exited
+				position.ExitPriceSignal = &stockIndicator.Close[i]
+				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
+
+				exitReason := "HIT_PROFIT"
+				position.ExitReason = &exitReason
+			} else if exit_condition {
+				// Exit Condition (lowest priority)
+				position.State = shared.Exited
+				position.ExitPriceSignal = &stockIndicator.Close[i]
+				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
+				exitReason := "EXIT_CONDITION_MET"
 				position.ExitReason = &exitReason
 
-				// TODO: Make Order(Sell if LONG, else Buy)
+			}
+
+			// TODO: if condition matches, Make Order(Sell if LONG, else Buy)
+			if position.State == shared.Exited {
+				// Simulate Order
+				// Add Selling Price or Buying Price based on position type
+
+				// NOTE: Simulate Order - Remove once the order is implemented
+				position.ExitPriceOrder = &stockIndicator.Close[i]
+				position.ExitTimeOrder = &stockIndicator.Timestamp[i]
+
+				// Calculate P&L - Absolute and Percentage
+				var profitlossAbsolute, profitLossPercentage float64
+				profitlossAbsolute, profitLossPercentage = engine.CalculateProfitLoss(
+					position.Direction,
+					*position.EntryPriceOrder,
+					*position.ExitPriceOrder,
+				)
+				position.ProfitLossAbsolute = &profitlossAbsolute
+				position.ProfitLossPercentage = &profitLossPercentage
+
+				// Calculate Entry Fees and Exit Fees
+				var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
+				position.EntryFees = &fees
+				position.ExitFees = &fees
+
+				// Calculate Transaction Costs
+				transactionCost := *position.EntryFees + *position.ExitFees
+				position.TransactionCost = &transactionCost
+
+				netProfitLoss := *position.ProfitLossAbsolute - *position.TransactionCost
+				position.NetProfitLoss = &netProfitLoss
+
 			}
 		default:
 			panic("Error in position Eval")
@@ -143,6 +218,14 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 		}
 	}
 
+	// Update the Run State and End Time
+	run.State = shared.Ended
+	endTime := util.GetTime()
+	run.EndedTime = &endTime
+
+	// Finally Update the changes in db
+	engine.service.UpdateRunState(run)
+
 	// Calculate the Run Metrics
 	runMetrics := engine.CalculateRunMetrics(run)
 
@@ -151,43 +234,29 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run) *shared.StockInd
 
 	// Change the Run Status to Ended
 	run.State = shared.Ended
-	engine.service.UpdateRunState(run)
 
 	return stockIndicator
+}
 
-	// response := map[string][]float64{}
-	// response["close"] = closeData
-	// response["ema10"] = indicators
+func (engine *Engine) CalculateProfitLoss(
+	direction shared.Direction,
+	entryPrice float64,
+	exitPrice float64,
+) (float64, float64) {
 
-	// return response
+	var profitLossAbsolute float64
+	var profitLossPercentage float64
 
-	// id := run.ID
+	if (direction == shared.LONG) {
+		profitLossAbsolute = exitPrice - entryPrice
+	} else {
+		profitLossAbsolute = entryPrice - exitPrice
+	}
 
-	// run.State = "IN_PROGRESS"
+	// Calculate Profit/Loss Percentage
+	profitLossPercentage = (profitLossAbsolute / entryPrice) * 100
 
-	// engine.service.UpdateState(run)
-
-	// start := 100
-	// end := 200
-
-	// counter := 0
-
-	// println(start)
-	// println(end)
-
-	// for i := start; i < end; i++ {
-	// 	println(start, end)
-	// 	engine.HandlePosition(
-	// 		id,
-	// 		strategy,
-	// 		(*data)[counter:start],
-	// 	)
-	// 	counter++
-	// }
-
-	// run.State = "ENDED"
-
-	// engine.service.UpdateState(run)
+	return profitLossAbsolute, profitLossPercentage
 }
 
 func (engine *Engine) HandlePositionIndicator(
@@ -269,10 +338,10 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 	var totalPositionSize float64
 	var totalCommission float64 = 0 // Assuming zero commission for now (can be updated later)
 	var totalSlippage float64 = 0   // Assuming zero slippage for now (can be updated later)
-	
+
 	// Daily returns for standard deviation calculation
 	dailyReturns := []float64{}
-	
+
 	// Calculate metrics from positions
 	for i, pos := range positions {
 		// Skip incomplete positions
@@ -334,7 +403,7 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		initialCapital := positions[0].EntryPriceSignal
 		if initialCapital != nil && *initialCapital > 0 {
 			metrics.TotalReturnPCT = (totalPnL / *initialCapital) * 100
-			
+
 			// Calculate annualized return (simplified)
 			totalDuration := run.EndedTime.Sub(*run.StartedTime).Hours() / 24 // in days
 			if totalDuration > 0 {
