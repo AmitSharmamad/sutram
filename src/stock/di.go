@@ -8,14 +8,13 @@ import (
 
 type Root struct{}
 
-func NewRootProv(
-	router *Router,
-) *Root {
+func NewRoot(router *Router) *Root {
 	return &Root{}
 }
 
 var Set = wire.NewSet(
-	NewRootProv,
+	NewRoot,
+	NewMasterRepoProv,
 	NewRepoProv,
 	NewServiceProv,
 	wire.Bind(new(shared.StockService), new(*Service)),

@@ -7,8 +7,8 @@ import (
 
 	env "algo/src/core/config"
 
-	_ "github.com/lib/pq"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type Postgres struct {
@@ -24,6 +24,14 @@ func NewPostgresProv(env *env.EnvProv) *Postgres {
 	db.Connect()
 
 	return db
+}
+
+func (postgres *Postgres) GetDB() *sqlx.DB {
+	return postgres.db
+}
+
+func (postgres *Postgres) NamedQuery(query string, arg interface{}) (*sqlx.Rows, error) {
+	return postgres.db.NamedQuery(query, arg)
 }
 
 func (postgres *Postgres) Connect() {
