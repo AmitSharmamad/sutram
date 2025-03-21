@@ -1,12 +1,14 @@
-package migration
+package migrate
 
 import (
 	"fmt"
 	"log"
+
+	"algo/src/shared"
 )
 
 type OHLCVHandler interface {
-	HandleBatch([]*OHLCV) error
+	HandleBatch(shared.InstrumentMaster, []*shared.OHLCV) error
 }
 
 var size = 1000
@@ -19,7 +21,7 @@ func Migrate(source DataSource, handler OHLCVHandler) error {
 	}
 
 	for chunk := range chunks {
-		var records []*OHLCV
+		var records []*shared.OHLCV
 
 		for _, row := range chunk {
 			record, err := source.Provider.MapToOHLCV(row)
@@ -31,7 +33,7 @@ func Migrate(source DataSource, handler OHLCVHandler) error {
 		}
 
 		if len(records) > 0 {
-			if err := handler.HandleBatch(records); err != nil {
+			if err := handler.HandleBatch(source.InstrumentMaster, records); err != nil {
 				log.Printf("Error handling batch: %v", err)
 			}
 		}

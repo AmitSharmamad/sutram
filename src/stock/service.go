@@ -1,17 +1,24 @@
 package stock
 
 import (
-	"algo/src/shared"
+	"fmt"
 	"time"
+
+	"algo/src/shared"
 )
 
 type Service struct {
-	repo *Repo
+	masterRepo *MasterRepo
+	repo       *Repo
 }
 
-func NewServiceProv(repo *Repo) *Service {
+func NewServiceProv(
+	masterRepo *MasterRepo,
+	repo *Repo,
+) *Service {
 	return &Service{
-		repo: repo,
+		masterRepo: masterRepo,
+		repo:       repo,
 	}
 }
 
@@ -58,7 +65,6 @@ func (service *Service) Converter(sd shared.StockData) *shared.StockColumn {
 }
 
 func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange {
-
 	var dateRange shared.DateRange
 
 	switch dateRangeStr {
@@ -89,7 +95,6 @@ func (service *Service) ConvertToDateRange(dateRangeStr string) shared.DateRange
 }
 
 func (service *Service) ConvertToGranularity(granularityStr string) shared.StockGranularity {
-
 	var granularity shared.StockGranularity
 
 	switch granularityStr {
@@ -124,7 +129,6 @@ func (service *Service) Get(
 	granularityStr string,
 	lastNRecords int32,
 ) *shared.StockData {
-
 	instrumentId, err := service.repo.GetInstrumentId(name)
 	if err != nil {
 		panic(err)
@@ -138,4 +142,54 @@ func (service *Service) Get(
 	}
 
 	return stockData
+}
+
+func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.OHLCV) error {
+	uniqueInstruments := make(map[string]struct{})
+
+	for _, instrument := range instruments {
+		uniqueInstruments[instrument.Instrument] = struct{}{}
+	}
+
+	for instrument := range uniqueInstruments {
+		m, err := s.masterRepo.GetInstrument(instrument)
+		if err != nil {
+			fmt.Printf("error in getting instrument %+v\n", err)
+		}
+		if m == nil {
+			latestID, err := s.masterRepo.GetLatestID()
+			if err != nil {
+				panic("error in getting instrument id")
+			}
+			id := latestID + 1
+			s.masterRepo.Insert(&shared.InstrumentMaster{
+				ID:             id,
+				Exchange:       master.Exchange,
+				Segment:        master.Segment,
+				Symbol:         instrument,
+				Instrument:     instrument,
+				InstrumentID:   id,
+				InstrumentName: instrument,
+			})
+		}
+	}
+
+	s.repo.Insert(instruments)
+
+	return nil
+}
+
+type InstrumentService struct {
+	masterRepo *MasterRepo
+	repo       *Repo
+}
+
+func NewInstrumentServiceProv(
+	masterRepo *MasterRepo,
+	repo *Repo,
+) *InstrumentService {
+	return &InstrumentService{
+		masterRepo: masterRepo,
+		repo:       repo,
+	}
 }

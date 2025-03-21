@@ -12,6 +12,8 @@
 # deploy:
 # 	docker-compose up --build -d
 
+help:
+	@cat Makefile
 
 ### prod
 
@@ -31,10 +33,12 @@ webd:
 	air
 
 migrateb:
-	go build -o s-migrate cmd/migrate/main.go
-	./s-migrate
+	@wire cmd/migrate/wire.go
+	@go build -o s-migrate cmd/migrate/wire_gen.go cmd/migrate/main.go
+	@./s-migrate
 
 migrated:
+	wire cmd/migrate/wire.go
 	go build -gcflags="all=-N -l" -o s-migrate cmd/migrate/main.go
 	./s-migrate
 

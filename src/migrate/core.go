@@ -1,4 +1,4 @@
-package migration
+package migrate
 
 import (
 	"encoding/csv"
@@ -8,18 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-)
 
-// OHLCV represents a single candlestick data point
-type OHLCV struct {
-	Instrument string
-	Timestamp  time.Time
-	Open       float64
-	High       float64
-	Low        float64
-	Close      float64
-	Volume     int64
-}
+	"algo/src/shared"
+)
 
 // CSVMapper maps CSV column names to their respective field names
 type CSVMapper struct {
@@ -37,8 +28,8 @@ type CSVMapper struct {
 }
 
 // ParseCSVRow converts a row of string data to OHLCV struct
-func ParseCSVRow(row map[string]string, mapper CSVMapper) (*OHLCV, error) {
-	data := &OHLCV{}
+func ParseCSVRow(row map[string]string, mapper CSVMapper) (*shared.OHLCV, error) {
+	data := &shared.OHLCV{}
 	var err error
 
 	// Parse timestamp based on whether we have combined or separate date/time columns
@@ -176,7 +167,6 @@ func ReadCSVInChunks(dirPath string, chunkSize int, headers []string) (chan []ma
 			}
 			return nil
 		})
-
 		if err != nil {
 			fmt.Printf("Error walking directory: %v\n", err)
 		}
