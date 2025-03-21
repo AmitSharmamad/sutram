@@ -157,7 +157,6 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 			fmt.Printf("error in getting instrument %+v\n", err)
 		}
 		if m == nil {
-			fmt.Printf("%s, %+v, %t\n", instrument, m, m == nil)
 			latestID, err := s.masterRepo.GetLatestID()
 			if err != nil {
 				panic("error in getting instrument id")
