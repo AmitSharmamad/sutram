@@ -28,6 +28,15 @@ const (
 	SHORT Direction = "SHORT"
 )
 
+type ExitReason string
+
+const (
+	HIT_STOP_LOSS          ExitReason = "HIT_STOP_LOSS"
+	HIT_TRAILING_STOP_LOSS ExitReason = "HIT_TRAILING_STOP_LOSS"
+	HIT_TAKE_PROFIT        ExitReason = "HIT_TAKE_PROFIT"
+	EXIT_CONDITION_MET     ExitReason = "EXIT_CONDITION_MET"
+)
+
 type Position struct {
 	ID                   uuid.UUID     `json:"id" db:"id"`
 	RunID                uuid.UUID     `json:"run_id" db:"run_id"`
@@ -43,7 +52,7 @@ type Position struct {
 	ExitPriceOrder       *float64      `json:"exit_price_order" db:"exit_price_order"`
 	ExitTimeOrder        *time.Time    `json:"exit_time_order" db:"exit_time_order"`
 	ExitSignal           *string       `json:"exit_signal" db:"exit_signal"`
-	ExitReason           *string       `json:"exit_reason" db:"exit_reason"`
+	ExitReason           *ExitReason   `json:"exit_reason" db:"exit_reason"`
 	ProfitLossAbsolute   *float64      `json:"profit_loss_absolute" db:"profit_loss_absolute"`
 	ProfitLossPercentage *float64      `json:"profit_loss_percentage" db:"profit_loss_percentage"`
 	TransactionCost      *float64      `json:"transaction_cost" db:"transaction_cost"`

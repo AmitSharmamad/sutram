@@ -6,27 +6,29 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	NotEntered PositionState = "NOT_ENTERED"
-	Entered    PositionState = "ENTERED"
-	Exited     PositionState = "EXITED"
+type RunState string
 
+const (
 	NotStarted RunState = "NOT_STARTED"
 	Started    RunState = "STARTED"
 	Ended      RunState = "ENDED"
 )
 
-type RunState string
-
 type PositionState string
+
+const (
+	NotEntered PositionState = "NOT_ENTERED"
+	Entered    PositionState = "ENTERED"
+	Exited     PositionState = "EXITED"
+)
+
+type RunType string
 
 const (
 	BackTest   RunType = "BACKTEST"
 	PaperTrade RunType = "PAPER_TRADE"
 	LiveTrade  RunType = "LIVE_TRADE"
 )
-
-type RunType string
 
 type Runs []Run
 

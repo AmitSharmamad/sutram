@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"algo/src/shared"
 	"algo/src/util"
@@ -46,9 +47,6 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string 
 
 	var wg sync.WaitGroup
 
-	// waiting for all the run functions to finish
-	wg.Add(len(instruments))
-
 	runs := []shared.Run{}
 	for _, instrument := range instruments {
 		runObj := shared.Run{}
@@ -68,9 +66,13 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string 
 		runs = append(runs, runObj)
 		run := engine.service.CreateRun(&runObj)
 
+		wg.Add(1)
+
 		// Execute run asynchronously as goroutine
 		go engine.Run(ctx, run, &wg)
 	}
+
+	wg.Wait()
 
 	println(runs)
 
@@ -152,60 +154,40 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGro
 			// Apply exit logic in priority order with if-else
 			if currentPrice < stopLossPrice {
 				// Stop Loss (highest priority)
-				position.State = shared.Exited
-				position.ExitPriceSignal = &stockIndicator.Close[i]
-				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
-				exitReason := "HIT_STOP_LOSS"
-				position.ExitReason = &exitReason
+				position = engine.UpdatePositionOnExitSignal(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
+					shared.HIT_STOP_LOSS,
+				)
 			} else if currentPrice >= targetProfitPrice {
 				// Target Profit (second priority)
-				position.State = shared.Exited
-				position.ExitPriceSignal = &stockIndicator.Close[i]
-				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
-
-				exitReason := "HIT_PROFIT"
-				position.ExitReason = &exitReason
+				position = engine.UpdatePositionOnExitSignal(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
+					shared.HIT_TAKE_PROFIT,
+				)
 			} else if exit_condition {
 				// Exit Condition (lowest priority)
-				position.State = shared.Exited
-				position.ExitPriceSignal = &stockIndicator.Close[i]
-				position.ExitTimeSignal = &stockIndicator.Timestamp[i]
-				exitReason := "EXIT_CONDITION_MET"
-				position.ExitReason = &exitReason
-
+				position = engine.UpdatePositionOnExitSignal(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
+					shared.EXIT_CONDITION_MET,
+				)
 			}
 
 			// TODO: if condition matches, Make Order(Sell if LONG, else Buy)
 			if position.State == shared.Exited {
 				// Simulate Order
-				// Add Selling Price or Buying Price based on position type
 
 				// NOTE: Simulate Order - Remove once the order is implemented
-				position.ExitPriceOrder = &stockIndicator.Close[i]
-				position.ExitTimeOrder = &stockIndicator.Timestamp[i]
-
-				// Calculate P&L - Absolute and Percentage
-				var profitlossAbsolute, profitLossPercentage float64
-				profitlossAbsolute, profitLossPercentage = engine.CalculateProfitLoss(
-					position.Direction,
-					*position.EntryPriceOrder,
-					*position.ExitPriceOrder,
+				position = engine.UpdatePositionOnExitOrder(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
 				)
-				position.ProfitLossAbsolute = &profitlossAbsolute
-				position.ProfitLossPercentage = &profitLossPercentage
-
-				// Calculate Entry Fees and Exit Fees
-				var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
-				position.EntryFees = &fees
-				position.ExitFees = &fees
-
-				// Calculate Transaction Costs
-				transactionCost := *position.EntryFees + *position.ExitFees
-				position.TransactionCost = &transactionCost
-
-				netProfitLoss := *position.ProfitLossAbsolute - *position.TransactionCost
-				position.NetProfitLoss = &netProfitLoss
-
 			}
 		default:
 			panic("Error in position Eval")
@@ -238,6 +220,56 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGro
 	return stockIndicator
 }
 
+func (engine *Engine) UpdatePositionOnExitOrder(
+	position *shared.Position,
+	exitPriceOrder *float64,
+	exitTimeStampOrder *time.Time,
+) *shared.Position {
+
+	position.ExitPriceOrder = exitPriceOrder
+	position.ExitTimeOrder = exitTimeStampOrder
+
+	// Calculate P&L - Absolute and Percentage
+	var profitlossAbsolute, profitLossPercentage float64
+	profitlossAbsolute, profitLossPercentage = engine.CalculateProfitLoss(
+		position.Direction,
+		*position.EntryPriceOrder,
+		*position.ExitPriceOrder,
+	)
+	position.ProfitLossAbsolute = &profitlossAbsolute
+	position.ProfitLossPercentage = &profitLossPercentage
+
+	// Calculate Entry Fees and Exit Fees
+	var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
+	position.EntryFees = &fees
+	position.ExitFees = &fees
+
+	// Calculate Transaction Costs
+	transactionCost := *position.EntryFees + *position.ExitFees
+	position.TransactionCost = &transactionCost
+
+	netProfitLoss := *position.ProfitLossAbsolute - *position.TransactionCost
+	position.NetProfitLoss = &netProfitLoss
+
+	return position
+}
+
+func (engine *Engine) UpdatePositionOnExitSignal(
+	position *shared.Position,
+	exitPrice *float64,
+	exitTimeStamp *time.Time,
+	exitReason shared.ExitReason,
+) *shared.Position {
+
+	position.State = shared.Exited
+	position.ExitPriceSignal = exitPrice
+	position.ExitTimeSignal = exitTimeStamp
+	position.ExitReason = &exitReason
+
+	return position
+
+}
+
 func (engine *Engine) CalculateProfitLoss(
 	direction shared.Direction,
 	entryPrice float64,
@@ -247,7 +279,7 @@ func (engine *Engine) CalculateProfitLoss(
 	var profitLossAbsolute float64
 	var profitLossPercentage float64
 
-	if (direction == shared.LONG) {
+	if direction == shared.LONG {
 		profitLossAbsolute = exitPrice - entryPrice
 	} else {
 		profitLossAbsolute = entryPrice - exitPrice
