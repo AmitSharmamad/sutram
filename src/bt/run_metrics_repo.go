@@ -120,16 +120,18 @@ func (repo *RunMetricsRepo) Get(runId uuid.UUID) (*shared.RunMetrics, error) {
 
 	err := repo.db.Select(
 		&metrics,
-		"SELECT * FROM run_metrics WHERE run_id = $1",
-		runId,
+		"SELECT * FROM run_metrics WHERE run_id = :run_id",
+		map[string]interface{}{
+			"run_id": runId,
+		},
 	)
 
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	if len(metrics) == 0 {
-		return nil, nil
+		panic("No metrics found")
 	}
 
 	return metrics[0], nil
