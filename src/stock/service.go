@@ -129,10 +129,12 @@ func (service *Service) Get(
 	granularityStr string,
 	lastNRecords int32,
 ) *shared.StockData {
-	instrumentId, err := service.repo.GetInstrumentId(name)
-	if err != nil {
-		panic(err)
-	}
+	// instrumentId, err := service.repo.GetInstrumentId(name)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	var instrumentId int32 = 3
 	dateRange := service.ConvertToDateRange(dateRangeStr)
 	granularity := service.ConvertToGranularity(granularityStr)
 
