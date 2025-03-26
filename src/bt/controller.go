@@ -47,15 +47,15 @@ func (controller *Controller) CreateRun(gctx *gin.Context) {
 }
 
 func (controller *Controller) Start(gctx *gin.Context) {
-	ctx := shared.GetReqCtx(gctx)
-	id := gctx.Param("id")
-	run, err := controller.service.GetRun(id)
-	if err != nil {
-		panic(err)
-	}
-	println(run)
-	indicators := controller.engine.Run(ctx, run)
-	shared.SuccessResp(gctx, indicators)
+	// ctx := shared.GetReqCtx(gctx)
+	// id := gctx.Param("id")
+	// run, err := controller.service.GetRun(id)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// println(run)
+	// indicators := controller.engine.Run(ctx, run)
+	shared.SuccessResp(gctx, []string{})
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}
