@@ -118,7 +118,7 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGro
 		position := engine.GetLatestPosition(run.ID, strategy)
 		currPos := position.State
 		switch currPos {
-		case "NOT_ENTERED":
+		case shared.NotEntered:
 			// LONG POSITION
 
 			// check if the entry expression is true
@@ -127,18 +127,22 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGro
 				fmt.Println("test", stockIndicator.Timestamp[i].Format("2006-01-02 15:04:05"))
 				fmt.Printf("close -> %.6f", stockIndicator.Close[i])
 				fmt.Printf("ema14[i] -> %.6f ema50[i] -> %.6f\n", ema14[i], ema50[i])
-				position.State = shared.Entered
-				position.EntryPriceSignal = &stockIndicator.Close[i]
-				position.EntryTimeSignal = &stockIndicator.Timestamp[i]
+
+				position = engine.UpdatePositionOnEntrySignal(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
+				)
 
 				// NOTE: Simulate Order - Remove once the order is implemented
-				position.EntryPriceOrder = &stockIndicator.Close[i]
-				position.EntryTimeOrder = &stockIndicator.Timestamp[i]
-
-				// TODO: Make Order(Buy if LONG, else Sell)
+				engine.UpdatePositionOnEntryOrder(
+					position,
+					&stockIndicator.Close[i],
+					&stockIndicator.Timestamp[i],
+				)
 			}
 
-		case "ENTERED":
+		case shared.Entered:
 			// Exit logic using if-else conditions to ensure mutual exclusivity
 
 			// Check all exit conditions in priority order
@@ -256,18 +260,42 @@ func (engine *Engine) UpdatePositionOnExitOrder(
 
 func (engine *Engine) UpdatePositionOnExitSignal(
 	position *shared.Position,
-	exitPrice *float64,
-	exitTimeStamp *time.Time,
+	exitPriceSignal *float64,
+	exitTimeStampSignal *time.Time,
 	exitReason shared.ExitReason,
 ) *shared.Position {
 
 	position.State = shared.Exited
-	position.ExitPriceSignal = exitPrice
-	position.ExitTimeSignal = exitTimeStamp
+	position.ExitPriceSignal = exitPriceSignal
+	position.ExitTimeSignal = exitTimeStampSignal
 	position.ExitReason = &exitReason
 
 	return position
 
+}
+
+func (engine *Engine) UpdatePositionOnEntrySignal(
+	position *shared.Position,
+	entryPriceSignal *float64,
+	entryTimeStampSignal *time.Time,
+) *shared.Position {
+	position.State = shared.Entered
+	position.EntryPriceSignal = entryPriceSignal
+	position.EntryTimeSignal = entryTimeStampSignal
+
+	return position
+}
+
+func (engine *Engine) UpdatePositionOnEntryOrder(
+	position *shared.Position,
+	entryPriceOrder *float64,
+	entryTimeStampOrder *time.Time,
+) *shared.Position {
+	position.State = shared.Entered
+	position.EntryPriceOrder = entryPriceOrder
+	position.EntryTimeOrder = entryTimeStampOrder
+
+	return position
 }
 
 func (engine *Engine) CalculateProfitLoss(
