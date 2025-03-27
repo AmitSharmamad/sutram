@@ -76,4 +76,19 @@ func (e *ForbiddenError) Error() string {
 	return e.Message
 }
 
+// 404
+
+type NotFoundError HTTPError
+
+func NewNotFoundError(msg string, code string) *NotFoundError {
+	return &NotFoundError{
+		Message: msg,
+		Code:    code,
+	}
+}
+
+func (e *NotFoundError) Error() string {
+	return e.Message
+}
+
 /// 5xx status codes

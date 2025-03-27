@@ -2,6 +2,7 @@ package bt
 
 import (
 	"algo/src/shared"
+	"algo/src/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,18 @@ func NewControllerProv(
 	}
 }
 
+func (controller *Controller) DoBacktest(gctx *gin.Context) {
+
+	ctx := shared.GetReqCtx(gctx)
+	strategyIDStr := gctx.Query("strategy_id")
+
+	// convert the strategyID to a uuid
+	strategyID := util.Parse(strategyIDStr)
+	dummy := controller.engine.Start(ctx, strategyID)
+
+	shared.SuccessResp(gctx, dummy)
+}
+
 func (controller *Controller) CreateRun(gctx *gin.Context) {
 	run := shared.NewRun()
 
@@ -34,15 +47,15 @@ func (controller *Controller) CreateRun(gctx *gin.Context) {
 }
 
 func (controller *Controller) Start(gctx *gin.Context) {
-	ctx := shared.GetReqCtx(gctx)
-	id := gctx.Param("id")
-	run, err := controller.service.GetRun(id)
-	if err != nil {
-		panic(err)
-	}
-	println(run)
-	indicators := controller.engine.Run(ctx, run)
-	shared.SuccessResp(gctx, indicators)
+	// ctx := shared.GetReqCtx(gctx)
+	// id := gctx.Param("id")
+	// run, err := controller.service.GetRun(id)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// println(run)
+	// indicators := controller.engine.Run(ctx, run)
+	shared.SuccessResp(gctx, []string{})
 }
 
 func (controller *Controller) Pause(gctx *gin.Context) {}

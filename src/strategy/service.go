@@ -34,7 +34,9 @@ func (service *Service) Get(
 ) *shared.Strategy {
 	strategy, err := service.repo.Get(ctx, id)
 	if err != nil {
-		panic("")
+		// NOTE: check if this is the correct way to handle this
+		errorMessage := "Strategy not found"
+		panic(shared.NewBadRequest(errorMessage, "NOT_FOUND"))
 	}
 	return strategy
 }

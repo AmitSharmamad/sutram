@@ -11,17 +11,20 @@ type Service struct {
 	runRepo         *RunRepo
 	positionRepo    *PositionRepo
 	positionLogRepo *PositionLogRepo
+	runMetricsRepo  *RunMetricsRepo
 }
 
 func NewServiceProv(
 	repo *RunRepo,
 	positionRepo *PositionRepo,
 	positionLogRepo *PositionLogRepo,
+	runMetricsRepo *RunMetricsRepo,
 ) *Service {
 	return &Service{
 		runRepo:         repo,
 		positionRepo:    positionRepo,
 		positionLogRepo: positionLogRepo,
+		runMetricsRepo:  runMetricsRepo,
 	}
 }
 
@@ -41,8 +44,11 @@ func (service *Service) CreateRun(run *shared.Run) *shared.Run {
 	return run
 }
 
-func (service *Service) CreatePosition(runID uuid.UUID) *shared.Position {
-	position := shared.NewPosition(runID)
+func (service *Service) CreatePosition(
+	runID uuid.UUID,
+	direction shared.Direction,
+) *shared.Position {
+	position := shared.NewPosition(runID, direction)
 	service.positionRepo.Create(position)
 	return position
 }
@@ -111,10 +117,10 @@ func (service *Service) GetPositions(runID uuid.UUID) shared.Positions {
 	return *positions
 }
 
-
-
 func (service *Service) SaveRunMetrics(metrics *shared.RunMetrics) {
-	// TODO: Implement metrics storage
-	// For now just log the metrics
 	println("Saving run metrics:", metrics.ID.String())
+	err := service.runMetricsRepo.Create(metrics)
+	if err != nil {
+		println("Error saving run metrics:", err)
+	}
 }

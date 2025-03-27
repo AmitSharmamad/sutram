@@ -24,9 +24,9 @@ func NewPositionRepoProv(
 func (repo *PositionRepo) Create(position *shared.Position) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO position (
-			id, run_id, state
+			id, run_id, state, direction
 		) VALUES (
-			:id, :run_id, :state
+			:id, :run_id, :state, :direction
 		)
 		`,
 		position,
@@ -67,10 +67,25 @@ func (repo *PositionRepo) Update(position *shared.Position) error {
 		UPDATE position
 		SET
 			state = :state,
-			entry_price = :entry_price,
-			entry_time = :entry_time,
-			exit_price = :exit_price,
-			exit_time = :exit_time,
+			entry_price_signal = :entry_price_signal,
+			entry_time_signal = :entry_time_signal,
+			exit_price_signal = :exit_price_signal,
+			exit_time_signal = :exit_time_signal,
+
+			entry_price_order = :entry_price_order,
+			entry_time_order = :entry_time_order,
+			exit_price_order = :exit_price_order,
+			exit_time_order = :exit_time_order,
+
+			profit_loss_absolute = :profit_loss_absolute,
+			profit_loss_percentage = :profit_loss_percentage,
+
+			entry_fees = :entry_fees,
+			exit_fees = :exit_fees,
+			transaction_cost = :transaction_cost,
+
+			net_profit_loss = :net_profit_loss,
+
 			exit_reason = :exit_reason
 		WHERE id = :id
 		`,
