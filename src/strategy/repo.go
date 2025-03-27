@@ -41,7 +41,6 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			instruments,
 			chart_type,
 			chart_timeframe,
-			chart_unknown,
 			qty,
 
 			entry_expression,
@@ -68,7 +67,6 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			:instruments,
 			:chart_type,
 			:chart_timeframe,
-			:chart_unknown,
 			:qty,
 
 			:entry_expression,
@@ -98,10 +96,10 @@ func (repo *Repo) Get(
 ) (*shared.Strategy, error) {
 	userID := shared.FromReqCtx[string](ctx, shared.UserID)
 
-	var strategies shared.Strategies
+	var strategy shared.Strategy
 
-	err := repo.db.Select(
-		&strategies,
+	err := repo.db.Get(
+		&strategy,
 		`
 		SELECT *
 		FROM strategy
@@ -111,13 +109,9 @@ func (repo *Repo) Get(
 		userID,
 		id,
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	return &strategies[0], nil
+	return &strategy, err
 }
-
 func (repo *Repo) GetLatest(
 	ctx context.Context,
 ) (*shared.Strategy, error) {

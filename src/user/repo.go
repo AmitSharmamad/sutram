@@ -3,6 +3,9 @@ package user
 import (
 	"algo/src/core/db"
 	"algo/src/shared"
+	"fmt"
+
+	"github.com/lib/pq"
 )
 
 type Repo struct {
@@ -27,6 +30,12 @@ func (repo *Repo) Create(user *User) (bool, error) {
 		user,
 	)
 	if err != nil {
+		// Check if this is a unique violation error
+		// NOTE: Check if this is a how it's supposed to be
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			errorMessage := "Username or email already exists"
+			return false, shared.NewBadRequest(errorMessage, "DUPLICATE_RECORD")
+		}
 		return false, err
 	}
 	rows, e := res.RowsAffected()
@@ -36,14 +45,21 @@ func (repo *Repo) Create(user *User) (bool, error) {
 	return true, nil
 }
 
-func (repo *Repo) GetAll() {}
-
-func (repo *Repo) Get() (shared.Users, error) {
+func (repo *Repo) GetAll(offset int, limit int) (shared.Users, error) {
 	var users shared.Users
+
+	query := fmt.Sprintf(`
+        SELECT *
+        FROM "user"
+		ORDER BY created_at DESC
+		LIMIT %d OFFSET %d
+    `, limit, offset)
+
 	err := repo.db.Select(
 		&users,
-		"SELECT * FROM \"user\" LIMIT 10;",
+		query,
 	)
+
 	return users, err
 }
 

@@ -16,20 +16,21 @@ func NewRunRepoProv(
 	return &RunRepo{
 		Name: "sutram.bt_run",
 		db:   factory.Get("postgres"),
-
 	}
 }
 
 func (repo *RunRepo) Create(run *shared.Run) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO run (
-			id, strategy_id, instrument, state, qty,
+			id, strategy_id, instrument, "type", exchange, state, qty,
 			period_start_time, period_end_time
 		)
 		VALUES (
 			:id,
 			:strategy_id,
 			:instrument,
+			:type,
+			:exchange,
 			:state,
 			:qty,
 			:period_start_time,
@@ -44,7 +45,10 @@ func (repo *RunRepo) Create(run *shared.Run) error {
 func (repo *RunRepo) GetByStrategyID(id string) (shared.Runs, error) {
 	var runs shared.Runs
 	err := repo.db.Select(&runs, `
-		SELECT id, strategy_id, instrument, run_group_id, type
+		SELECT id, run_group_id, strategy_id, exchange, instrument,
+		"type", "state", qty,
+		period_start_time, period_end_time, started_time, ended_time,
+		created_at, updated_at
 		FROM run
 		WHERE strategy_id = $1;
 		`,
@@ -68,7 +72,10 @@ func (repo *RunRepo) Get(id string) (*shared.Run, error) {
 func (repo *RunRepo) UpdateState(run *shared.Run) error {
 	_, err := repo.db.Update(`
 		UPDATE run
-		SET state = :state
+		SET
+			state = :state,
+			started_time = :started_time,
+			ended_time = :ended_time
 		WHERE id = :id
 		`,
 		run,

@@ -16,11 +16,10 @@ type Strategy struct {
 	// Position
 	Name           string         `json:"name" db:"name"`
 	Description    string         `json:"description" db:"description"`
-	PositionType   string         `json:"position_type" db:"position_type"`
+	PositionType   Direction      `json:"position_type" db:"position_type"`
 	Instruments    pq.StringArray `json:"instruments" db:"instruments"`
 	ChartType      string         `json:"chart_type" db:"chart_type"`
 	ChartTimeframe string         `json:"chart_timeframe" db:"chart_timeframe"`
-	ChartUnknown   string         `json:"chart_unknown" db:"chart_unknown"`
 	Qty            int32          `json:"qty" db:"qty"`
 
 	// Entry Condition
@@ -82,7 +81,7 @@ func (strategy *Strategy) Validate() {
 
 type StrategyService interface {
 	Get(ctx context.Context, id uuid.UUID) *Strategy
-	Create(ctx context.Context, strategy *Strategy,) (*Strategy, error)
+	Create(ctx context.Context, strategy *Strategy) (*Strategy, error)
 	GetData() StockData
 	GetAll(ctx context.Context) (*Strategies, error)
 	Validate(strategy *Strategy) bool
