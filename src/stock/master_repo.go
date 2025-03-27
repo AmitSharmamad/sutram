@@ -17,19 +17,6 @@ func NewMasterRepoProv(factory *db.DBFactory) *MasterRepo {
 	}
 }
 
-/**
-ID             uint64    `json:"id" db:"id"`
-Exchange       Exchange  `json:"exchange" db:"exchange"`
-Segment        Segment   `json:"segment" db:"segment"`
-Symbol         string    `json:"symbol" db:"symbol"`
-Instrument     string    `json:"instrument" db:"instrument"`
-InstrumentID   uint64    `json:"instrument_id" db:"instrument_id"`
-InstrumentName string    `json:"instrument_name" db:"instrument_name"`
-StartDate      time.Time `json:"start_date" db:"start_date"`
-Expiry         time.Time `json:"expiry" db:"expiry"`
-
-*/
-
 func (r *MasterRepo) Insert(master *shared.InstrumentMaster) error {
 	_, err := r.db.GetDB().Exec(`
 		INSERT INTO sutram.instrument_master (

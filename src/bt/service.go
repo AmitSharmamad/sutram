@@ -2,12 +2,12 @@ package bt
 
 import (
 	"algo/src/shared"
-	"algo/src/util"
 
 	"github.com/google/uuid"
 )
 
 type Service struct {
+	runGroupRepo    *RunGroupRepo
 	runRepo         *RunRepo
 	positionRepo    *PositionRepo
 	positionLogRepo *PositionLogRepo
@@ -15,13 +15,15 @@ type Service struct {
 }
 
 func NewServiceProv(
-	repo *RunRepo,
+	runGroupRepo *RunGroupRepo,
+	runRepo *RunRepo,
 	positionRepo *PositionRepo,
 	positionLogRepo *PositionLogRepo,
 	runMetricsRepo *RunMetricsRepo,
 ) *Service {
 	return &Service{
-		runRepo:         repo,
+		runGroupRepo:    runGroupRepo,
+		runRepo:         runRepo,
 		positionRepo:    positionRepo,
 		positionLogRepo: positionLogRepo,
 		runMetricsRepo:  runMetricsRepo,
@@ -30,27 +32,6 @@ func NewServiceProv(
 
 func (service *Service) UpdateState(run *shared.Run) {
 	service.runRepo.UpdateState(run)
-}
-
-func (service *Service) CreateRun(run *shared.Run) *shared.Run {
-	run.ID = util.NewUUID()
-
-	err := service.runRepo.Create(run)
-	if err != nil {
-		panic(err)
-	}
-
-	// TODO: emit an event to asynchronously run the strategy back testing
-	return run
-}
-
-func (service *Service) CreatePosition(
-	runID uuid.UUID,
-	direction shared.Direction,
-) *shared.Position {
-	position := shared.NewPosition(runID, direction)
-	service.positionRepo.Create(position)
-	return position
 }
 
 func (service *Service) GetLatestPosition(runID uuid.UUID) *shared.Position {
@@ -115,12 +96,4 @@ func (service *Service) GetPositions(runID uuid.UUID) shared.Positions {
 		panic("Error fetching positions")
 	}
 	return *positions
-}
-
-func (service *Service) SaveRunMetrics(metrics *shared.RunMetrics) {
-	println("Saving run metrics:", metrics.ID.String())
-	err := service.runMetricsRepo.Create(metrics)
-	if err != nil {
-		println("Error saving run metrics:", err)
-	}
 }

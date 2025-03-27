@@ -2,6 +2,7 @@ package stock
 
 import (
 	"fmt"
+	"time"
 
 	"algo/src/core/db"
 	"algo/src/shared"
@@ -37,81 +38,109 @@ func (repo *Repo) GetInstrumentId(instrumentName string) (int32, error) {
 
 func (repo *Repo) Get(
 	instrumentId int32,
-	dateRange shared.DateRange,
-	granularity shared.StockGranularity,
-	lastNRecords int32,
+	startPeriod time.Time,
+	endPeriod time.Time,
+	timeFrame string,
 ) (*shared.StockData, error) {
 	var data shared.StockData
-	var query string
 
-	// Set interval value and unit based on granularity
-	var intervalValue, intervalUnit string
-	switch granularity {
-	case shared.StockGranularity1m:
-		intervalValue, intervalUnit = "1", "MINUTE"
-	case shared.StockGranularity3m:
-		intervalValue, intervalUnit = "3", "MINUTE"
-	case shared.StockGranularity5m:
-		intervalValue, intervalUnit = "5", "MINUTE"
-	case shared.StockGranularity15m:
-		intervalValue, intervalUnit = "15", "MINUTE"
-	case shared.StockGranularity30m:
-		intervalValue, intervalUnit = "30", "MINUTE"
-	case shared.StockGranularity1h:
-		intervalValue, intervalUnit = "1", "HOUR"
-	case shared.StockGranularity3h:
-		intervalValue, intervalUnit = "3", "HOUR"
-	case shared.StockGranularity1d:
-		intervalValue, intervalUnit = "1", "DAY"
-	case shared.StockGranularity1M:
-		intervalValue, intervalUnit = "1", "MONTH"
-	default:
-		return nil, fmt.Errorf("unsupported granularity: %s", granularity)
-	}
+	query := fmt.Sprintf(`
+		SELECT
+			CASE
+				WHEN '%s' = '1m' THEN toStartOfInterval(timestamp, INTERVAL 1 MINUTE)
+				WHEN '%s' = '3m' THEN toStartOfInterval(timestamp, INTERVAL 3 MINUTE)
+				WHEN '%s' = '5m' THEN toStartOfInterval(timestamp, INTERVAL 5 MINUTE)
+				WHEN '%s' = '15m' THEN toStartOfInterval(timestamp, INTERVAL 15 MINUTE)
+				WHEN '%s' = '30m' THEN toStartOfInterval(timestamp, INTERVAL 30 MINUTE)
+				WHEN '%s' = '1h' THEN toStartOfInterval(timestamp, INTERVAL 1 HOUR)
+				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
+				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
+				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
+			END AS interval_time,
+			id,
+			MIN(low) AS low,
+			MAX(high) AS high,
+			first_value(open) AS open,
+			last_value(close) AS close,
+			SUM(volume) AS volume
+		FROM
+			instrument
+		WHERE
+			id = %s
+			AND timestamp BETWEEN toDateTime64('%s', 6) AND toDateTime64('%s', 6)
+		GROUP BY
+			id,
+			interval_time
+		ORDER BY
+			interval_time ASC;
+	`,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		instrumentId,
+		startPeriod.Format("2006-01-02 15:04:05"),
+		endPeriod.Format("2006-01-02 15:04:05"),
+	)
 
-	// Base aggregation query
-	query = fmt.Sprintf(`
-        SELECT
-            toStartOfInterval(timestamp, INTERVAL %s %s) AS timestamp,
-            argMin(open, timestamp) AS open,
-            max(high) AS high,
-            min(low) AS low,
-            argMax(close, timestamp) AS close,
-            sum(volume) AS volume,
-            now() AS created_at
-        FROM sutram.instrument
-        WHERE id = ?
-    `, intervalValue, intervalUnit)
-
-	// Add date filtering based on the requested range
-	switch dateRange {
-	case shared.LastDay:
-		query += " AND timestamp >= now() - INTERVAL 1 DAY"
-	case shared.LastWeek:
-		query += " AND timestamp >= now() - INTERVAL 7 DAY"
-	case shared.LastMonth:
-		query += " AND timestamp >= now() - INTERVAL 1 MONTH"
-	case shared.Last6Months:
-		query += " AND timestamp >= now() - INTERVAL 6 MONTH"
-	case shared.LastYear:
-		query += " AND timestamp >= now() - INTERVAL 1 YEAR"
-	case shared.YearToDate:
-		query += " AND timestamp >= toStartOfYear(now())"
-	case shared.Last3Years:
-		query += " AND timestamp >= now() - INTERVAL 3 YEAR"
-	case shared.Last5Years:
-		query += " AND timestamp >= now() - INTERVAL 5 YEAR"
-	case shared.All:
-		// No additional filtering
-	}
-
-	// Add grouping for aggregated queries
-	query += " GROUP BY timestamp"
-
-	// Add ordering and limit
-	query += " ORDER BY timestamp ASC"
-	// Execute the query without limit
 	err := repo.db.Select(&data, query, instrumentId)
+	return &data, err
+}
+
+func(repo *Repo) GetLookBack(id int32, timeFrame string, startTime time.Time, lookback int32) (*shared.StockData, error) {
+	var data shared.StockData
+
+	query := fmt.Sprintf(`
+		SELECT
+			CASE
+				WHEN '%s' = '1m' THEN toStartOfInterval(timestamp, INTERVAL 1 MINUTE)
+				WHEN '%s' = '3m' THEN toStartOfInterval(timestamp, INTERVAL 3 MINUTE)
+				WHEN '%s' = '5m' THEN toStartOfInterval(timestamp, INTERVAL 5 MINUTE)
+				WHEN '%s' = '15m' THEN toStartOfInterval(timestamp, INTERVAL 15 MINUTE)
+				WHEN '%s' = '30m' THEN toStartOfInterval(timestamp, INTERVAL 30 MINUTE)
+				WHEN '%s' = '1h' THEN toStartOfInterval(timestamp, INTERVAL 1 HOUR)
+				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
+				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
+				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
+			END AS interval_time,
+			id,
+			MIN(low) AS low,
+			MAX(high) AS high,
+			first_value(open) AS open,
+			last_value(close) AS close,
+			SUM(volume) AS volume
+		FROM
+			instrument
+		WHERE
+			id = %d
+			AND timestamp <= toDateTime64('%s', 6)
+		GROUP BY
+			id,
+			interval_time
+		ORDER BY
+			interval_time DESC
+		LIMIT %d;
+	`,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		id,
+		startTime.Format("2006-01-02 15:04:05"),
+		lookback,
+	)
+
+	err := repo.db.Select(&data, query)
 	return &data, err
 }
 

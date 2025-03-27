@@ -121,7 +121,11 @@ const (
 
 type StockService interface {
 	Converter(sd StockData) *StockColumn
-	Get(name string, dateRangeStr string, granularityStr string, lastNRecords int32) *StockData
+	Get(id int32, startPeriod time.Time,
+		endPeriod time.Time,
+		timeFrame string,
+		lookBack int32,
+	) *StockData
 	ConvertToDateRange(dateRangeStr string) DateRange
 	ConvertToGranularity(granularityStr string) StockGranularity
 	Insert(master InstrumentMaster, instruments []*OHLCV) error

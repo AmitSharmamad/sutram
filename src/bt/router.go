@@ -11,7 +11,6 @@ func NewRoutesProv(
 	api := engine.Group("/bt")
 	{
 		api.POST("/start", controller.DoBacktest)
-		api.POST("/run", controller.CreateRun)
 		api.POST("/run/:id/start", controller.Start)
 		api.POST("/run/:id/pause", controller.Pause)
 		api.POST("/run/:id/resume", controller.Resume)
