@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"algo/src/util"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,26 +31,50 @@ const (
 	LiveTrade  RunType = "LIVE_TRADE"
 )
 
-type Runs []Run
-
-type Run struct {
-	ID              uuid.UUID  `json:"id" db:"id"`
-	RunGroupID      *uuid.UUID `json:"run_group_id" db:"run_group_id"`
-	StrategyID      uuid.UUID  `json:"strategy_id" db:"strategy_id"`
-	Exchange        string     `json:"exchange" db:"exchange"`
-	Instrument      string     `json:"instrument" db:"instrument"`
-	RunType         RunType    `json:"type" db:"type"`
-	State           RunState   `json:"state" db:"state"`
-	Qty             int        `json:"qty" db:"qty"`
-	PeriodStartTime *time.Time `json:"period_start_time" db:"period_start_time"`
-	PeriodEndTime   *time.Time `json:"period_end_time" db:"period_end_time"`
-	StartedTime     *time.Time `json:"started_time" db:"started_time"`
-	EndedTime       *time.Time `json:"ended_time" db:"ended_time"`
+type RunGroup struct {
+	ID         uuid.UUID `json:"id" db:"id"`
+	StrategyID uuid.UUID `json:"strategy_id" db:"strategy_id"`
+	Runs       []*Run    `json:"runs"`
 	Audit
 }
 
-func NewRun() *Run {
-	return new(Run)
+func NewRunGroup(strategyID uuid.UUID) *RunGroup {
+	return &RunGroup{
+		ID:         uuid.New(),
+		StrategyID: strategyID,
+	}
+}
+
+type Runs []Run
+
+type Run struct {
+	ID              uuid.UUID   `json:"id" db:"id"`
+	RunGroupID      *uuid.UUID  `json:"run_group_id" db:"run_group_id"`
+	StrategyID      uuid.UUID   `json:"strategy_id" db:"strategy_id"`
+	Exchange        string      `json:"exchange" db:"exchange"`
+	Instrument      string      `json:"instrument" db:"instrument"`
+	RunType         RunType     `json:"type" db:"type"`
+	State           RunState    `json:"state" db:"state"`
+	Qty             int         `json:"qty" db:"qty"`
+	Positions       []*Position `json:"positions"`
+	RunMetrics      *RunMetrics `json:"metrics"`
+	PeriodStartTime *time.Time  `json:"period_start_time" db:"period_start_time"`
+	PeriodEndTime   *time.Time  `json:"period_end_time" db:"period_end_time"`
+	StartedTime     *time.Time  `json:"started_time" db:"started_time"`
+	EndedTime       *time.Time  `json:"ended_time" db:"ended_time"`
+	Audit
+}
+
+func NewRun(runGroupID, strategyID uuid.UUID, instrument string) *Run {
+	return &Run{
+		ID:         util.NewUUID(),
+		RunGroupID: &runGroupID,
+		StrategyID: strategyID,
+		Instrument: instrument,
+		RunType:    BackTest,
+		State:      NotStarted,
+		Qty:        10,
+	}
 }
 
 func (run *Run) GetPositionType() PositionType {
