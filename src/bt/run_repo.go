@@ -19,7 +19,7 @@ func NewRunRepoProv(
 	}
 }
 
-func (repo *RunRepo) Create(run *shared.Run) error {
+func (repo *RunRepo) Create(runs []*shared.Run) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO run (
 			id, strategy_id, instrument, "type", exchange, state, qty,
@@ -37,7 +37,7 @@ func (repo *RunRepo) Create(run *shared.Run) error {
 			:period_end_time
 		)
 		`,
-		run,
+		runs,
 	)
 	return err
 }

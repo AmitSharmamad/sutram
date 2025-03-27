@@ -21,7 +21,7 @@ func NewRunMetricsRepoProv(
 	}
 }
 
-func (repo *RunMetricsRepo) Create(runMetrics *shared.RunMetrics) error {
+func (repo *RunMetricsRepo) Create(runMetrics []*shared.RunMetrics) error {
 	_, err := repo.db.Insert(
 		`
 		INSERT INTO run_metrics (

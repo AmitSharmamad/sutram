@@ -37,8 +37,8 @@ type Strategy struct {
 	MaxTrades      int32     `json:"max_trades" db:"max_trades"`
 	EntryStartTime time.Time `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime   time.Time `json:"entry_end_time" db:"entry_end_time"`
-	StartDate      time.Time `json:"start_date" db:"start_date"`
-	EndDate        time.Time `json:"end_date" db:"end_date"`
+	StartPeriod      time.Time `json:"start_date" db:"start_date"`
+	EndPeriod        time.Time `json:"end_date" db:"end_date"`
 	IsActive       bool      `json:"is_active" db:"is_active"`
 
 	// Audit

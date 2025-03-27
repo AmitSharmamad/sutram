@@ -29,21 +29,9 @@ func (controller *Controller) DoBacktest(gctx *gin.Context) {
 
 	// convert the strategyID to a uuid
 	strategyID := util.Parse(strategyIDStr)
-	dummy := controller.engine.Start(ctx, strategyID)
+	runGroup := controller.engine.Start(ctx, strategyID)
 
-	shared.SuccessResp(gctx, dummy)
-}
-
-func (controller *Controller) CreateRun(gctx *gin.Context) {
-	run := shared.NewRun()
-
-	gctx.Bind(run)
-
-	// validate the run input
-
-	run = controller.service.CreateRun(run)
-
-	shared.SuccessResp(gctx, run)
+	shared.SuccessResp(gctx, runGroup)
 }
 
 func (controller *Controller) Start(gctx *gin.Context) {
