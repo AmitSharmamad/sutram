@@ -21,7 +21,7 @@ func NewPositionRepoProv(
 	}
 }
 
-func (repo *PositionRepo) Create(position *shared.Position) error {
+func (repo *PositionRepo) Create(positions []*shared.Position) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO position (
 			id, run_id, state, direction
@@ -29,7 +29,7 @@ func (repo *PositionRepo) Create(position *shared.Position) error {
 			:id, :run_id, :state, :direction
 		)
 		`,
-		position,
+		positions,
 	)
 	return err
 }

@@ -124,26 +124,27 @@ func (service *Service) ConvertToGranularity(granularityStr string) shared.Stock
 }
 
 func (service *Service) Get(
-	name string,
-	dateRangeStr string,
-	granularityStr string,
-	lastNRecords int32,
+	id int32,
+	startPeriod time.Time,
+	endPeriod time.Time,
+	timeFrame string,
+	lookBack int32,
 ) *shared.StockData {
-	// instrumentId, err := service.repo.GetInstrumentId(name)
-	// if err != nil {
-	// 	panic(err)
-	// }
 
-	var instrumentId int32 = 3
-	dateRange := service.ConvertToDateRange(dateRangeStr)
-	granularity := service.ConvertToGranularity(granularityStr)
+	dateRangeData, err := service.repo.Get(id, startPeriod, endPeriod, timeFrame)
+	lookBackData, err := service.repo.GetLookBack(id, timeFrame, startPeriod, lookBack)
 
-	stockData, err := service.repo.Get(instrumentId, dateRange, granularity, lastNRecords)
+	for i, j := 0, len(*lookBackData)-1; i < j; i, j = i+1, j-1 {
+		(*lookBackData)[i], (*lookBackData)[j] = (*lookBackData)[j], (*lookBackData)[i]
+	}
+
 	if err != nil {
 		panic(err)
 	}
+	data := append(make(shared.StockData, 0), *lookBackData...)
+	data = append(data, *dateRangeData...)
 
-	return stockData
+	return &data
 }
 
 func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.OHLCV) error {

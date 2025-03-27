@@ -2,7 +2,6 @@ package bt
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -34,173 +33,155 @@ func NewEngineProv(
 	}
 }
 
-func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) []string {
+func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.RunGroup {
 
 	strategy := engine.strategyService.Get(ctx, strategyID)
 
-	// get the instruments for the strategy
-	instruments := strategy.Instruments
+	runGroup := shared.NewRunGroup(strategyID)
 
-	// for each of the instruments in the strategy:
-	// 1. Create a run
-	// 2. Asynchronously run the run
+	instruments := strategy.Instruments
 
 	var wg sync.WaitGroup
 
-	runs := []shared.Run{}
+	runs := make([]*shared.Run, 0)
+
 	for _, instrument := range instruments {
-		runObj := shared.Run{}
+		run := shared.NewRun(
+			runGroup.ID,
+			strategyID,
+			instrument,
+		)
 
-		runObj.Instrument = instrument
-		runObj.StrategyID = strategyID
-		runObj.RunGroupID = nil
-		runObj.Exchange = "MCX"
-		runObj.RunType = shared.BackTest
-		runObj.State = shared.NotStarted
-		runObj.Qty = 10
-		runObj.PeriodStartTime = nil
-		runObj.PeriodEndTime = nil
-		runObj.StartedTime = nil
-		runObj.EndedTime = nil
-
-		runs = append(runs, runObj)
-		run := engine.service.CreateRun(&runObj)
+		runs = append(runs, run)
 
 		wg.Add(1)
 
 		// Execute run asynchronously as goroutine
-		go engine.Run(ctx, run, &wg)
+		go engine.Run(ctx, run, strategy, &wg)
 	}
 
 	wg.Wait()
 
-	println(runs)
+	engine.service.runGroupRepo.Create(runGroup)
 
-	return instruments
+	engine.service.runRepo.Create(runs)
 
+	positions := make([]*shared.Position, 0)
+	runMetrics := make([]*shared.RunMetrics, 0)
+	for _, run := range runs {
+		runMetrics = append(runMetrics, run.RunMetrics)
+
+		positions = append(positions, run.Positions...)
+	}
+	engine.service.positionRepo.Create(positions)
+
+	engine.service.runMetricsRepo.Create(runMetrics)
+
+	runGroup.Runs = runs
+
+	return runGroup
 }
 
-func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGroup) *shared.StockIndicator {
+func (engine *Engine) Run(
+	ctx context.Context, run *shared.Run, strategy *shared.Strategy, wg *sync.WaitGroup,
+) {
 	defer wg.Done()
 
-	strategy := engine.strategyService.Get(ctx, run.StrategyID)
+	// Fetch the strategy
+	// Fetch the datarange
+	// Fetch the instrument data based off of the datarange
+	// Iterate through the data. Start taking positions
 
 	// Update the Run Start Time
 	startTime := util.GetTime()
 	run.StartedTime = &startTime
 
-	// entryDataRange := strategy.GetEntryDataRange()
-	// exitDataRange := strategy.GetExitDataRange()
+	// TODO: Fix this
+	entryLookBack := strategy.GetEntryDataRange()
+	exitLookBack := strategy.GetExitDataRange()
 
-	// dataRange := util.Max(entryDataRange, exitDataRange)
+	lookBack := util.Max(entryLookBack, exitLookBack)
 
-	// println("Fetching the data for the range ", dataRange)
+	println("Fetching the data for the range ", lookBack)
 
-	instrument := run.Instrument
+	// instrument := run.Instrument
 
-	data := engine.stockService.Get(instrument, "", "", 1000) // Remove hardcoded values
-	stockDataColumn := engine.stockService.Converter(*data)
-	println(stockDataColumn.Close)
-	closeData := stockDataColumn.Close
-	println(closeData[0])
-	ema14 := engine.indicatorService.GetIndicatorData(ctx, "EMA", 14, data)
-	ema50 := engine.indicatorService.GetIndicatorData(ctx, "EMA", 50, data)
+	// TODO: Fetch instrment id
+	data := engine.stockService.Get(
+		0, strategy.StartPeriod, strategy.EndPeriod, strategy.ChartTimeframe, lookBack,
+	)
 
-	stockIndicator := &shared.StockIndicator{
-		StockColumn: *stockDataColumn,
-		Indicators: map[string][]float64{
-			"ema14": ema14,
-			"ema50": ema50,
-		},
-	}
+	for i := lookBack; i < int32(len(*data)); i++ {
+		current := (*data)[i]
+		position := engine.GetLatestPosition(run, strategy)
 
-	for i := 50; i < len(stockIndicator.Close); i++ {
-		position := engine.GetLatestPosition(run.ID, strategy)
-		currPos := position.State
-		switch currPos {
+		switch position.State {
 		case shared.NotEntered:
-			// LONG POSITION
-
+			// TODO:
 			// check if the entry expression is true
-			entry_condition := (ema14[i] > ema50[i]) && (ema14[i-1] < ema50[i-1])
+			entry_condition := true
 			if entry_condition {
-				fmt.Println("test", stockIndicator.Timestamp[i].Format("2006-01-02 15:04:05"))
-				fmt.Printf("close -> %.6f", stockIndicator.Close[i])
-				fmt.Printf("ema14[i] -> %.6f ema50[i] -> %.6f\n", ema14[i], ema50[i])
 
 				position = engine.UpdatePositionOnEntrySignal(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 				)
 
-				// NOTE: Simulate Order - Remove once the order is implemented
 				engine.UpdatePositionOnEntryOrder(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 				)
 			}
 
 		case shared.Entered:
-			// Exit logic using if-else conditions to ensure mutual exclusivity
-
-			// Check all exit conditions in priority order
-			currentPrice := stockIndicator.Close[i]
 			var stopLossPrice float64
 			var targetProfitPrice float64
 
-			// NOTE: Remove hardcoded values and replace 'EntryPriceSignal' with 'EntryPriceOrder'
-			stopLossPrice = *position.EntryPriceSignal * (1 - 0.01)
-			targetProfitPrice = *position.EntryPriceSignal * (1 + 0.02)
-			exit_condition := (ema14[i] < ema50[i]) && (ema14[i-1] < ema50[i-1])
+			// TODO: Handle Absolute and Percentage for stoploss
+			stopLossPrice = *position.EntryPriceSignal * (1 - strategy.StopLoss)
+			targetProfitPrice = *position.EntryPriceSignal * (1 + strategy.TargetProfit)
+			exit_condition := true
 
-			// Apply exit logic in priority order with if-else
-			if currentPrice < stopLossPrice {
+			// TODO: Fix this
+			if current.Close < stopLossPrice {
 				// Stop Loss (highest priority)
 				position = engine.UpdatePositionOnExitSignal(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 					shared.HIT_STOP_LOSS,
 				)
-			} else if currentPrice >= targetProfitPrice {
+			} else if current.Close >= targetProfitPrice {
 				// Target Profit (second priority)
 				position = engine.UpdatePositionOnExitSignal(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 					shared.HIT_TAKE_PROFIT,
 				)
 			} else if exit_condition {
 				// Exit Condition (lowest priority)
 				position = engine.UpdatePositionOnExitSignal(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 					shared.EXIT_CONDITION_MET,
 				)
 			}
 
-			// TODO: if condition matches, Make Order(Sell if LONG, else Buy)
-			if position.State == shared.Exited {
-				// Simulate Order
+			if position.IsDone() {
+				// TODO: if condition matches, Make Order(Sell if LONG, else Buy)
 
-				// NOTE: Simulate Order - Remove once the order is implemented
 				position = engine.UpdatePositionOnExitOrder(
 					position,
-					&stockIndicator.Close[i],
-					&stockIndicator.Timestamp[i],
+					&current.Close,
+					&current.Timestamp,
 				)
 			}
 		default:
 			panic("Error in position Eval")
-		}
-
-		// Update the Position
-		updatedPos := position.State
-		if currPos != updatedPos {
-			engine.service.UpdatePosition(position)
 		}
 	}
 
@@ -209,19 +190,10 @@ func (engine *Engine) Run(ctx context.Context, run *shared.Run, wg *sync.WaitGro
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
 
-	// Finally Update the changes in db
-	engine.service.UpdateRunState(run)
-
 	// Calculate the Run Metrics
-	runMetrics := engine.CalculateRunMetrics(run)
+	run.RunMetrics = engine.CalculateRunMetrics(run)
 
-	// Store the metrics
-	engine.service.SaveRunMetrics(runMetrics)
-
-	// Change the Run Status to Ended
 	run.State = shared.Ended
-
-	return stockIndicator
 }
 
 func (engine *Engine) UpdatePositionOnExitOrder(
@@ -319,61 +291,33 @@ func (engine *Engine) CalculateProfitLoss(
 	return profitLossAbsolute, profitLossPercentage
 }
 
-func (engine *Engine) HandlePositionIndicator(
-	runID uuid.UUID,
-	strategy *shared.Strategy,
-	data shared.StockIndicator,
-) {
-
-}
-
-func (engine *Engine) HandlePosition(
-	runID uuid.UUID,
-	strategy *shared.Strategy,
-	data shared.StockData,
-) {
-	position := engine.GetLatestPosition(runID, strategy)
-	currPos := position.State
-	switch position.State {
-	case shared.NotEntered:
-		if engine.expressionService.Eval(strategy.EntryExpression, data) {
-			position.State = shared.Entered
-		}
-	case shared.Entered:
-		if engine.expressionService.Eval(strategy.ExitExpression, data) {
-			position.State = shared.Exited
-		}
-	default:
-		panic("Error in position Eval")
-	}
-
-	updatedPos := position.State
-	engine.service.CreateLog(shared.NewPositionLog(
-		position.ID,
-		position.State,
-	))
-	if currPos != updatedPos {
-		engine.service.UpdatePosition(position)
-	}
-}
-
 func (engine *Engine) GetLatestPosition(
-	id uuid.UUID,
+	run *shared.Run,
 	strategy *shared.Strategy,
 ) *shared.Position {
-	position := engine.service.GetLatestPosition(id)
-	if position == nil || position.IsDone() {
-		// NOTE: direction is position is equivalent to strategy.PositionType
-		direction := strategy.PositionType
-		// create a new position
-		position = engine.service.CreatePosition(id, direction)
+	position := shared.NewPosition(
+		run.ID,
+		strategy.PositionType,
+	)
+
+	length := len(run.Positions)
+
+	if length != 0 {
+		latest := run.Positions[length-1]
+		if !latest.IsDone() {
+			return latest
+		}
 	}
+
+	run.Positions = append(run.Positions, position)
 	return position
 }
 
 func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
-	// Get all positions for this run
-	positions := engine.service.GetPositions(run.ID)
+
+	// TODO: Check this logic
+
+	positions := run.Positions
 
 	metrics := &shared.RunMetrics{
 		ID:    util.NewUUID(),

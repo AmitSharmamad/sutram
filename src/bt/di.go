@@ -11,6 +11,7 @@ func NewRoot(*Router) *Root {
 var Set = wire.NewSet(
 	NewRoot,
 
+	NewRunGroupRepoProv,
 	NewRunRepoProv,
 	NewRunMetricsRepoProv,
 	NewPositionRepoProv,
