@@ -80,19 +80,25 @@ func (position *Position) CalculateStopLossPrice(stopLoss float64, stopLossType 
 	entryPrice := position.EntryPriceOrder
 
 	var stopLossPrice float64
-	// Absolute
+
 	if stopLossType == ABSOLUTE {
 		if position.Direction == LONG {
 			stopLossPrice = *entryPrice - stopLoss
-		} else { // Short
+		} else if position.Direction == SHORT {
 			stopLossPrice = *entryPrice + stopLoss
+		} else {
+			panic("Invalid PositionType")
 		}
-	} else { // Percentage
+	} else if stopLossType == PERCENTAGE {
 		if position.Direction == LONG {
 			stopLossPrice = *entryPrice * (1 - stopLoss)
-		} else { // Short
+		} else if position.Direction == SHORT {
 			stopLossPrice = *entryPrice * (1 + stopLoss)
+		} else {
+			panic("Invalid PositionType")
 		}
+	} else {
+		panic("Invalid StopLossType")
 	}
 
 	return stopLossPrice
@@ -102,19 +108,25 @@ func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targe
 	entryPrice := position.EntryPriceOrder
 
 	var targetProfitPrice float64
-	// Absolute
+
 	if targetProfitType == ABSOLUTE {
 		if position.Direction == LONG {
 			targetProfitPrice = *entryPrice + targetProfit
-		} else { // Short
+		} else if position.Direction == SHORT {
 			targetProfitPrice = *entryPrice - targetProfit
+		} else {
+			panic("Invalid PositionType")
 		}
-	} else { // Percentage
+	} else if targetProfitType == PERCENTAGE {
 		if position.Direction == LONG {
 			targetProfitPrice = *entryPrice * (1 + targetProfit)
-		} else { // Short
+		} else if position.Direction == SHORT {
 			targetProfitPrice = *entryPrice * (1 - targetProfit)
+		} else {
+			panic("Invalid PositionType")
 		}
+	} else {
+		panic("Invalid StopLossType")
 	}
 
 	return targetProfitPrice
@@ -133,18 +145,24 @@ func (position *Position) CalculateTrailingStopLossPrice(
 
 		if trailingStopLossType == ABSOLUTE {
 			trailingStopLossPrice = *position.HighestPrice - trailingStopLoss
-		} else { // Percentage
+		} else if trailingStopLossType == PERCENTAGE {
 			trailingStopLossPrice = *position.HighestPrice * (1 - trailingStopLoss)
+		} else {
+			panic("Invalid TrailingStopLossType")
 		}
-	} else { // Short
+	} else if position.Direction == SHORT {
 		f := util.Min(*position.LowestPrice, currentClose)
 		position.LowestPrice = &f
 
 		if trailingStopLossType == ABSOLUTE {
 			trailingStopLossPrice = *position.LowestPrice + trailingStopLoss
-		} else { // Percentage
+		} else if trailingStopLossType == PERCENTAGE {
 			trailingStopLossPrice = *position.LowestPrice * (1 + trailingStopLoss)
+		} else {
+			panic("Invalid TrailingStopLossType")
 		}
+	} else {
+		panic("Invalid PositionType")
 	}
 
 	return trailingStopLossPrice
@@ -184,6 +202,26 @@ func (position *Position) CheckForExit(
 	}
 
 	return position.IsDone()
+}
+
+func (position *Position) UpdateOnEntrySignal(
+	entryPriceSignal *float64,
+	entryTimeStampSignal *time.Time,
+) {
+	// NOTE: Check this out for Live Trading
+	// position.State = Entered
+	position.EntryPriceSignal = entryPriceSignal
+	position.EntryTimeSignal = entryTimeStampSignal
+}
+
+func (position *Position) UpdateOnEntryOrder(
+	entryPriceOrder *float64,
+	entryTimeStampOrder *time.Time,
+) {
+	position.State = Entered
+	position.EntryPriceOrder = entryPriceOrder
+	position.EntryTimeOrder = entryTimeStampOrder
+
 }
 
 func (position *Position) UpdateOnExitSignal(

@@ -25,10 +25,10 @@ func NewControllerProv(
 func (controller *Controller) DoBacktest(gctx *gin.Context) {
 
 	ctx := shared.GetReqCtx(gctx)
-	strategyIDStr := gctx.Query("strategy_id")
 
 	// convert the strategyID to a uuid
-	strategyID := util.Parse(strategyIDStr)
+	strategyID := util.Parse(gctx.Query("strategy_id"))
+
 	runGroup := controller.engine.Start(ctx, strategyID)
 
 	shared.SuccessResp(gctx, runGroup)
