@@ -9,6 +9,13 @@ func Max[T int32 | float32 | int64 | float64](v1 T, v2 T) T {
     return v2
 }
 
+func Min[T int32 | float32 | int64 | float64](v1 T, v2 T) T {
+    if v1 < v2 {
+        return v1
+    }
+    return v2
+}
+
 func Round(f float64) float64 {
 	pow := math.Pow(10, float64(2))
 	return math.Round(f*pow) / pow
