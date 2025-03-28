@@ -3,7 +3,6 @@ package bt
 import (
 	"context"
 	"sync"
-	"time"
 
 	"algo/src/shared"
 	"algo/src/util"
@@ -77,7 +76,7 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 	}
 	engine.service.positionRepo.Create(positions)
 
-	engine.service.runMetricsRepo.Create(runMetrics)
+	engine.service.runMetricsRepo.Upsert(runMetrics)
 
 	runGroup.Runs = runs
 
@@ -121,14 +120,12 @@ func (engine *Engine) Run(
 				position.HighestPrice = &current.Close
 				position.LowestPrice = &current.Close
 
-				position = engine.UpdatePositionOnEntrySignal(
-					position,
+				position.UpdateOnEntrySignal(
 					&current.Close,
 					&current.Timestamp,
 				)
 
-				engine.UpdatePositionOnEntryOrder(
-					position,
+				position.UpdateOnEntryOrder(
 					&current.Close,
 					&current.Timestamp,
 				)
@@ -180,37 +177,13 @@ func (engine *Engine) Run(
 			panic("Error in position Eval")
 		}
 	}
-	
+
 	run.RunMetrics = engine.CalculateRunMetrics(run)
 
 	run.State = shared.Ended
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
 
-}
-
-func (engine *Engine) UpdatePositionOnEntrySignal(
-	position *shared.Position,
-	entryPriceSignal *float64,
-	entryTimeStampSignal *time.Time,
-) *shared.Position {
-	position.State = shared.Entered
-	position.EntryPriceSignal = entryPriceSignal
-	position.EntryTimeSignal = entryTimeStampSignal
-
-	return position
-}
-
-func (engine *Engine) UpdatePositionOnEntryOrder(
-	position *shared.Position,
-	entryPriceOrder *float64,
-	entryTimeStampOrder *time.Time,
-) *shared.Position {
-	position.State = shared.Entered
-	position.EntryPriceOrder = entryPriceOrder
-	position.EntryTimeOrder = entryTimeStampOrder
-
-	return position
 }
 
 func (engine *Engine) GetLatestPosition(

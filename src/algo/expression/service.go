@@ -15,10 +15,10 @@ func (service *Service) Eval(
 	return NewExpressionStatement(expression).Eval(*data)
 }
 
-func GetEntryDataRange(strategy *shared.Strategy) int32 {
+func (service *Service) GetEntryDataRange(strategy *shared.Strategy) int32 {
 	return NewExpressionStatement(strategy.EntryExpression).GetDataRange()
 }
 
-func GetExitDataRange(strategy *shared.Strategy) int32 {
+func (service *Service) GetExitDataRange(strategy *shared.Strategy) int32 {
 	return NewExpressionStatement(strategy.ExitExpression).GetDataRange()
 }
