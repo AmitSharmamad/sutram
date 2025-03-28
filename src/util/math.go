@@ -2,11 +2,11 @@ package util
 
 import "math"
 
-func Max(v1 int32, v2 int32) int32 {
-	if v1 > v2 {
-		return v1
-	}
-	return v2
+func Max[T int32 | float32 | int64 | float64](v1 T, v2 T) T {
+    if v1 > v2 {
+        return v1
+    }
+    return v2
 }
 
 func Round(f float64) float64 {

@@ -23,14 +23,16 @@ func NewEngineProv(
 	service *Service,
 	strategyService shared.StrategyService,
 	stockService shared.StockService,
+	expressionService shared.ExpressionService,
 	indicatorService shared.IndicatorService,
-) *Engine {
-	return &Engine{
-		service:          service,
-		strategyService:  strategyService,
-		stockService:     stockService,
-		indicatorService: indicatorService,
-	}
+	) *Engine {
+		return &Engine{
+			service:          service,
+			strategyService:  strategyService,
+			stockService:     stockService,
+			expressionService: expressionService,
+			indicatorService: indicatorService,
+		}
 }
 
 func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.RunGroup {
@@ -111,16 +113,19 @@ func (engine *Engine) Run(
 		0, strategy.StartPeriod, strategy.EndPeriod, strategy.ChartTimeframe, lookBack,
 	)
 
+	var highestPrice float64
 	for i := lookBack; i < int32(len(*data)); i++ {
 		current := (*data)[i]
 		position := engine.GetLatestPosition(run, strategy)
-
 		switch position.State {
 		case shared.NotEntered:
 			// TODO:
 			// check if the entry expression is true
-			entry_condition := true
-			if entry_condition {
+			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, data)
+
+			if entryCondition {
+
+				highestPrice = current.Close
 
 				position = engine.UpdatePositionOnEntrySignal(
 					position,
@@ -139,47 +144,58 @@ func (engine *Engine) Run(
 			var stopLossPrice float64
 			var targetProfitPrice float64
 
+			// Calculate Trailing Stop Loss
+			highestPrice = util.Max(highestPrice, current.Close)
+			trailingStopLossPrice := highestPrice - strategy.TrailingStopLoss
+
 			// TODO: Handle Absolute and Percentage for stoploss
 			stopLossPrice = *position.EntryPriceSignal * (1 - strategy.StopLoss)
 			targetProfitPrice = *position.EntryPriceSignal * (1 + strategy.TargetProfit)
-			exit_condition := true
 
-			// TODO: Fix this
-			if current.Close < stopLossPrice {
-				// Stop Loss (highest priority)
-				position = engine.UpdatePositionOnExitSignal(
-					position,
-					&current.Close,
-					&current.Timestamp,
-					shared.HIT_STOP_LOSS,
-				)
-			} else if current.Close >= targetProfitPrice {
-				// Target Profit (second priority)
-				position = engine.UpdatePositionOnExitSignal(
-					position,
-					&current.Close,
-					&current.Timestamp,
-					shared.HIT_TAKE_PROFIT,
-				)
-			} else if exit_condition {
-				// Exit Condition (lowest priority)
-				position = engine.UpdatePositionOnExitSignal(
-					position,
-					&current.Close,
-					&current.Timestamp,
-					shared.EXIT_CONDITION_MET,
-				)
+			exitCondition := engine.expressionService.Eval(strategy.ExitExpression, data)
+
+			stopLossTriggered := (
+				(position.IsLong() && (current.Close < stopLossPrice)) || 
+				(!position.IsLong() && (current.Close > stopLossPrice)))
+			trailingStopTriggered := (
+				(position.IsLong() && current.Close < trailingStopLossPrice) ||
+				(!position.IsLong() && (current.Close > trailingStopLossPrice)))
+			takeProfitTriggered := (
+				(position.IsLong() && (current.Close >= targetProfitPrice)) ||
+				(!position.IsLong() && (current.Close <= targetProfitPrice)))
+
+			var exitReason shared.ExitReason
+			if stopLossTriggered {
+				position.State = shared.Exited
+				exitReason = shared.HIT_STOP_LOSS
+			} else if trailingStopTriggered {
+				position.State = shared.Exited
+				exitReason = shared.HIT_TRAILING_STOP_LOSS
+			} else if takeProfitTriggered {
+				position.State = shared.Exited
+				exitReason = shared.HIT_TAKE_PROFIT
+			} else if exitCondition {
+				position.State = shared.Exited
+				exitReason = shared.EXIT_CONDITION_MET
 			}
 
 			if position.IsDone() {
-				// TODO: if condition matches, Make Order(Sell if LONG, else Buy)
 
-				position = engine.UpdatePositionOnExitOrder(
+				engine.UpdatePositionOnExitSignal(
+					position,
+					&current.Close,
+					&current.Timestamp,
+					exitReason,
+				)
+
+				// Simulate Order
+				engine.UpdatePositionOnExitOrder(
 					position,
 					&current.Close,
 					&current.Timestamp,
 				)
 			}
+
 		default:
 			panic("Error in position Eval")
 		}
@@ -200,7 +216,7 @@ func (engine *Engine) UpdatePositionOnExitOrder(
 	position *shared.Position,
 	exitPriceOrder *float64,
 	exitTimeStampOrder *time.Time,
-) *shared.Position {
+) {
 
 	position.ExitPriceOrder = exitPriceOrder
 	position.ExitTimeOrder = exitTimeStampOrder
@@ -226,8 +242,6 @@ func (engine *Engine) UpdatePositionOnExitOrder(
 
 	netProfitLoss := *position.ProfitLossAbsolute - *position.TransactionCost
 	position.NetProfitLoss = &netProfitLoss
-
-	return position
 }
 
 func (engine *Engine) UpdatePositionOnExitSignal(
@@ -235,14 +249,12 @@ func (engine *Engine) UpdatePositionOnExitSignal(
 	exitPriceSignal *float64,
 	exitTimeStampSignal *time.Time,
 	exitReason shared.ExitReason,
-) *shared.Position {
+) {
 
 	position.State = shared.Exited
 	position.ExitPriceSignal = exitPriceSignal
 	position.ExitTimeSignal = exitTimeStampSignal
 	position.ExitReason = &exitReason
-
-	return position
 
 }
 
