@@ -47,11 +47,11 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 
 	runs := make([]*shared.Run, 0)
 
-	for _, instrument := range instruments {
+	for _, instrumentID := range instruments {
 		run := shared.NewRun(
 			runGroup.ID,
 			strategyID,
-			instrument,
+			instrumentID,
 		)
 
 		runs = append(runs, run)
@@ -85,32 +85,27 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 }
 
 func (engine *Engine) Run(
-	ctx context.Context, run *shared.Run, strategy *shared.Strategy, wg *sync.WaitGroup,
+	ctx context.Context,
+	run *shared.Run,
+	strategy *shared.Strategy,
+	wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
-	// Fetch the strategy
-	// Fetch the datarange
-	// Fetch the instrument data based off of the datarange
-	// Iterate through the data. Start taking positions
-
-	// Update the Run Start Time
 	startTime := util.GetTime()
 	run.StartedTime = &startTime
 
-	// TODO: Fix this
-	entryLookBack := strategy.GetEntryDataRange()
-	exitLookBack := strategy.GetExitDataRange()
+	entryLookBack := engine.expressionService.GetEntryDataRange(strategy)
+	exitLookBack := engine.expressionService.GetExitDataRange(strategy)
 
 	lookBack := util.Max(entryLookBack, exitLookBack)
 
-	println("Fetching the data for the range ", lookBack)
-
-	// instrument := run.Instrument
-
-	// TODO: Fetch instrment id
 	data := engine.stockService.Get(
-		0, strategy.StartPeriod, strategy.EndPeriod, strategy.ChartTimeframe, lookBack,
+		run.InstrumentID,
+		strategy.StartPeriod,
+		strategy.EndPeriod,
+		strategy.ChartTimeframe,
+		lookBack,
 	)
 
 	for i := lookBack; i < int32(len(*data)); i++ {
@@ -118,8 +113,7 @@ func (engine *Engine) Run(
 		position := engine.GetLatestPosition(run, strategy)
 		switch position.State {
 		case shared.NotEntered:
-			// TODO:
-			// check if the entry expression is true
+
 			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, data)
 
 			if entryCondition {
@@ -186,16 +180,13 @@ func (engine *Engine) Run(
 			panic("Error in position Eval")
 		}
 	}
+	
+	run.RunMetrics = engine.CalculateRunMetrics(run)
 
-	// Update the Run State and End Time
 	run.State = shared.Ended
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
 
-	// Calculate the Run Metrics
-	run.RunMetrics = engine.CalculateRunMetrics(run)
-
-	run.State = shared.Ended
 }
 
 func (engine *Engine) UpdatePositionOnEntrySignal(

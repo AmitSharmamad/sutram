@@ -21,13 +21,13 @@ type Strategy struct {
 	ID     uuid.UUID `json:"id" db:"id"`
 	UserID uuid.UUID `json:"user_id" db:"user_id"`
 
-	Name           string         `json:"name" db:"name"`
-	Description    string         `json:"description" db:"description"`
-	PositionType   Direction      `json:"position_type" db:"position_type"`
-	Instruments    pq.StringArray `json:"instruments" db:"instruments"`
-	ChartType      string         `json:"chart_type" db:"chart_type"`
-	ChartTimeframe string         `json:"chart_timeframe" db:"chart_timeframe"`
-	Qty            int32          `json:"qty" db:"qty"`
+	Name           string        `json:"name" db:"name"`
+	Description    string        `json:"description" db:"description"`
+	PositionType   Direction     `json:"position_type" db:"position_type"`
+	Instruments    pq.Int32Array `json:"instruments" db:"instruments"`
+	ChartType      string        `json:"chart_type" db:"chart_type"`
+	ChartTimeframe string        `json:"chart_timeframe" db:"chart_timeframe"`
+	Qty            int32         `json:"qty" db:"qty"`
 
 	EntryExpression string `json:"entry_expression" db:"entry_expression"`
 	ExitExpression  string `json:"exit_expression" db:"exit_expression"`
@@ -53,30 +53,6 @@ type Strategy struct {
 }
 
 type Strategies []Strategy
-
-func (strategy *Strategy) GetEntryDataRange() int32 {
-	return 0
-	// return NewExpressionStatement(
-	// 	strategy.EntryExpression,
-	// ).GetDataRange()
-}
-
-func (strategy *Strategy) GetExitDataRange() int32 {
-	return 0
-	// return NewExpressionStatement(
-	// 	strategy.ExitExpression,
-	// ).GetDataRange()
-}
-
-func (strategy *Strategy) TryEnter(data StockData) bool {
-	// TODO: handle this
-	return true
-}
-
-func (strategy *Strategy) TryExit(data StockData) bool {
-	// TODO: handle this
-	return true
-}
 
 func (strategy *Strategy) Validate() {
 	path := "../data/llm.json"
