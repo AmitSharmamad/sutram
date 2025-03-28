@@ -66,7 +66,7 @@ func (repo *Repo) Get(
 		FROM
 			instrument
 		WHERE
-			id = %s
+			id = %d
 			AND timestamp BETWEEN toDateTime64('%s', 6) AND toDateTime64('%s', 6)
 		GROUP BY
 			id,
@@ -92,7 +92,12 @@ func (repo *Repo) Get(
 	return &data, err
 }
 
-func(repo *Repo) GetLookBack(id int32, timeFrame string, startTime time.Time, lookback int32) (*shared.StockData, error) {
+func (repo *Repo) GetLookBack(
+	id int32,
+	timeFrame string,
+	startTime time.Time,
+	lookback int32,
+) (*shared.StockData, error) {
 	var data shared.StockData
 
 	query := fmt.Sprintf(`

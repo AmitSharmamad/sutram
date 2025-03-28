@@ -13,6 +13,7 @@ const (
 	NotStarted RunState = "NOT_STARTED"
 	Started    RunState = "STARTED"
 	Ended      RunState = "ENDED"
+	// Failed     RunState = "FAILED"
 )
 
 type PositionState string
@@ -52,7 +53,7 @@ type Run struct {
 	RunGroupID      *uuid.UUID  `json:"run_group_id" db:"run_group_id"`
 	StrategyID      uuid.UUID   `json:"strategy_id" db:"strategy_id"`
 	Exchange        string      `json:"exchange" db:"exchange"`
-	Instrument      string      `json:"instrument" db:"instrument"`
+	InstrumentID    int32       `json:"instrument_id" db:"instrument_id"`
 	RunType         RunType     `json:"type" db:"type"`
 	State           RunState    `json:"state" db:"state"`
 	Qty             int         `json:"qty" db:"qty"`
@@ -65,15 +66,15 @@ type Run struct {
 	Audit
 }
 
-func NewRun(runGroupID, strategyID uuid.UUID, instrument string) *Run {
+func NewRun(runGroupID, strategyID uuid.UUID, instrumentID int32) *Run {
 	return &Run{
-		ID:         util.NewUUID(),
-		RunGroupID: &runGroupID,
-		StrategyID: strategyID,
-		Instrument: instrument,
-		RunType:    BackTest,
-		State:      NotStarted,
-		Qty:        10,
+		ID:           util.NewUUID(),
+		RunGroupID:   &runGroupID,
+		StrategyID:   strategyID,
+		InstrumentID: instrumentID,
+		RunType:      BackTest,
+		State:        NotStarted,
+		Qty:          10,
 	}
 }
 
