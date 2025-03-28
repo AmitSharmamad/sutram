@@ -7,6 +7,7 @@
 package main
 
 import (
+	"algo/src/algo/expression"
 	"algo/src/algo/indicator"
 	"algo/src/auth"
 	"algo/src/bt"
@@ -63,8 +64,9 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	positionLogRepo := bt.NewPositionLogRepoProv(dbFactory)
 	runMetricsRepo := bt.NewRunMetricsRepoProv(dbFactory)
 	btService := bt.NewServiceProv(runGroupRepo, runRepo, positionRepo, positionLogRepo, runMetricsRepo)
+	expressionService := expression.NewService()
 	indicatorService := indicator.NewServiceProv()
-	btEngine := bt.NewEngineProv(btService, service, stockService, indicatorService)
+	btEngine := bt.NewEngineProv(btService, service, stockService, expressionService, indicatorService)
 	btController := bt.NewControllerProv(btService, btEngine)
 	btRouter := bt.NewRoutesProv(engine, btController)
 	btRoot := bt.NewRoot(btRouter)
