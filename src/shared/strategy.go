@@ -10,10 +10,17 @@ import (
 	"github.com/lib/pq"
 )
 
+type ValueType string
+
+var (
+	ABSOLUTE   ValueType = "ABSOLUTE"
+	PERCENTAGE ValueType = "PERCENTAGE"
+)
+
 type Strategy struct {
 	ID     uuid.UUID `json:"id" db:"id"`
 	UserID uuid.UUID `json:"user_id" db:"user_id"`
-	// Position
+
 	Name           string         `json:"name" db:"name"`
 	Description    string         `json:"description" db:"description"`
 	PositionType   Direction      `json:"position_type" db:"position_type"`
@@ -22,23 +29,23 @@ type Strategy struct {
 	ChartTimeframe string         `json:"chart_timeframe" db:"chart_timeframe"`
 	Qty            int32          `json:"qty" db:"qty"`
 
-	// Entry Condition
 	EntryExpression string `json:"entry_expression" db:"entry_expression"`
+	ExitExpression  string `json:"exit_expression" db:"exit_expression"`
 
-	// Exit Condition
-	ExitExpression   string  `json:"exit_expression" db:"exit_expression"`
-	TargetProfit     float64 `json:"target_profit" db:"target_profit"`
-	StopLoss         float64 `json:"stop_loss" db:"stop_loss"`
-	TrailingStopLoss float64 `json:"trailing_stop_loss" db:"trailing_stop_loss"`
-	ExitType         string  `json:"exit_type" db:"exit_type"`
+	TargetProfit         float64   `json:"target_profit" db:"target_profit"`
+	TargetProfitType     ValueType `json:"target_profit_type" db:"target_profit_type"`
+	StopLoss             float64   `json:"stop_loss" db:"stop_loss"`
+	StopLossType         ValueType `json:"stop_loss_type" db:"stop_loss_type"`
+	TrailingStopLoss     float64   `json:"trailing_stop_loss" db:"trailing_stop_loss"`
+	TrailingStopLossType ValueType `json:"trailing_stop_loss_type" db:"trailing_stop_loss_type"`
+	ExitType             string    `json:"exit_type" db:"exit_type"`
 
-	// Backtest params
 	Capital        float64   `json:"capital" db:"capital"`
 	MaxTrades      int32     `json:"max_trades" db:"max_trades"`
 	EntryStartTime time.Time `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime   time.Time `json:"entry_end_time" db:"entry_end_time"`
-	StartPeriod      time.Time `json:"start_date" db:"start_date"`
-	EndPeriod        time.Time `json:"end_date" db:"end_date"`
+	StartPeriod    time.Time `json:"start_date" db:"start_date"`
+	EndPeriod      time.Time `json:"end_date" db:"end_date"`
 	IsActive       bool      `json:"is_active" db:"is_active"`
 
 	// Audit
