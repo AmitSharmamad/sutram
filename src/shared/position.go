@@ -74,6 +74,10 @@ func NewPosition(runID uuid.UUID, direction Direction) *Position {
 	}
 }
 
+func (position *Position) IsLong() bool {
+	return position.Direction == LONG
+}
+
 func (position *Position) IsDone() bool {
 	return position.State == Exited
 }

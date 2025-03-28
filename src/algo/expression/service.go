@@ -10,7 +10,7 @@ func NewService() *Service {
 
 func (service *Service) Eval(
 	expression string,
-	data shared.StockData,
+	data *shared.StockData,
 ) bool {
-	return NewExpressionStatement(expression).Eval(data)
+	return NewExpressionStatement(expression).Eval(*data)
 }
