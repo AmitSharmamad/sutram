@@ -36,8 +36,8 @@ type Strategy struct {
 	TargetProfitType     ValueType `json:"target_profit_type" db:"target_profit_type"`
 	StopLoss             float64   `json:"stop_loss" db:"stop_loss"`
 	StopLossType         ValueType `json:"stop_loss_type" db:"stop_loss_type"`
-	TrailingStopLoss     float64   `json:"trailing_stop_loss" db:"trailing_stop_loss"`
-	TrailingStopLossType ValueType `json:"trailing_stop_loss_type" db:"trailing_stop_loss_type"`
+	TrailingStopLoss     *float64   `json:"trailing_stop_loss" db:"trailing_stop_loss"`
+	TrailingStopLossType *ValueType `json:"trailing_stop_loss_type" db:"trailing_stop_loss_type"`
 	ExitType             string    `json:"exit_type" db:"exit_type"`
 
 	Capital        float64   `json:"capital" db:"capital"`

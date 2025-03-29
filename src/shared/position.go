@@ -134,8 +134,8 @@ func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targe
 
 func (position *Position) CalculateTrailingStopLossPrice(
 	currentClose float64,
-	trailingStopLoss float64,
-	trailingStopLossType ValueType,
+	trailingStopLoss *float64,
+	trailingStopLossType *ValueType,
 ) float64 {
 	var trailingStopLossPrice float64
 
@@ -143,10 +143,10 @@ func (position *Position) CalculateTrailingStopLossPrice(
 		f := util.Max(*position.HighestPrice, currentClose)
 		position.HighestPrice = &f
 
-		if trailingStopLossType == ABSOLUTE {
-			trailingStopLossPrice = *position.HighestPrice - trailingStopLoss
-		} else if trailingStopLossType == PERCENTAGE {
-			trailingStopLossPrice = *position.HighestPrice * (1 - trailingStopLoss)
+		if trailingStopLossType == &ABSOLUTE {
+			trailingStopLossPrice = *position.HighestPrice - *trailingStopLoss
+		} else if trailingStopLossType == &PERCENTAGE {
+			trailingStopLossPrice = *position.HighestPrice * (1 - *trailingStopLoss)
 		} else {
 			panic("Invalid TrailingStopLossType")
 		}
@@ -154,10 +154,10 @@ func (position *Position) CalculateTrailingStopLossPrice(
 		f := util.Min(*position.LowestPrice, currentClose)
 		position.LowestPrice = &f
 
-		if trailingStopLossType == ABSOLUTE {
-			trailingStopLossPrice = *position.LowestPrice + trailingStopLoss
-		} else if trailingStopLossType == PERCENTAGE {
-			trailingStopLossPrice = *position.LowestPrice * (1 + trailingStopLoss)
+		if trailingStopLossType == &ABSOLUTE {
+			trailingStopLossPrice = *position.LowestPrice + *trailingStopLoss
+		} else if trailingStopLossType == &PERCENTAGE {
+			trailingStopLossPrice = *position.LowestPrice * (1 + *trailingStopLoss)
 		} else {
 			panic("Invalid TrailingStopLossType")
 		}

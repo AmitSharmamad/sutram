@@ -56,23 +56,22 @@ func (repo *Repo) Get(
 				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
 				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
 				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
-			END AS interval_time,
-			id,
+			END AS timestamp,
 			MIN(low) AS low,
 			MAX(high) AS high,
 			first_value(open) AS open,
 			last_value(close) AS close,
 			SUM(volume) AS volume
 		FROM
-			instrument
+			sutram.instrument
 		WHERE
 			id = %d
 			AND timestamp BETWEEN toDateTime64('%s', 6) AND toDateTime64('%s', 6)
 		GROUP BY
 			id,
-			interval_time
+			timestamp
 		ORDER BY
-			interval_time ASC;
+			timestamp ASC;
 	`,
 		timeFrame,
 		timeFrame,
@@ -88,7 +87,7 @@ func (repo *Repo) Get(
 		endPeriod.Format("2006-01-02 15:04:05"),
 	)
 
-	err := repo.db.Select(&data, query, instrumentId)
+	err := repo.db.Select(&data, query)
 	return &data, err
 }
 
@@ -112,23 +111,22 @@ func (repo *Repo) GetLookBack(
 				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
 				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
 				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
-			END AS interval_time,
-			id,
+			END AS timestamp,
 			MIN(low) AS low,
 			MAX(high) AS high,
 			first_value(open) AS open,
 			last_value(close) AS close,
 			SUM(volume) AS volume
 		FROM
-			instrument
+			sutram.instrument
 		WHERE
 			id = %d
 			AND timestamp <= toDateTime64('%s', 6)
 		GROUP BY
 			id,
-			interval_time
+			timestamp
 		ORDER BY
-			interval_time DESC
+			timestamp DESC
 		LIMIT %d;
 	`,
 		timeFrame,
@@ -152,7 +150,7 @@ func (repo *Repo) GetLookBack(
 func (repo *Repo) Insert(instruments []*shared.OHLCV) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO sutram.instrument (
-			id, symbol, open, high, low, close, volume, timestamp, created_at, updated_at
+			id, instrument, open, high, low, close, volume, timestamp, created_at, updated_at
 		) VALUES (
 			:id, :instrument, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
 		)`,

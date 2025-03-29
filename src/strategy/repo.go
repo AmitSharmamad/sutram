@@ -46,8 +46,11 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			entry_expression,
 			exit_expression,
 			target_profit,
+			target_profit_type,
 			stop_loss,
+			stop_loss_type,
 			trailing_stop_loss,
+			trailing_stop_loss_type,
 			exit_type,
 
 			capital,
@@ -72,8 +75,11 @@ func (repo *Repo) Create(ctx context.Context, strategy *shared.Strategy) error {
 			:entry_expression,
 			:exit_expression,
 			:target_profit,
+			:target_profit_type,
 			:stop_loss,
+			:stop_loss_type,
 			:trailing_stop_loss,
+			:trailing_stop_loss_type,
 			:exit_type,
 
 			:capital,
