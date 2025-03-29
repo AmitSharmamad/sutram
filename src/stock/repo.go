@@ -83,8 +83,8 @@ func (repo *Repo) Get(
 		timeFrame,
 		timeFrame,
 		instrumentId,
-		startPeriod.Format("2006-01-02 15:04:05"),
-		endPeriod.Format("2006-01-02 15:04:05"),
+		"2024-01-31 09:00:00",
+		"2024-01-31 10:00:00",
 	)
 
 	err := repo.db.Select(&data, query)
@@ -121,7 +121,7 @@ func (repo *Repo) GetLookBack(
 			sutram.instrument
 		WHERE
 			id = %d
-			AND timestamp <= toDateTime64('%s', 6)
+			AND timestamp < toDateTime64('%s', 6)
 		GROUP BY
 			id,
 			timestamp
@@ -139,7 +139,7 @@ func (repo *Repo) GetLookBack(
 		timeFrame,
 		timeFrame,
 		id,
-		startTime.Format("2006-01-02 15:04:05"),
+		"2024-01-31 09:00:00",
 		lookback,
 	)
 

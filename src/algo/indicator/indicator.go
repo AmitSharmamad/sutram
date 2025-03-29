@@ -27,7 +27,7 @@ type Prices []float64
 type IndicatorCalculator interface {
 	Calculate(prices Prices, config map[string]any, point string) float64
 	CalculateAll(data shared.StockData, config map[string]any, point string) []float64
-	GetDataRange() int32
+	GetDataRange(config map[string]any) int32
 }
 
 func (expression *IndicatorExpression) Handle(data shared.StockData) bool {
@@ -61,7 +61,7 @@ func (indicator *Indicator) Handle(data shared.StockData) float64 {
 
 func (indicator *Indicator) GetDataRange() int32 {
 	calculator := GetIndFactory(indicator.Name)
-	return calculator.GetDataRange()
+	return calculator.GetDataRange(indicator.Value)
 }
 
 func GetPrices(data shared.StockData, point string) Prices {
