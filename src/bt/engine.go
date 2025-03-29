@@ -63,6 +63,8 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 
 	wg.Wait()
 
+	runGroup.Runs = runs
+
 	engine.service.runGroupRepo.Create(runGroup)
 
 	engine.service.runRepo.Create(runs)
@@ -76,9 +78,8 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 	}
 	engine.service.positionRepo.Create(positions)
 
-	engine.service.runMetricsRepo.Upsert(runMetrics)
-
-	runGroup.Runs = runs
+	err := engine.service.runMetricsRepo.Upsert(runMetrics)
+	println(err)
 
 	return runGroup
 }
@@ -113,7 +114,8 @@ func (engine *Engine) Run(
 		switch position.State {
 		case shared.NotEntered:
 
-			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, data)
+			slicedData := (*data)[:i+1]
+			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, &slicedData)
 
 			if entryCondition {
 
@@ -177,13 +179,12 @@ func (engine *Engine) Run(
 			panic("Error in position Eval")
 		}
 	}
-
-	run.RunMetrics = engine.CalculateRunMetrics(run)
-
+	
 	run.State = shared.Ended
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
 
+	run.RunMetrics = engine.CalculateRunMetrics(run)
 }
 
 func (engine *Engine) GetLatestPosition(

@@ -137,35 +137,37 @@ func (position *Position) CalculateTrailingStopLossPrice(
 	trailingStopLoss *float64,
 	trailingStopLossType *ValueType,
 ) float64 {
-	var trailingStopLossPrice float64
+	// var trailingStopLossPrice float64
 
-	if position.Direction == LONG {
-		f := util.Max(*position.HighestPrice, currentClose)
-		position.HighestPrice = &f
+	return 0
 
-		if trailingStopLossType == &ABSOLUTE {
-			trailingStopLossPrice = *position.HighestPrice - *trailingStopLoss
-		} else if trailingStopLossType == &PERCENTAGE {
-			trailingStopLossPrice = *position.HighestPrice * (1 - *trailingStopLoss)
-		} else {
-			panic("Invalid TrailingStopLossType")
-		}
-	} else if position.Direction == SHORT {
-		f := util.Min(*position.LowestPrice, currentClose)
-		position.LowestPrice = &f
+	// if position.Direction == LONG {
+	// 	f := util.Max(*position.HighestPrice, currentClose)
+	// 	position.HighestPrice = &f
 
-		if trailingStopLossType == &ABSOLUTE {
-			trailingStopLossPrice = *position.LowestPrice + *trailingStopLoss
-		} else if trailingStopLossType == &PERCENTAGE {
-			trailingStopLossPrice = *position.LowestPrice * (1 + *trailingStopLoss)
-		} else {
-			panic("Invalid TrailingStopLossType")
-		}
-	} else {
-		panic("Invalid PositionType")
-	}
+	// 	if trailingStopLossType == &ABSOLUTE {
+	// 		trailingStopLossPrice = *position.HighestPrice - *trailingStopLoss
+	// 	} else if trailingStopLossType == &PERCENTAGE {
+	// 		trailingStopLossPrice = *position.HighestPrice * (1 - *trailingStopLoss)
+	// 	} else {
+	// 		panic("Invalid TrailingStopLossType")
+	// 	}
+	// } else if position.Direction == SHORT {
+	// 	f := util.Min(*position.LowestPrice, currentClose)
+	// 	position.LowestPrice = &f
 
-	return trailingStopLossPrice
+	// 	if trailingStopLossType == &ABSOLUTE {
+	// 		trailingStopLossPrice = *position.LowestPrice + *trailingStopLoss
+	// 	} else if trailingStopLossType == &PERCENTAGE {
+	// 		trailingStopLossPrice = *position.LowestPrice * (1 + *trailingStopLoss)
+	// 	} else {
+	// 		panic("Invalid TrailingStopLossType")
+	// 	}
+	// } else {
+	// 	panic("Invalid PositionType")
+	// }
+
+	// return trailingStopLossPrice
 }
 
 func (position *Position) CheckForExit(

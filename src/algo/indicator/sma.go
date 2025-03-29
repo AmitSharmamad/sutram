@@ -47,8 +47,26 @@ func (indicator *SMA) Calculate(
 	return util.Round(sum / float64(period))
 }
 
-func (sma *SMA) GetDataRange() int32 {
-	return int32(sma.period)
+func (indicator *SMA) GetDataRange(config map[string]any) int32 {
+	period := indicator.period
+	if period == 0 {
+		if p, ok := config["period"].(int); ok {
+			period = p
+		} else {
+			period = 14 // default period
+		}
+	}
+
+	offset := indicator.offset
+	if offset == 0 {
+		if p, ok := config["period"].(int); ok {
+			offset = p
+		} else {
+			offset = 0
+		}
+	}
+
+	return int32(period + offset)
 }
 
 func (indicator *SMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
