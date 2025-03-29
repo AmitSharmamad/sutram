@@ -22,6 +22,7 @@ func NewRunMetricsRepoProv(
 }
 
 func (repo *RunMetricsRepo) Upsert(runMetrics []*shared.RunMetrics) error {
+	// TODO: Fix AnnualizedReturn
 	_, err := repo.db.Insert(
 		`
 		INSERT INTO run_metrics (

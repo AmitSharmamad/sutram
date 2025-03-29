@@ -10,18 +10,6 @@ type EMA struct {
 	offset int
 }
 
-func (indicator *EMA) Init(config map[string]any) {
-	
-	period := indicator.period
-	if period == 0 {
-		if p, ok := config["period"].(int); ok {
-			indicator.period = p
-		} else {
-			indicator.period = 14 // default period
-		}
-	}
-}
-
 func (indicator *EMA) Calculate(
 	prices Prices,
 	config map[string]any,
