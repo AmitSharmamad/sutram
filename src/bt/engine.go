@@ -145,11 +145,14 @@ func (engine *Engine) Run(
 				strategy.TargetProfitType,
 			)
 
-			trailingStopLossPrice := position.CalculateTrailingStopLossPrice(
-				current.Close,
-				strategy.TrailingStopLoss,
-				strategy.TrailingStopLossType,
-			)
+			var trailingStopLossPrice float64
+			if strategy.TrailingStopLoss != nil {
+				trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
+					current.Close,
+					strategy.TrailingStopLoss,
+					strategy.TrailingStopLossType,
+				)
+			}
 
 			exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, data)
 
