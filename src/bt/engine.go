@@ -3,7 +3,6 @@ package bt
 import (
 	"context"
 	"sync"
-	"time"
 
 	"algo/src/shared"
 	"algo/src/util"
@@ -25,14 +24,14 @@ func NewEngineProv(
 	stockService shared.StockService,
 	expressionService shared.ExpressionService,
 	indicatorService shared.IndicatorService,
-	) *Engine {
-		return &Engine{
-			service:          service,
-			strategyService:  strategyService,
-			stockService:     stockService,
-			expressionService: expressionService,
-			indicatorService: indicatorService,
-		}
+) *Engine {
+	return &Engine{
+		service:           service,
+		strategyService:   strategyService,
+		stockService:      stockService,
+		expressionService: expressionService,
+		indicatorService:  indicatorService,
+	}
 }
 
 func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.RunGroup {
@@ -47,11 +46,11 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 
 	runs := make([]*shared.Run, 0)
 
-	for _, instrument := range instruments {
+	for _, instrumentID := range instruments {
 		run := shared.NewRun(
 			runGroup.ID,
 			strategyID,
-			instrument,
+			instrumentID,
 		)
 
 		runs = append(runs, run)
@@ -63,6 +62,8 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 	}
 
 	wg.Wait()
+
+	runGroup.Runs = runs
 
 	engine.service.runGroupRepo.Create(runGroup)
 
@@ -77,120 +78,98 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 	}
 	engine.service.positionRepo.Create(positions)
 
-	engine.service.runMetricsRepo.Create(runMetrics)
-
-	runGroup.Runs = runs
+	err := engine.service.runMetricsRepo.Upsert(runMetrics)
+	println(err)
 
 	return runGroup
 }
 
 func (engine *Engine) Run(
-	ctx context.Context, run *shared.Run, strategy *shared.Strategy, wg *sync.WaitGroup,
+	ctx context.Context,
+	run *shared.Run,
+	strategy *shared.Strategy,
+	wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
 
-	// Fetch the strategy
-	// Fetch the datarange
-	// Fetch the instrument data based off of the datarange
-	// Iterate through the data. Start taking positions
-
-	// Update the Run Start Time
 	startTime := util.GetTime()
 	run.StartedTime = &startTime
 
-	// TODO: Fix this
-	entryLookBack := strategy.GetEntryDataRange()
-	exitLookBack := strategy.GetExitDataRange()
+	entryLookBack := engine.expressionService.GetEntryDataRange(strategy)
+	exitLookBack := engine.expressionService.GetExitDataRange(strategy)
 
 	lookBack := util.Max(entryLookBack, exitLookBack)
 
-	println("Fetching the data for the range ", lookBack)
-
-	// instrument := run.Instrument
-
-	// TODO: Fetch instrment id
 	data := engine.stockService.Get(
-		0, strategy.StartPeriod, strategy.EndPeriod, strategy.ChartTimeframe, lookBack,
+		run.InstrumentID,
+		strategy.StartPeriod,
+		strategy.EndPeriod,
+		strategy.ChartTimeframe,
+		lookBack,
 	)
 
-	var highestPrice float64
 	for i := lookBack; i < int32(len(*data)); i++ {
 		current := (*data)[i]
 		position := engine.GetLatestPosition(run, strategy)
 		switch position.State {
 		case shared.NotEntered:
-			// TODO:
-			// check if the entry expression is true
-			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, data)
+
+			slicedData := (*data)[:i+1]
+			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, &slicedData)
 
 			if entryCondition {
 
-				highestPrice = current.Close
+				position.HighestPrice = &current.Close
+				position.LowestPrice = &current.Close
 
-				position = engine.UpdatePositionOnEntrySignal(
-					position,
+				position.UpdateOnEntrySignal(
 					&current.Close,
 					&current.Timestamp,
 				)
 
-				engine.UpdatePositionOnEntryOrder(
-					position,
+				position.UpdateOnEntryOrder(
 					&current.Close,
 					&current.Timestamp,
 				)
 			}
 
 		case shared.Entered:
-			var stopLossPrice float64
-			var targetProfitPrice float64
 
-			// Calculate Trailing Stop Loss
-			highestPrice = util.Max(highestPrice, current.Close)
-			trailingStopLossPrice := highestPrice - strategy.TrailingStopLoss
+			stopLossPrice := position.CalculateStopLossPrice(
+				strategy.StopLoss,
+				strategy.StopLossType,
+			)
 
-			// TODO: Handle Absolute and Percentage for stoploss
-			stopLossPrice = *position.EntryPriceSignal * (1 - strategy.StopLoss)
-			targetProfitPrice = *position.EntryPriceSignal * (1 + strategy.TargetProfit)
+			targetProfitPrice := position.CalculateTargetProfitPrice(
+				strategy.TargetProfit,
+				strategy.TargetProfitType,
+			)
 
-			exitCondition := engine.expressionService.Eval(strategy.ExitExpression, data)
+			trailingStopLossPrice := position.CalculateTrailingStopLossPrice(
+				current.Close,
+				strategy.TrailingStopLoss,
+				strategy.TrailingStopLossType,
+			)
 
-			stopLossTriggered := (
-				(position.IsLong() && (current.Close < stopLossPrice)) || 
-				(!position.IsLong() && (current.Close > stopLossPrice)))
-			trailingStopTriggered := (
-				(position.IsLong() && current.Close < trailingStopLossPrice) ||
-				(!position.IsLong() && (current.Close > trailingStopLossPrice)))
-			takeProfitTriggered := (
-				(position.IsLong() && (current.Close >= targetProfitPrice)) ||
-				(!position.IsLong() && (current.Close <= targetProfitPrice)))
+			exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, data)
 
-			var exitReason shared.ExitReason
-			if stopLossTriggered {
-				position.State = shared.Exited
-				exitReason = shared.HIT_STOP_LOSS
-			} else if trailingStopTriggered {
-				position.State = shared.Exited
-				exitReason = shared.HIT_TRAILING_STOP_LOSS
-			} else if takeProfitTriggered {
-				position.State = shared.Exited
-				exitReason = shared.HIT_TAKE_PROFIT
-			} else if exitCondition {
-				position.State = shared.Exited
-				exitReason = shared.EXIT_CONDITION_MET
-			}
+			isExit := position.CheckForExit(
+				current.Close,
+				stopLossPrice,
+				targetProfitPrice,
+				trailingStopLossPrice,
+				exitConditionResult,
+			)
 
-			if position.IsDone() {
+			if isExit {
 
-				engine.UpdatePositionOnExitSignal(
-					position,
+				position.UpdateOnExitSignal(
 					&current.Close,
 					&current.Timestamp,
-					exitReason,
 				)
 
 				// Simulate Order
-				engine.UpdatePositionOnExitOrder(
-					position,
+				position.UpdateOnExitOrder(
 					&current.Close,
 					&current.Timestamp,
 				)
@@ -200,107 +179,12 @@ func (engine *Engine) Run(
 			panic("Error in position Eval")
 		}
 	}
-
-	// Update the Run State and End Time
+	
 	run.State = shared.Ended
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
 
-	// Calculate the Run Metrics
 	run.RunMetrics = engine.CalculateRunMetrics(run)
-
-	run.State = shared.Ended
-}
-
-func (engine *Engine) UpdatePositionOnExitOrder(
-	position *shared.Position,
-	exitPriceOrder *float64,
-	exitTimeStampOrder *time.Time,
-) {
-
-	position.ExitPriceOrder = exitPriceOrder
-	position.ExitTimeOrder = exitTimeStampOrder
-
-	// Calculate P&L - Absolute and Percentage
-	var profitlossAbsolute, profitLossPercentage float64
-	profitlossAbsolute, profitLossPercentage = engine.CalculateProfitLoss(
-		position.Direction,
-		*position.EntryPriceOrder,
-		*position.ExitPriceOrder,
-	)
-	position.ProfitLossAbsolute = &profitlossAbsolute
-	position.ProfitLossPercentage = &profitLossPercentage
-
-	// Calculate Entry Fees and Exit Fees
-	var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
-	position.EntryFees = &fees
-	position.ExitFees = &fees
-
-	// Calculate Transaction Costs
-	transactionCost := *position.EntryFees + *position.ExitFees
-	position.TransactionCost = &transactionCost
-
-	netProfitLoss := *position.ProfitLossAbsolute - *position.TransactionCost
-	position.NetProfitLoss = &netProfitLoss
-}
-
-func (engine *Engine) UpdatePositionOnExitSignal(
-	position *shared.Position,
-	exitPriceSignal *float64,
-	exitTimeStampSignal *time.Time,
-	exitReason shared.ExitReason,
-) {
-
-	position.State = shared.Exited
-	position.ExitPriceSignal = exitPriceSignal
-	position.ExitTimeSignal = exitTimeStampSignal
-	position.ExitReason = &exitReason
-
-}
-
-func (engine *Engine) UpdatePositionOnEntrySignal(
-	position *shared.Position,
-	entryPriceSignal *float64,
-	entryTimeStampSignal *time.Time,
-) *shared.Position {
-	position.State = shared.Entered
-	position.EntryPriceSignal = entryPriceSignal
-	position.EntryTimeSignal = entryTimeStampSignal
-
-	return position
-}
-
-func (engine *Engine) UpdatePositionOnEntryOrder(
-	position *shared.Position,
-	entryPriceOrder *float64,
-	entryTimeStampOrder *time.Time,
-) *shared.Position {
-	position.State = shared.Entered
-	position.EntryPriceOrder = entryPriceOrder
-	position.EntryTimeOrder = entryTimeStampOrder
-
-	return position
-}
-
-func (engine *Engine) CalculateProfitLoss(
-	direction shared.Direction,
-	entryPrice float64,
-	exitPrice float64,
-) (float64, float64) {
-
-	var profitLossAbsolute float64
-	var profitLossPercentage float64
-
-	if direction == shared.LONG {
-		profitLossAbsolute = exitPrice - entryPrice
-	} else {
-		profitLossAbsolute = entryPrice - exitPrice
-	}
-
-	// Calculate Profit/Loss Percentage
-	profitLossPercentage = (profitLossAbsolute / entryPrice) * 100
-
-	return profitLossAbsolute, profitLossPercentage
 }
 
 func (engine *Engine) GetLatestPosition(

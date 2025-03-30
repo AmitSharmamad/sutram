@@ -177,7 +177,24 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 		}
 	}
 
-	s.repo.Insert(instruments)
+	instrumentIDMap := make(map[string]uint64)
+	masterInstruments, _ := s.masterRepo.GetAll()
+
+	for _, masterInstrument := range masterInstruments {
+		if (masterInstrument.Instrument == "") || (masterInstrument.ID == 0) {
+			panic("data is missing")
+		}
+		instrumentIDMap[masterInstrument.Instrument] = masterInstrument.ID
+	}
+
+	for _, instrument := range instruments {
+		instrument.ID = int64(instrumentIDMap[instrument.Instrument])
+	}
+
+	err := s.repo.Insert(instruments)
+	if err != nil {
+		fmt.Printf("error in inserting instrument %+v\n", err)
+	}
 
 	return nil
 }

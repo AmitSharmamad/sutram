@@ -39,6 +39,16 @@ func (r *MasterRepo) GetInstrument(name string) (*shared.InstrumentMaster, error
 	return &master[0], err
 }
 
+func (r *MasterRepo) GetAll() ([]shared.InstrumentMaster, error) {
+	// TODO: Add the filter for instrument name
+	master := make([]shared.InstrumentMaster, 0)
+	err := r.db.Select(&master, "SELECT * FROM sutram.instrument_master")
+	if err != nil {
+		return nil, err
+	}
+	return master, nil
+}
+
 func (r *MasterRepo) GetLatestID() (uint64, error) {
 	ids := make([]uint64, 0)
 	err := r.db.Select(&ids, "SELECT id FROM sutram.instrument_master ORDER BY id DESC LIMIT 1;")

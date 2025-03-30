@@ -14,3 +14,11 @@ func (service *Service) Eval(
 ) bool {
 	return NewExpressionStatement(expression).Eval(*data)
 }
+
+func (service *Service) GetEntryDataRange(strategy *shared.Strategy) int32 {
+	return NewExpressionStatement(strategy.EntryExpression).GetDataRange()
+}
+
+func (service *Service) GetExitDataRange(strategy *shared.Strategy) int32 {
+	return NewExpressionStatement(strategy.ExitExpression).GetDataRange()
+}
