@@ -11,13 +11,8 @@ func (indicator *IndNumber) Calculate(
 	config map[string]any,
 	point string,
 ) float64 {
-	println("Executing Number")
 
-	println(prices)
-	println(config)
-	println(point)
-
-	return 0.0
+	return indicator.Value
 }
 
 func (number *IndNumber) GetDataRange(config map[string]any) int32 {

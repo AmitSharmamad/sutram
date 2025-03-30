@@ -10,19 +10,20 @@ type EMA struct {
 	offset int
 }
 
+func (indicator *EMA) sliceData(prices Prices) Prices {
+	start := len(prices) - indicator.offset - indicator.period
+	end := len(prices) - indicator.offset
+
+	return prices[start:end]
+}
+
 func (indicator *EMA) Calculate(
 	prices Prices,
 	config map[string]any,
 	point string,
 ) float64 {
 	period := indicator.period
-	if period == 0 {
-		if p, ok := config["period"].(int); ok {
-			period = p
-		} else {
-			period = 14 // default period
-		}
-	}
+	prices = indicator.sliceData(prices)
 
 	if len(prices) < period {
 		return 0.0
