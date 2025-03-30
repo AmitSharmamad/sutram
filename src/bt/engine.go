@@ -65,6 +65,8 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 
 	runGroup.Runs = runs
 
+	// TODO: Move all the below DB operations to a separate goroutine function
+
 	engine.service.runGroupRepo.Create(runGroup)
 
 	engine.service.runRepo.Create(runs)
@@ -73,7 +75,6 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 	runMetrics := make([]*shared.RunMetrics, 0)
 	for _, run := range runs {
 		runMetrics = append(runMetrics, run.RunMetrics)
-
 		positions = append(positions, run.Positions...)
 	}
 	engine.service.positionRepo.Create(positions)
@@ -111,29 +112,57 @@ func (engine *Engine) Run(
 	for i := lookBack; i < int32(len(*data)); i++ {
 		current := (*data)[i]
 		position := engine.GetLatestPosition(run, strategy)
+		slicedData := (*data)[:i+1]
+
 		switch position.State {
 		case shared.NotEntered:
-
-			slicedData := (*data)[:i+1]
-			entryCondition := engine.expressionService.Eval(strategy.EntryExpression, &slicedData)
-
-			if entryCondition {
-
-				position.HighestPrice = &current.Close
-				position.LowestPrice = &current.Close
-
-				position.UpdateOnEntrySignal(
-					&current.Close,
-					&current.Timestamp,
-				)
-
-				position.UpdateOnEntryOrder(
-					&current.Close,
-					&current.Timestamp,
-				)
-			}
-
+			engine.TryEnter(position, strategy, &current, &slicedData,)
 		case shared.Entered:
+			engine.TryExit(position, strategy, &current, &slicedData)
+		default:
+			panic("Error in position Eval")
+		}
+	}
+
+	run.State = shared.Ended
+	endTime := util.GetTime()
+	run.EndedTime = &endTime
+
+	run.RunMetrics = engine.CalculateRunMetrics(run)
+}
+
+func (engine *Engine) TryEnter(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	current *shared.Stock,
+	currentData *shared.StockData,
+) {
+
+	entryCondition := engine.expressionService.Eval(strategy.EntryExpression, currentData)
+
+	if entryCondition {
+
+		position.HighestPrice = &current.Close
+		position.LowestPrice = &current.Close
+
+		position.UpdateOnEntrySignal(
+			&current.Close,
+			&current.Timestamp,
+		)
+
+		position.UpdateOnEntryOrder(
+			&current.Close,
+			&current.Timestamp,
+		)
+	}
+}
+
+func (engine *Engine) TryExit(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	current *shared.Stock,
+	currentData *shared.StockData,
+){
 
 			stopLossPrice := position.CalculateStopLossPrice(
 				strategy.StopLoss,
@@ -154,7 +183,7 @@ func (engine *Engine) Run(
 				)
 			}
 
-			exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, data)
+			exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, currentData)
 
 			isExit := position.CheckForExit(
 				current.Close,
@@ -177,17 +206,6 @@ func (engine *Engine) Run(
 					&current.Timestamp,
 				)
 			}
-
-		default:
-			panic("Error in position Eval")
-		}
-	}
-	
-	run.State = shared.Ended
-	endTime := util.GetTime()
-	run.EndedTime = &endTime
-
-	run.RunMetrics = engine.CalculateRunMetrics(run)
 }
 
 func (engine *Engine) GetLatestPosition(
