@@ -31,7 +31,6 @@ type IndicatorCalculator interface {
 }
 
 func (expression *IndicatorExpression) Handle(data shared.StockData) bool {
-	println("Handling indicator expression")
 
 	lhsValue := expression.Lhs.Handle(data)
 	rhsValue := expression.Rhs.Handle(data)
@@ -48,15 +47,12 @@ func (expression *IndicatorExpression) GetDataRange() int32 {
 }
 
 func (indicator *Indicator) Handle(data shared.StockData) float64 {
-	println("Handling indicator", indicator)
-
-	config := make(map[string]any, 0)
 
 	calculator := GetIndFactory(indicator.Name)
 
 	prices := GetPrices(data, indicator.Point)
 
-	return (calculator).Calculate(prices, config, indicator.Point)
+	return (calculator).Calculate(prices, indicator.Value, indicator.Point)
 }
 
 func (indicator *Indicator) GetDataRange() int32 {

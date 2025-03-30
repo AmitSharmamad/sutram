@@ -19,7 +19,6 @@ type LogicalExpression struct {
 }
 
 func (expression *LogicalExpression) Handle(data shared.StockData) bool {
-	println("Handling logical expression")
 
 	lhsValue := expression.Lhs.Handle(data)
 
