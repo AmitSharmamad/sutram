@@ -10,6 +10,18 @@ type EMA struct {
 	offset int
 }
 
+func (indicator *EMA) Init(config map[string]any) {
+	
+	period := indicator.period
+	if period == 0 {
+		if p, ok := config["period"].(int); ok {
+			indicator.period = p
+		} else {
+			indicator.period = 14 // default period
+		}
+	}
+}
+
 func (indicator *EMA) Calculate(
 	prices Prices,
 	config map[string]any,
@@ -47,8 +59,21 @@ func (indicator *EMA) Calculate(
 	return util.Round(ema)
 }
 
-func (ema *EMA) GetDataRange() int32 {
-	return 0
+func (indicator *EMA) GetDataRange(config map[string]any) int32 {
+
+	if p, ok := config["period"].(float64); ok {
+		indicator.period = int(p)
+	} else {
+		indicator.period = 14 // default period
+	}
+
+	if p, ok := config["offset"].(float64); ok {
+		indicator.offset = int(p)
+	} else {
+		indicator.offset = 0
+	}
+
+	return int32(indicator.period + indicator.offset)
 }
 
 func (indicator *EMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {

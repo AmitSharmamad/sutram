@@ -5,4 +5,7 @@ type ExpressionService interface {
 		expression string,
 		data *StockData,
 	) bool
+
+	GetEntryDataRange(strategy *Strategy) int32
+	GetExitDataRange(strategy *Strategy) int32
 }

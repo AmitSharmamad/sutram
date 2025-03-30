@@ -21,14 +21,13 @@ func NewRunMetricsRepoProv(
 	}
 }
 
-func (repo *RunMetricsRepo) Create(runMetrics []*shared.RunMetrics) error {
+func (repo *RunMetricsRepo) Upsert(runMetrics []*shared.RunMetrics) error {
 	_, err := repo.db.Insert(
 		`
 		INSERT INTO run_metrics (
 			id,
 			run_id,
 			total_return_pct,
-			annualized_return,
 			risk_adjusted_return,
 			sharpe_ratio,
 			sortino_ratio,
@@ -57,7 +56,6 @@ func (repo *RunMetricsRepo) Create(runMetrics []*shared.RunMetrics) error {
 			:id,
 			:run_id,
 			:total_return_pct,
-			:annualized_return,
 			:risk_adjusted_return,
 			:sharpe_ratio,
 			:sortino_ratio,
@@ -85,7 +83,6 @@ func (repo *RunMetricsRepo) Create(runMetrics []*shared.RunMetrics) error {
 		)
 		ON CONFLICT (run_id) DO UPDATE SET
 			total_return_pct = :total_return_pct,
-			annualized_return = :annualized_return,
 			risk_adjusted_return = :risk_adjusted_return,
 			sharpe_ratio = :sharpe_ratio,
 			sortino_ratio = :sortino_ratio,
@@ -112,6 +109,7 @@ func (repo *RunMetricsRepo) Create(runMetrics []*shared.RunMetrics) error {
 		`,
 		runMetrics,
 	)
+
 	return err
 }
 

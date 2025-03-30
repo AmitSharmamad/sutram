@@ -22,19 +22,12 @@ func NewRunGroupRepoProv(
 func (repo *RunGroupRepo) Create(runGroup *shared.RunGroup) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO run_group (
-			id, strategy_id, instrument, "type", exchange, state, qty,
-			period_start_time, period_end_time
+			id,
+			strategy_id
 		)
 		VALUES (
 			:id,
-			:strategy_id,
-			:instrument,
-			:type,
-			:exchange,
-			:state,
-			:qty,
-			:period_start_time,
-			:period_end_time
+			:strategy_id
 		)
 		`,
 		runGroup,

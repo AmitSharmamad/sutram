@@ -22,13 +22,20 @@ func NewRunRepoProv(
 func (repo *RunRepo) Create(runs []*shared.Run) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO run (
-			id, strategy_id, instrument, "type", exchange, state, qty,
-			period_start_time, period_end_time
+			id,
+			strategy_id,
+			instrument_id,
+			"type",
+			exchange,
+			state,
+			qty,
+			period_start_time,
+			period_end_time
 		)
 		VALUES (
 			:id,
 			:strategy_id,
-			:instrument,
+			:instrument_id,
 			:type,
 			:exchange,
 			:state,
