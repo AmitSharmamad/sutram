@@ -13,16 +13,16 @@ type Expression struct {
 func (*Expression) Init() {}
 
 func NewExpressionStatement(expression string) *Expression {
-	input := &Expression{}
-	err := json.Unmarshal([]byte(expression), input)
+	expr := &Expression{}
+	err := json.Unmarshal([]byte(expression), expr)
 	if err != nil {
 		panic(err)
 	}
-	return input
+	return expr
 }
 
 func (expression *Expression) Eval(data shared.StockData) bool {
-	println("Evaluating input ", expression)
+
 	if expression.Type == "ExpressionStatement" {
 		if expression.Value.Type == "LogicalExpression" {
 			return expression.Value.Handle(data)
