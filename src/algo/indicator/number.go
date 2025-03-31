@@ -8,7 +8,7 @@ type IndNumber struct {
 
 func (indicator *IndNumber) Calculate(
 	prices Prices,
-	config map[string]any,
+	config []any,
 	point string,
 ) float64 {
 
@@ -21,13 +21,13 @@ func (number *IndNumber) GetDataRange(config map[string]any) int32 {
 
 func (indicator *IndNumber) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
 	var results []float64
-	prices := GetPrices(data, point)
+	// prices := GetPrices(data, point)
 
-	for i := 0; i < len(data); i++ {
-		windowPrices := prices[:i+1]
-		result := indicator.Calculate(windowPrices, config, point)
-		results = append(results, result)
-	}
+	// for i := 0; i < len(data); i++ {
+	// 	windowPrices := prices[:i+1]
+	// 	result := indicator.Calculate(windowPrices, config, point)
+	// 	results = append(results, result)
+	// }
 
 	return results
 }
