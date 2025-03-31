@@ -12,24 +12,26 @@ type SMA struct {
 
 func (indicator *SMA) Calculate(
 	prices Prices,
-	config map[string]any,
+	config []any,
 	point string,
 ) float64 {
 	period := indicator.period
-	if period == 0 {
-		if p, ok := config["period"].(int); ok {
-			period = p
-		} else {
-			period = 14 // default period
-		}
-	}
+	offset := 0
 
-	offset := indicator.offset
-	if offset == 0 {
-		if o, ok := config["offset"].(int); ok {
-			offset = o
-		}
-	}
+	// if period == 0 {
+	// 	if p, ok := config["period"].(int); ok {
+	// 		period = p
+	// 	} else {
+	// 		period = 14 // default period
+	// 	}
+	// }
+
+	// offset := indicator.offset
+	// if offset == 0 {
+	// 	if o, ok := config["offset"].(int); ok {
+	// 		offset = o
+	// 	}
+	// }
 
 	if len(prices) < period+offset {
 		return 0.0
@@ -71,13 +73,13 @@ func (indicator *SMA) GetDataRange(config map[string]any) int32 {
 
 func (indicator *SMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
 	var results []float64
-	prices := GetPrices(data, point)
+	// prices := GetPrices(data, point)
 
-	for i := 0; i < len(data); i++ {
-		windowPrices := prices[:i+1]
-		result := indicator.Calculate(windowPrices, config, point)
-		results = append(results, result)
-	}
+	// for i := 0; i < len(data); i++ {
+	// 	windowPrices := prices[:i+1]
+	// 	result := indicator.Calculate(windowPrices, config, point)
+	// 	results = append(results, result)
+	// }
 
 	return results
 }
