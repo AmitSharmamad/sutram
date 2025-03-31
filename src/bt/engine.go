@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"algo/src/parser"
 	"algo/src/shared"
 	"algo/src/util"
 
@@ -116,7 +117,7 @@ func (engine *Engine) Run(
 
 		switch position.State {
 		case shared.NotEntered:
-			engine.TryEnter(position, strategy, &current, &slicedData,)
+			engine.TryEnter(position, strategy, &current, &slicedData)
 		case shared.Entered:
 			engine.TryExit(position, strategy, &current, &slicedData)
 		default:
@@ -135,10 +136,20 @@ func (engine *Engine) TryEnter(
 	position *shared.Position,
 	strategy *shared.Strategy,
 	current *shared.Stock,
-	currentData *shared.StockData,
+	data *shared.StockData,
 ) {
+	entryCondition := true
 
-	entryCondition := engine.expressionService.Eval(strategy.EntryExpression, currentData)
+	vars := make(map[string]float64)
+	ctx := parser.NewEvaluationContext(data, vars)
+
+	// Check - we are saving the Entry and exit expressions in string format
+	node, err := parser.Parse(strategy.EntryExpression)
+	if err != nil {
+		panic("Error parsing expression")
+	}
+
+	node.Evaluate(ctx)
 
 	if entryCondition {
 
@@ -162,50 +173,50 @@ func (engine *Engine) TryExit(
 	strategy *shared.Strategy,
 	current *shared.Stock,
 	currentData *shared.StockData,
-){
+) {
 
-			stopLossPrice := position.CalculateStopLossPrice(
-				strategy.StopLoss,
-				strategy.StopLossType,
-			)
+	stopLossPrice := position.CalculateStopLossPrice(
+		strategy.StopLoss,
+		strategy.StopLossType,
+	)
 
-			targetProfitPrice := position.CalculateTargetProfitPrice(
-				strategy.TargetProfit,
-				strategy.TargetProfitType,
-			)
+	targetProfitPrice := position.CalculateTargetProfitPrice(
+		strategy.TargetProfit,
+		strategy.TargetProfitType,
+	)
 
-			var trailingStopLossPrice float64
-			if strategy.TrailingStopLoss != nil {
-				trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
-					current.Close,
-					strategy.TrailingStopLoss,
-					strategy.TrailingStopLossType,
-				)
-			}
+	var trailingStopLossPrice float64
+	if strategy.TrailingStopLoss != nil {
+		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
+			current.Close,
+			strategy.TrailingStopLoss,
+			strategy.TrailingStopLossType,
+		)
+	}
 
-			exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, currentData)
+	exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, currentData)
 
-			isExit := position.CheckForExit(
-				current.Close,
-				stopLossPrice,
-				targetProfitPrice,
-				trailingStopLossPrice,
-				exitConditionResult,
-			)
+	isExit := position.CheckForExit(
+		current.Close,
+		stopLossPrice,
+		targetProfitPrice,
+		trailingStopLossPrice,
+		exitConditionResult,
+	)
 
-			if isExit {
+	if isExit {
 
-				position.UpdateOnExitSignal(
-					&current.Close,
-					&current.Timestamp,
-				)
+		position.UpdateOnExitSignal(
+			&current.Close,
+			&current.Timestamp,
+		)
 
-				// Simulate Order
-				position.UpdateOnExitOrder(
-					&current.Close,
-					&current.Timestamp,
-				)
-			}
+		// Simulate Order
+		position.UpdateOnExitOrder(
+			&current.Close,
+			&current.Timestamp,
+		)
+	}
 }
 
 func (engine *Engine) GetLatestPosition(

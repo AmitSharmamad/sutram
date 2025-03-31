@@ -25,7 +25,7 @@ type Indicator struct {
 type Prices []float64
 
 type IndicatorCalculator interface {
-	Calculate(prices Prices, config map[string]any, point string) float64
+	Calculate(prices Prices, config []any, point string) float64
 	CalculateAll(data shared.StockData, config map[string]any, point string) []float64
 	GetDataRange(config map[string]any) int32
 }
@@ -51,8 +51,9 @@ func (indicator *Indicator) Handle(data shared.StockData) float64 {
 	calculator := GetIndFactory(indicator.Name)
 
 	prices := GetPrices(data, indicator.Point)
+	config := []any{}
 
-	return (calculator).Calculate(prices, indicator.Value, indicator.Point)
+	return (calculator).Calculate(prices, config, indicator.Point)
 }
 
 func (indicator *Indicator) GetDataRange() int32 {
@@ -67,15 +68,15 @@ func GetPrices(data shared.StockData, point string) Prices {
 		var value float64
 		switch point {
 		case "open":
-			value = d.Close
-		case "high":
 			value = d.Open
+		case "high":
+			value = d.High
 		case "close":
 			value = d.Close
 		case "low":
-			value = d.Open
+			value = d.Low
 		case "volume":
-			value = d.Open
+			value = float64(d.Volume)
 		default:
 			value = d.Close
 		}
