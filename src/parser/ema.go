@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -10,20 +9,23 @@ type EMA struct {
 	offset int
 }
 
-func (indicator *EMA) sliceData(prices Prices) Prices {
+func (indicator *EMA) SliceData(prices Prices) Prices {
 	start := len(prices) - indicator.offset - indicator.period
 	end := len(prices) - indicator.offset
-
 	return prices[start:end]
 }
 
 func (indicator *EMA) Calculate(
-	prices Prices,
 	config []any,
-	point string,
+	prices Prices,
 ) float64 {
-	period := indicator.period
-	prices = indicator.sliceData(prices)
+	point := config[0].(string)
+	period := config[1].(int)
+	offset := config[2].(int)
+
+	println(point, period, offset)
+
+	prices = indicator.SliceData(prices)
 
 	if len(prices) < period {
 		return 0.0
@@ -49,7 +51,6 @@ func (indicator *EMA) Calculate(
 }
 
 func (indicator *EMA) GetDataRange(config map[string]any) int32 {
-
 	if p, ok := config["period"].(float64); ok {
 		indicator.period = int(p)
 	} else {
@@ -63,17 +64,4 @@ func (indicator *EMA) GetDataRange(config map[string]any) int32 {
 	}
 
 	return int32(indicator.period + indicator.offset)
-}
-
-func (indicator *EMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
-	var results []float64
-// 	prices := GetPrices(data, point)
-
-// 	for i := 0; i < len(data); i++ {
-// 		windowPrices := prices[:i+1]
-// 		result := indicator.Calculate(windowPrices, config, point)
-// 		results = append(results, result)
-// 	}
-
-	return results
 }

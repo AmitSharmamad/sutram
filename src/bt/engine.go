@@ -36,7 +36,6 @@ func NewEngineProv(
 }
 
 func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.RunGroup {
-
 	strategy := engine.strategyService.Get(ctx, strategyID)
 
 	runGroup := shared.NewRunGroup(strategyID)
@@ -78,6 +77,7 @@ func (engine *Engine) Start(ctx context.Context, strategyID uuid.UUID) *shared.R
 		runMetrics = append(runMetrics, run.RunMetrics)
 		positions = append(positions, run.Positions...)
 	}
+
 	engine.service.positionRepo.Create(positions)
 
 	err := engine.service.runMetricsRepo.Upsert(runMetrics)
@@ -97,10 +97,13 @@ func (engine *Engine) Run(
 	startTime := util.GetTime()
 	run.StartedTime = &startTime
 
-	entryLookBack := engine.expressionService.GetEntryDataRange(strategy)
-	exitLookBack := engine.expressionService.GetExitDataRange(strategy)
+	// TODO: fix this
+	// entryLookBack := engine.expressionService.GetEntryDataRange(strategy)
+	// exitLookBack := engine.expressionService.GetExitDataRange(strategy)
+	// lookBack := util.Max(entryLookBack, exitLookBack)
 
-	lookBack := util.Max(entryLookBack, exitLookBack)
+	// TODO: fix this for GA, leave it like this for now
+	var lookBack int32 = 1000
 
 	data := engine.stockService.Get(
 		run.InstrumentID,
@@ -138,20 +141,13 @@ func (engine *Engine) TryEnter(
 	current *shared.Stock,
 	data *shared.StockData,
 ) {
-	entryCondition := true
+	ctx := parser.NewEvaluationContext(data)
 
-	vars := make(map[string]float64)
-	ctx := parser.NewEvaluationContext(data, vars)
-
-	// Check - we are saving the Entry and exit expressions in string format
-	node, err := parser.Parse(strategy.EntryExpression)
-	if err != nil {
-		panic("Error parsing expression")
-	}
-
-	node.Evaluate(ctx)
+	entryCondition := parser.Execute(strategy.EntryExpression, ctx)
 
 	if entryCondition {
+
+		println("entering")
 
 		position.HighestPrice = &current.Close
 		position.LowestPrice = &current.Close
@@ -172,9 +168,8 @@ func (engine *Engine) TryExit(
 	position *shared.Position,
 	strategy *shared.Strategy,
 	current *shared.Stock,
-	currentData *shared.StockData,
+	data *shared.StockData,
 ) {
-
 	stopLossPrice := position.CalculateStopLossPrice(
 		strategy.StopLoss,
 		strategy.StopLossType,
@@ -194,7 +189,9 @@ func (engine *Engine) TryExit(
 		)
 	}
 
-	exitConditionResult := engine.expressionService.Eval(strategy.ExitExpression, currentData)
+	ctx := parser.NewEvaluationContext(data)
+
+	exitConditionResult := parser.Execute(strategy.ExitExpression, ctx)
 
 	isExit := position.CheckForExit(
 		current.Close,
@@ -205,6 +202,8 @@ func (engine *Engine) TryExit(
 	)
 
 	if isExit {
+
+		println("exiting")
 
 		position.UpdateOnExitSignal(
 			&current.Close,
@@ -242,7 +241,6 @@ func (engine *Engine) GetLatestPosition(
 }
 
 func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
-
 	// TODO: Check this logic
 
 	positions := run.Positions
