@@ -1,13 +1,14 @@
 package parser
 
 import (
-	"algo/src/shared"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"algo/src/shared"
 )
 
 // TokenType represents different types of tokens in our grammar
@@ -199,7 +200,6 @@ func (n *VariableNode) String() string {
 }
 
 func (n *VariableNode) Evaluate(ctx *EvaluationContext) (float64, error) {
-
 	if value, exists := ctx.Variables[n.Name]; exists {
 		return value, nil
 	}
@@ -359,7 +359,7 @@ func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	}
 
 	prices := make([]float64, len(args))
-	result := calculator.Calculate(prices, args, "close")
+	result := calculator.Calculate(args, prices)
 	return result, nil
 }
 
@@ -634,10 +634,10 @@ type EvaluationContext struct {
 }
 
 // NewEvaluationContext creates a new evaluation context
-func NewEvaluationContext(data *shared.StockData, vars map[string]float64) *EvaluationContext {
+func NewEvaluationContext(data *shared.StockData) *EvaluationContext {
 	return &EvaluationContext{
-		Data:      data,
-		Variables: vars,
+		Data: data,
+		// Variables: vars,
 		// Functions: funcs,
 	}
 }
@@ -695,10 +695,18 @@ func Parse(expr string) (Node, error) {
 }
 
 // Execute evaluates an expression
-func Execute(expr string, ctx *EvaluationContext) (float64, error) {
+func Execute(expr string, ctx *EvaluationContext) bool {
 	node, err := Parse(expr)
 	if err != nil {
-		return 0, err
+		println("Error in parsing the expression: ", err)
+		panic("parse expression error: ALERT ALERT ALERT!!!")
 	}
-	return node.Evaluate(ctx)
+
+	result, err := node.Evaluate(ctx)
+	if err != nil {
+		println("Error in evaluating the expression: ", err)
+		panic("parse evaluation error: ALERT ALERT ALERT!!!")
+	}
+
+	return result > 0
 }

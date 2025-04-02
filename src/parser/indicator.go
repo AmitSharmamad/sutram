@@ -15,8 +15,8 @@ type Indicator struct {
 type Prices []float64
 
 type IndicatorCalculator interface {
-	Calculate(prices Prices, config []any, point string) float64
-	CalculateAll(data shared.StockData, config map[string]any, point string) []float64
+	Calculate(config []any, prices Prices) float64
+	SliceData(prices Prices) Prices
 	GetDataRange(config map[string]any) int32
 }
 
