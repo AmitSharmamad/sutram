@@ -206,6 +206,11 @@ func (n *VariableNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	return 0, fmt.Errorf("variable not found: %s", n.Name)
 }
 
+// GetName returns the name of the variable
+func (n *VariableNode) GetName() string {
+    return n.Name
+}
+
 // BinaryOpNode represents a binary operation
 type BinaryOpNode struct {
 	Left     Node
@@ -347,10 +352,23 @@ func (n *FunctionCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.Name, strings.Join(args, ", "))
 }
 
+
+// EMA(close, 50, 0)
+
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	args := make([]any, len(n.Arguments))
 	for i, arg := range n.Arguments {
-		args[i] = arg
+        if varNode, isVariable := arg.(*VariableNode); isVariable {
+            args[i] = varNode.Name
+            continue
+        }
+
+		value, err := arg.Evaluate(ctx)
+		if err != nil {
+			return 0, err
+		}
+
+		args[i] = value
 	}
 
 	calculator := GetIndFactory(n.Name)
@@ -358,7 +376,8 @@ func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		return 0, fmt.Errorf("unknown indicator: %s", n.Name)
 	}
 
-	prices := make([]float64, len(args))
+	prices := GetPrices(*ctx.Data, args[0].(string))
+
 	result := calculator.Calculate(args, prices)
 	return result, nil
 }

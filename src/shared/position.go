@@ -150,6 +150,7 @@ func (position *Position) CalculateTrailingStopLossPrice(
 		} else {
 			panic("Invalid TrailingStopLossType")
 		}
+
 	} else if position.Direction == SHORT {
 		f := util.Min(*position.LowestPrice, currentClose)
 		position.LowestPrice = &f
