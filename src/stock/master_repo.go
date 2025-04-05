@@ -3,6 +3,7 @@ package stock
 import (
 	"algo/src/core/db"
 	"algo/src/shared"
+	"fmt"
 )
 
 type MasterRepo struct {
@@ -39,25 +40,46 @@ func (r *MasterRepo) GetInstrument(name string) (*shared.InstrumentMaster, error
 	return &master[0], err
 }
 
-func (r *MasterRepo) GetAll(exchange, segment string) ([]shared.InstrumentMaster, error) {
+func (r *MasterRepo) GetAll(exchange, segment string, page, limit int) ([]shared.InstrumentMaster, int, error) {
 	master := make([]shared.InstrumentMaster, 0)
-	query := "SELECT * FROM sutram.instrument_master WHERE 1=1"
+	var total int
+
+	// Get total count first
+	countQuery := "SELECT COUNT(*) FROM sutram.instrument_master WHERE 1=1"
 	args := make([]interface{}, 0)
 
 	if exchange != "" {
-		query += " AND exchange = ?"
+		countQuery += " AND exchange = ?"
 		args = append(args, exchange)
 	}
 	if segment != "" {
-		query += " AND segment = ?"
+		countQuery += " AND segment = ?"
 		args = append(args, segment)
 	}
 
-	err := r.db.Select(&master, query, args...)
+	err := r.db.Get(&total, countQuery, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return master, nil
+
+	// Then get paginated results
+	query := "SELECT * FROM sutram.instrument_master WHERE 1=1"
+	if exchange != "" {
+		query += " AND exchange = ?"
+	}
+	if segment != "" {
+		query += " AND segment = ?"
+	}
+
+	// Add pagination
+	offset := (page - 1) * limit
+	query += fmt.Sprintf(" ORDER BY symbol ASC LIMIT %d OFFSET %d", limit, offset)
+
+	err = r.db.Select(&master, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	return master, total, nil
 }
 
 func (r *MasterRepo) GetLatestID() (uint64, error) {
