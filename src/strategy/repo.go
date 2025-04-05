@@ -160,3 +160,35 @@ func (repo *Repo) GetAll(
 
 	return &strategies, nil
 }
+
+func (repo *Repo) Update(ctx context.Context, strategy *shared.Strategy) error {
+	_, err := repo.db.Update(`
+		UPDATE strategy 
+		SET
+			name = :name,
+			description = :description,
+			position_type = :position_type,
+			instruments = :instruments,
+			chart_type = :chart_type,
+			chart_timeframe = :chart_timeframe,
+			qty = :qty,
+			entry_expression = :entry_expression,
+			exit_expression = :exit_expression,
+			target_profit = :target_profit,
+			target_profit_type = :target_profit_type,
+			stop_loss = :stop_loss,
+			stop_loss_type = :stop_loss_type,
+			trailing_stop_loss = :trailing_stop_loss,
+			trailing_stop_loss_type = :trailing_stop_loss_type,
+			exit_type = :exit_type,
+			capital = :capital,
+			max_trades = :max_trades,
+			entry_start_time = :entry_start_time,
+			entry_end_time = :entry_end_time,
+			start_date = :start_date,
+			end_date = :end_date,
+			is_active = :is_active
+		WHERE id = :id
+	`, strategy)
+	return err
+}
