@@ -188,7 +188,17 @@ func (repo *Repo) Update(ctx context.Context, strategy *shared.Strategy) error {
 			start_date = :start_date,
 			end_date = :end_date,
 			is_active = :is_active
-		WHERE id = :id
+		WHERE id = :id;
 	`, strategy)
+	return err
+}
+
+func (repo *Repo) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := repo.db.Delete(`
+		DELETE FROM strategy 
+		WHERE id = :id;
+	`, map[string]interface{}{
+		"id": id,
+	})
 	return err
 }
