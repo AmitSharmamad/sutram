@@ -130,17 +130,22 @@ func (service *Service) Get(
 	timeFrame string,
 	lookBack int32,
 ) *shared.StockData {
-
 	dateRangeData, err := service.repo.Get(id, startPeriod, endPeriod, timeFrame)
+	if err != nil {
+		// Since interface doesn't allow returning error, we return empty StockData
+		return &shared.StockData{}
+	}
+	
 	lookBackData, err := service.repo.GetLookBack(id, timeFrame, startPeriod, lookBack)
+	if err != nil {
+		// Since interface doesn't allow returning error, we return date range data only
+		return dateRangeData
+	}
 
 	for i, j := 0, len(*lookBackData)-1; i < j; i, j = i+1, j-1 {
 		(*lookBackData)[i], (*lookBackData)[j] = (*lookBackData)[j], (*lookBackData)[i]
 	}
 
-	if err != nil {
-		panic(err)
-	}
 	data := append(make(shared.StockData, 0), *lookBackData...)
 	data = append(data, *dateRangeData...)
 
@@ -178,7 +183,7 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 	}
 
 	instrumentIDMap := make(map[string]uint64)
-	masterInstruments, _ := s.masterRepo.GetAll()
+	masterInstruments, _ := s.masterRepo.GetAll("", "") // Pass empty strings to get all instruments
 
 	for _, masterInstrument := range masterInstruments {
 		if (masterInstrument.Instrument == "") || (masterInstrument.ID == 0) {
