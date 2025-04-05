@@ -76,12 +76,12 @@ func NewPosition(runID uuid.UUID, direction Direction) *Position {
 	}
 }
 
-func (position *Position) CalculateStopLossPrice(stopLoss float64, stopLossType ValueType) float64 {
+func (position *Position) CalculateStopLossPrice(stopLoss float64, stopLossType *ValueType) float64 {
 	entryPrice := position.EntryPriceOrder
 
 	var stopLossPrice float64
 
-	if stopLossType == ABSOLUTE {
+	if *stopLossType == ABSOLUTE {
 		if position.Direction == LONG {
 			stopLossPrice = *entryPrice - stopLoss
 		} else if position.Direction == SHORT {
@@ -89,7 +89,7 @@ func (position *Position) CalculateStopLossPrice(stopLoss float64, stopLossType 
 		} else {
 			panic("Invalid PositionType")
 		}
-	} else if stopLossType == PERCENTAGE {
+	} else if *stopLossType == PERCENTAGE {
 		if position.Direction == LONG {
 			stopLossPrice = *entryPrice * (1 - stopLoss)
 		} else if position.Direction == SHORT {
@@ -104,12 +104,12 @@ func (position *Position) CalculateStopLossPrice(stopLoss float64, stopLossType 
 	return stopLossPrice
 }
 
-func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targetProfitType ValueType) float64 {
+func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targetProfitType *ValueType) float64 {
 	entryPrice := position.EntryPriceOrder
 
 	var targetProfitPrice float64
 
-	if targetProfitType == ABSOLUTE {
+	if *targetProfitType == ABSOLUTE {
 		if position.Direction == LONG {
 			targetProfitPrice = *entryPrice + targetProfit
 		} else if position.Direction == SHORT {
@@ -117,7 +117,7 @@ func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targe
 		} else {
 			panic("Invalid PositionType")
 		}
-	} else if targetProfitType == PERCENTAGE {
+	} else if *targetProfitType == PERCENTAGE {
 		if position.Direction == LONG {
 			targetProfitPrice = *entryPrice * (1 + targetProfit)
 		} else if position.Direction == SHORT {

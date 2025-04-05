@@ -80,3 +80,13 @@ func (service *Service) Update(
 	}
 	return service.Get(ctx, id), nil
 }
+
+func (service *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	// First check if strategy exists
+	_, err := service.repo.Get(ctx, id)
+	if err != nil {
+		return shared.NewBadRequest("Strategy not found", "NOT_FOUND")
+	}
+
+	return service.repo.Delete(ctx, id)
+}

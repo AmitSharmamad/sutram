@@ -21,6 +21,7 @@ func NewRoutesProv(
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)
 		api.PUT("/:id", controller.Update)
+		api.DELETE("/:id", controller.Delete)
 	}
 
 	router := &Router{}
