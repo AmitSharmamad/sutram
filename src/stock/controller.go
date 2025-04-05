@@ -20,24 +20,14 @@ func NewControllerProv(
 }
 
 func (controller *Controller) GetStocks(gctx *gin.Context) {
-	exchange := shared.Exchange(gctx.Query("exchange"))
-	segment := shared.Segment(gctx.Query("segment"))
+	exchange := gctx.Query("exchange")
+	segment := gctx.Query("segment")
 
-	// Get all instruments from master repo
-	instruments, err := controller.service.masterRepo.GetAll()
+	instruments, err := controller.service.masterRepo.GetAll(exchange, segment)
 	if err != nil {
 		web.InternalServerErrorResp(gctx, err.Error(), "INSTRUMENT_FETCH_ERROR")
 		return
 	}
 
-	// Apply filters if provided
-	filteredInstruments := make([]shared.InstrumentMaster, 0)
-	for _, instrument := range instruments {
-		if (exchange == "" || instrument.Exchange == exchange) &&
-			(segment == "" || instrument.Segment == segment) {
-			filteredInstruments = append(filteredInstruments, instrument)
-		}
-	}
-
-	shared.SuccessResp(gctx, filteredInstruments)
+	shared.SuccessResp(gctx, instruments)
 }

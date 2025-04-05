@@ -39,10 +39,21 @@ func (r *MasterRepo) GetInstrument(name string) (*shared.InstrumentMaster, error
 	return &master[0], err
 }
 
-func (r *MasterRepo) GetAll() ([]shared.InstrumentMaster, error) {
-	// TODO: Add the filter for instrument name
+func (r *MasterRepo) GetAll(exchange, segment string) ([]shared.InstrumentMaster, error) {
 	master := make([]shared.InstrumentMaster, 0)
-	err := r.db.Select(&master, "SELECT * FROM sutram.instrument_master")
+	query := "SELECT * FROM sutram.instrument_master WHERE 1=1"
+	args := make([]interface{}, 0)
+
+	if exchange != "" {
+		query += " AND exchange = ?"
+		args = append(args, exchange)
+	}
+	if segment != "" {
+		query += " AND segment = ?"
+		args = append(args, segment)
+	}
+
+	err := r.db.Select(&master, query, args...)
 	if err != nil {
 		return nil, err
 	}
