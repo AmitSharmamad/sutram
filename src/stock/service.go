@@ -135,7 +135,7 @@ func (service *Service) Get(
 		// Since interface doesn't allow returning error, we return empty StockData
 		return &shared.StockData{}
 	}
-	
+
 	lookBackData, err := service.repo.GetLookBack(id, timeFrame, startPeriod, lookBack)
 	if err != nil {
 		// Since interface doesn't allow returning error, we return date range data only
@@ -183,7 +183,16 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 	}
 
 	instrumentIDMap := make(map[string]uint64)
-	masterInstruments, _ := s.masterRepo.GetAll("", "") // Pass empty strings to get all instruments
+	masterInstruments, total, _ := s.masterRepo.GetAll("", "", 1, 1000) // Get first 1000 instruments
+
+	// If we have more than 1000 instruments, fetch the rest
+	if total > 1000 {
+		remainingPages := (total + 999) / 1000
+		for page := 2; page <= remainingPages; page++ {
+			moreInstruments, _, _ := s.masterRepo.GetAll("", "", page, 1000)
+			masterInstruments = append(masterInstruments, moreInstruments...)
+		}
+	}
 
 	for _, masterInstrument := range masterInstruments {
 		if (masterInstrument.Instrument == "") || (masterInstrument.ID == 0) {
