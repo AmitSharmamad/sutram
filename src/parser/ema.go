@@ -19,11 +19,12 @@ func (indicator *EMA) Calculate(
 	config []any,
 	prices Prices,
 ) float64 {
-	point := config[0].(string)
-	period := config[1].(int)
-	offset := config[2].(int)
 
-	println(point, period, offset)
+	period := int(config[1].(float64))
+	indicator.period = period
+	indicator.offset = int(config[2].(float64))
+
+	// println(point, period, offset)
 
 	prices = indicator.SliceData(prices)
 

@@ -170,6 +170,7 @@ func (engine *Engine) TryExit(
 	current *shared.Stock,
 	data *shared.StockData,
 ) {
+
 	stopLossPrice := position.CalculateStopLossPrice(
 		strategy.StopLoss,
 		strategy.StopLossType,

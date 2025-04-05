@@ -31,15 +31,15 @@ func GetPrices(data shared.StockData, point string) Prices {
 	for _, d := range data {
 		var value float64
 		switch point {
-		case "open":
+		case "OPEN":
 			value = d.Open
-		case "high":
+		case "HIGH":
 			value = d.High
-		case "close":
+		case "CLOSE":
 			value = d.Close
-		case "low":
+		case "LOW":
 			value = d.Low
-		case "volume":
+		case "VOLUME":
 			value = float64(d.Volume)
 		default:
 			value = d.Close
