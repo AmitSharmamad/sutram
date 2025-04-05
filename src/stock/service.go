@@ -125,8 +125,8 @@ func (service *Service) ConvertToGranularity(granularityStr string) shared.Stock
 
 func (service *Service) Get(
 	id int32,
-	startPeriod time.Time,
-	endPeriod time.Time,
+	startPeriod shared.CustomTime,
+	endPeriod shared.CustomTime,
 	timeFrame string,
 	lookBack int32,
 ) *shared.StockData {

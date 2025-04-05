@@ -2,7 +2,6 @@ package stock
 
 import (
 	"fmt"
-	"time"
 
 	"algo/src/core/db"
 	"algo/src/shared"
@@ -38,8 +37,8 @@ func (repo *Repo) GetInstrumentId(instrumentName string) (int32, error) {
 
 func (repo *Repo) Get(
 	instrumentId int32,
-	startPeriod time.Time,
-	endPeriod time.Time,
+	startPeriod shared.CustomTime,
+	endPeriod shared.CustomTime,
 	timeFrame string,
 ) (*shared.StockData, error) {
 	var data shared.StockData
@@ -94,7 +93,7 @@ func (repo *Repo) Get(
 func (repo *Repo) GetLookBack(
 	id int32,
 	timeFrame string,
-	startTime time.Time,
+	startTime shared.CustomTime,
 	lookback int32,
 ) (*shared.StockData, error) {
 	var data shared.StockData

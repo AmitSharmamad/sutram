@@ -1,9 +1,8 @@
 package strategy
 
 import (
-	"fmt"
-
 	"algo/src/shared"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -50,16 +49,27 @@ func (controller *Controller) Create(gctx *gin.Context) {
 
 	strategy := new(shared.Strategy)
 
-	gctx.Bind(strategy)
+	if err := gctx.ShouldBind(strategy); err != nil {
+		fmt.Printf("Binding error: %v\n", err)
+		panic(shared.NewBadRequest("Invalid request body: "+err.Error(), "INVALID_REQUEST"))
+	}
+
+	// // Validate dates
+	// now := time.Now()
+	// if strategy.StartPeriod.After(strategy.EndPeriod.Time) {
+	// 	panic(shared.NewBadRequest("Start date must be before end date", "INVALID_DATE_RANGE"))
+	// }
+	// if strategy.EndPeriod.Before(now) {
+	// 	panic(shared.NewBadRequest("End date cannot be in the past", "INVALID_DATE"))
+	// }
 
 	// TODO: Work on the validation logic
 	// isValid := controller.service.Validate(strategy)
-
 	// if !isValid {
 	// 	panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
 	// }
 
-	fmt.Printf("%+v\n", strategy)
+	fmt.Printf("Received strategy: %+v\n", strategy)
 
 	strategy, err := controller.service.Create(ctx, strategy)
 	if err != nil {

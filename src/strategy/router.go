@@ -16,12 +16,13 @@ func NewRoutesProv(
 	authMiddleware *http.AuthMiddleware,
 ) *Router {
 	api := engine.Group("/strategy")
+	// api.Use(authMiddleware.Auth())
 	{
 		api.POST("", controller.Create)
-
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)
 	}
 
-	return &Router{}
+	router := &Router{}
+	return router
 }

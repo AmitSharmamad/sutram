@@ -123,8 +123,8 @@ type StockService interface {
 	Converter(sd StockData) *StockColumn
 	Get(
 		id int32,
-		startPeriod time.Time,
-		endPeriod time.Time,
+		startPeriod CustomTime,
+		endPeriod CustomTime,
 		timeFrame string,
 		lookBack int32,
 	) *StockData
