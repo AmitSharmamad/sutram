@@ -67,3 +67,16 @@ func (service *Service) Validate(strategy *shared.Strategy) bool {
 
 	return true
 }
+
+func (service *Service) Update(
+	ctx context.Context,
+	id uuid.UUID,
+	strategy *shared.Strategy,
+) (*shared.Strategy, error) {
+	strategy.ID = id
+	err := service.repo.Update(ctx, strategy)
+	if err != nil {
+		return nil, err
+	}
+	return service.Get(ctx, id), nil
+}

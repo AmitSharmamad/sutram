@@ -80,3 +80,25 @@ func (controller *Controller) Create(gctx *gin.Context) {
 
 	shared.SuccessResp(gctx, s)
 }
+
+func (controller *Controller) Update(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		panic(shared.NewBadRequest("Invalid strategy ID", "INVALID_ID"))
+	}
+
+	strategy := new(shared.Strategy)
+	if err := gctx.ShouldBind(strategy); err != nil {
+		fmt.Printf("Binding error: %v\n", err)
+		panic(shared.NewBadRequest("Invalid request body: "+err.Error(), "INVALID_REQUEST"))
+	}
+
+	strategy, err = controller.service.Update(ctx, id, strategy)
+	if err != nil {
+		panic(err)
+	}
+
+	shared.SuccessResp(gctx, strategy)
+}
