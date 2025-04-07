@@ -11,6 +11,7 @@ func NewRoutesProv(
 	api := engine.Group("/stock")
 	{
 		api.GET("", controller.GetStocks)
+		api.GET("/by-ids", controller.GetStocksByIDs)
 	}
 
 	return &Router{}

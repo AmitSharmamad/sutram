@@ -213,6 +213,10 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 	return nil
 }
 
+func (s *Service) GetStocksByIDs(ids []uint64) ([]shared.InstrumentMaster, error) {
+	return s.masterRepo.GetByIDs(ids)
+}
+
 type InstrumentService struct {
 	masterRepo *MasterRepo
 	repo       *Repo
