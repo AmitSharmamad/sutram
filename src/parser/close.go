@@ -18,7 +18,7 @@ func (indicator *Close) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	offset := config[0].(int)
+	offset := int(config[0].(float64))
 	indicator.offset = offset
 
 	prices := GetPrices(*ctx.Data, "CLOSE")
