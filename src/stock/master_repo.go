@@ -90,3 +90,15 @@ func (r *MasterRepo) GetLatestID() (uint64, error) {
 	}
 	return 0, err
 }
+
+func (r *MasterRepo) GetByIDs(ids []uint64) ([]shared.InstrumentMaster, error) {
+	if len(ids) == 0 {
+		return []shared.InstrumentMaster{}, nil
+	}
+
+	instruments := make([]shared.InstrumentMaster, 0)
+	query := "SELECT * FROM sutram.instrument_master WHERE id IN ($1);"
+	err := r.db.Select(&instruments, query, ids)
+
+	return instruments, err
+}

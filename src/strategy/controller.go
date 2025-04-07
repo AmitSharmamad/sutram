@@ -117,3 +117,19 @@ func (controller *Controller) Delete(gctx *gin.Context) {
 
 	shared.SuccessResp(gctx, gin.H{"message": "Strategy deleted successfully"})
 }
+
+func (controller *Controller) Clone(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		panic(shared.NewBadRequest("Invalid strategy ID", "INVALID_ID"))
+	}
+
+	strategy, err := controller.service.Clone(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+
+	shared.SuccessResp(gctx, strategy)
+}

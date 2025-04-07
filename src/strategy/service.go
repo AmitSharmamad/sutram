@@ -90,3 +90,27 @@ func (service *Service) Delete(ctx context.Context, id uuid.UUID) error {
 
 	return service.repo.Delete(ctx, id)
 }
+
+func (service *Service) Clone(
+	ctx context.Context,
+	id uuid.UUID,
+) (*shared.Strategy, error) {
+	// Get the original strategy
+	originalStrategy, err := service.repo.Get(ctx, id)
+	if err != nil {
+		return nil, shared.NewBadRequest("Strategy not found", "NOT_FOUND")
+	}
+
+	// Create a new strategy with same properties but new ID
+	newStrategy := *originalStrategy
+	newStrategy.ID = util.NewUUID()
+	newStrategy.Name = originalStrategy.Name + " - Copy"
+
+	// Save the new strategy
+	err = service.repo.Create(ctx, &newStrategy)
+	if err != nil {
+		return nil, err
+	}
+
+	return &newStrategy, nil
+}

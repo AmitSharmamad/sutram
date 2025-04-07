@@ -22,6 +22,7 @@ func NewRoutesProv(
 		api.GET("/:id", controller.Get)
 		api.PUT("/:id", controller.Update)
 		api.DELETE("/:id", controller.Delete)
+		api.POST("/:id/clone", controller.Clone)
 	}
 
 	router := &Router{}
