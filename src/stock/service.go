@@ -196,6 +196,7 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 
 	for _, masterInstrument := range masterInstruments {
 		if (masterInstrument.Instrument == "") || (masterInstrument.ID == 0) {
+			println(masterInstrument.Instrument, masterInstrument.ID)
 			panic("data is missing")
 		}
 		instrumentIDMap[masterInstrument.Instrument] = masterInstrument.ID
