@@ -376,9 +376,7 @@ func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		return 0, fmt.Errorf("unknown indicator: %s", n.Name)
 	}
 
-	prices := GetPrices(*ctx.Data, args[0].(string))
-
-	result := calculator.Calculate(args, prices)
+	result := calculator.Calculate(args, ctx)
 	return result, nil
 }
 
