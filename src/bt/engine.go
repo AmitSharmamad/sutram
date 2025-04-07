@@ -186,7 +186,7 @@ func (engine *Engine) TryExit(
 		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
 			current.Close,
 			strategy.TrailingStopLoss,
-			strategy.TrailingStopLossType,
+			*strategy.TrailingStopLossType,
 		)
 	}
 
