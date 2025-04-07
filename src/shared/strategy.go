@@ -21,6 +21,13 @@ var (
 	PERCENTAGE ValueType = "PERCENTAGE"
 )
 
+type TradeType string
+
+var (
+	MIS      TradeType = "MIS"
+	CNC_NRML TradeType = "CNC/NRML"
+)
+
 type Strategy struct {
 	ID     uuid.UUID `json:"id" db:"id"`
 	UserID uuid.UUID `json:"user_id" db:"user_id"`
@@ -28,6 +35,7 @@ type Strategy struct {
 	Name           string        `json:"name" db:"name"`
 	Description    string        `json:"description" db:"description"`
 	PositionType   Direction     `json:"position_type" db:"position_type"`
+	TradeType      TradeType     `json:"trade_type" db:"trade_type"`
 	Instruments    pq.Int32Array `json:"instruments" db:"instruments"`
 	ChartType      string        `json:"chart_type" db:"chart_type"`
 	ChartTimeframe string        `json:"chart_timeframe" db:"chart_timeframe"`
