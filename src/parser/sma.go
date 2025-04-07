@@ -24,6 +24,9 @@ func (indicator *SMA) Calculate(
 	period := int(config[1].(float64))
 	offset := int(config[2].(float64))
 
+	indicator.period = period
+	indicator.offset = offset
+
 	prices := GetPrices(*ctx.Data, point)
 
 	println(point, period, offset)
