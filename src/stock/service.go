@@ -125,22 +125,27 @@ func (service *Service) ConvertToGranularity(granularityStr string) shared.Stock
 
 func (service *Service) Get(
 	id int32,
-	startPeriod time.Time,
-	endPeriod time.Time,
+	startPeriod shared.CustomTime,
+	endPeriod shared.CustomTime,
 	timeFrame string,
 	lookBack int32,
 ) *shared.StockData {
-
 	dateRangeData, err := service.repo.Get(id, startPeriod, endPeriod, timeFrame)
+	if err != nil {
+		// Since interface doesn't allow returning error, we return empty StockData
+		return &shared.StockData{}
+	}
+
 	lookBackData, err := service.repo.GetLookBack(id, timeFrame, startPeriod, lookBack)
+	if err != nil {
+		// Since interface doesn't allow returning error, we return date range data only
+		return dateRangeData
+	}
 
 	for i, j := 0, len(*lookBackData)-1; i < j; i, j = i+1, j-1 {
 		(*lookBackData)[i], (*lookBackData)[j] = (*lookBackData)[j], (*lookBackData)[i]
 	}
 
-	if err != nil {
-		panic(err)
-	}
 	data := append(make(shared.StockData, 0), *lookBackData...)
 	data = append(data, *dateRangeData...)
 
@@ -178,7 +183,16 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 	}
 
 	instrumentIDMap := make(map[string]uint64)
-	masterInstruments, _ := s.masterRepo.GetAll()
+	masterInstruments, total, _ := s.masterRepo.GetAll("", "", 1, 1000) // Get first 1000 instruments
+
+	// If we have more than 1000 instruments, fetch the rest
+	if total > 1000 {
+		remainingPages := (total + 999) / 1000
+		for page := 2; page <= remainingPages; page++ {
+			moreInstruments, _, _ := s.masterRepo.GetAll("", "", page, 1000)
+			masterInstruments = append(masterInstruments, moreInstruments...)
+		}
+	}
 
 	for _, masterInstrument := range masterInstruments {
 		if (masterInstrument.Instrument == "") || (masterInstrument.ID == 0) {
@@ -197,6 +211,10 @@ func (s *Service) Insert(master shared.InstrumentMaster, instruments []*shared.O
 	}
 
 	return nil
+}
+
+func (s *Service) GetStocksByIDs(ids []uint64) ([]shared.InstrumentMaster, error) {
+	return s.masterRepo.GetByIDs(ids)
 }
 
 type InstrumentService struct {

@@ -17,8 +17,9 @@ func main() {
 
 	// Configure DataFeeds provider
 
-	// Initialize provider with date/time formats
-	provider := migrate.NewDataFeedsProvider()
+	// Initialize provider with TradingView format
+	// provider := migrate.NewDataFeedsProvider()
+	provider := migrate.NewTradingViewProvider()
 
 	// Create data source configuration
 	source := migrate.DataSource{

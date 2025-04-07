@@ -1,9 +1,8 @@
 package strategy
 
 import (
-	"fmt"
-
 	"algo/src/shared"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -50,16 +49,27 @@ func (controller *Controller) Create(gctx *gin.Context) {
 
 	strategy := new(shared.Strategy)
 
-	gctx.Bind(strategy)
+	if err := gctx.ShouldBind(strategy); err != nil {
+		fmt.Printf("Binding error: %v\n", err)
+		panic(shared.NewBadRequest("Invalid request body: "+err.Error(), "INVALID_REQUEST"))
+	}
+
+	// // Validate dates
+	// now := time.Now()
+	// if strategy.StartPeriod.After(strategy.EndPeriod.Time) {
+	// 	panic(shared.NewBadRequest("Start date must be before end date", "INVALID_DATE_RANGE"))
+	// }
+	// if strategy.EndPeriod.Before(now) {
+	// 	panic(shared.NewBadRequest("End date cannot be in the past", "INVALID_DATE"))
+	// }
 
 	// TODO: Work on the validation logic
 	// isValid := controller.service.Validate(strategy)
-
 	// if !isValid {
 	// 	panic(shared.NewBadRequest("Invalid Expression(s)", "INVALID_EXPRESSION"))
 	// }
 
-	fmt.Printf("%+v\n", strategy)
+	fmt.Printf("Received strategy: %+v\n", strategy)
 
 	strategy, err := controller.service.Create(ctx, strategy)
 	if err != nil {
@@ -69,4 +79,57 @@ func (controller *Controller) Create(gctx *gin.Context) {
 	s := controller.service.Get(ctx, strategy.ID)
 
 	shared.SuccessResp(gctx, s)
+}
+
+func (controller *Controller) Update(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		panic(shared.NewBadRequest("Invalid strategy ID", "INVALID_ID"))
+	}
+
+	strategy := new(shared.Strategy)
+	if err := gctx.ShouldBind(strategy); err != nil {
+		fmt.Printf("Binding error: %v\n", err)
+		panic(shared.NewBadRequest("Invalid request body: "+err.Error(), "INVALID_REQUEST"))
+	}
+
+	strategy, err = controller.service.Update(ctx, id, strategy)
+	if err != nil {
+		panic(err)
+	}
+
+	shared.SuccessResp(gctx, strategy)
+}
+
+func (controller *Controller) Delete(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		panic(shared.NewBadRequest("Invalid strategy ID", "INVALID_ID"))
+	}
+
+	if err := controller.service.Delete(ctx, id); err != nil {
+		panic(err)
+	}
+
+	shared.SuccessResp(gctx, gin.H{"message": "Strategy deleted successfully"})
+}
+
+func (controller *Controller) Clone(gctx *gin.Context) {
+	ctx := shared.GetReqCtx(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		panic(shared.NewBadRequest("Invalid strategy ID", "INVALID_ID"))
+	}
+
+	strategy, err := controller.service.Clone(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+
+	shared.SuccessResp(gctx, strategy)
 }

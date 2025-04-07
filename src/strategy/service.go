@@ -67,3 +67,50 @@ func (service *Service) Validate(strategy *shared.Strategy) bool {
 
 	return true
 }
+
+func (service *Service) Update(
+	ctx context.Context,
+	id uuid.UUID,
+	strategy *shared.Strategy,
+) (*shared.Strategy, error) {
+	strategy.ID = id
+	err := service.repo.Update(ctx, strategy)
+	if err != nil {
+		return nil, err
+	}
+	return service.Get(ctx, id), nil
+}
+
+func (service *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	// First check if strategy exists
+	_, err := service.repo.Get(ctx, id)
+	if err != nil {
+		return shared.NewBadRequest("Strategy not found", "NOT_FOUND")
+	}
+
+	return service.repo.Delete(ctx, id)
+}
+
+func (service *Service) Clone(
+	ctx context.Context,
+	id uuid.UUID,
+) (*shared.Strategy, error) {
+	// Get the original strategy
+	originalStrategy, err := service.repo.Get(ctx, id)
+	if err != nil {
+		return nil, shared.NewBadRequest("Strategy not found", "NOT_FOUND")
+	}
+
+	// Create a new strategy with same properties but new ID
+	newStrategy := *originalStrategy
+	newStrategy.ID = util.NewUUID()
+	newStrategy.Name = originalStrategy.Name + " - Copy"
+
+	// Save the new strategy
+	err = service.repo.Create(ctx, &newStrategy)
+	if err != nil {
+		return nil, err
+	}
+
+	return &newStrategy, nil
+}

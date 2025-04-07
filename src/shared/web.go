@@ -24,6 +24,26 @@ func SuccessResp(ctx *gin.Context, data interface{}) {
 	ctx.IndentedJSON(http.StatusOK, Data(data))
 }
 
+type PaginationResponse struct {
+	Data       interface{} `json:"data"`
+	Total      int         `json:"total"`
+	Page       int         `json:"page"`
+	Limit      int         `json:"limit"`
+	TotalPages int         `json:"total_pages"`
+}
+
+func PaginatedResp(ctx *gin.Context, data interface{}, total, page, limit int) {
+	totalPages := (total + limit - 1) / limit // Round up division
+	resp := PaginationResponse{
+		Data:       data,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}
+	ctx.JSON(http.StatusOK, resp)
+}
+
 /// 4xx status codes
 
 type HTTPError struct {

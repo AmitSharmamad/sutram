@@ -4,7 +4,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "wire cmd/web/wire.go && go build -o s-web cmd/web/wire_gen.go cmd/web/main.go",
+            "command": "wire cmd/web/wire.go && go build -gcflags=\"all=-N -l\" -o s-web cmd/web/wire_gen.go cmd/web/main.go",
             "group": "build",
             "problemMatcher": []
         }
