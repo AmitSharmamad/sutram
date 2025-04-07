@@ -82,8 +82,8 @@ func (repo *Repo) Get(
 		timeFrame,
 		timeFrame,
 		instrumentId,
-		"2024-01-01 09:00:00",
-		"2024-01-31 10:00:00",
+		startPeriod.Format("2006-01-02 15:04:05"),
+		endPeriod.Format("2006-01-02 15:04:05"),
 	)
 
 	err := repo.db.Select(&data, query)
