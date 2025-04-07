@@ -1,13 +1,14 @@
 package parser
 
 import (
-	"algo/src/shared"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"algo/src/shared"
 )
 
 // TokenType represents different types of tokens in our grammar
@@ -199,11 +200,15 @@ func (n *VariableNode) String() string {
 }
 
 func (n *VariableNode) Evaluate(ctx *EvaluationContext) (float64, error) {
-
 	if value, exists := ctx.Variables[n.Name]; exists {
 		return value, nil
 	}
 	return 0, fmt.Errorf("variable not found: %s", n.Name)
+}
+
+// GetName returns the name of the variable
+func (n *VariableNode) GetName() string {
+    return n.Name
 }
 
 // BinaryOpNode represents a binary operation
@@ -347,10 +352,23 @@ func (n *FunctionCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.Name, strings.Join(args, ", "))
 }
 
+
+// EMA(close, 50, 0)
+
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	args := make([]any, len(n.Arguments))
 	for i, arg := range n.Arguments {
-		args[i] = arg
+        if varNode, isVariable := arg.(*VariableNode); isVariable {
+            args[i] = varNode.Name
+            continue
+        }
+
+		value, err := arg.Evaluate(ctx)
+		if err != nil {
+			return 0, err
+		}
+
+		args[i] = value
 	}
 
 	calculator := GetIndFactory(n.Name)
@@ -358,8 +376,9 @@ func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		return 0, fmt.Errorf("unknown indicator: %s", n.Name)
 	}
 
-	prices := make([]float64, len(args))
-	result := calculator.Calculate(prices, args, "close")
+	prices := GetPrices(*ctx.Data, args[0].(string))
+
+	result := calculator.Calculate(args, prices)
 	return result, nil
 }
 
@@ -634,10 +653,10 @@ type EvaluationContext struct {
 }
 
 // NewEvaluationContext creates a new evaluation context
-func NewEvaluationContext(data *shared.StockData, vars map[string]float64) *EvaluationContext {
+func NewEvaluationContext(data *shared.StockData) *EvaluationContext {
 	return &EvaluationContext{
-		Data:      data,
-		Variables: vars,
+		Data: data,
+		// Variables: vars,
 		// Functions: funcs,
 	}
 }
@@ -695,10 +714,18 @@ func Parse(expr string) (Node, error) {
 }
 
 // Execute evaluates an expression
-func Execute(expr string, ctx *EvaluationContext) (float64, error) {
+func Execute(expr string, ctx *EvaluationContext) bool {
 	node, err := Parse(expr)
 	if err != nil {
-		return 0, err
+		println("Error in parsing the expression: ", err)
+		panic("parse expression error: ALERT ALERT ALERT!!!")
 	}
-	return node.Evaluate(ctx)
+
+	result, err := node.Evaluate(ctx)
+	if err != nil {
+		println("Error in evaluating the expression: ", err)
+		panic("parse evaluation error: ALERT ALERT ALERT!!!")
+	}
+
+	return result > 0
 }

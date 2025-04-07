@@ -18,10 +18,13 @@ func NewRoutesProv(
 	api := engine.Group("/strategy")
 	{
 		api.POST("", controller.Create)
-
 		api.GET("", controller.GetAll)
 		api.GET("/:id", controller.Get)
+		api.PUT("/:id", controller.Update)
+		api.DELETE("/:id", controller.Delete)
+		api.POST("/:id/clone", controller.Clone)
 	}
 
-	return &Router{}
+	router := &Router{}
+	return router
 }

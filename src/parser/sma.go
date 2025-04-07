@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"algo/src/shared"
 	"algo/src/util"
 )
 
@@ -10,28 +9,22 @@ type SMA struct {
 	offset int
 }
 
-// SMA(OHLCV, period, offset) *SMA {
-func (indicator *SMA) Calculate(
-	prices Prices,
-	config []any,
-	point string,
-) float64 {
-	period := indicator.period
-	offset := 0
-	// if period == 0 {
-	// 	if p, ok := config["period"].(int); ok {
-	// 		period = p
-	// 	} else {
-	// 		period = 14 // default period
-	// 	}
-	// }
+func (indicator *SMA) SliceData(prices Prices) Prices {
+	start := len(prices) - indicator.offset - indicator.period
+	end := len(prices) - indicator.offset
+	return prices[start:end]
+}
 
-	// offset := indicator.offset
-	// if offset == 0 {
-	// 	if o, ok := config["offset"].(int); ok {
-	// 		offset = o
-	// 	}
-	// }
+// SMA(OHLCV, period, offset)
+func (indicator *SMA) Calculate(
+	config []any,
+	prices Prices,
+) float64 {
+	point := config[0].(string)
+	period := config[1].(int)
+	offset := config[2].(int)
+
+	println(point, period, offset)
 
 	if len(prices) < period+offset {
 		return 0.0
@@ -69,17 +62,4 @@ func (indicator *SMA) GetDataRange(config map[string]any) int32 {
 	}
 
 	return int32(period + offset)
-}
-
-func (indicator *SMA) CalculateAll(data shared.StockData, config map[string]any, point string) []float64 {
-	var results []float64
-	// prices := GetPrices(data, point)
-
-	// for i := 0; i < len(data); i++ {
-	// 	windowPrices := prices[:i+1]
-	// 	result := indicator.Calculate(windowPrices, config, point)
-	// 	results = append(results, result)
-	// }
-
-	return results
 }
