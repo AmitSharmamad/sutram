@@ -192,7 +192,11 @@ func (engine *Engine) TryExit(
 
 	ctx := parser.NewEvaluationContext(data)
 
-	exitConditionResult := parser.Execute(strategy.ExitExpression, ctx)
+	exitConditionResult := false
+
+	if (strategy.ExitExpression != "") {
+		exitConditionResult = parser.Execute(strategy.ExitExpression, ctx)
+	}
 
 	isExit := position.CheckForExit(
 		current.Close,
