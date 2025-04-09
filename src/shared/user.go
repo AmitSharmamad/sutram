@@ -21,4 +21,5 @@ type User struct {
 
 type UserService interface {
 	GetByUsername(username string) (User, error)
+	Create(user *User) (bool, error)
 }

@@ -186,13 +186,17 @@ func (engine *Engine) TryExit(
 		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
 			current.Close,
 			strategy.TrailingStopLoss,
-			strategy.TrailingStopLossType,
+			*strategy.TrailingStopLossType,
 		)
 	}
 
 	ctx := parser.NewEvaluationContext(data)
 
-	exitConditionResult := parser.Execute(strategy.ExitExpression, ctx)
+	exitConditionResult := false
+
+	if strategy.ExitExpression != "" {
+		exitConditionResult = parser.Execute(strategy.ExitExpression, ctx)
+	}
 
 	isExit := position.CheckForExit(
 		current.Close,
@@ -242,8 +246,6 @@ func (engine *Engine) GetLatestPosition(
 }
 
 func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
-	// TODO: Check this logic
-
 	positions := run.Positions
 
 	metrics := &shared.RunMetrics{
@@ -267,8 +269,8 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 	var peakValue float64
 	var maxPositionSize float64
 	var totalPositionSize float64
-	var totalCommission float64 = 0 // Assuming zero commission for now (can be updated later)
-	var totalSlippage float64 = 0   // Assuming zero slippage for now (can be updated later)
+	var totalCommission float64 = 0
+	var totalSlippage float64 = 0
 
 	// Daily returns for standard deviation calculation
 	dailyReturns := []float64{}
@@ -287,12 +289,23 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		}
 		totalPositionSize += positionSize
 
-		// Calculate position P&L
-		pnl := *pos.ExitPriceSignal - *pos.EntryPriceSignal
+		// Calculate position P&L based on direction
+		var pnl float64
+		if pos.Direction == shared.LONG {
+			pnl = *pos.ExitPriceSignal - *pos.EntryPriceSignal
+		} else if pos.Direction == shared.SHORT {
+			pnl = *pos.EntryPriceSignal - *pos.ExitPriceSignal
+		}
 		totalPnL += pnl
 
-		// Calculate daily return for this position (simplified)
-		dailyReturn := pnl / positionSize
+		// Calculate daily return for this position (direction-aware)
+		var dailyReturn float64
+		if pos.Direction == shared.LONG {
+			dailyReturn = pnl / positionSize
+		} else {
+			// For short positions, positive return means price went down
+			dailyReturn = -pnl / positionSize
+		}
 		dailyReturns = append(dailyReturns, dailyReturn)
 
 		// Update peak value and drawdown
@@ -305,13 +318,13 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 			maxDrawdown = currentDrawdown
 		}
 
-		// Win/Loss statistics
-		if pnl > 0 {
+		// Win/Loss statistics (direction-aware)
+		if (pos.Direction == shared.LONG && pnl > 0) || (pos.Direction == shared.SHORT && pnl < 0) {
 			totalWins++
-			winAmount += pnl
-		} else if pnl < 0 {
+			winAmount += util.Abs(pnl)
+		} else if (pos.Direction == shared.LONG && pnl < 0) || (pos.Direction == shared.SHORT && pnl > 0) {
 			totalLosses++
-			lossAmount += -pnl // Make loss amount positive for calculations
+			lossAmount += util.Abs(pnl)
 		}
 
 		// Trade duration
@@ -319,9 +332,9 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		totalTradeDuration += duration.Hours()
 	}
 
+	// ... rest of the existing metrics calculation ...
 	totalTrades := int64(len(positions))
 	if totalTrades > 0 {
-		// Basic metrics
 		metrics.TotalTrades = totalTrades
 		metrics.WinRate = float64(totalWins) / float64(totalTrades)
 		metrics.AvgTradeDuration = totalTradeDuration / float64(totalTrades)
@@ -329,16 +342,12 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		metrics.AvgPositionSize = totalPositionSize / float64(totalTrades)
 
 		// P&L and return metrics
-		// If we have initial capital information from the strategy or run, use it
-		// For now, we'll use the first position's entry price as a proxy for initial capital
 		initialCapital := positions[0].EntryPriceSignal
 		if initialCapital != nil && *initialCapital > 0 {
 			metrics.TotalReturnPCT = (totalPnL / *initialCapital) * 100
 
-			// Calculate annualized return (simplified)
-			totalDuration := run.EndedTime.Sub(*run.StartedTime).Hours() / 24 // in days
+			totalDuration := run.EndedTime.Sub(*run.StartedTime).Hours() / 24
 			if totalDuration > 0 {
-				// Annualized return = (1 + total_return)^(365/days) - 1
 				annualFactor := 365.0 / totalDuration
 				metrics.AnnualizedReturn = (util.Pow(1+totalPnL/(*initialCapital), annualFactor) - 1) * 100
 			}
@@ -358,10 +367,10 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 		// Risk metrics
 		metrics.MaxDrawdown = maxDrawdown
 		if peakValue > 0 {
-			metrics.MaxDrawdownDuration = maxDrawdown / peakValue * 100 // As percentage
+			metrics.MaxDrawdownDuration = maxDrawdown / peakValue * 100
 		}
 
-		// Standard deviation calculation
+		// Standard deviation and ratios
 		if len(dailyReturns) > 0 {
 			mean := 0.0
 			for _, ret := range dailyReturns {
@@ -376,12 +385,10 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 			variance /= float64(len(dailyReturns))
 			metrics.StdDeviation = util.Sqrt(variance)
 
-			// Calculate Sharpe Ratio (simplified, assuming risk-free rate of 0)
 			if metrics.StdDeviation > 0 {
-				metrics.SharpeRatio = mean / metrics.StdDeviation * util.Sqrt(252) // Annualized
+				metrics.SharpeRatio = mean / metrics.StdDeviation * util.Sqrt(252)
 			}
 
-			// Calculate downside deviation (for Sortino ratio)
 			downsideVariance := 0.0
 			for _, ret := range dailyReturns {
 				if ret < 0 {
@@ -391,9 +398,8 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 			downsideVariance /= float64(len(dailyReturns))
 			metrics.DownsideDeviation = util.Sqrt(downsideVariance)
 
-			// Calculate Sortino Ratio
 			if metrics.DownsideDeviation > 0 {
-				metrics.SortinoRatio = mean / metrics.DownsideDeviation * util.Sqrt(252) // Annualized
+				metrics.SortinoRatio = mean / metrics.DownsideDeviation * util.Sqrt(252)
 			}
 		}
 

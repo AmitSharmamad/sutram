@@ -22,7 +22,7 @@ func NewRepoProv(
 	}
 }
 
-func (repo *Repo) Create(user *User) (bool, error) {
+func (repo *Repo) Create(user *shared.User) (bool, error) {
 	res, err := repo.db.Insert(
 		`INSERT INTO "user" (name, username, email, password, phone_number) VALUES (
 		:name, :username, :email, :password, :phone_number

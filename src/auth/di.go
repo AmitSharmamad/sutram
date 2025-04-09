@@ -19,6 +19,7 @@ var Set = wire.NewSet(
 	NewRepoProv,
 	wire.Bind(new(shared.AuthService), new(*Service)),
 	NewServiceProv,
+	NewGoogleServiceProv,
 	NewControllerProv,
 	NewRoutesProv,
 )

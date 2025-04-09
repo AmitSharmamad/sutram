@@ -15,7 +15,7 @@ type Indicator struct {
 type Prices []float64
 
 type IndicatorCalculator interface {
-	Calculate(config []any, prices Prices) float64
+	Calculate(config []any, ctx *EvaluationContext) float64
 	SliceData(prices Prices) Prices
 	GetDataRange(config map[string]any) int32
 }

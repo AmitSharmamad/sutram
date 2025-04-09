@@ -66,6 +66,20 @@ func (e *BadRequestError) Error() string {
 	return e.Message
 }
 
+func BadReqResp(ctx *gin.Context, msg string, code string) {
+	ctx.JSON(http.StatusBadRequest, Error{
+		Result:  false,
+		Message: msg,
+		Code:    code,
+	})
+}
+
+type Error struct {
+	Result  bool   `json:"result"`
+	Message string `json:"message"`
+	Code    string `json:"code"`
+}
+
 // 401
 
 type UnauthorizedError HTTPError
