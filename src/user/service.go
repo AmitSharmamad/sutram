@@ -26,7 +26,7 @@ func NewServiceProv(
 	}
 }
 
-func (service *Service) GetAll( offset int, limit int) (shared.Users, error) {
+func (service *Service) GetAll(offset int, limit int) (shared.Users, error) {
 	users, err := service.repo.GetAll(offset, limit)
 	if err != nil {
 		fmt.Println(err)
@@ -44,11 +44,11 @@ func (service *Service) GetByUsername(username string) (shared.User, error) {
 	return res[0], nil
 }
 
-func (service *Service) Create(user *User) (bool, error) {
-	return service.repo.Create(user)
+func (service *Service) Create(user *shared.User) (bool, error) {
+	return service.repo.Create((*shared.User)(user))
 }
 
-func (service *Service) GetToken(user *User) string {
+func (service *Service) GetToken(user *shared.User) string {
 	mySigningKey := []byte(service.env.GetProp(env.JWT_SIGNING_SECRET))
 
 	// Create the Claims

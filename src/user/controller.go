@@ -36,7 +36,7 @@ func (controller *Controller) GetAll(gctx *gin.Context) {
 }
 
 func (controller *Controller) Create(gctx *gin.Context) {
-	user := User{}
+	user := shared.User{}
 	gctx.Bind(&user)
 
 	_, err := controller.service.Create(&user)
