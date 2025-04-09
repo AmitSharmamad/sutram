@@ -3,17 +3,17 @@ package util
 import "math"
 
 func Max[T int32 | float32 | int64 | float64](v1 T, v2 T) T {
-    if v1 > v2 {
-        return v1
-    }
-    return v2
+	if v1 > v2 {
+		return v1
+	}
+	return v2
 }
 
 func Min[T int32 | float32 | int64 | float64](v1 T, v2 T) T {
-    if v1 < v2 {
-        return v1
-    }
-    return v2
+	if v1 < v2 {
+		return v1
+	}
+	return v2
 }
 
 func Round(f float64) float64 {
@@ -29,4 +29,12 @@ func Pow(base, exponent float64) float64 {
 // Sqrt is a wrapper for math.Sqrt
 func Sqrt(x float64) float64 {
 	return math.Sqrt(x)
+}
+
+// Abs returns the absolute value of x
+func Abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

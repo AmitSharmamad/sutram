@@ -18,11 +18,16 @@ func (indicator *SMA) SliceData(prices Prices) Prices {
 // SMA(OHLCV, period, offset)
 func (indicator *SMA) Calculate(
 	config []any,
-	prices Prices,
+	ctx *EvaluationContext,
 ) float64 {
 	point := config[0].(string)
-	period := config[1].(int)
-	offset := config[2].(int)
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.period = period
+	indicator.offset = offset
+
+	prices := GetPrices(*ctx.Data, point)
 
 	println(point, period, offset)
 

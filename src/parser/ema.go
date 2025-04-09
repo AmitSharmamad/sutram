@@ -17,20 +17,22 @@ func (indicator *EMA) SliceData(prices Prices) Prices {
 
 func (indicator *EMA) Calculate(
 	config []any,
-	prices Prices,
+	ctx *EvaluationContext,
 ) float64 {
-
+	point := config[0].(string)
 	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
 	indicator.period = period
-	indicator.offset = int(config[2].(float64))
+	indicator.offset = offset
 
-	// println(point, period, offset)
+	prices := GetPrices(*ctx.Data, point)
 
-	prices = indicator.SliceData(prices)
-
-	if len(prices) < period {
+	if len(prices) < period+offset {
 		return 0.0
 	}
+
+	prices = indicator.SliceData(prices)
 
 	// Calculate multiplier
 	multiplier := 2.0 / float64(period+1)

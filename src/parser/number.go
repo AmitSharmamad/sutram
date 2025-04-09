@@ -10,7 +10,7 @@ func (indicator *IndNumber) SliceData(prices Prices) Prices {
 
 func (indicator *IndNumber) Calculate(
 	config []any,
-	prices Prices,
+	ctx *EvaluationContext,
 ) float64 {
 	return config[0].(float64)
 }
