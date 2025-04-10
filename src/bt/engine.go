@@ -128,6 +128,26 @@ func (engine *Engine) Run(
 		}
 	}
 
+	// handle the last data point
+	if len(run.Positions) > 0 {
+		lastPosition := run.Positions[len(run.Positions)-1]
+		if lastPosition.State == shared.Entered {
+			// Force exit the last position using the last data point
+			lastData := (*data)[len(*data)-1]
+			lastPosition.UpdateOnExitSignal(
+				&lastData.Close,
+				&lastData.Timestamp,
+			)
+			lastPosition.UpdateOnExitOrder(
+				&lastData.Close,
+				&lastData.Timestamp,
+			)
+		} else if lastPosition.State == shared.NotEntered {
+			// Remove the last position if it was never entered
+			run.Positions = run.Positions[:len(run.Positions)-1]
+		}
+	}
+
 	run.State = shared.Ended
 	endTime := util.GetTime()
 	run.EndedTime = &endTime
