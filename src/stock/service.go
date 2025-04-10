@@ -2,6 +2,7 @@ package stock
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"algo/src/shared"
@@ -231,4 +232,128 @@ func NewInstrumentServiceProv(
 		masterRepo: masterRepo,
 		repo:       repo,
 	}
+}
+
+// TODO: this is not tested at all
+// CalculateHeikenAshi calculates Heiken-Ashi candles from standard OHLCV data.
+// It requires the input data to be sorted chronologically.
+func CalculateHeikenAshi(ohlcvData shared.StockData) (shared.StockData, error) {
+	if len(ohlcvData) == 0 {
+		return nil, fmt.Errorf("input ohlcvData slice is empty")
+	}
+
+	haCandles := make(shared.StockData, len(ohlcvData))
+
+	// Calculate the first Heiken-Ashi candle
+	firstOhlc := ohlcvData[0]
+	haCandles[0].Timestamp = firstOhlc.Timestamp
+	haCandles[0].Close = (firstOhlc.Open + firstOhlc.High + firstOhlc.Low + firstOhlc.Close) / 4
+	// For the very first candle, HA Open is often calculated like this:
+	haCandles[0].Open = (firstOhlc.Open + firstOhlc.Close) / 2
+	haCandles[0].High = max(firstOhlc.High, max(haCandles[0].Open, haCandles[0].Close))
+	haCandles[0].Low = min(firstOhlc.Low, min(haCandles[0].Open, haCandles[0].Close))
+
+	// Calculate subsequent Heiken-Ashi candles
+	for i := 1; i < len(ohlcvData); i++ {
+		currentOhlc := ohlcvData[i]
+		prevHA := haCandles[i-1]
+
+		haCandles[i].Timestamp = currentOhlc.Timestamp
+		haCandles[i].Close = (currentOhlc.Open + currentOhlc.High + currentOhlc.Low + currentOhlc.Close) / 4
+		haCandles[i].Open = (prevHA.Open + prevHA.Close) / 2
+		haCandles[i].High = max(currentOhlc.High, max(haCandles[i].Open, haCandles[i].Close))
+		haCandles[i].Low = min(currentOhlc.Low, min(haCandles[i].Open, haCandles[i].Close))
+	}
+
+	return haCandles, nil
+}
+
+// TODO: this is not tested at all
+// CalculateRenko calculates Renko bricks from standard OHLCV data using closing prices.
+// It requires the input data to be sorted chronologically.
+// brickSize determines the minimum price movement required to form a new brick.
+func CalculateRenko(ohlcvData []shared.Stock, brickSize float64) ([]shared.Stock, error) {
+	if len(ohlcvData) == 0 {
+		return nil, fmt.Errorf("input ohlcvData slice is empty")
+	}
+	if brickSize <= 0 {
+		return nil, fmt.Errorf("brickSize must be positive")
+	}
+
+	var renkoBricks []shared.Stock
+	if len(ohlcvData) == 0 {
+		return renkoBricks, nil // Return empty slice if no input data
+	}
+
+	// --- Initial Brick Determination ---
+	// We need a starting point. Often, the first brick is established
+	// based on the first significant move or simply the first close.
+	// Here, we'll establish the first "level" based on the first close,
+	// but won't draw a brick until a brickSize move occurs from it.
+	// A more robust approach might analyze the first few candles.
+	// For simplicity, let's set the initial level based on the first close.
+	lastBrickCloseLevel := ohlcvData[0].Close
+	// Or, alternatively, start with an actual first brick:
+	firstBrick := shared.Stock{
+		Timestamp: ohlcvData[0].Timestamp,
+		Open:      ohlcvData[0].Close, // Or Open price
+		Close:     ohlcvData[0].Close, // Initial close defines the level
+		Direction: 0,                  // Undefined until next move
+	}
+	renkoBricks = append(renkoBricks, firstBrick)
+	lastBrickCloseLevel = firstBrick.Close
+
+	// --- Iterate through remaining data ---
+	for i := 1; i < len(ohlcvData); i++ {
+		currentPrice := ohlcvData[i].Close
+		currentTimestamp := ohlcvData[i].Timestamp
+
+		// Calculate potential next brick levels
+		priceMovement := currentPrice - lastBrickCloseLevel
+		direction := 0
+		numBricks := 0
+
+		if priceMovement >= brickSize {
+			direction = 1 // Up brick
+			numBricks = int(math.Floor(priceMovement / brickSize))
+		} else if priceMovement <= -brickSize {
+			direction = -1 // Down brick
+			numBricks = int(math.Floor(math.Abs(priceMovement) / brickSize))
+		}
+
+		// Add new bricks if movement threshold is met
+		if numBricks > 0 {
+			for j := 0; j < numBricks; j++ {
+				brickOpen := lastBrickCloseLevel + float64(j*direction)*brickSize
+				brickClose := brickOpen + float64(direction)*brickSize
+				newBrick := shared.Stock{
+					Timestamp: currentTimestamp, // Mark with timestamp when threshold was crossed
+					Open:      brickOpen,
+					Close:     brickClose,
+					Direction: direction,
+				}
+				renkoBricks = append(renkoBricks, newBrick)
+				lastBrickCloseLevel = brickClose // Update the level for the next comparison
+			}
+		}
+		// If numBricks is 0, the price didn't move enough to form a new brick,
+		// so we keep the lastBrickCloseLevel as is and continue.
+	}
+
+	// Handle the case where the first brick wasn't immediately added
+	// (if using the 'level' approach instead of adding the first brick right away)
+	if len(renkoBricks) == 0 && len(ohlcvData) > 0 {
+		// Optionally add an initial brick based on the first close if no movement occurred
+		// This behavior might need adjustment based on specific requirements.
+		initialBrick := shared.Stock{
+			Timestamp: ohlcvData[0].Timestamp,
+			Open:      ohlcvData[0].Close, // Or Open
+			Close:     ohlcvData[0].Close,
+			Direction: 0, // No direction determined yet
+		}
+		// Decide if you want to add this placeholder or not.
+		renkoBricks = append(renkoBricks, initialBrick)
+	}
+
+	return renkoBricks, nil
 }
