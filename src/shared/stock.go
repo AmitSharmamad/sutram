@@ -53,6 +53,8 @@ type Stock struct {
 
 	Volume int64 `json:"volume" db:"volume"`
 
+	Direction int
+
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
