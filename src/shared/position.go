@@ -250,7 +250,8 @@ func (position *Position) UpdateOnExitOrder(
 	)
 
 	// Calculate Entry Fees and Exit Fees
-	var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
+	// TODO: Fix this
+	var fees float64 = 0 // Assuming fixed entry fees for now (can be updated later)
 	position.EntryFees = &fees
 	position.ExitFees = &fees
 
