@@ -103,7 +103,7 @@ func (engine *Engine) Run(
 	// lookBack := util.Max(entryLookBack, exitLookBack)
 
 	// TODO: fix this for GA, leave it like this for now
-	var lookBack int32 = 1000
+	var lookBack int32 = 15
 
 	data := engine.stockService.Get(
 		run.InstrumentID,
@@ -369,8 +369,10 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 
 			totalDuration := run.EndedTime.Sub(*run.StartedTime).Hours() / 24
 			if totalDuration > 0 {
-				annualFactor := 365.0 / totalDuration
-				metrics.AnnualizedReturn = (util.Pow(1+totalPnL/(*initialCapital), annualFactor) - 1) * 100
+				// TODO: Fix this
+				// annualFactor := 365.0 / totalDuration
+				// metrics.AnnualizedReturn = (util.Pow(1+totalPnL/(*initialCapital), annualFactor) - 1) * 100
+				metrics.AnnualizedReturn = 0
 			}
 		}
 

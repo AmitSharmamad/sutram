@@ -209,7 +209,7 @@ func (n *VariableNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 
 // GetName returns the name of the variable
 func (n *VariableNode) GetName() string {
-    return n.Name
+	return n.Name
 }
 
 // BinaryOpNode represents a binary operation
@@ -261,9 +261,25 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		}
 		return 0, nil
 	case "CROSSESABOVE":
-		if left > right {
+		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
+		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		if (left > right) && (prevLeft <= prevRight) {
 			return 1, nil
 		}
+
 		return 0, nil
 	case "<":
 		if left < right {
@@ -271,9 +287,25 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		}
 		return 0, nil
 	case "CROSSESBELOW":
-		if left < right {
+		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
+		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		if (left < right) && (prevLeft >= prevRight) {
 			return 1, nil
 		}
+
 		return 0, nil
 	case ">=":
 		if left >= right {
@@ -368,10 +400,10 @@ func (n *FunctionCallNode) String() string {
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	args := make([]any, len(n.Arguments))
 	for i, arg := range n.Arguments {
-        if varNode, isVariable := arg.(*VariableNode); isVariable {
-            args[i] = varNode.Name
-            continue
-        }
+		if varNode, isVariable := arg.(*VariableNode); isVariable {
+			args[i] = varNode.Name
+			continue
+		}
 
 		value, err := arg.Evaluate(ctx)
 		if err != nil {
