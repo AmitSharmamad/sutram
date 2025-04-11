@@ -144,7 +144,8 @@ func (l *Lexer) readIdentifier() Token {
 	value := l.input[position:l.position]
 
 	// Check for logical operators
-	if strings.ToUpper(value) == "AND" || strings.ToUpper(value) == "OR" || strings.ToUpper(value) == "NOT" {
+	if strings.ToUpper(value) == "AND" || strings.ToUpper(value) == "OR" || strings.ToUpper(value) == "NOT" ||
+		strings.ToUpper(value) == "CROSSESABOVE" || strings.ToUpper(value) == "CROSSESBELOW" {
 		return Token{Type: OPERATOR, Value: strings.ToUpper(value)}
 	}
 
@@ -259,7 +260,17 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 			return 1, nil
 		}
 		return 0, nil
+	case "CROSSESABOVE":
+		if left > right {
+			return 1, nil
+		}
+		return 0, nil
 	case "<":
+		if left < right {
+			return 1, nil
+		}
+		return 0, nil
+	case "CROSSESBELOW":
 		if left < right {
 			return 1, nil
 		}
@@ -352,7 +363,6 @@ func (n *FunctionCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.Name, strings.Join(args, ", "))
 }
 
-
 // EMA(close, 50, 0)
 
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
@@ -443,7 +453,8 @@ func (p *Parser) parseComparison() (Node, error) {
 	if p.currentToken.Type == OPERATOR &&
 		(p.currentToken.Value == ">" || p.currentToken.Value == "<" ||
 			p.currentToken.Value == ">=" || p.currentToken.Value == "<=" ||
-			p.currentToken.Value == "==" || p.currentToken.Value == "!=") {
+			p.currentToken.Value == "==" || p.currentToken.Value == "!=" ||
+			p.currentToken.Value == "CROSSESABOVE" || p.currentToken.Value == "CROSSESBELOW") {
 		operator := p.currentToken.Value
 		p.nextToken()
 
