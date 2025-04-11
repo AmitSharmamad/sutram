@@ -132,6 +132,7 @@ func (engine *Engine) Run(
 	if len(run.Positions) > 0 {
 		lastPosition := run.Positions[len(run.Positions)-1]
 		if lastPosition.State == shared.Entered {
+			lastPosition.State = shared.Exited
 			// Force exit the last position using the last data point
 			lastData := (*data)[len(*data)-1]
 			lastPosition.UpdateOnExitSignal(
