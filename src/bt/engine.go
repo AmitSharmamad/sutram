@@ -3,6 +3,7 @@ package bt
 import (
 	"context"
 	"sync"
+	"time"
 
 	"algo/src/parser"
 	"algo/src/shared"
@@ -97,15 +98,17 @@ func (engine *Engine) Run(
 	startTime := util.GetTime()
 	run.StartedTime = &startTime
 
+	// Calculate lookback period for both entry and exit conditions
 	// TODO: fix this
 	// entryLookBack := engine.expressionService.GetEntryDataRange(strategy)
 	// exitLookBack := engine.expressionService.GetExitDataRange(strategy)
 	// lookBack := util.Max(entryLookBack, exitLookBack)
 
 	// TODO: fix this for GA, leave it like this for now
-	var lookBack int32 = 15
+	var lookBack int32 = 13
 
-	data := engine.stockService.Get(
+	// Get timeframe data for entry conditions
+	timeframeData := engine.stockService.Get(
 		run.InstrumentID,
 		strategy.StartPeriod,
 		strategy.EndPeriod,
@@ -113,18 +116,59 @@ func (engine *Engine) Run(
 		lookBack,
 	)
 
-	for i := lookBack; i < int32(len(*data)); i++ {
-		current := (*data)[i]
-		position := engine.GetLatestPosition(run, strategy)
-		slicedData := (*data)[:i+1]
+	// Get 1-second data for more granular exit condition checking
+	secondData := engine.stockService.Get(
+		run.InstrumentID,
+		strategy.StartPeriod,
+		strategy.EndPeriod,
+		string(shared.StockGranularity1s), // Use the constant for 1-second data
+		lookBack,
+	)
 
-		switch position.State {
-		case shared.NotEntered:
-			engine.TryEnter(position, strategy, &current, &slicedData)
-		case shared.Entered:
-			engine.TryExit(position, strategy, &current, &slicedData)
-		default:
-			panic("Error in position Eval")
+	if len(*timeframeData) == 0 {
+		// Handle case where data is not available
+		run.State = shared.Ended
+		endTime := util.GetTime()
+		run.EndedTime = &endTime
+		return
+	}
+
+	// Main loop through timeframe data for entry signals
+	for i := lookBack; i < int32(len(*timeframeData)); i++ {
+		currentTimeframe := (*timeframeData)[i]
+		position := engine.GetLatestPosition(run, strategy)
+		slicedTimeframeData := (*timeframeData)[:i+1]
+
+		if position.State == shared.NotEntered {
+			// Check entry using timeframe data
+			entrySignal := engine.CheckEntryCondition(position, strategy, &currentTimeframe, &slicedTimeframeData)
+
+			if entrySignal && len(*secondData) > 0 {
+				// Determine the end time for exit condition checking
+				var nextTimeframeBoundary time.Time
+				if i < int32(len(*timeframeData))-1 {
+					nextTimeframeBoundary = (*timeframeData)[i+1].Timestamp
+				} else {
+					nextTimeframeBoundary = strategy.EndPeriod.Time
+				}
+
+				// Position was entered, now need to check exit using second data
+				engine.ProcessExitWithSecondData(position, strategy, secondData, currentTimeframe.Timestamp, nextTimeframeBoundary)
+
+				// If position exited, we can optionally optimize by advancing the counter
+				// to the next timeframe after the exit time
+				if position.State == shared.Exited && position.ExitTimeOrder != nil {
+					// Find the next possible entry point in timeframe data after this exit
+					exitTime := *position.ExitTimeOrder
+					for j := i + 1; j < int32(len(*timeframeData)); j++ {
+						// If this timeframe data point is after the exit time, set counter to it
+						if (*timeframeData)[j].Timestamp.After(exitTime) {
+							i = j - 1 // -1 because the loop will increment i
+							break
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -134,7 +178,7 @@ func (engine *Engine) Run(
 		if lastPosition.State == shared.Entered {
 			lastPosition.State = shared.Exited
 			// Force exit the last position using the last data point
-			lastData := (*data)[len(*data)-1]
+			lastData := (*timeframeData)[len(*timeframeData)-1]
 			lastPosition.UpdateOnExitSignal(
 				&lastData.Close,
 				&lastData.Timestamp,
@@ -154,6 +198,35 @@ func (engine *Engine) Run(
 	run.EndedTime = &endTime
 
 	run.RunMetrics = engine.CalculateRunMetrics(run)
+}
+
+func (engine *Engine) CheckEntryCondition(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	current *shared.Stock,
+	data *shared.StockData,
+) bool {
+	ctx := parser.NewEvaluationContext(data)
+	entryCondition := parser.Execute(strategy.EntryExpression, ctx)
+
+	if entryCondition {
+		position.HighestPrice = &current.Close
+		position.LowestPrice = &current.Close
+
+		position.UpdateOnEntrySignal(
+			&current.Close,
+			&current.Timestamp,
+		)
+
+		position.UpdateOnEntryOrder(
+			&current.Close,
+			&current.Timestamp,
+		)
+
+		return true
+	}
+
+	return false
 }
 
 func (engine *Engine) TryEnter(
@@ -435,4 +508,192 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 	}
 
 	return metrics
+}
+
+func (engine *Engine) ProcessExitWithMinuteData(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	minuteData *shared.StockData,
+	startTime time.Time,
+	endTime time.Time,
+) {
+	// Find the starting point in the 1-minute data (where timestamp >= position entry time)
+	var startIndex int32 = -1
+	for i := int32(0); i < int32(len(*minuteData)); i++ {
+		if !(*minuteData)[i].Timestamp.Before(startTime) {
+			startIndex = i
+			break
+		}
+	}
+
+	// If we couldn't find a valid starting point, use timeframe data for exit
+	if startIndex == -1 {
+		// Create a single data point for exit evaluation using the entry data
+		fallbackStock := shared.Stock{
+			Timestamp: *position.EntryTimeOrder,
+			Open:      *position.EntryPriceOrder,
+			High:      *position.EntryPriceOrder,
+			Low:       *position.EntryPriceOrder,
+			Close:     *position.EntryPriceOrder,
+			Volume:    0,
+			Direction: 0,
+		}
+
+		// Fallback to using the entry data for exit decision
+		slicedData := shared.StockData{fallbackStock}
+		engine.CheckExitCondition(position, strategy, &fallbackStock, &slicedData)
+		return
+	}
+
+	// Find the end index in the 1-minute data (last point before next candle or endTime)
+	var endIndex int32 = int32(len(*minuteData)) - 1
+	for i := startIndex; i < int32(len(*minuteData)); i++ {
+		if !(*minuteData)[i].Timestamp.Before(endTime) {
+			endIndex = i - 1
+			break
+		}
+	}
+
+	// If we couldn't find a valid range, return
+	if endIndex < startIndex {
+		return
+	}
+
+	// Process each 1-minute data point until we exit the position or reach the end time
+	for i := startIndex; i <= endIndex; i++ {
+		current := (*minuteData)[i]
+
+		// Skip processing if position is already exited
+		if position.State == shared.Exited {
+			break
+		}
+
+		// Slice the data from the beginning to the current point for context
+		slicedData := (*minuteData)[:i+1]
+
+		// Try to exit the position using current 1-minute data
+		engine.CheckExitCondition(position, strategy, &current, &slicedData)
+	}
+}
+
+func (engine *Engine) ProcessExitWithSecondData(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	secondData *shared.StockData,
+	startTime time.Time,
+	endTime time.Time,
+) {
+	// Find the starting point in the 1-second data (where timestamp >= position entry time)
+	var startIndex int32 = -1
+	for i := int32(0); i < int32(len(*secondData)); i++ {
+		if !(*secondData)[i].Timestamp.Before(startTime) {
+			startIndex = i
+			break
+		}
+	}
+
+	// TODO: Check this
+	// If we couldn't find a valid starting point, use timeframe data for exit
+	if startIndex == -1 {
+		// Create a single data point for exit evaluation using the entry data
+		fallbackStock := shared.Stock{
+			Timestamp: *position.EntryTimeOrder,
+			Open:      *position.EntryPriceOrder,
+			High:      *position.EntryPriceOrder,
+			Low:       *position.EntryPriceOrder,
+			Close:     *position.EntryPriceOrder,
+			Volume:    0,
+			Direction: 0,
+		}
+
+		// Fallback to using the entry data for exit decision
+		slicedData := shared.StockData{fallbackStock}
+		engine.CheckExitCondition(position, strategy, &fallbackStock, &slicedData)
+		return
+	}
+
+	// Find the end index in the 1-second data (last point before next candle or endTime)
+	var endIndex int32 = int32(len(*secondData)) - 1
+	for i := startIndex; i < int32(len(*secondData)); i++ {
+		if !(*secondData)[i].Timestamp.Before(endTime) {
+			endIndex = i - 1
+			break
+		}
+	}
+
+	// If we couldn't find a valid range, return
+	if endIndex < startIndex {
+		return
+	}
+
+	// Process each 1-second data point until we exit the position or reach the end time
+	for i := startIndex; i <= endIndex; i++ {
+		current := (*secondData)[i]
+
+		// Skip processing if position is already exited
+		if position.State == shared.Exited {
+			break
+		}
+
+		// Slice the data from the beginning to the current point for context
+		slicedData := (*secondData)[:i+1]
+
+		// Try to exit the position using current 1-second data
+		engine.CheckExitCondition(position, strategy, &current, &slicedData)
+	}
+}
+
+func (engine *Engine) CheckExitCondition(
+	position *shared.Position,
+	strategy *shared.Strategy,
+	current *shared.Stock,
+	data *shared.StockData,
+) {
+	stopLossPrice := position.CalculateStopLossPrice(
+		strategy.StopLoss,
+		strategy.StopLossType,
+	)
+
+	targetProfitPrice := position.CalculateTargetProfitPrice(
+		strategy.TargetProfit,
+		strategy.TargetProfitType,
+	)
+
+	var trailingStopLossPrice float64
+	if strategy.TrailingStopLoss != nil {
+		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
+			current.Close,
+			strategy.TrailingStopLoss,
+			*strategy.TrailingStopLossType,
+		)
+	}
+
+	ctx := parser.NewEvaluationContext(data)
+
+	exitConditionResult := false
+
+	if strategy.ExitExpression != "" {
+		exitConditionResult = parser.Execute(strategy.ExitExpression, ctx)
+	}
+
+	isExit := position.CheckForExit(
+		current.Close,
+		stopLossPrice,
+		targetProfitPrice,
+		trailingStopLossPrice,
+		exitConditionResult,
+	)
+
+	if isExit {
+		position.UpdateOnExitSignal(
+			&current.Close,
+			&current.Timestamp,
+		)
+
+		// Simulate Order
+		position.UpdateOnExitOrder(
+			&current.Close,
+			&current.Timestamp,
+		)
+	}
 }

@@ -46,6 +46,7 @@ func (repo *Repo) Get(
 	query := fmt.Sprintf(`
 		SELECT
 			CASE
+				WHEN '%s' = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
 				WHEN '%s' = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
 				WHEN '%s' = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
 				WHEN '%s' = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
@@ -81,6 +82,7 @@ func (repo *Repo) Get(
 		timeFrame,
 		timeFrame,
 		timeFrame,
+		timeFrame,
 		instrumentId,
 		startPeriod.Format("2006-01-02 15:04:05"),
 		endPeriod.Format("2006-01-02 15:04:05"),
@@ -101,6 +103,7 @@ func (repo *Repo) GetLookBack(
 	query := fmt.Sprintf(`
 		SELECT
 			CASE
+				WHEN '%s' = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
 				WHEN '%s' = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
 				WHEN '%s' = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
 				WHEN '%s' = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
@@ -128,6 +131,7 @@ func (repo *Repo) GetLookBack(
 			timestamp DESC
 		LIMIT %d;
 	`,
+		timeFrame,
 		timeFrame,
 		timeFrame,
 		timeFrame,
