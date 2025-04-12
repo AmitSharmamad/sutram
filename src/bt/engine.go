@@ -275,14 +275,8 @@ func (engine *Engine) TryExit(
 		strategy.TargetProfitType,
 	)
 
-	var trailingStopLossPrice float64
-	if strategy.TrailingStopLoss != nil {
-		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
-			current.Close,
-			strategy.TrailingStopLoss,
-			*strategy.TrailingStopLossType,
-		)
-	}
+	// Removed trailing stop loss calculation
+	var trailingStopLossPrice float64 = 0
 
 	ctx := parser.NewEvaluationContext(data)
 
@@ -659,14 +653,8 @@ func (engine *Engine) CheckExitCondition(
 		strategy.TargetProfitType,
 	)
 
-	var trailingStopLossPrice float64
-	if strategy.TrailingStopLoss != nil {
-		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
-			current.Close,
-			strategy.TrailingStopLoss,
-			*strategy.TrailingStopLossType,
-		)
-	}
+	// Removed trailing stop loss calculation
+	var trailingStopLossPrice float64 = 0
 
 	ctx := parser.NewEvaluationContext(data)
 
