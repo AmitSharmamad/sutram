@@ -19,6 +19,9 @@ func NewRoutesProv(
 		api.GET("/run", controller.GetAllRuns)
 		api.GET("/run/:id", controller.GetRun)
 		api.GET("/run/:id/log", controller.GetRunLogs)
+
+		// Live trading deployment endpoint
+		api.POST("/strategy/:id/deploy", controller.DeployLive)
 	}
 
 	println(api)

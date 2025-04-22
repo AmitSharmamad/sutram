@@ -1,26 +1,34 @@
 package bt
 
-import "github.com/google/wire"
+import (
+	"algo/src/broker"
+
+	"github.com/google/wire"
+)
 
 type Root struct{}
 
-func NewRoot(*Router) *Root {
+func NewRoot(router *Router) *Root {
 	return &Root{}
+}
+
+// NewBrokerProvider provides a broker implementation
+func NewBrokerProvider() broker.LiveTradingBroker {
+	// In a real implementation, you'd select a broker based on configuration
+	// For now, return nil to avoid errors but this needs to be implemented with a real broker
+	return nil
 }
 
 var Set = wire.NewSet(
 	NewRoot,
-
+	NewServiceProv,
 	NewRunGroupRepoProv,
 	NewRunRepoProv,
-	NewRunMetricsRepoProv,
 	NewPositionRepoProv,
 	NewPositionLogRepoProv,
-
-	NewServiceProv,
-	NewControllerProv,
-
+	NewRunMetricsRepoProv,
 	NewRoutesProv,
-
+	NewControllerProv,
+	NewBrokerProvider,
 	NewEngineProv,
 )
