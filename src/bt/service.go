@@ -12,6 +12,7 @@ type Service struct {
 	positionRepo    *PositionRepo
 	positionLogRepo *PositionLogRepo
 	runMetricsRepo  *RunMetricsRepo
+	strategyService shared.StrategyService
 }
 
 func NewServiceProv(
@@ -20,6 +21,7 @@ func NewServiceProv(
 	positionRepo *PositionRepo,
 	positionLogRepo *PositionLogRepo,
 	runMetricsRepo *RunMetricsRepo,
+	strategyService shared.StrategyService,
 ) *Service {
 	return &Service{
 		runGroupRepo:    runGroupRepo,
@@ -27,6 +29,7 @@ func NewServiceProv(
 		positionRepo:    positionRepo,
 		positionLogRepo: positionLogRepo,
 		runMetricsRepo:  runMetricsRepo,
+		strategyService: strategyService,
 	}
 }
 

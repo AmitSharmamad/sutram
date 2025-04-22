@@ -7,6 +7,7 @@ import (
 	env "algo/src/core/config"
 	"algo/src/core/db"
 	"algo/src/core/http"
+	dvendor "algo/src/d-vendor"
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
@@ -36,4 +37,5 @@ var Set = wire.NewSet(
 	auth.Set,
 	http.Set,
 	algo.Set,
+	dvendor.Set,
 )
