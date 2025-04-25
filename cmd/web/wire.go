@@ -8,6 +8,7 @@ import (
 	"algo/src/bt"
 	"algo/src/core/http"
 	"algo/src/di"
+	"algo/src/marketplace"
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
@@ -29,6 +30,7 @@ func NewWebContainer(
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
 	BTRoot *bt.Root,
+	MarketplaceController *marketplace.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
@@ -40,6 +42,7 @@ func BuildContainer(
 		wire.Build(
 			NewWebContainer,
 			di.Set,
+			marketplace.Set,
 		),
 	)
 }
