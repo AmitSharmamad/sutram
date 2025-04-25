@@ -15,6 +15,7 @@ import (
 	"algo/src/core/db"
 	"algo/src/core/http"
 	"algo/src/di"
+	"algo/src/marketplace"
 	"algo/src/stock"
 	"algo/src/strategy"
 	"algo/src/template"
@@ -71,7 +72,12 @@ func BuildContainer(engine *gin.Engine) *WebContainer {
 	btController := bt.NewControllerProv(btService, btEngine)
 	btRouter := bt.NewRoutesProv(engine, btController)
 	btRoot := bt.NewRoot(btRouter)
-	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, btRoot)
+	repository := marketplace.NewRepoProv(dbFactory)
+	marketplaceService := marketplace.NewServiceProv(repository)
+	marketplaceController := marketplace.NewControllerProv(marketplaceService)
+	routerGroup := marketplace.NewRoutesProv(engine, marketplaceController)
+	marketplaceRoot := marketplace.NewRootProv(routerGroup)
+	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, btRoot, marketplaceRoot)
 	return webContainer
 }
 
@@ -89,6 +95,7 @@ func NewWebContainer(
 	AuthRoot *auth.Root,
 	HTTPRoot *http.Root,
 	BTRoot *bt.Root,
+	MarketplaceController *marketplace.Root,
 ) *WebContainer {
 	return &WebContainer{}
 }
