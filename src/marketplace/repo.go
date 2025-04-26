@@ -142,7 +142,7 @@ func (r *repository) GetListings(ctx context.Context, params ListingQueryParams)
 		if err != nil {
 			return nil, err
 		}
-		listings[i].Categories = categories
+		listings[i].Categories = convertToMarketplaceCategories(categories)
 
 		// Get performance metrics
 		performance, err := r.GetPerformance(ctx, listings[i].ID)
@@ -179,7 +179,7 @@ func (r *repository) GetListingByID(ctx context.Context, id uuid.UUID) (*shared.
 	if err != nil {
 		return nil, err
 	}
-	listing.Categories = categories
+	listing.Categories = convertToMarketplaceCategories(categories)
 
 	// Get performance metrics
 	performance, err := r.GetPerformance(ctx, id)
@@ -441,7 +441,7 @@ func (r *repository) UpdateListing(ctx context.Context, id uuid.UUID, updateRequ
 	if err != nil {
 		return nil, err
 	}
-	listing.Categories = categories
+	listing.Categories = convertToMarketplaceCategories(categories)
 
 	return &listing, nil
 }
@@ -961,4 +961,20 @@ func (r *repository) GetSellerListings(ctx context.Context, userID uuid.UUID) (s
 	`, userID)
 
 	return listings, err
+}
+
+// Helper function to convert []shared.Category to []shared.MarketplaceCategory
+func convertToMarketplaceCategories(categories []shared.Category) []shared.MarketplaceCategory {
+	marketplaceCategories := make([]shared.MarketplaceCategory, len(categories))
+	for i, category := range categories {
+		marketplaceCategories[i] = shared.MarketplaceCategory{
+			ID:          uuid.UUID{}, // This needs to be properly set based on your requirements
+			Name:        category.Name,
+			Description: category.Description,
+			Icon:        &category.Icon,
+			CreatedAt:   category.CreatedAt,
+			UpdatedAt:   time.Time{}, // You might want to set this properly
+		}
+	}
+	return marketplaceCategories
 }
