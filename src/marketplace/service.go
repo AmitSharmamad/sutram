@@ -21,7 +21,7 @@ type Service interface {
 	DeleteListing(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 
 	// Category operations
-	GetCategories(ctx context.Context) (shared.Categories, error)
+	GetCategories(ctx context.Context) (shared.MarketplaceCategories, error)
 
 	// Performance metrics operations
 	UpdatePerformance(ctx context.Context, listingID uuid.UUID, userID uuid.UUID, req *shared.UpdatePerformanceRequest) error
@@ -159,7 +159,7 @@ func (s *service) DeleteListing(ctx context.Context, id uuid.UUID, userID uuid.U
 }
 
 // GetCategories retrieves all marketplace categories
-func (s *service) GetCategories(ctx context.Context) (shared.Categories, error) {
+func (s *service) GetCategories(ctx context.Context) (shared.MarketplaceCategories, error) {
 	return s.repo.GetCategories(ctx)
 }
 
