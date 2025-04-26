@@ -39,7 +39,7 @@ type Strategy struct {
 	Instruments    pq.Int32Array `json:"instruments" db:"instruments"`
 	ChartType      string        `json:"chart_type" db:"chart_type"`
 	ChartTimeframe string        `json:"chart_timeframe" db:"chart_timeframe"`
-	Qty            int           `json:"qty" db:"qty"`
+	Qty            int32         `json:"qty" db:"qty"`
 
 	EntryExpression string `json:"entry_expression" db:"entry_expression"`
 	ExitExpression  string `json:"exit_expression" db:"exit_expression"`
