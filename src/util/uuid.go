@@ -1,24 +1,14 @@
 package util
 
-import (
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
-// Parse converts a string to a UUID
-func Parse(s string) uuid.UUID {
-	id, _ := uuid.Parse(s)
-	return id
-}
-
-// NewUUID generates a new UUID
 func NewUUID() uuid.UUID {
 	return uuid.New()
 }
 
-// ParsePtr converts a string to a UUID pointer
-func ParsePtr(s string) *uuid.UUID {
-	id := Parse(s)
-	return &id
+func Parse(id string) uuid.UUID {
+	i, _ := uuid.Parse(id)
+	return i
 }
 
 // ToString converts a UUID to a string

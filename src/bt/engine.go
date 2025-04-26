@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"algo/src/broker"
 	"algo/src/parser"
 	"algo/src/shared"
 	"algo/src/util"
@@ -19,7 +18,6 @@ type Engine struct {
 	stockService      shared.StockService
 	expressionService shared.ExpressionService
 	indicatorService  shared.IndicatorService
-	broker            broker.LiveTradingBroker
 }
 
 func NewEngineProv(
@@ -28,7 +26,6 @@ func NewEngineProv(
 	stockService shared.StockService,
 	expressionService shared.ExpressionService,
 	indicatorService shared.IndicatorService,
-	broker broker.LiveTradingBroker,
 ) *Engine {
 	return &Engine{
 		service:           service,
@@ -36,7 +33,6 @@ func NewEngineProv(
 		stockService:      stockService,
 		expressionService: expressionService,
 		indicatorService:  indicatorService,
-		broker:            broker,
 	}
 }
 
@@ -508,7 +504,6 @@ func (engine *Engine) CalculateRunMetrics(run *shared.Run) *shared.RunMetrics {
 	return metrics
 }
 
-<<<<<<< Updated upstream
 func (engine *Engine) ProcessExitWithMinuteData(
 	position *shared.Position,
 	strategy *shared.Strategy,
@@ -643,173 +638,11 @@ func (engine *Engine) ProcessExitWithSecondData(
 }
 
 func (engine *Engine) CheckExitCondition(
-=======
-func (engine *Engine) RunLiveTrading(
-	ctx context.Context,
-	run *shared.Run,
-	strategy *shared.Strategy,
-) error {
-	// Connect to broker
-	if err := engine.broker.Connect(ctx); err != nil {
-		return err
-	}
-
-	// Subscribe to real-time updates for the instrument
-	if err := engine.broker.Subscribe(ctx, []int32{run.InstrumentID}); err != nil {
-		return err
-	}
-	defer engine.broker.Unsubscribe(ctx, []int32{run.InstrumentID})
-
-	// Initialize the run
-	startTime := util.GetTime()
-	run.StartedTime = &startTime
-	run.State = shared.Started
-	run.RunType = shared.LiveTrade
-
-	// Get initial position
-	position := engine.GetLatestPosition(run, strategy)
-
-	// Start with some historical data for indicators
-	var lookBack int32 = 100 // Reduced lookback for live trading
-	historicalData := engine.stockService.Get(
-		run.InstrumentID,
-		strategy.StartPeriod,
-		strategy.EndPeriod,
-		strategy.ChartTimeframe,
-		lookBack,
-	)
-
-	data := *historicalData
-	
-	for {
-		select {
-		case <-ctx.Done():
-			// Handle graceful shutdown
-			endTime := util.GetTime()
-			run.EndedTime = &endTime
-			run.State = shared.Ended
-			return ctx.Err()
-			
-		default:
-			// Get latest quote
-			quote, err := engine.broker.GetQuote(ctx, run.InstrumentID)
-			if err != nil {
-				continue
-			}
-
-			// Update our data series with the new quote
-			current := shared.Stock{
-				Close:     quote.Close,
-				Open:      quote.Open,
-				High:      quote.High,
-				Low:       quote.Low,
-				Volume:    quote.Volume,
-				Timestamp: quote.Timestamp,
-			}
-			data = append(data, current)
-
-			// Maintain rolling window of data
-			if len(data) > 1000 { // Keep last 1000 data points
-				data = data[1:]
-			}
-
-			switch position.State {
-			case shared.NotEntered:
-				if engine.tryEnterLive(ctx, position, strategy, &current, &data) {
-					// Place actual order through broker
-					order := broker.Order{
-						InstrumentID: run.InstrumentID,
-						Type:        broker.MARKET,
-						Direction:   strategy.PositionType,
-						Quantity:    strategy.Qty,
-					}
-					
-					orderID, err := engine.broker.PlaceOrder(ctx, order)
-					if err != nil {
-						continue
-					}
-
-					// Monitor order status
-					for {
-						status, err := engine.broker.GetOrderStatus(ctx, orderID)
-						if err != nil {
-							break
-						}
-						if status == broker.EXECUTED {
-							// Order was filled, update position
-							position.State = shared.Entered
-							position.EntryOrderID = util.ParsePtr(orderID)
-							break
-						} else if status == broker.REJECTED || status == broker.CANCELLED {
-							// Order failed, reset position
-							position.State = shared.NotEntered
-							break
-						}
-					}
-				}
-
-			case shared.Entered:
-				if engine.tryExitLive(ctx, position, strategy, &current, &data) {
-					// Place exit order
-					order := broker.Order{
-						InstrumentID: run.InstrumentID,
-						Type:        broker.MARKET,
-						Direction:   engine.getOppositeDirection(strategy.PositionType),
-						Quantity:    strategy.Qty,
-					}
-					
-					orderID, err := engine.broker.PlaceOrder(ctx, order)
-					if err != nil {
-						continue
-					}
-
-					// Monitor exit order status
-					for {
-						status, err := engine.broker.GetOrderStatus(ctx, orderID)
-						if err != nil {
-							break
-						}
-						if status == broker.EXECUTED {
-							// Order was filled, update position
-							position.State = shared.Exited
-							position.ExitOrderID = util.ParsePtr(orderID)
-							// Create new position for next trade
-							position = engine.GetLatestPosition(run, strategy)
-							break
-						} else if status == broker.REJECTED || status == broker.CANCELLED {
-							// Order failed, keep position open
-							break
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-func (engine *Engine) tryEnterLive(
-	ctx context.Context,
->>>>>>> Stashed changes
 	position *shared.Position,
 	strategy *shared.Strategy,
 	current *shared.Stock,
 	data *shared.StockData,
-<<<<<<< Updated upstream
 ) {
-=======
-) bool {
-	evalCtx := parser.NewEvaluationContext(data)
-	return parser.Execute(strategy.EntryExpression, evalCtx)
-}
-
-func (engine *Engine) tryExitLive(
-	ctx context.Context,
-	position *shared.Position,
-	strategy *shared.Strategy,
-	current *shared.Stock,
-	data *shared.StockData,
-) bool {
->>>>>>> Stashed changes
 	stopLossPrice := position.CalculateStopLossPrice(
 		strategy.StopLoss,
 		strategy.StopLossType,
@@ -820,7 +653,6 @@ func (engine *Engine) tryExitLive(
 		strategy.TargetProfitType,
 	)
 
-<<<<<<< Updated upstream
 	// Removed trailing stop loss calculation
 	var trailingStopLossPrice float64 = 0
 
@@ -833,31 +665,12 @@ func (engine *Engine) tryExitLive(
 	}
 
 	isExit := position.CheckForExit(
-=======
-	var trailingStopLossPrice float64
-	if strategy.TrailingStopLoss != nil {
-		trailingStopLossPrice = position.CalculateTrailingStopLossPrice(
-			current.Close,
-			strategy.TrailingStopLoss,
-			*strategy.TrailingStopLossType,
-		)
-	}
-
-	evalCtx := parser.NewEvaluationContext(data)
-	exitConditionResult := false
-	if strategy.ExitExpression != "" {
-		exitConditionResult = parser.Execute(strategy.ExitExpression, evalCtx)
-	}
-
-	return position.CheckForExit(
->>>>>>> Stashed changes
 		current.Close,
 		stopLossPrice,
 		targetProfitPrice,
 		trailingStopLossPrice,
 		exitConditionResult,
 	)
-<<<<<<< Updated upstream
 
 	if isExit {
 		position.UpdateOnExitSignal(
@@ -871,13 +684,4 @@ func (engine *Engine) tryExitLive(
 			&current.Timestamp,
 		)
 	}
-=======
-}
-
-func (engine *Engine) getOppositeDirection(direction shared.Direction) shared.Direction {
-	if direction == shared.LONG {
-		return shared.SHORT
-	}
-	return shared.LONG
->>>>>>> Stashed changes
 }

@@ -3,7 +3,6 @@ package bt
 import (
 	"algo/src/shared"
 	"algo/src/util"
-	"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -91,54 +90,4 @@ func (controller *Controller) GetRunLogs(gctx *gin.Context) {
 	logs := controller.service.GetRunLogs(id)
 
 	shared.SuccessResp(gctx, logs)
-}
-
-func (controller *Controller) DeployLive(gctx *gin.Context) {
-	ctx := shared.GetReqCtx(gctx)
-
-	strategyID := util.Parse(gctx.Param("id"))
-	strategy := controller.service.strategyService.Get(ctx, strategyID)
-
-	if !strategy.IsActive {
-		panic(shared.NewBadRequest("Strategy is not active", "INACTIVE_STRATEGY"))
-	}
-
-	runGroup := shared.NewRunGroup(strategyID)
-	runs := make([]*shared.Run, 0)
-
-	// Create runs for each instrument
-	for _, instrumentID := range strategy.Instruments {
-		run := shared.NewRun(
-			runGroup.ID,
-			strategyID,
-			instrumentID,
-		)
-		run.RunType = shared.LiveTrade
-		runs = append(runs, run)
-	}
-
-	runGroup.Runs = runs
-
-	// Save runs to database first
-	controller.service.runGroupRepo.Create(runGroup)
-	controller.service.runRepo.Create(runs)
-
-	// Start live trading for each run in separate goroutines
-	errChan := make(chan error, len(runs))
-	for _, run := range runs {
-		go func(r *shared.Run) {
-			errChan <- controller.engine.RunLiveTrading(ctx, r, strategy)
-		}(run)
-	}
-
-	// Monitor for errors
-	go func() {
-		for err := range errChan {
-			if err != nil {
-				fmt.Printf("Live trading error: %v\n", err)
-			}
-		}
-	}()
-
-	shared.SuccessResp(gctx, runGroup)
 }
