@@ -53,8 +53,8 @@ type MarketplaceCategory struct {
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Categories represents a collection of categories
-type Categories []Category
+// MarketplaceCategories represents a collection of marketplace categories
+type MarketplaceCategories []MarketplaceCategory
 
 // Subscription represents a user's subscription to a marketplace listing
 type Subscription struct {
