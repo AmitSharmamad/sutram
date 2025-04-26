@@ -135,3 +135,7 @@ main
 
 # data
 data/historical
+
+# DB data folders
+db/pg
+db/ch
