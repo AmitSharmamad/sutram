@@ -1,0 +1,54 @@
+services:
+
+  sutram-clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: sutramdb
+    environment:
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_PASSWORD=admin
+    ports:
+      - 8123:8123
+      - 9000:9000
+    volumes:
+      - ./db/ch/data:/var/lib/clickhouse/
+      - ./db/ch/logs:/var/log/clickhouse-server/
+      - ./db/sql/clickhouse:/docker-entrypoint-initdb.d/
+    restart: unless-stopped
+    networks:
+      - sutram-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  sutram-postgres:
+    image: postgres:latest
+    container_name: sutrampgdb
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=sutram  # Creates a database by default
+    ports:
+      - 9009:5432  # PostgreSQL default port is 5432, not 9009
+    volumes:
+      - ./db/sql/postgres:/docker-entrypoint-initdb.d/
+      - ./db/pg/data:/var/lib/postgresql/data  # Correct PostgreSQL data path
+    restart: unless-stopped
+    networks:
+      - sutram-network
+
+networks:
+  sutram-network:
+    name: sutram-network
+    driver: bridge
