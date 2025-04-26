@@ -8,22 +8,22 @@ import (
 
 // MarketplaceListing represents a strategy listing in the marketplace
 type MarketplaceListing struct {
-	ID               uuid.UUID    `json:"id" db:"id"`
-	StrategyID       uuid.UUID    `json:"strategy_id" db:"strategy_id"`
-	UserID           uuid.UUID    `json:"user_id" db:"user_id"`
-	Title            string       `json:"title" db:"title"`
-	Description      string       `json:"description" db:"description"`
-	Price            float64      `json:"price" db:"price"`
-	SubscriptionType string       `json:"subscription_type" db:"subscription_type"` // 'one-time', 'monthly', 'yearly'
-	IsFeatured       bool         `json:"is_featured" db:"is_featured"`
-	IsActive         bool         `json:"is_active" db:"is_active"`
-	Views            int          `json:"views" db:"views"`
-	Ratings          float64      `json:"ratings" db:"ratings"`
-	Features         []string     `json:"features"`
-	Categories       []Category   `json:"categories,omitempty"`
-	Performance      *Performance `json:"performance,omitempty"`
-	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID             `json:"id" db:"id"`
+	StrategyID       uuid.UUID             `json:"strategy_id" db:"strategy_id"`
+	UserID           uuid.UUID             `json:"user_id" db:"user_id"`
+	Title            string                `json:"title" db:"title"`
+	Description      string                `json:"description" db:"description"`
+	Price            float64               `json:"price" db:"price"`
+	SubscriptionType string                `json:"subscription_type" db:"subscription_type"` // 'one-time', 'monthly', 'yearly'
+	IsFeatured       bool                  `json:"is_featured" db:"is_featured"`
+	IsActive         bool                  `json:"is_active" db:"is_active"`
+	Views            int                   `json:"views" db:"views"`
+	Ratings          float64               `json:"ratings" db:"ratings"`
+	Features         []string              `json:"features"`
+	Categories       []MarketplaceCategory `json:"categories,omitempty"`
+	Performance      *Performance          `json:"performance,omitempty"`
+	CreatedAt        time.Time             `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time             `json:"updated_at" db:"updated_at"`
 }
 
 // MarketplaceListings represents a collection of marketplace listings
@@ -43,18 +43,18 @@ type Performance struct {
 	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Category represents a marketplace category
-type Category struct {
+// MarketplaceCategory represents a marketplace category
+type MarketplaceCategory struct {
 	ID          uuid.UUID `json:"id" db:"id"`
 	Name        string    `json:"name" db:"name"`
 	Description string    `json:"description" db:"description"`
-	Icon        *string    `json:"icon" db:"icon"`
+	Icon        *string   `json:"icon" db:"icon"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Categories represents a collection of categories
-type Categories []Category
+// MarketplaceCategories represents a collection of marketplace categories
+type MarketplaceCategories []MarketplaceCategory
 
 // Subscription represents a user's subscription to a marketplace listing
 type Subscription struct {
