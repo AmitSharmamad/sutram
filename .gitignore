@@ -139,4 +139,4 @@ data/historical
 # DB data folders
 db/db
 
-bin
+bin/web-server

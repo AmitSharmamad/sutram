@@ -1,0 +1,77 @@
+package backtest
+
+import (
+	"database/sql"
+
+	infraRepo "algo/internal/infra/persistance/repository"
+	"algo/internal/modules/backtest/application/service"
+	"algo/internal/modules/backtest/infrastructure/persistence/postgres"
+	backtestHttp "algo/internal/modules/backtest/interfaces/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
+)
+
+// Module represents the backtest module
+type Module struct {
+	db         *sql.DB
+	controller *backtestHttp.BacktestController
+}
+
+// ProvideModule provides a wire provider set for the backtest module
+var ProvideModule = wire.NewSet(
+	ProvideBacktestModule,
+)
+
+// ProvideBacktestModule provides a backtest module instance
+func ProvideBacktestModule() (*Module, error) {
+	return New(), nil
+}
+
+// New creates a new backtest module
+func New() *Module {
+	// Get database connection
+	db, err := infraRepo.ProvidePostgresDB()
+	if err != nil {
+		panic(err) // In a real app, handle this more gracefully
+	}
+
+	module := &Module{
+		db: db,
+	}
+
+	// Initialize module components
+	module.initialize()
+
+	return module
+}
+
+// initialize sets up the backtest module
+func (m *Module) initialize() {
+	// Create repositories
+	runGroupRepo := postgres.NewRunGroupRepository(m.db)
+	runRepo := postgres.NewRunRepository(m.db)
+	positionRepo := postgres.NewPositionRepository(m.db)
+	runMetricsRepo := postgres.NewRunMetricsRepository(m.db)
+
+	// Create services
+	backtestService := service.NewBacktestService(
+		runGroupRepo,
+		runRepo,
+		positionRepo,
+		runMetricsRepo,
+	)
+
+	// Create controller
+	m.controller = backtestHttp.NewBacktestController(backtestService)
+}
+
+// RegisterRoutes registers the backtest module routes with the given router
+func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
+	backtestHttp.RegisterRoutes(router, m.controller)
+}
+
+// GetController returns the backtest controller
+func (m *Module) GetController() *backtestHttp.BacktestController {
+	return m.controller
+}
