@@ -4,8 +4,9 @@
 package main
 
 import (
+	"algo/internal/modules/instrument"
 	"algo/internal/modules/user"
-	
+
 	"github.com/google/wire"
 )
 
@@ -17,18 +18,23 @@ func InitializeApp() (*App, error) {
 
 		// User module
 		user.New,
+
+		// Instrument module
+		instrument.New,
 	)
 	return &App{}, nil
 }
 
 // App represents the application container
 type App struct {
-	UserModule *user.Module
+	UserModule       *user.Module
+	InstrumentModule *instrument.Module
 }
 
 // NewApp creates a new application instance
-func NewApp(userModule *user.Module) *App {
+func NewApp(userModule *user.Module, instrumentModule *instrument.Module) *App {
 	return &App{
-		UserModule: userModule,
+		UserModule:       userModule,
+		InstrumentModule: instrumentModule,
 	}
 }

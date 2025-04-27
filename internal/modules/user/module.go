@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	infraRepo "algo/internal/infra/persistance/repository"
 	"algo/internal/modules/user/application/service"
 	"algo/internal/modules/user/application/service/auth"
 	"algo/internal/modules/user/infrastructure/persistence/postgres"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	_ "github.com/lib/pq"
 )
 
 // Module represents the user module
@@ -26,15 +26,6 @@ type Module struct {
 var ProvideModule = wire.NewSet(
 	ProvideUserModule,
 )
-
-// ProvideDB provides a database connection
-func ProvideDB() (*sql.DB, error) {
-	connStr := os.Getenv("DATABASE_URL")
-	if connStr == "" {
-		connStr = "postgres://postgres:postgres@localhost:5432/sutram?sslmode=disable"
-	}
-	return sql.Open("postgres", connStr)
-}
 
 // ProvideJWTSecret provides the JWT secret key
 func ProvideJWTSecret() string {
@@ -53,7 +44,7 @@ func ProvideUserModule() (*Module, error) {
 // New creates a new user module
 func New() *Module {
 	// Get database connection
-	db, err := ProvideDB()
+	db, err := infraRepo.ProvidePostgresDB()
 	if err != nil {
 		panic(err) // In a real app, handle this more gracefully
 	}
