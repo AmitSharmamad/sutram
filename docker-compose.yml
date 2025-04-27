@@ -1,20 +1,22 @@
 services:
-  al-go:
+  web-app:
     build:
-      context: ./backend/al-go
-      dockerfile: Dockerfile
+      context: ./
+      dockerfile: Dockerfile.web
     env_file:
-      - backend/al-go/.env
-    container_name: sutram-al-go
+      - ./.env
+    container_name: sutram-web
     ports:
-      - 9090:9090
+      - 8080:8080
     networks:
       - sutram-network
     depends_on:
-      sutramdb:
+      postgres:
+        condition: service_healthy  # <-- Waits for Postgres to be ready
+      clickhouse:
         condition: service_healthy  # <-- Waits for ClickHouse to be ready
 
-  sutramdb:
+  clickhouse:
     image: clickhouse/clickhouse-server
     container_name: sutramdb
     environment:
@@ -25,12 +27,48 @@ services:
       - 8123:8123
       - 9000:9000
     volumes:
-      - ./db/mount/data:/var/lib/clickhouse/
-      - ./db/mount/logs:/var/log/clickhouse-server/
-      - ./db/sql:/docker-entrypoint-initdb.d/
+      - ./db/db/ch/data:/var/lib/clickhouse/
+      - ./db/db/ch/logs:/var/log/clickhouse-server/
+      - ./db/sql/clickhouse:/docker-entrypoint-initdb.d/
     restart: unless-stopped
     networks:
       - sutram-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8123/ping",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+      
+  postgres:
+    image: postgres:latest
+    container_name: sutrampgdb
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=sutram
+    ports:
+      - 9009:5432
+    volumes:
+      - ./db/sql/postgres:/docker-entrypoint-initdb.d/
+      - ./db/db/pg/data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - sutram-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d sutram"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     healthcheck:
       test:
         [

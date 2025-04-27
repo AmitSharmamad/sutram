@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"algo/internal/modules/user/application/dto"
 	"algo/internal/modules/user/application/service"
@@ -746,7 +747,7 @@ func (c *UserController) DeactivateUser(ctx *gin.Context) {
 // Helper function to extract token from header
 func extractToken(ctx *gin.Context) string {
 	bearerToken := ctx.GetHeader("Authorization")
-	if len(bearerToken) > 7 && bearerToken[:7] == "Bearer " {
+	if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
 		return bearerToken[7:]
 	}
 	return ""
