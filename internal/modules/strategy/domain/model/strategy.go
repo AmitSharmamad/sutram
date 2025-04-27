@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // Position type enum (direction)
@@ -62,7 +63,7 @@ type Strategy struct {
 	Name                 string         `json:"name" db:"name"`
 	Description          string         `json:"description" db:"description"`
 	PositionType         Direction      `json:"position_type" db:"position_type"`
-	Instruments          []int          `json:"instruments" db:"instruments"`
+	Instruments          pq.Int32Array  `json:"instruments" db:"instruments"`
 	ChartType            ChartType      `json:"chart_type" db:"chart_type"`
 	ChartTimeframe       ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
 	TradeType            TradeType      `json:"trade_type" db:"trade_type"`
@@ -93,7 +94,7 @@ func NewStrategy(
 	name string,
 	description string,
 	positionType Direction,
-	instruments []int,
+	instruments pq.Int32Array,
 	chartType ChartType,
 	chartTimeframe ChartTimeframe,
 	tradeType TradeType,
@@ -135,7 +136,7 @@ func (s *Strategy) Update(
 	name string,
 	description string,
 	positionType Direction,
-	instruments []int,
+	instruments pq.Int32Array,
 	chartType ChartType,
 	chartTimeframe ChartTimeframe,
 	tradeType TradeType,

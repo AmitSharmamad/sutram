@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // validator is a singleton instance of the validator
@@ -93,7 +94,7 @@ type CreateStrategyRequest struct {
 	Name                 string               `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string               `json:"description" validate:"max=500" db:"description"`
 	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
-	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
+	Instruments          pq.Int32Array        `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
 	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W" db:"chart_timeframe"`
 	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS" db:"trade_type"`
@@ -121,7 +122,7 @@ type UpdateStrategyRequest struct {
 	Name                 string               `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string               `json:"description" validate:"max=500" db:"description"`
 	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
-	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
+	Instruments          pq.Int32Array        `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
 	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W" db:"chart_timeframe"`
 	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS" db:"trade_type"`
@@ -150,7 +151,7 @@ type StrategyResponse struct {
 	Name                 string               `json:"name" db:"name"`
 	Description          string               `json:"description" db:"description"`
 	PositionType         model.Direction      `json:"position_type" db:"position_type"`
-	Instruments          []int                `json:"instruments" db:"instruments"`
+	Instruments          pq.Int32Array        `json:"instruments" db:"instruments"`
 	ChartType            model.ChartType      `json:"chart_type" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
 	TradeType            model.TradeType      `json:"trade_type" db:"trade_type"`
