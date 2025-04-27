@@ -744,13 +744,20 @@ func (c *UserController) DeactivateUser(ctx *gin.Context) {
 	})
 }
 
-// Helper function to extract token from header
-func extractToken(ctx *gin.Context) string {
+// ExtractToken extracts the JWT token from the Authorization header
+// Returns the token without the "Bearer " prefix or empty string if not found
+// This function is exported so it can be used by other modules
+func ExtractToken(ctx *gin.Context) string {
 	bearerToken := ctx.GetHeader("Authorization")
 	if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
 		return bearerToken[7:]
 	}
 	return ""
+}
+
+// For backward compatibility, keep the unexported version
+func extractToken(ctx *gin.Context) string {
+	return ExtractToken(ctx)
 }
 
 // Helper function to get user ID from token

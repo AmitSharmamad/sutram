@@ -24,7 +24,9 @@ INSERT INTO strategy (
   entry_expression,
   exit_expression,
   target_profit,
+  target_profit_type,
   stop_loss,
+  stop_loss_type,
   trailing_stop_loss,
   exit_type,
   capital,
@@ -50,7 +52,9 @@ VALUES (
   'SMA(CLOSE, 14, 0) CrossesAbove SMA(CLOSE, 14, 0)',  -- Empty entry expression
   'SMA(CLOSE, 14, 0) CrossesAbove SMA(CLOSE, 14, 0)',  -- Empty exit expression
   0.05,  -- 5% target profit
+  'ABSOLUTE', -- target profit type
   0.02,  -- 2% stop loss
+  'ABSOLUTE',  -- Stop loss type
   0.03,  -- 3% trailing stop loss
   'PERCENTAGE',  -- Exit type
   100000.00,  -- Capital allocation

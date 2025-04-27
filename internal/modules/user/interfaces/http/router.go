@@ -37,10 +37,12 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 }
 
 // AuthMiddleware implements authentication middleware
+// This middleware validates the JWT token and sets the userID in the context
+// It can be reused across different modules to ensure authentication
 func AuthMiddleware(controller *UserController) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// Get the token from header
-		tokenString := extractToken(ctx)
+		tokenString := ExtractToken(ctx)
 		if tokenString == "" {
 			ctx.AbortWithStatusJSON(401, gin.H{
 				"success": false,
@@ -50,7 +52,7 @@ func AuthMiddleware(controller *UserController) gin.HandlerFunc {
 		}
 
 		// Validate the token
-		_, err := controller.authService.ValidateToken(ctx.Request.Context(), tokenString)
+		claims, err := controller.authService.ValidateToken(ctx.Request.Context(), tokenString)
 		if err != nil {
 			ctx.AbortWithStatusJSON(401, gin.H{
 				"success": false,
@@ -58,6 +60,22 @@ func AuthMiddleware(controller *UserController) gin.HandlerFunc {
 			})
 			return
 		}
+
+		// Set user ID in context for other handlers
+		userID, err := controller.GetUserIDFromToken(tokenString)
+		if err != nil {
+			ctx.AbortWithStatusJSON(401, gin.H{
+				"success": false,
+				"error":   "Invalid token: user ID extraction failed",
+			})
+			return
+		}
+
+		// Set userID in context for use in handler functions
+		ctx.Set("userID", userID)
+		ctx.Set("claims", claims)
+		// Add the token to context so it can be used by other handlers if needed
+		ctx.Set("token", tokenString)
 
 		ctx.Next()
 	}
@@ -67,7 +85,7 @@ func AuthMiddleware(controller *UserController) gin.HandlerFunc {
 func AdminMiddleware(controller *UserController) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// Get the token from header
-		tokenString := extractToken(ctx)
+		tokenString := ExtractToken(ctx)
 		if tokenString == "" {
 			ctx.AbortWithStatusJSON(401, gin.H{
 				"success": false,
