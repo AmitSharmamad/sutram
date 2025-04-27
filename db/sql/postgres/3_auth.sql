@@ -3,7 +3,7 @@
 -- Roles table for defining platform roles
 CREATE TABLE IF NOT EXISTS role (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL,
+    name role_type UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS user_role (
 -- Permissions table
 CREATE TABLE IF NOT EXISTS permission (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,
+    name permission_type UNIQUE NOT NULL,
     description TEXT,
     resource_type VARCHAR(50) NOT NULL, -- 'strategy', 'backtest', 'marketplace', etc.
     action VARCHAR(50) NOT NULL, -- 'create', 'read', 'update', 'delete', etc.

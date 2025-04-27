@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS position (
     updated_at TIMESTAMP DEFAULT now(),
 
     PRIMARY KEY (id),
-    FOREIGN KEY (run_id) REFERENCES run(id) ON DELETE CASCADE
+    FOREIGN KEY (run_id) REFERENCES run(id) ON DELETE CASCADE,
+    FOREIGN KEY (entry_order_id) REFERENCES "order"(id) ON DELETE SET NULL,
+    FOREIGN KEY (exit_order_id) REFERENCES "order"(id) ON DELETE SET NULL
 );
 
 -- Metrics Table
