@@ -8,11 +8,11 @@ import (
 type InstrumentDTO struct {
 	ID        uint64    `json:"id"`
 	Symbol    string    `json:"symbol"`
-	Open      float32   `json:"open"`
-	High      float32   `json:"high"`
-	Low       float32   `json:"low"`
-	Close     float32   `json:"close"`
-	Volume    float32   `json:"volume"`
+	Open      float64   `json:"open"`
+	High      float64   `json:"high"`
+	Low       float64   `json:"low"`
+	Close     float64   `json:"close"`
+	Volume    float64   `json:"volume"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -36,21 +36,21 @@ type InstrumentWithMetadataDTO struct {
 // CreateInstrumentRequest represents request to create an instrument
 type CreateInstrumentRequest struct {
 	Symbol    string    `json:"symbol" binding:"required"`
-	Open      float32   `json:"open" binding:"required"`
-	High      float32   `json:"high" binding:"required"`
-	Low       float32   `json:"low" binding:"required"`
-	Close     float32   `json:"close" binding:"required"`
-	Volume    float32   `json:"volume" binding:"required"`
+	Open      float64   `json:"open" binding:"required"`
+	High      float64   `json:"high" binding:"required"`
+	Low       float64   `json:"low" binding:"required"`
+	Close     float64   `json:"close" binding:"required"`
+	Volume    float64   `json:"volume" binding:"required"`
 	Timestamp time.Time `json:"timestamp" binding:"required"`
 }
 
 // UpdateInstrumentRequest represents request to update an instrument
 type UpdateInstrumentRequest struct {
-	Open      float32   `json:"open" binding:"required"`
-	High      float32   `json:"high" binding:"required"`
-	Low       float32   `json:"low" binding:"required"`
-	Close     float32   `json:"close" binding:"required"`
-	Volume    float32   `json:"volume" binding:"required"`
+	Open      float64   `json:"open" binding:"required"`
+	High      float64   `json:"high" binding:"required"`
+	Low       float64   `json:"low" binding:"required"`
+	Close     float64   `json:"close" binding:"required"`
+	Volume    float64   `json:"volume" binding:"required"`
 	Timestamp time.Time `json:"timestamp" binding:"required"`
 }
 

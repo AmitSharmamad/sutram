@@ -8,15 +8,17 @@ import (
 type Instrument struct {
 	ID        uint64    `json:"id" db:"id"`
 	Symbol    string    `json:"symbol" db:"instrument"` // Named instrument in DB
-	Open      float32   `json:"open" db:"open"`
-	High      float32   `json:"high" db:"high"`
-	Low       float32   `json:"low" db:"low"`
-	Close     float32   `json:"close" db:"close"`
-	Volume    float32   `json:"volume" db:"volume"`
+	Open      float64   `json:"open" db:"open"`
+	High      float64   `json:"high" db:"high"`
+	Low       float64   `json:"low" db:"low"`
+	Close     float64   `json:"close" db:"close"`
+	Volume    float64   `json:"volume" db:"volume"`
 	Timestamp time.Time `json:"timestamp" db:"timestamp"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
+
+type StockData []Instrument
 
 // InstrumentMaster represents the master instrument record with metadata
 type InstrumentMaster struct {
