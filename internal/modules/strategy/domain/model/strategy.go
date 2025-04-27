@@ -57,34 +57,34 @@ const (
 
 // Strategy represents a trading strategy with entry/exit conditions and risk parameters
 type Strategy struct {
-	ID                   uuid.UUID      `json:"id"`
-	UserID               uuid.UUID      `json:"user_id"`
-	Name                 string         `json:"name"`
-	Description          string         `json:"description"`
-	PositionType         Direction      `json:"position_type"`
-	Instruments          []int          `json:"instruments"`
-	ChartType            ChartType      `json:"chart_type"`
-	ChartTimeframe       ChartTimeframe `json:"chart_timeframe"`
-	TradeType            TradeType      `json:"trade_type"`
-	Qty                  int            `json:"qty"`
-	EntryExpression      string         `json:"entry_expression"`
-	ExitExpression       string         `json:"exit_expression,omitempty"`
-	TargetProfit         float64        `json:"target_profit"`
-	TargetProfitType     ValueType      `json:"target_profit_type"`
-	StopLoss             float64        `json:"stop_loss"`
-	StopLossType         ValueType      `json:"stop_loss_type"`
-	TrailingStopLoss     *float64       `json:"trailing_stop_loss,omitempty"`
-	TrailingStopLossType *ValueType     `json:"trailing_stop_loss_type,omitempty"`
-	ExitType             *string        `json:"exit_type,omitempty"`
-	Capital              float64        `json:"capital"`
-	MaxTrades            *int           `json:"max_trades,omitempty"`
-	EntryStartTime       *time.Time     `json:"entry_start_time,omitempty"`
-	EntryEndTime         *time.Time     `json:"entry_end_time,omitempty"`
-	StartDate            *time.Time     `json:"start_date,omitempty"`
-	EndDate              *time.Time     `json:"end_date,omitempty"`
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
-	IsActive             bool           `json:"is_active"`
+	ID                   uuid.UUID      `json:"id" db:"id"`
+	UserID               uuid.UUID      `json:"user_id" db:"user_id"`
+	Name                 string         `json:"name" db:"name"`
+	Description          string         `json:"description" db:"description"`
+	PositionType         Direction      `json:"position_type" db:"position_type"`
+	Instruments          []int          `json:"instruments" db:"instruments"`
+	ChartType            ChartType      `json:"chart_type" db:"chart_type"`
+	ChartTimeframe       ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
+	TradeType            TradeType      `json:"trade_type" db:"trade_type"`
+	Qty                  int            `json:"qty" db:"qty"`
+	EntryExpression      string         `json:"entry_expression" db:"entry_expression"`
+	ExitExpression       string         `json:"exit_expression,omitempty" db:"exit_expression"`
+	TargetProfit         float64        `json:"target_profit" db:"target_profit"`
+	TargetProfitType     ValueType      `json:"target_profit_type" db:"target_profit_type"`
+	StopLoss             float64        `json:"stop_loss" db:"stop_loss"`
+	StopLossType         ValueType      `json:"stop_loss_type" db:"stop_loss_type"`
+	TrailingStopLoss     *float64       `json:"trailing_stop_loss,omitempty" db:"trailing_stop_loss"`
+	TrailingStopLossType *ValueType     `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
+	ExitType             *string        `json:"exit_type,omitempty" db:"exit_type"`
+	Capital              float64        `json:"capital" db:"capital"`
+	MaxTrades            *int           `json:"max_trades,omitempty" db:"max_trades"`
+	EntryStartTime       *time.Time     `json:"entry_start_time,omitempty" db:"entry_start_time"`
+	EntryEndTime         *time.Time     `json:"entry_end_time,omitempty" db:"entry_end_time"`
+	StartDate            *time.Time     `json:"start_date,omitempty" db:"start_date"`
+	EndDate              *time.Time     `json:"end_date,omitempty" db:"end_date"`
+	CreatedAt            time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at" db:"updated_at"`
+	IsActive             bool           `json:"is_active" db:"is_active"`
 }
 
 // NewStrategy creates a new strategy with the given parameters

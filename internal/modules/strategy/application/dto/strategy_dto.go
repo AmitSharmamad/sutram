@@ -90,102 +90,102 @@ var (
 
 // CreateStrategyRequest represents the request to create a new strategy
 type CreateStrategyRequest struct {
-	Name                 string               `json:"name" validate:"required,min=3,max=100"`
-	Description          string               `json:"description" validate:"max=500"`
-	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH"`
-	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0"`
-	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO"`
-	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W"`
-	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS"`
-	Qty                  int                  `json:"qty" validate:"required,gt=0"`
-	EntryExpression      string               `json:"entry_expression" validate:"required"`
-	ExitExpression       string               `json:"exit_expression"`
-	TargetProfit         *float64             `json:"target_profit" validate:"required,gte=0"`
-	TargetProfitType     *model.ValueType     `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE"`
-	StopLoss             *float64             `json:"stop_loss" validate:"required,gte=0"`
-	StopLossType         *model.ValueType     `json:"stop_loss_type" validate:"required,oneof=ABSOLUTE PERCENTAGE"`
-	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0"`
-	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE"`
-	ExitType             *string              `json:"exit_type"`
-	Capital              *float64             `json:"capital" validate:"required,gt=0"`
-	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0"`
-	EntryStartTime       *time.Time           `json:"entry_start_time"`
-	EntryEndTime         *time.Time           `json:"entry_end_time"`
-	StartDate            *time.Time           `json:"start_date"`
-	EndDate              *time.Time           `json:"end_date"`
+	Name                 string               `json:"name" validate:"required,min=3,max=100" db:"name"`
+	Description          string               `json:"description" validate:"max=500" db:"description"`
+	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
+	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
+	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
+	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W" db:"chart_timeframe"`
+	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS" db:"trade_type"`
+	Qty                  int                  `json:"qty" validate:"required,gt=0" db:"qty"`
+	EntryExpression      string               `json:"entry_expression" validate:"required" db:"entry_expression"`
+	ExitExpression       string               `json:"exit_expression" db:"exit_expression"`
+	TargetProfit         *float64             `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
+	TargetProfitType     *model.ValueType     `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"target_profit_type"`
+	StopLoss             *float64             `json:"stop_loss" validate:"required,gte=0" db:"stop_loss"`
+	StopLossType         *model.ValueType     `json:"stop_loss_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"stop_loss_type"`
+	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
+	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
+	ExitType             *string              `json:"exit_type" db:"exit_type"`
+	Capital              *float64             `json:"capital" validate:"required,gt=0" db:"capital"`
+	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
+	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
+	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
+	StartDate            *time.Time           `json:"start_date" db:"start_date"`
+	EndDate              *time.Time           `json:"end_date" db:"end_date"`
 }
 
 // UpdateStrategyRequest represents the request to update an existing strategy
 type UpdateStrategyRequest struct {
-	ID                   uuid.UUID            `json:"id" validate:"required"`
-	Name                 string               `json:"name" validate:"required,min=3,max=100"`
-	Description          string               `json:"description" validate:"max=500"`
-	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH"`
-	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0"`
-	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO"`
-	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W"`
-	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS"`
-	Qty                  int                  `json:"qty" validate:"required,gt=0"`
-	EntryExpression      string               `json:"entry_expression" validate:"required"`
-	ExitExpression       string               `json:"exit_expression"`
-	TargetProfit         *float64             `json:"target_profit" validate:"required,gte=0"`
-	TargetProfitType     *model.ValueType     `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE"`
-	StopLoss             *float64             `json:"stop_loss" validate:"required,gte=0"`
-	StopLossType         *model.ValueType     `json:"stop_loss_type" validate:"required,oneof=ABSOLUTE PERCENTAGE"`
-	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0"`
-	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE"`
-	ExitType             *string              `json:"exit_type"`
-	Capital              *float64             `json:"capital" validate:"required,gt=0"`
-	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0"`
-	EntryStartTime       *time.Time           `json:"entry_start_time"`
-	EntryEndTime         *time.Time           `json:"entry_end_time"`
-	StartDate            *time.Time           `json:"start_date"`
-	EndDate              *time.Time           `json:"end_date"`
+	ID                   uuid.UUID            `json:"id" validate:"required" db:"id"`
+	Name                 string               `json:"name" validate:"required,min=3,max=100" db:"name"`
+	Description          string               `json:"description" validate:"max=500" db:"description"`
+	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
+	Instruments          []int                `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
+	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
+	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1M 5M 15M 30M 1H 4H 1D 1W" db:"chart_timeframe"`
+	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MARKET LIMIT STOP_LOSS" db:"trade_type"`
+	Qty                  int                  `json:"qty" validate:"required,gt=0" db:"qty"`
+	EntryExpression      string               `json:"entry_expression" validate:"required" db:"entry_expression"`
+	ExitExpression       string               `json:"exit_expression" db:"exit_expression"`
+	TargetProfit         *float64             `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
+	TargetProfitType     *model.ValueType     `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"target_profit_type"`
+	StopLoss             *float64             `json:"stop_loss" validate:"required,gte=0" db:"stop_loss"`
+	StopLossType         *model.ValueType     `json:"stop_loss_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"stop_loss_type"`
+	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
+	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
+	ExitType             *string              `json:"exit_type" db:"exit_type"`
+	Capital              *float64             `json:"capital" validate:"required,gt=0" db:"capital"`
+	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
+	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
+	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
+	StartDate            *time.Time           `json:"start_date" db:"start_date"`
+	EndDate              *time.Time           `json:"end_date" db:"end_date"`
 }
 
 // StrategyResponse represents the response for a strategy
 type StrategyResponse struct {
-	ID                   uuid.UUID            `json:"id"`
-	UserID               uuid.UUID            `json:"user_id"`
-	Name                 string               `json:"name"`
-	Description          string               `json:"description"`
-	PositionType         model.Direction      `json:"position_type"`
-	Instruments          []int                `json:"instruments"`
-	ChartType            model.ChartType      `json:"chart_type"`
-	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe"`
-	TradeType            model.TradeType      `json:"trade_type"`
-	Qty                  int                  `json:"qty"`
-	EntryExpression      string               `json:"entry_expression"`
-	ExitExpression       string               `json:"exit_expression"`
-	TargetProfit         float64              `json:"target_profit,omitempty"`
-	TargetProfitType     model.ValueType      `json:"target_profit_type,omitempty"`
-	StopLoss             float64              `json:"stop_loss,omitempty"`
-	StopLossType         model.ValueType      `json:"stop_loss_type,omitempty"`
-	TrailingStopLoss     float64              `json:"trailing_stop_loss,omitempty"`
-	TrailingStopLossType model.ValueType      `json:"trailing_stop_loss_type,omitempty"`
-	ExitType             string               `json:"exit_type,omitempty"`
-	Capital              float64              `json:"capital,omitempty"`
-	MaxTrades            int                  `json:"max_trades,omitempty"`
-	EntryStartTime       *time.Time           `json:"entry_start_time,omitempty"`
-	EntryEndTime         *time.Time           `json:"entry_end_time,omitempty"`
-	StartDate            *time.Time           `json:"start_date,omitempty"`
-	EndDate              *time.Time           `json:"end_date,omitempty"`
-	CreatedAt            time.Time            `json:"created_at"`
-	UpdatedAt            time.Time            `json:"updated_at"`
-	IsActive             bool                 `json:"is_active"`
+	ID                   uuid.UUID            `json:"id" db:"id"`
+	UserID               uuid.UUID            `json:"user_id" db:"user_id"`
+	Name                 string               `json:"name" db:"name"`
+	Description          string               `json:"description" db:"description"`
+	PositionType         model.Direction      `json:"position_type" db:"position_type"`
+	Instruments          []int                `json:"instruments" db:"instruments"`
+	ChartType            model.ChartType      `json:"chart_type" db:"chart_type"`
+	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
+	TradeType            model.TradeType      `json:"trade_type" db:"trade_type"`
+	Qty                  int                  `json:"qty" db:"qty"`
+	EntryExpression      string               `json:"entry_expression" db:"entry_expression"`
+	ExitExpression       string               `json:"exit_expression" db:"exit_expression"`
+	TargetProfit         float64              `json:"target_profit,omitempty" db:"target_profit"`
+	TargetProfitType     model.ValueType      `json:"target_profit_type,omitempty" db:"target_profit_type"`
+	StopLoss             float64              `json:"stop_loss,omitempty" db:"stop_loss"`
+	StopLossType         model.ValueType      `json:"stop_loss_type,omitempty" db:"stop_loss_type"`
+	TrailingStopLoss     float64              `json:"trailing_stop_loss,omitempty" db:"trailing_stop_loss"`
+	TrailingStopLossType model.ValueType      `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
+	ExitType             string               `json:"exit_type,omitempty" db:"exit_type"`
+	Capital              float64              `json:"capital,omitempty" db:"capital"`
+	MaxTrades            int                  `json:"max_trades,omitempty" db:"max_trades"`
+	EntryStartTime       *time.Time           `json:"entry_start_time,omitempty" db:"entry_start_time"`
+	EntryEndTime         *time.Time           `json:"entry_end_time,omitempty" db:"entry_end_time"`
+	StartDate            *time.Time           `json:"start_date,omitempty" db:"start_date"`
+	EndDate              *time.Time           `json:"end_date,omitempty" db:"end_date"`
+	CreatedAt            time.Time            `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time            `json:"updated_at" db:"updated_at"`
+	IsActive             bool                 `json:"is_active" db:"is_active"`
 }
 
 // StrategyFilter represents filters for searching strategies
 type StrategyFilter struct {
-	UserID         *uuid.UUID            `json:"user_id"`
-	Name           *string               `json:"name"`
-	PositionType   *model.Direction      `json:"position_type"`
-	Instrument     *int                  `json:"instrument"`
-	ChartType      *model.ChartType      `json:"chart_type"`
-	ChartTimeframe *model.ChartTimeframe `json:"chart_timeframe"`
-	IsActive       *bool                 `json:"is_active"`
-	CreatedAfter   *time.Time            `json:"created_after"`
-	CreatedBefore  *time.Time            `json:"created_before"`
+	UserID         *uuid.UUID            `json:"user_id" db:"user_id"`
+	Name           *string               `json:"name" db:"name"`
+	PositionType   *model.Direction      `json:"position_type" db:"position_type"`
+	Instrument     *int                  `json:"instrument" db:"instrument"`
+	ChartType      *model.ChartType      `json:"chart_type" db:"chart_type"`
+	ChartTimeframe *model.ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
+	IsActive       *bool                 `json:"is_active" db:"is_active"`
+	CreatedAfter   *time.Time            `json:"created_after" db:"created_after"`
+	CreatedBefore  *time.Time            `json:"created_before" db:"created_before"`
 }
 
 // FromDomain converts a domain model to a response DTO
