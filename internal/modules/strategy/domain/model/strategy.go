@@ -1,0 +1,195 @@
+package model
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Position type enum (direction)
+type Direction string
+
+const (
+	Long  Direction = "LONG"
+	Short Direction = "SHORT"
+	Both  Direction = "BOTH"
+)
+
+// Chart type enum
+type ChartType string
+
+const (
+	Candlestick ChartType = "CANDLESTICK"
+	Heikinashi  ChartType = "HEIKINASHI"
+	Renko       ChartType = "RENKO"
+)
+
+// Chart timeframe enum
+type ChartTimeframe string
+
+const (
+	OneMinute      ChartTimeframe = "1M"
+	FiveMinutes    ChartTimeframe = "5M"
+	FifteenMinutes ChartTimeframe = "15M"
+	ThirtyMinutes  ChartTimeframe = "30M"
+	OneHour        ChartTimeframe = "1H"
+	FourHours      ChartTimeframe = "4H"
+	OneDay         ChartTimeframe = "1D"
+	OneWeek        ChartTimeframe = "1W"
+)
+
+// Trade type enum
+type TradeType string
+
+const (
+	Market   TradeType = "MARKET"
+	Limit    TradeType = "LIMIT"
+	StopLoss TradeType = "STOP_LOSS"
+)
+
+// Value type enum
+type ValueType string
+
+const (
+	Absolute   ValueType = "ABSOLUTE"
+	Percentage ValueType = "PERCENTAGE"
+)
+
+// Strategy represents a trading strategy with entry/exit conditions and risk parameters
+type Strategy struct {
+	ID                   uuid.UUID      `json:"id"`
+	UserID               uuid.UUID      `json:"user_id"`
+	Name                 string         `json:"name"`
+	Description          string         `json:"description"`
+	PositionType         Direction      `json:"position_type"`
+	Instruments          []int          `json:"instruments"`
+	ChartType            ChartType      `json:"chart_type"`
+	ChartTimeframe       ChartTimeframe `json:"chart_timeframe"`
+	TradeType            TradeType      `json:"trade_type"`
+	Qty                  int            `json:"qty"`
+	EntryExpression      string         `json:"entry_expression"`
+	ExitExpression       string         `json:"exit_expression,omitempty"`
+	TargetProfit         float64        `json:"target_profit"`
+	TargetProfitType     ValueType      `json:"target_profit_type"`
+	StopLoss             float64        `json:"stop_loss"`
+	StopLossType         ValueType      `json:"stop_loss_type"`
+	TrailingStopLoss     *float64       `json:"trailing_stop_loss,omitempty"`
+	TrailingStopLossType *ValueType     `json:"trailing_stop_loss_type,omitempty"`
+	ExitType             *string        `json:"exit_type,omitempty"`
+	Capital              float64        `json:"capital"`
+	MaxTrades            *int           `json:"max_trades,omitempty"`
+	EntryStartTime       *time.Time     `json:"entry_start_time,omitempty"`
+	EntryEndTime         *time.Time     `json:"entry_end_time,omitempty"`
+	StartDate            *time.Time     `json:"start_date,omitempty"`
+	EndDate              *time.Time     `json:"end_date,omitempty"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	IsActive             bool           `json:"is_active"`
+}
+
+// NewStrategy creates a new strategy with the given parameters
+func NewStrategy(
+	userID uuid.UUID,
+	name string,
+	description string,
+	positionType Direction,
+	instruments []int,
+	chartType ChartType,
+	chartTimeframe ChartTimeframe,
+	tradeType TradeType,
+	qty int,
+	entryExpression string,
+	exitExpression string,
+	targetProfit float64,
+	targetProfitType ValueType,
+	stopLoss float64,
+	stopLossType ValueType,
+	capital float64,
+) *Strategy {
+	return &Strategy{
+		ID:               uuid.New(),
+		UserID:           userID,
+		Name:             name,
+		Description:      description,
+		PositionType:     positionType,
+		Instruments:      instruments,
+		ChartType:        chartType,
+		ChartTimeframe:   chartTimeframe,
+		TradeType:        tradeType,
+		Qty:              qty,
+		EntryExpression:  entryExpression,
+		ExitExpression:   exitExpression,
+		TargetProfit:     targetProfit,
+		TargetProfitType: targetProfitType,
+		StopLoss:         stopLoss,
+		StopLossType:     stopLossType,
+		Capital:          capital,
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+		IsActive:         true,
+	}
+}
+
+// Update updates the strategy fields
+func (s *Strategy) Update(
+	name string,
+	description string,
+	positionType Direction,
+	instruments []int,
+	chartType ChartType,
+	chartTimeframe ChartTimeframe,
+	tradeType TradeType,
+	qty int,
+	entryExpression string,
+	exitExpression string,
+	targetProfit float64,
+	targetProfitType ValueType,
+	stopLoss float64,
+	stopLossType ValueType,
+	trailingStopLoss *float64,
+	trailingStopLossType *ValueType,
+	exitType *string,
+	capital float64,
+	maxTrades *int,
+	entryStartTime *time.Time,
+	entryEndTime *time.Time,
+	startDate *time.Time,
+	endDate *time.Time,
+) {
+	s.Name = name
+	s.Description = description
+	s.PositionType = positionType
+	s.Instruments = instruments
+	s.ChartType = chartType
+	s.ChartTimeframe = chartTimeframe
+	s.TradeType = tradeType
+	s.Qty = qty
+	s.EntryExpression = entryExpression
+	s.ExitExpression = exitExpression
+	s.TargetProfit = targetProfit
+	s.TargetProfitType = targetProfitType
+	s.StopLoss = stopLoss
+	s.StopLossType = stopLossType
+	s.TrailingStopLoss = trailingStopLoss
+	s.TrailingStopLossType = trailingStopLossType
+	s.ExitType = exitType
+	s.Capital = capital
+	s.MaxTrades = maxTrades
+	s.EntryStartTime = entryStartTime
+	s.EntryEndTime = entryEndTime
+	s.StartDate = startDate
+	s.EndDate = endDate
+	s.UpdatedAt = time.Now()
+}
+
+// Activate activates the strategy
+func (s *Strategy) Activate() {
+	s.IsActive = true
+	s.UpdatedAt = time.Now()
+}
+
+// Deactivate deactivates the strategy
+func (s *Strategy) Deactivate() {
+	s.IsActive = false
+	s.UpdatedAt = time.Now()
+}
