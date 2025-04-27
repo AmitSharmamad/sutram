@@ -81,6 +81,23 @@ type GetInstrumentsByTimeRangeRequest struct {
 	EndTime   time.Time `json:"end_time" binding:"required"`
 }
 
+// InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters
+type InstrumentMasterFilterDTO struct {
+	Exchange string `form:"exchange"`
+	Segment  string `form:"segment"`
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=10"`
+}
+
+// PaginatedResponse represents a paginated API response
+type PaginatedResponse struct {
+	Data       interface{} `json:"data"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"pageSize"`
+	TotalCount int         `json:"totalCount"`
+	TotalPages int         `json:"totalPages"`
+}
+
 // ApiResponse represents a standard API response structure
 type ApiResponse struct {
 	Success bool        `json:"success"`
