@@ -1,4 +1,4 @@
-Use the below libraries to build the project
+## Use the below libraries to build the project
 
 ```
 github.com/ClickHouse/clickhouse-go/v2 v2.30.1
@@ -14,3 +14,8 @@ github.com/joho/godotenv v1.5.1
 github.com/lib/pq v1.10.9
 github.com/xeipuuv/gojsonschema v1.2.0
 ```
+
+## No Code Duplication
+1. Do not create the same interface or struct twice.
+2. For Example, if backtesting module needs StockService, do not create it inhouse. Instead, import it from Stock Module.
+3. Before creating a interface or struct, check if it already exists
