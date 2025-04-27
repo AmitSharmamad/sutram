@@ -29,14 +29,12 @@ const (
 type ChartTimeframe string
 
 const (
-	OneMinute      ChartTimeframe = "1M"
-	FiveMinutes    ChartTimeframe = "5M"
-	FifteenMinutes ChartTimeframe = "15M"
-	ThirtyMinutes  ChartTimeframe = "30M"
-	OneHour        ChartTimeframe = "1H"
-	FourHours      ChartTimeframe = "4H"
-	OneDay         ChartTimeframe = "1D"
-	OneWeek        ChartTimeframe = "1W"
+	OneMinute      ChartTimeframe = "1m"
+	ThreeMinutes   ChartTimeframe = "3m"
+	FiveMinutes    ChartTimeframe = "5m"
+	FifteenMinutes ChartTimeframe = "15m"
+	OneHour        ChartTimeframe = "1h"
+	OneDay         ChartTimeframe = "1d"
 )
 
 // Trade type enum
