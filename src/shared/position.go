@@ -132,43 +132,6 @@ func (position *Position) CalculateTargetProfitPrice(targetProfit float64, targe
 	return targetProfitPrice
 }
 
-func (position *Position) CalculateTrailingStopLossPrice(
-	currentClose float64,
-	trailingStopLoss *float64,
-	trailingStopLossType ValueType,
-) float64 {
-	var trailingStopLossPrice float64
-
-	if position.Direction == LONG {
-		f := util.Max(*position.HighestPrice, currentClose)
-		position.HighestPrice = &f
-
-		if trailingStopLossType == ABSOLUTE {
-			trailingStopLossPrice = *position.HighestPrice - *trailingStopLoss
-		} else if trailingStopLossType == PERCENTAGE {
-			trailingStopLossPrice = *position.HighestPrice * (1 - (*trailingStopLoss / 100))
-		} else {
-			panic("Invalid TrailingStopLossType")
-		}
-
-	} else if position.Direction == SHORT {
-		f := util.Min(*position.LowestPrice, currentClose)
-		position.LowestPrice = &f
-
-		if trailingStopLossType == ABSOLUTE {
-			trailingStopLossPrice = *position.LowestPrice + *trailingStopLoss
-		} else if trailingStopLossType == PERCENTAGE {
-			trailingStopLossPrice = *position.LowestPrice * (1 + (*trailingStopLoss / 100))
-		} else {
-			panic("Invalid TrailingStopLossType")
-		}
-	} else {
-		panic("Invalid PositionType")
-	}
-
-	return trailingStopLossPrice
-}
-
 func (position *Position) CheckForExit(
 	currentClose float64,
 	stopLossPrice float64,
@@ -250,7 +213,8 @@ func (position *Position) UpdateOnExitOrder(
 	)
 
 	// Calculate Entry Fees and Exit Fees
-	var fees float64 = 20.0 // Assuming fixed entry fees for now (can be updated later)
+	// TODO: Fix this
+	var fees float64 = 0 // Assuming fixed entry fees for now (can be updated later)
 	position.EntryFees = &fees
 	position.ExitFees = &fees
 

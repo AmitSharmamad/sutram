@@ -144,7 +144,8 @@ func (l *Lexer) readIdentifier() Token {
 	value := l.input[position:l.position]
 
 	// Check for logical operators
-	if strings.ToUpper(value) == "AND" || strings.ToUpper(value) == "OR" || strings.ToUpper(value) == "NOT" {
+	if strings.ToUpper(value) == "AND" || strings.ToUpper(value) == "OR" || strings.ToUpper(value) == "NOT" ||
+		strings.ToUpper(value) == "CROSSESABOVE" || strings.ToUpper(value) == "CROSSESBELOW" {
 		return Token{Type: OPERATOR, Value: strings.ToUpper(value)}
 	}
 
@@ -208,7 +209,7 @@ func (n *VariableNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 
 // GetName returns the name of the variable
 func (n *VariableNode) GetName() string {
-    return n.Name
+	return n.Name
 }
 
 // BinaryOpNode represents a binary operation
@@ -259,10 +260,52 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 			return 1, nil
 		}
 		return 0, nil
+	case "CROSSESABOVE":
+		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
+		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		if (left > right) && (prevLeft <= prevRight) {
+			return 1, nil
+		}
+
+		return 0, nil
 	case "<":
 		if left < right {
 			return 1, nil
 		}
+		return 0, nil
+	case "CROSSESBELOW":
+		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
+		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
+
+		if err != nil {
+			// TODO: handle err
+			return 0, nil
+		}
+
+		if (left < right) && (prevLeft >= prevRight) {
+			return 1, nil
+		}
+
 		return 0, nil
 	case ">=":
 		if left >= right {
@@ -352,16 +395,15 @@ func (n *FunctionCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.Name, strings.Join(args, ", "))
 }
 
-
 // EMA(close, 50, 0)
 
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	args := make([]any, len(n.Arguments))
 	for i, arg := range n.Arguments {
-        if varNode, isVariable := arg.(*VariableNode); isVariable {
-            args[i] = varNode.Name
-            continue
-        }
+		if varNode, isVariable := arg.(*VariableNode); isVariable {
+			args[i] = varNode.Name
+			continue
+		}
 
 		value, err := arg.Evaluate(ctx)
 		if err != nil {
@@ -443,7 +485,8 @@ func (p *Parser) parseComparison() (Node, error) {
 	if p.currentToken.Type == OPERATOR &&
 		(p.currentToken.Value == ">" || p.currentToken.Value == "<" ||
 			p.currentToken.Value == ">=" || p.currentToken.Value == "<=" ||
-			p.currentToken.Value == "==" || p.currentToken.Value == "!=") {
+			p.currentToken.Value == "==" || p.currentToken.Value == "!=" ||
+			p.currentToken.Value == "CROSSESABOVE" || p.currentToken.Value == "CROSSESBELOW") {
 		operator := p.currentToken.Value
 		p.nextToken()
 
