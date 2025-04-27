@@ -110,6 +110,7 @@ const (
 type StockGranularity string
 
 const (
+	StockGranularity1s  StockGranularity = "1s" // 1-second data granularity
 	StockGranularity1m  StockGranularity = "1m"
 	StockGranularity3m  StockGranularity = "3m"
 	StockGranularity5m  StockGranularity = "5m"

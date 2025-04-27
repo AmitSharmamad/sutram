@@ -46,15 +46,16 @@ func (repo *Repo) Get(
 	query := fmt.Sprintf(`
 		SELECT
 			CASE
-				WHEN '%s' = '1m' THEN toStartOfInterval(timestamp, INTERVAL 1 MINUTE)
-				WHEN '%s' = '3m' THEN toStartOfInterval(timestamp, INTERVAL 3 MINUTE)
-				WHEN '%s' = '5m' THEN toStartOfInterval(timestamp, INTERVAL 5 MINUTE)
-				WHEN '%s' = '15m' THEN toStartOfInterval(timestamp, INTERVAL 15 MINUTE)
-				WHEN '%s' = '30m' THEN toStartOfInterval(timestamp, INTERVAL 30 MINUTE)
-				WHEN '%s' = '1h' THEN toStartOfInterval(timestamp, INTERVAL 1 HOUR)
-				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
-				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
-				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
+				WHEN '%s' = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
+				WHEN '%s' = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
+				WHEN '%s' = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
+				WHEN '%s' = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
+				WHEN '%s' = '15m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 15 MINUTE)
+				WHEN '%s' = '30m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 30 MINUTE)
+				WHEN '%s' = '1h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 HOUR)
+				WHEN '%s' = '3h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 HOUR)
+				WHEN '%s' = '1d' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 DAY)
+				WHEN '%s' = '1M' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MONTH)
 			END AS timestamp,
 			MIN(low) AS low,
 			MAX(high) AS high,
@@ -65,13 +66,14 @@ func (repo *Repo) Get(
 			sutram.instrument
 		WHERE
 			id = %d
-			AND timestamp BETWEEN toDateTime64('%s', 6) AND toDateTime64('%s', 6)
+			AND toTimeZone(timestamp, 'Asia/Kolkata') BETWEEN toDateTime64('%s', 6, 'Asia/Kolkata') AND toDateTime64('%s', 6, 'Asia/Kolkata')
 		GROUP BY
 			id,
 			timestamp
 		ORDER BY
 			timestamp ASC;
 	`,
+		timeFrame,
 		timeFrame,
 		timeFrame,
 		timeFrame,
@@ -101,15 +103,16 @@ func (repo *Repo) GetLookBack(
 	query := fmt.Sprintf(`
 		SELECT
 			CASE
-				WHEN '%s' = '1m' THEN toStartOfInterval(timestamp, INTERVAL 1 MINUTE)
-				WHEN '%s' = '3m' THEN toStartOfInterval(timestamp, INTERVAL 3 MINUTE)
-				WHEN '%s' = '5m' THEN toStartOfInterval(timestamp, INTERVAL 5 MINUTE)
-				WHEN '%s' = '15m' THEN toStartOfInterval(timestamp, INTERVAL 15 MINUTE)
-				WHEN '%s' = '30m' THEN toStartOfInterval(timestamp, INTERVAL 30 MINUTE)
-				WHEN '%s' = '1h' THEN toStartOfInterval(timestamp, INTERVAL 1 HOUR)
-				WHEN '%s' = '3h' THEN toStartOfInterval(timestamp, INTERVAL 3 HOUR)
-				WHEN '%s' = '1d' THEN toStartOfInterval(timestamp, INTERVAL 1 DAY)
-				WHEN '%s' = '1M' THEN toStartOfInterval(timestamp, INTERVAL 1 MONTH)
+				WHEN '%s' = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
+				WHEN '%s' = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
+				WHEN '%s' = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
+				WHEN '%s' = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
+				WHEN '%s' = '15m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 15 MINUTE)
+				WHEN '%s' = '30m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 30 MINUTE)
+				WHEN '%s' = '1h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 HOUR)
+				WHEN '%s' = '3h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 HOUR)
+				WHEN '%s' = '1d' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 DAY)
+				WHEN '%s' = '1M' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MONTH)
 			END AS timestamp,
 			MIN(low) AS low,
 			MAX(high) AS high,
@@ -120,7 +123,7 @@ func (repo *Repo) GetLookBack(
 			sutram.instrument
 		WHERE
 			id = %d
-			AND timestamp < toDateTime64('%s', 6)
+			AND toTimeZone(timestamp, 'Asia/Kolkata') < toDateTime64('%s', 6, 'Asia/Kolkata')
 		GROUP BY
 			id,
 			timestamp
@@ -137,8 +140,9 @@ func (repo *Repo) GetLookBack(
 		timeFrame,
 		timeFrame,
 		timeFrame,
+		timeFrame,
 		id,
-		"2024-01-31 09:00:00",
+		startTime.Format("2006-01-02 15:04:05"),
 		lookback,
 	)
 
