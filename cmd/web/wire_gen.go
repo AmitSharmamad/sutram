@@ -7,6 +7,7 @@
 package main
 
 import (
+	"algo/internal/modules/instrument"
 	"algo/internal/modules/user"
 )
 
@@ -15,7 +16,8 @@ import (
 // InitializeApp sets up the application with all its dependencies
 func InitializeApp() (*App, error) {
 	module := user.New()
-	app := NewApp(module)
+	instrumentModule := instrument.New()
+	app := NewApp(module, instrumentModule)
 	return app, nil
 }
 
@@ -23,12 +25,14 @@ func InitializeApp() (*App, error) {
 
 // App represents the application container
 type App struct {
-	UserModule *user.Module
+	UserModule       *user.Module
+	InstrumentModule *instrument.Module
 }
 
 // NewApp creates a new application instance
-func NewApp(userModule *user.Module) *App {
+func NewApp(userModule *user.Module, instrumentModule *instrument.Module) *App {
 	return &App{
-		UserModule: userModule,
+		UserModule:       userModule,
+		InstrumentModule: instrumentModule,
 	}
 }

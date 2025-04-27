@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"algo/internal/modules/instrument"
 	"algo/internal/modules/user"
 
 	"github.com/gin-contrib/cors"
@@ -145,6 +146,10 @@ func initializeModules(router *gin.RouterGroup) {
 	// Initialize user module
 	userModule := user.New()
 	userModule.RegisterRoutes(router.Group("/users"))
+
+	// Initialize instrument module
+	instrumentModule := instrument.New()
+	instrumentModule.RegisterRoutes(router.Group("/instruments"))
 
 	// Additional modules will be initialized here
 }
