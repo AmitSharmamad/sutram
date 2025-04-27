@@ -2,6 +2,7 @@ package user
 
 import (
 	"database/sql"
+	"os"
 	"time"
 
 	"algo/internal/modules/user/application/service"
@@ -10,27 +11,69 @@ import (
 	"algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
+	_ "github.com/lib/pq"
 )
 
 // Module represents the user module
 type Module struct {
 	db         *sql.DB
 	jwtSecret  string
-	router     *gin.RouterGroup
 	controller *http.UserController
 }
 
-// NewModule creates a new user module
-func NewModule(db *sql.DB, jwtSecret string, router *gin.RouterGroup) *Module {
-	return &Module{
-		db:        db,
-		jwtSecret: jwtSecret,
-		router:    router,
+// ProvideModule provides a wire provider set for the user module
+var ProvideModule = wire.NewSet(
+	ProvideUserModule,
+)
+
+// ProvideDB provides a database connection
+func ProvideDB() (*sql.DB, error) {
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		connStr = "postgres://postgres:postgres@localhost:5432/sutram?sslmode=disable"
 	}
+	return sql.Open("postgres", connStr)
 }
 
-// Initialize sets up the user module
-func (m *Module) Initialize() {
+// ProvideJWTSecret provides the JWT secret key
+func ProvideJWTSecret() string {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "default-jwt-secret-for-development-only"
+	}
+	return secret
+}
+
+// ProvideUserModule provides a user module instance
+func ProvideUserModule() (*Module, error) {
+	return New(), nil
+}
+
+// New creates a new user module
+func New() *Module {
+	// Get database connection
+	db, err := ProvideDB()
+	if err != nil {
+		panic(err) // In a real app, handle this more gracefully
+	}
+
+	// Get JWT secret
+	jwtSecret := ProvideJWTSecret()
+
+	module := &Module{
+		db:        db,
+		jwtSecret: jwtSecret,
+	}
+
+	// Initialize module components
+	module.initialize()
+
+	return module
+}
+
+// initialize sets up the user module
+func (m *Module) initialize() {
 	// Create repositories
 	userRepo := postgres.NewUserRepository(m.db)
 	roleRepo := postgres.NewRoleRepository(m.db)
@@ -42,9 +85,11 @@ func (m *Module) Initialize() {
 
 	// Create controller
 	m.controller = http.NewUserController(authService, userService)
+}
 
-	// Register routes
-	http.RegisterRoutes(m.router, m.controller)
+// RegisterRoutes registers the user module routes with the given router
+func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
+	http.RegisterRoutes(router, m.controller)
 }
 
 // GetController returns the user controller
