@@ -15,6 +15,13 @@ github.com/lib/pq v1.10.9
 github.com/xeipuuv/gojsonschema v1.2.0
 ```
 
+## Import Rules
+1. Use algo/ as relative qualifier for imports
+2. Don't use absolute imports for project files
+
+## Struct Tags
+1. Add json and db tags with snake_case for all the relevant model structs
+
 ## No Code Duplication
 1. Do not create the same interface or struct twice.
 2. For Example, if backtesting module needs StockService, do not create it inhouse. Instead, import it from Stock Module.
