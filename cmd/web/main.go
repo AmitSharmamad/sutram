@@ -37,7 +37,7 @@ func main() {
 	setupMiddleware(router)
 
 	// Setup API routes
-	apiRouter := router.Group("/api")
+	apiRouter := router.Group("/")
 
 	// Initialize modules
 	initializeModules(apiRouter)
@@ -142,11 +142,11 @@ func loggingMiddleware() gin.HandlerFunc {
 func initializeModules(router *gin.RouterGroup) {
 	// Initialize user module
 	userModule := user.New()
-	userModule.RegisterRoutes(router.Group("/users"))
+	userModule.RegisterRoutes(router)
 
 	// Initialize instrument module
 	instrumentModule := instrument.New()
-	instrumentModule.RegisterRoutes(router.Group("/instruments"))
+	instrumentModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }

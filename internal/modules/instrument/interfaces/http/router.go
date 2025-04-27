@@ -7,7 +7,7 @@ import (
 // RegisterRoutes registers the instrument module routes
 func RegisterRoutes(router *gin.RouterGroup, controller *InstrumentController) {
 	// Instrument routes
-	instruments := router.Group("/instruments")
+	instruments := router.Group("/instrument")
 	{
 		instruments.GET("/:id", controller.GetInstrumentByID)
 		instruments.PUT("/:id", controller.UpdateInstrument)

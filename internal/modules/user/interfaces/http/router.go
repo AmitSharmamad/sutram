@@ -11,7 +11,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 	router.POST("/login", controller.Login)
 
 	// Authenticated routes
-	auth := router.Group("/")
+	auth := router.Group("/user")
 	auth.Use(AuthMiddleware(controller))
 	{
 		auth.POST("/refresh-token", controller.RefreshToken)
@@ -20,19 +20,19 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 		auth.POST("/change-password", controller.ChangePassword)
 
 		// Get user roles (can be own roles or admin access)
-		auth.GET("/users/:id/roles", controller.GetUserRoles)
+		auth.GET("/:id/roles", controller.GetUserRoles)
 	}
 
 	// Admin routes
 	admin := router.Group("/admin")
 	admin.Use(AdminMiddleware(controller))
 	{
-		admin.GET("/users/:id", controller.GetUserByID)
-		admin.POST("/users/:id/roles", controller.AssignRole)
-		admin.DELETE("/users/:id/roles", controller.RemoveRole)
+		admin.GET("/:id", controller.GetUserByID)
+		admin.POST("/:id/roles", controller.AssignRole)
+		admin.DELETE("/:id/roles", controller.RemoveRole)
 		admin.GET("/roles", controller.GetAllRoles)
-		admin.PUT("/users/:id/activate", controller.ActivateUser)
-		admin.PUT("/users/:id/deactivate", controller.DeactivateUser)
+		admin.PUT("/:id/activate", controller.ActivateUser)
+		admin.PUT("/:id/deactivate", controller.DeactivateUser)
 	}
 }
 
