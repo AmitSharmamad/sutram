@@ -1,0 +1,70 @@
+package parser
+
+import (
+	util "algo/internal/util/math"
+)
+
+type EMA struct {
+	period int
+	offset int
+}
+
+func (indicator *EMA) SliceData(prices Prices) Prices {
+	start := len(prices) - indicator.offset - indicator.period
+	end := len(prices) - indicator.offset
+	return prices[start:end]
+}
+
+func (indicator *EMA) Calculate(
+	config []any,
+	ctx *EvaluationContext,
+) float64 {
+	point := config[0].(string)
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.period = period
+	indicator.offset = offset
+
+	prices := GetPrices(*ctx.Data, point)
+
+	if len(prices) < period+offset {
+		return 0.0
+	}
+
+	prices = indicator.SliceData(prices)
+
+	// Calculate multiplier
+	multiplier := 2.0 / float64(period+1)
+
+	// Calculate initial SMA
+	var sma float64
+	for i := 0; i < period; i++ {
+		sma += prices[i]
+	}
+	sma /= float64(period)
+
+	// Calculate EMA
+	ema := sma
+	for i := period; i < len(prices); i++ {
+		ema = (prices[i]-ema)*multiplier + ema
+	}
+
+	return util.Round(ema)
+}
+
+func (indicator *EMA) GetDataRange(config map[string]any) int32 {
+	if p, ok := config["period"].(float64); ok {
+		indicator.period = int(p)
+	} else {
+		indicator.period = 14 // default period
+	}
+
+	if p, ok := config["offset"].(float64); ok {
+		indicator.offset = int(p)
+	} else {
+		indicator.offset = 0
+	}
+
+	return int32(indicator.period + indicator.offset)
+}
