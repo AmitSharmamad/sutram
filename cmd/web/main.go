@@ -45,7 +45,7 @@ func main() {
 	initializeModules(apiRouter)
 
 	// Get port from environment or use default
-	port := getEnv("PORT", "8080")
+	port := getEnv("PORT", "9090")
 	serverAddr := fmt.Sprintf(":%s", port)
 
 	// Create a server with graceful shutdown
@@ -142,7 +142,7 @@ func loggingMiddleware() gin.HandlerFunc {
 
 // initializeModules initializes and connects all application modules
 func initializeModules(router *gin.RouterGroup) {
-	// Initialize user module
+	// Initialize user module first as other modules depend on its controllers for auth
 	userModule := user.New()
 	userModule.RegisterRoutes(router)
 
@@ -152,6 +152,9 @@ func initializeModules(router *gin.RouterGroup) {
 
 	// Initialize strategy module
 	strategyModule := strategy.New()
+	// Set user controller to enable auth middleware for all strategy endpoints
+	// This ensures that all strategy endpoints are protected by authentication
+	strategyModule.SetUserController(userModule.GetController())
 	strategyModule.RegisterRoutes(router)
 
 	// Initialize backtest module

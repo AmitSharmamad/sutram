@@ -8,6 +8,7 @@ import (
 	"algo/internal/modules/strategy/domain/repository"
 	"algo/internal/modules/strategy/infrastructure/persistence/postgres"
 	strategyHttp "algo/internal/modules/strategy/interfaces/http"
+	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -15,8 +16,9 @@ import (
 
 // Module represents the strategy module
 type Module struct {
-	db         *sql.DB
-	controller *strategyHttp.StrategyHandler
+	db             *sql.DB
+	controller     *strategyHttp.StrategyHandler
+	userController *userHttp.UserController
 }
 
 // ProvideModule provides a wire provider set for the strategy module
@@ -61,7 +63,12 @@ func (m *Module) initialize() {
 
 // RegisterRoutes registers the strategy module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
-	m.controller.RegisterRoutes(router)
+	m.controller.RegisterRoutes(router, m.userController)
+}
+
+// SetUserController sets the user controller instance
+func (m *Module) SetUserController(userController *userHttp.UserController) {
+	m.userController = userController
 }
 
 // GetController returns the strategy controller
