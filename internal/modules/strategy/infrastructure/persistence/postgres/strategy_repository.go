@@ -104,7 +104,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 	`
 
 	var strategy model.Strategy
-	var instruments []int
+	var instruments pq.Int32Array
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&strategy.ID,
@@ -174,7 +174,7 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 
 	for rows.Next() {
 		var strategy model.Strategy
-		var instruments []int
+		var instruments pq.Int32Array
 
 		err := rows.Scan(
 			&strategy.ID,
@@ -390,7 +390,7 @@ func (r *StrategyRepository) GetActiveStrategies(ctx context.Context) ([]*model.
 
 	for rows.Next() {
 		var strategy model.Strategy
-		var instruments []int
+		var instruments pq.Int32Array
 
 		err := rows.Scan(
 			&strategy.ID,
@@ -463,7 +463,7 @@ func (r *StrategyRepository) GetActiveStrategiesByUserID(ctx context.Context, us
 
 	for rows.Next() {
 		var strategy model.Strategy
-		var instruments []int
+		var instruments pq.Int32Array
 
 		err := rows.Scan(
 			&strategy.ID,
@@ -592,7 +592,7 @@ func (r *StrategyRepository) SearchStrategies(ctx context.Context, filters map[s
 
 	for rows.Next() {
 		var strategy model.Strategy
-		var instruments []int
+		var instruments pq.Int32Array
 
 		err := rows.Scan(
 			&strategy.ID,
