@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
@@ -222,4 +223,68 @@ func (r *InstrumentMasterRepository) Delete(ctx context.Context, id uint64) erro
 	}
 
 	return nil
+}
+
+// FindWithFilters returns instrument masters with filtering and pagination
+func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchange, segment string, offset, limit int) ([]*model.InstrumentMaster, int, error) {
+	// Build the WHERE clause based on filters
+	var whereConditions []string
+	var args []interface{}
+
+	if exchange != "" {
+		whereConditions = append(whereConditions, "exchange = ?")
+		args = append(args, exchange)
+	}
+
+	if segment != "" {
+		whereConditions = append(whereConditions, "segment = ?")
+		args = append(args, segment)
+	}
+
+	// Build the full WHERE clause
+	whereClause := ""
+	if len(whereConditions) > 0 {
+		whereClause = "WHERE " + strings.Join(whereConditions, " AND ")
+	}
+
+	// Query to get filtered and paginated data
+	query := fmt.Sprintf(`
+		SELECT 
+			id, 
+			exchange, 
+			segment, 
+			symbol, 
+			instrument, 
+			start_date, 
+			expiry
+		FROM instrument_master
+		%s
+		LIMIT ? OFFSET ?
+	`, whereClause)
+
+	// Add limit and offset to the arguments
+	args = append(args, limit, offset)
+
+	// Execute the query
+	var instrumentMasters []*model.InstrumentMaster
+	err := r.db.SelectContext(ctx, &instrumentMasters, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error querying instrument masters with filters: %w", err)
+	}
+
+	// Count query to get total records matching the filter
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM instrument_master
+		%s
+	`, whereClause)
+
+	// Execute the count query
+	var totalCount int
+	err = r.db.GetContext(ctx, &totalCount, countQuery, args[:len(args)-2]...) // Exclude limit and offset from count query
+	if err != nil {
+		return nil, 0, fmt.Errorf("error counting instrument masters with filters: %w", err)
+	}
+
+	return instrumentMasters, totalCount, nil
 }
