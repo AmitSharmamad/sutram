@@ -27,7 +27,7 @@ This document provides detailed guidelines for the three main application types 
    - Error handling middleware
 
 3. **API Versioning**:
-   - Use URL path versioning (e.g., `/api/v1/stock`)
+   - Use URL path versioning (e.g., `/api/stock`)
    - Each version should have its own router group
    - Maintain backward compatibility
 
