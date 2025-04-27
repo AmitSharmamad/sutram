@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"algo/internal/modules/instrument"
+	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
 
 	"github.com/gin-contrib/cors"
@@ -147,6 +148,10 @@ func initializeModules(router *gin.RouterGroup) {
 	// Initialize instrument module
 	instrumentModule := instrument.New()
 	instrumentModule.RegisterRoutes(router)
+
+	// Initialize strategy module
+	strategyModule := strategy.New()
+	strategyModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }
