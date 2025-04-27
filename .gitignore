@@ -140,3 +140,5 @@ data/historical
 db/db
 
 bin/web-server
+
+web
