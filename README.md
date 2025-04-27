@@ -41,15 +41,15 @@ The application will be available at http://localhost:8080.
 
 ### User Module
 
-- **POST /api/v1/users/register**: Register a new user
+- **POST /api/users/register**: Register a new user
   - Request: `{ "name": "...", "username": "...", "email": "...", "password": "..." }`
   - Response: `{ "success": true, "message": "User registered successfully", "data": { "token": "...", "user": {...}, "expires_at": 123456789 } }`
 
-- **POST /api/v1/users/login**: Login a user
+- **POST /api/users/login**: Login a user
   - Request: `{ "email": "...", "password": "..." }`
   - Response: `{ "success": true, "message": "Login successful", "data": { "token": "...", "user": {...}, "expires_at": 123456789 } }`
 
-- **GET /api/v1/users/profile**: Get user profile (requires authentication)
+- **GET /api/users/profile**: Get user profile (requires authentication)
   - Response: `{ "success": true, "data": {...} }`
 
 ## Development

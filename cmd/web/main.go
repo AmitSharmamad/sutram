@@ -39,11 +39,8 @@ func main() {
 	// Setup API routes
 	apiRouter := router.Group("/api")
 
-	// Initialize the v1 API router
-	v1Router := apiRouter.Group("/v1")
-
 	// Initialize modules
-	initializeModules(v1Router)
+	initializeModules(apiRouter)
 
 	// Get port from environment or use default
 	port := getEnv("PORT", "8080")
