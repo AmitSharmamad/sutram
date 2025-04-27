@@ -152,10 +152,35 @@ func (c *InstrumentController) GetInstrumentsByTimeRange(ctx *gin.Context) {
 	})
 }
 
-// GetAllInstrumentMasters gets all instrument masters
+// GetAllInstrumentMasters gets all instrument masters with filtering and pagination
 func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
-	// Get all instrument masters
-	instrumentMasters, err := c.instrumentService.GetAllInstrumentMasters(ctx.Request.Context())
+	// Parse query parameters for filtering and pagination
+	var filter dto.InstrumentMasterFilterDTO
+	if err := ctx.ShouldBindQuery(&filter); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid query parameters: " + err.Error(),
+		})
+		return
+	}
+
+	// Set default values if not provided
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PageSize < 1 {
+		filter.PageSize = 10
+	}
+
+	// Get instrument masters with filters
+	instrumentMasters, totalCount, err := c.instrumentService.GetInstrumentMastersWithFilters(
+		ctx.Request.Context(),
+		filter.Exchange,
+		filter.Segment,
+		filter.Page,
+		filter.PageSize,
+	)
+
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
 			Success: false,
@@ -170,9 +195,24 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 		instrumentMasterDTOs[i] = masterModelToDTO(instrumentMaster)
 	}
 
+	// Calculate total pages
+	totalPages := totalCount / filter.PageSize
+	if totalCount%filter.PageSize > 0 {
+		totalPages++
+	}
+
+	// Create paginated response
+	paginatedResponse := dto.PaginatedResponse{
+		Data:       instrumentMasterDTOs,
+		Page:       filter.Page,
+		PageSize:   filter.PageSize,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+	}
+
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
-		Data:    instrumentMasterDTOs,
+		Data:    paginatedResponse,
 	})
 }
 

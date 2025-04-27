@@ -18,7 +18,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *InstrumentController) {
 	}
 
 	// Instrument master routes
-	masters := router.Group("/instrument-masters")
+	masters := router.Group("/instrument-master")
 	{
 		masters.GET("", controller.GetAllInstrumentMasters)
 		masters.GET("/:id", controller.GetInstrumentMasterByID)
