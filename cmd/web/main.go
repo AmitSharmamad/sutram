@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"algo/internal/modules/backtest"
 	"algo/internal/modules/instrument"
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
@@ -152,6 +153,10 @@ func initializeModules(router *gin.RouterGroup) {
 	// Initialize strategy module
 	strategyModule := strategy.New()
 	strategyModule.RegisterRoutes(router)
+
+	// Initialize backtest module
+	backtestModule := backtest.New()
+	backtestModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }
