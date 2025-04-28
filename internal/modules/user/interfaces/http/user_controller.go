@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"algo/internal/modules/user/application/dto"
 	"algo/internal/modules/user/application/service"
@@ -57,6 +58,9 @@ func (c *UserController) Register(ctx *gin.Context) {
 	// Convert user model to DTO
 	userDTO := modelToDTO(authResp.User)
 
+	// Set JWT token as a cookie
+	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
+
 	// Create response
 	response := dto.AuthResponse{
 		Token:     authResp.Token,
@@ -99,6 +103,9 @@ func (c *UserController) Login(ctx *gin.Context) {
 	// Convert user model to DTO
 	userDTO := modelToDTO(authResp.User)
 
+	// Set JWT token as a cookie
+	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
+
 	// Create response
 	response := dto.AuthResponse{
 		Token:     authResp.Token,
@@ -137,6 +144,9 @@ func (c *UserController) RefreshToken(ctx *gin.Context) {
 
 	// Convert user model to DTO
 	userDTO := modelToDTO(authResp.User)
+
+	// Set JWT token as a cookie
+	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
 	// Create response
 	response := dto.AuthResponse{
@@ -289,6 +299,9 @@ func (c *UserController) ChangePassword(ctx *gin.Context) {
 
 	// Convert user model to DTO
 	userDTO := modelToDTO(authResp.User)
+
+	// Set JWT token as a cookie
+	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
 	// Create response
 	response := dto.AuthResponse{
@@ -744,14 +757,51 @@ func (c *UserController) DeactivateUser(ctx *gin.Context) {
 	})
 }
 
-// ExtractToken extracts the JWT token from the Authorization header
+// CheckMe checks if the user is logged in by verifying the token cookie
+func (c *UserController) CheckMe(ctx *gin.Context) {
+	// Get the token from header or cookie
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Not logged in",
+		})
+		return
+	}
+
+	// Validate the token
+	_, err := c.authService.ValidateToken(ctx.Request.Context(), tokenString)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid session: " + err.Error(),
+		})
+		return
+	}
+
+	// If token is valid, return success
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Message: "User is logged in",
+	})
+}
+
+// ExtractToken extracts the JWT token from the Authorization header or cookie
 // Returns the token without the "Bearer " prefix or empty string if not found
 // This function is exported so it can be used by other modules
 func ExtractToken(ctx *gin.Context) string {
+	// First, try to get token from Authorization header
 	bearerToken := ctx.GetHeader("Authorization")
 	if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
 		return bearerToken[7:]
 	}
+
+	// If not in header, try to get from cookie
+	cookie, err := ctx.Request.Cookie("token")
+	if err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
 	return ""
 }
 
@@ -763,6 +813,20 @@ func extractToken(ctx *gin.Context) string {
 // Helper function to get user ID from token
 func (c *UserController) GetUserIDFromToken(tokenString string) (uuid.UUID, error) {
 	return c.authService.GetUserIDFromToken(tokenString)
+}
+
+// Helper function to set token cookie
+func setTokenCookie(ctx *gin.Context, token string, expiresAt time.Time) {
+	cookie := &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		Expires:  expiresAt,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	}
+	http.SetCookie(ctx.Writer, cookie)
 }
 
 // Helper function to convert user model to DTO

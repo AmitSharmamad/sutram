@@ -9,6 +9,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 	// Public routes (no authentication required)
 	router.POST("/register", controller.Register)
 	router.POST("/login", controller.Login)
+	router.GET("/user/me", controller.CheckMe) // Public endpoint to check login status
 
 	// Authenticated routes
 	auth := router.Group("/user")
