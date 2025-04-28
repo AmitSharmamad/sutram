@@ -290,15 +290,16 @@ func ToUserProfileResponse(userProfile *model.UserProfile) UserProfileResponse {
 
 // BadgeResponse represents a badge in API responses
 type BadgeResponse struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	TypeID      int       `json:"type_id"`
-	TypeName    string    `json:"type_name"`
-	Tier        int       `json:"tier"`
-	Points      int       `json:"points"`
-	Icon        *string   `json:"icon"`
-	AwardedAt   time.Time `json:"awarded_at"`
+	ID          int        `json:"id"`
+	Name        string     `json:"name"`
+	Slug        string     `json:"slug"`
+	Description string     `json:"description"`
+	BadgeType   string     `json:"badge_type"`
+	TypeName    string     `json:"type_name,omitempty"`
+	Points      int        `json:"points"`
+	Icon        *string    `json:"icon,omitempty"`
+	Color       *string    `json:"color,omitempty"`
+	AwardedAt   *time.Time `json:"awarded_at,omitempty"`
 }
 
 // ToBadgeResponse converts a badge model to a badge response
@@ -306,12 +307,13 @@ func ToBadgeResponse(badge *model.Badge) BadgeResponse {
 	return BadgeResponse{
 		ID:          badge.ID,
 		Name:        badge.Name,
+		Slug:        badge.Slug,
 		Description: badge.Description,
-		TypeID:      badge.TypeID,
+		BadgeType:   badge.BadgeType,
 		TypeName:    badge.TypeName,
-		Tier:        badge.Tier,
 		Points:      badge.Points,
 		Icon:        badge.Icon,
+		Color:       badge.Color,
 		AwardedAt:   badge.AwardedAt,
 	}
 }

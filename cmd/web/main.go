@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"algo/internal/modules/backtest"
+	"algo/internal/modules/community"
 	"algo/internal/modules/instrument"
 	"algo/internal/modules/marketplace"
 	"algo/internal/modules/strategy"
@@ -165,6 +166,10 @@ func initializeModules(router *gin.RouterGroup) {
 	// Initialize marketplace module
 	marketplaceModule := marketplace.New()
 	marketplaceModule.RegisterRoutes(router)
+
+	// Initialize community module
+	communityModule := community.New()
+	communityModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }
