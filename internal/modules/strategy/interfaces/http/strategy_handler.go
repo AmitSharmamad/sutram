@@ -30,8 +30,13 @@ func (h *StrategyHandler) RegisterRoutes(r *gin.RouterGroup, userController *use
 	// Apply authentication middleware to all strategy endpoints
 	strategies.Use(userHttp.AuthMiddleware(userController))
 	{
+		// Handle both with and without trailing slash for POST and GET
+		strategies.POST("", h.CreateStrategy)
 		strategies.POST("/", h.CreateStrategy)
+		strategies.GET("", h.GetUserStrategies)
 		strategies.GET("/", h.GetUserStrategies)
+		
+		// Other routes remain the same
 		strategies.GET("/:id", h.GetStrategyByID)
 		strategies.PUT("/:id", h.UpdateStrategy)
 		strategies.DELETE("/:id", h.DeleteStrategy)

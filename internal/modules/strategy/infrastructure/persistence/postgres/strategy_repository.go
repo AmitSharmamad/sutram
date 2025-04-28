@@ -112,7 +112,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&strategy.Name,
 		&strategy.Description,
 		&strategy.PositionType,
-		pq.Array(&instruments),
+		&instruments,
 		&strategy.ChartType,
 		&strategy.ChartTimeframe,
 		&strategy.TradeType,
