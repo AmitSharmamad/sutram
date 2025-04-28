@@ -179,8 +179,6 @@ func (s *backtestService) CreateRun(ctx context.Context, req *dto.CreateRunReque
 		Qty:             run.Qty,
 		PeriodStartTime: run.PeriodStartTime,
 		PeriodEndTime:   run.PeriodEndTime,
-		StartedTime:     run.StartedTime,
-		EndedTime:       run.EndedTime,
 		CreatedAt:       run.CreatedAt,
 		UpdatedAt:       run.UpdatedAt,
 	}, nil
@@ -206,8 +204,6 @@ func (s *backtestService) GetRun(ctx context.Context, id uuid.UUID) (*dto.RunDTO
 		Qty:             run.Qty,
 		PeriodStartTime: run.PeriodStartTime,
 		PeriodEndTime:   run.PeriodEndTime,
-		StartedTime:     run.StartedTime,
-		EndedTime:       run.EndedTime,
 		CreatedAt:       run.CreatedAt,
 		UpdatedAt:       run.UpdatedAt,
 	}, nil
@@ -235,8 +231,6 @@ func (s *backtestService) GetRunsByRunGroup(ctx context.Context, runGroupID uuid
 			Qty:             run.Qty,
 			PeriodStartTime: run.PeriodStartTime,
 			PeriodEndTime:   run.PeriodEndTime,
-			StartedTime:     run.StartedTime,
-			EndedTime:       run.EndedTime,
 			CreatedAt:       run.CreatedAt,
 			UpdatedAt:       run.UpdatedAt,
 		})
@@ -267,8 +261,6 @@ func (s *backtestService) GetRunsByStrategy(ctx context.Context, strategyID uuid
 			Qty:             run.Qty,
 			PeriodStartTime: run.PeriodStartTime,
 			PeriodEndTime:   run.PeriodEndTime,
-			StartedTime:     run.StartedTime,
-			EndedTime:       run.EndedTime,
 			CreatedAt:       run.CreatedAt,
 			UpdatedAt:       run.UpdatedAt,
 		})
@@ -290,16 +282,26 @@ func (s *backtestService) UpdateRunState(ctx context.Context, id uuid.UUID, req 
 	run.UpdatedAt = time.Now()
 
 	// Update started/ended times based on state
+	now := time.Now()
 	switch run.State {
 	case model.Started:
-		run.StartedTime = time.Now()
+		run.StartedTime = &now
 	case model.Ended:
-		run.EndedTime = time.Now()
+		run.EndedTime = &now
 	}
 
 	// Save to database
 	if err := s.runRepo.Update(ctx, run); err != nil {
 		return nil, err
+	}
+
+	// Convert nullable time fields
+	var startedTime, endedTime time.Time
+	if run.StartedTime != nil {
+		startedTime = *run.StartedTime
+	}
+	if run.EndedTime != nil {
+		endedTime = *run.EndedTime
 	}
 
 	// Return updated run
@@ -314,8 +316,8 @@ func (s *backtestService) UpdateRunState(ctx context.Context, id uuid.UUID, req 
 		Qty:             run.Qty,
 		PeriodStartTime: run.PeriodStartTime,
 		PeriodEndTime:   run.PeriodEndTime,
-		StartedTime:     run.StartedTime,
-		EndedTime:       run.EndedTime,
+		StartedTime:     startedTime,
+		EndedTime:       endedTime,
 		CreatedAt:       run.CreatedAt,
 		UpdatedAt:       run.UpdatedAt,
 	}, nil
@@ -365,7 +367,8 @@ func (s *backtestService) SearchRuns(ctx context.Context, filter *dto.RunFilter)
 	// Convert to DTOs
 	result := make([]*dto.RunDTO, 0, len(runs))
 	for _, run := range runs {
-		result = append(result, &dto.RunDTO{
+		// Create base DTO
+		runDTO := &dto.RunDTO{
 			ID:              run.ID,
 			RunGroupID:      run.RunGroupID,
 			StrategyID:      run.StrategyID,
@@ -376,11 +379,20 @@ func (s *backtestService) SearchRuns(ctx context.Context, filter *dto.RunFilter)
 			Qty:             run.Qty,
 			PeriodStartTime: run.PeriodStartTime,
 			PeriodEndTime:   run.PeriodEndTime,
-			StartedTime:     run.StartedTime,
-			EndedTime:       run.EndedTime,
 			CreatedAt:       run.CreatedAt,
 			UpdatedAt:       run.UpdatedAt,
-		})
+		}
+
+		// Handle nullable time fields
+		if run.StartedTime != nil {
+			runDTO.StartedTime = *run.StartedTime
+		}
+
+		if run.EndedTime != nil {
+			runDTO.EndedTime = *run.EndedTime
+		}
+
+		result = append(result, runDTO)
 	}
 
 	return result, nil
@@ -505,33 +517,50 @@ func (s *backtestService) CreateRunMetrics(ctx context.Context, req *dto.CreateR
 	// Create domain model
 	metrics := model.NewRunMetrics(req.RunID)
 
-	// Set values
+	// Set non-pointer values
 	metrics.TotalReturnPct = req.TotalReturnPct
 	metrics.AnnualizedReturn = req.AnnualizedReturn
-	metrics.RiskAdjustedReturn = req.RiskAdjustedReturn
 	metrics.DailyReturns = req.DailyReturns
 	metrics.MonthlyReturns = req.MonthlyReturns
 	metrics.SharpeRatio = req.SharpeRatio
 	metrics.SortinoRatio = req.SortinoRatio
 	metrics.MaxDrawdown = req.MaxDrawdown
 	metrics.MaxDrawdownDuration = req.MaxDrawdownDuration
-	metrics.ValueAtRisk = req.ValueAtRisk
 	metrics.StdDeviation = req.StdDeviation
-	metrics.DownsideDeviation = req.DownsideDeviation
 	metrics.TotalTrades = req.TotalTrades
 	metrics.WinRate = req.WinRate
-	metrics.AvgWinSize = req.AvgWinSize
-	metrics.AvgLossSize = req.AvgLossSize
-	metrics.AvgTradeDuration = req.AvgTradeDuration
-	metrics.ProfitFactor = req.ProfitFactor
-	metrics.AvgPositionSize = req.AvgPositionSize
-	metrics.MaxPositionSize = req.MaxPositionSize
-	metrics.PositionTurnover = req.PositionTurnover
-	metrics.AvgExposure = req.AvgExposure
 	metrics.TotalCommission = req.TotalCommission
 	metrics.TotalSlippage = req.TotalSlippage
 	metrics.TransactionCostsPct = req.TransactionCostsPct
 	metrics.MetricJSON = req.MetricJSON
+
+	// Set pointer values
+	valueAtRisk := req.ValueAtRisk
+	metrics.ValueAtRisk = &valueAtRisk
+
+	avgWinSize := req.AvgWinSize
+	metrics.AvgWinSize = &avgWinSize
+
+	avgLossSize := req.AvgLossSize
+	metrics.AvgLossSize = &avgLossSize
+
+	avgTradeDuration := req.AvgTradeDuration
+	metrics.AvgTradeDuration = &avgTradeDuration
+
+	profitFactor := req.ProfitFactor
+	metrics.ProfitFactor = &profitFactor
+
+	avgPositionSize := req.AvgPositionSize
+	metrics.AvgPositionSize = &avgPositionSize
+
+	maxPositionSize := req.MaxPositionSize
+	metrics.MaxPositionSize = &maxPositionSize
+
+	positionTurnover := req.PositionTurnover
+	metrics.PositionTurnover = &positionTurnover
+
+	avgExposure := req.AvgExposure
+	metrics.AvgExposure = &avgExposure
 
 	// Save to database
 	if err := s.runMetricsRepo.Create(ctx, metrics); err != nil {
@@ -567,34 +596,51 @@ func (s *backtestService) UpdateRunMetrics(ctx context.Context, id uuid.UUID, re
 		return nil, ErrRunMetricsNotFound
 	}
 
-	// Update values
+	// Update non-pointer values
 	metrics.TotalReturnPct = req.TotalReturnPct
 	metrics.AnnualizedReturn = req.AnnualizedReturn
-	metrics.RiskAdjustedReturn = req.RiskAdjustedReturn
 	metrics.DailyReturns = req.DailyReturns
 	metrics.MonthlyReturns = req.MonthlyReturns
 	metrics.SharpeRatio = req.SharpeRatio
 	metrics.SortinoRatio = req.SortinoRatio
 	metrics.MaxDrawdown = req.MaxDrawdown
 	metrics.MaxDrawdownDuration = req.MaxDrawdownDuration
-	metrics.ValueAtRisk = req.ValueAtRisk
 	metrics.StdDeviation = req.StdDeviation
-	metrics.DownsideDeviation = req.DownsideDeviation
 	metrics.TotalTrades = req.TotalTrades
 	metrics.WinRate = req.WinRate
-	metrics.AvgWinSize = req.AvgWinSize
-	metrics.AvgLossSize = req.AvgLossSize
-	metrics.AvgTradeDuration = req.AvgTradeDuration
-	metrics.ProfitFactor = req.ProfitFactor
-	metrics.AvgPositionSize = req.AvgPositionSize
-	metrics.MaxPositionSize = req.MaxPositionSize
-	metrics.PositionTurnover = req.PositionTurnover
-	metrics.AvgExposure = req.AvgExposure
 	metrics.TotalCommission = req.TotalCommission
 	metrics.TotalSlippage = req.TotalSlippage
 	metrics.TransactionCostsPct = req.TransactionCostsPct
 	metrics.MetricJSON = req.MetricJSON
 	metrics.UpdatedAt = time.Now()
+
+	// Update pointer values
+	valueAtRisk := req.ValueAtRisk
+	metrics.ValueAtRisk = &valueAtRisk
+
+	avgWinSize := req.AvgWinSize
+	metrics.AvgWinSize = &avgWinSize
+
+	avgLossSize := req.AvgLossSize
+	metrics.AvgLossSize = &avgLossSize
+
+	avgTradeDuration := req.AvgTradeDuration
+	metrics.AvgTradeDuration = &avgTradeDuration
+
+	profitFactor := req.ProfitFactor
+	metrics.ProfitFactor = &profitFactor
+
+	avgPositionSize := req.AvgPositionSize
+	metrics.AvgPositionSize = &avgPositionSize
+
+	maxPositionSize := req.MaxPositionSize
+	metrics.MaxPositionSize = &maxPositionSize
+
+	positionTurnover := req.PositionTurnover
+	metrics.PositionTurnover = &positionTurnover
+
+	avgExposure := req.AvgExposure
+	metrics.AvgExposure = &avgExposure
 
 	// Save to database
 	if err := s.runMetricsRepo.Update(ctx, metrics); err != nil {
@@ -617,63 +663,97 @@ func (s *backtestService) DeleteRunMetrics(ctx context.Context, id uuid.UUID) er
 
 // Helper method to convert position model to DTO
 func (s *backtestService) positionToDTO(position *model.Position) *dto.PositionDTO {
-	return &dto.PositionDTO{
-		ID:                   position.ID,
-		RunID:                position.RunID,
-		State:                dto.PositionState(position.State),
-		Direction:            dto.Direction(position.Direction),
-		EntryPriceSignal:     position.EntryPriceSignal,
-		EntryTimeSignal:      position.EntryTimeSignal,
-		EntryPriceOrder:      position.EntryPriceOrder,
-		EntryTimeOrder:       position.EntryTimeOrder,
-		EntrySignal:          position.EntrySignal,
-		ExitPriceSignal:      position.ExitPriceSignal,
-		ExitTimeSignal:       position.ExitTimeSignal,
-		ExitPriceOrder:       position.ExitPriceOrder,
-		ExitTimeOrder:        position.ExitTimeOrder,
-		ExitSignal:           position.ExitSignal,
-		ExitReason:           position.ExitReason,
-		ProfitLossAbsolute:   position.ProfitLossAbsolute,
-		ProfitLossPercentage: position.ProfitLossPercentage,
-		TransactionCost:      position.TransactionCost,
-		EntryFees:            position.EntryFees,
-		ExitFees:             position.ExitFees,
-		NetProfitLoss:        position.NetProfitLoss,
-		PositionSize:         position.PositionSize,
-		EntryOrderID:         position.EntryOrderID,
-		ExitOrderID:          position.ExitOrderID,
-		CreatedAt:            position.CreatedAt,
-		UpdatedAt:            position.UpdatedAt,
+	positionDTO := &dto.PositionDTO{
+		ID:               position.ID,
+		RunID:            position.RunID,
+		State:            dto.PositionState(position.State),
+		Direction:        dto.Direction(position.Direction),
+		EntryPriceSignal: position.EntryPriceSignal,
+		EntryTimeSignal:  position.EntryTimeSignal,
+		EntrySignal:      position.EntrySignal,
+		PositionSize:     position.PositionSize,
+		EntryOrderID:     position.EntryOrderID,
+		ExitOrderID:      position.ExitOrderID,
+		CreatedAt:        position.CreatedAt,
+		UpdatedAt:        position.UpdatedAt,
 	}
+
+	// Handle nullable fields
+	if position.EntryPriceOrder != nil {
+		positionDTO.EntryPriceOrder = *position.EntryPriceOrder
+	}
+
+	if position.EntryTimeOrder != nil {
+		positionDTO.EntryTimeOrder = *position.EntryTimeOrder
+	}
+
+	if position.ExitPriceSignal != nil {
+		positionDTO.ExitPriceSignal = *position.ExitPriceSignal
+	}
+
+	if position.ExitTimeSignal != nil {
+		positionDTO.ExitTimeSignal = *position.ExitTimeSignal
+	}
+
+	if position.ExitPriceOrder != nil {
+		positionDTO.ExitPriceOrder = *position.ExitPriceOrder
+	}
+
+	if position.ExitTimeOrder != nil {
+		positionDTO.ExitTimeOrder = *position.ExitTimeOrder
+	}
+
+	if position.ExitSignal != nil {
+		positionDTO.ExitSignal = *position.ExitSignal
+	}
+
+	if position.ExitReason != nil {
+		positionDTO.ExitReason = *position.ExitReason
+	}
+
+	if position.ProfitLossAbsolute != nil {
+		positionDTO.ProfitLossAbsolute = *position.ProfitLossAbsolute
+	}
+
+	if position.ProfitLossPercentage != nil {
+		positionDTO.ProfitLossPercentage = *position.ProfitLossPercentage
+	}
+
+	if position.TransactionCost != nil {
+		positionDTO.TransactionCost = *position.TransactionCost
+	}
+
+	if position.EntryFees != nil {
+		positionDTO.EntryFees = *position.EntryFees
+	}
+
+	if position.ExitFees != nil {
+		positionDTO.ExitFees = *position.ExitFees
+	}
+
+	if position.NetProfitLoss != nil {
+		positionDTO.NetProfitLoss = *position.NetProfitLoss
+	}
+
+	return positionDTO
 }
 
 // Helper method to convert run metrics model to DTO
 func (s *backtestService) runMetricsToDTO(metrics *model.RunMetrics) *dto.RunMetricsDTO {
-	return &dto.RunMetricsDTO{
+	metricsDTO := &dto.RunMetricsDTO{
 		ID:                  metrics.ID,
 		RunID:               metrics.RunID,
 		TotalReturnPct:      metrics.TotalReturnPct,
 		AnnualizedReturn:    metrics.AnnualizedReturn,
-		RiskAdjustedReturn:  metrics.RiskAdjustedReturn,
 		DailyReturns:        metrics.DailyReturns,
 		MonthlyReturns:      metrics.MonthlyReturns,
 		SharpeRatio:         metrics.SharpeRatio,
 		SortinoRatio:        metrics.SortinoRatio,
 		MaxDrawdown:         metrics.MaxDrawdown,
 		MaxDrawdownDuration: metrics.MaxDrawdownDuration,
-		ValueAtRisk:         metrics.ValueAtRisk,
 		StdDeviation:        metrics.StdDeviation,
-		DownsideDeviation:   metrics.DownsideDeviation,
 		TotalTrades:         metrics.TotalTrades,
 		WinRate:             metrics.WinRate,
-		AvgWinSize:          metrics.AvgWinSize,
-		AvgLossSize:         metrics.AvgLossSize,
-		AvgTradeDuration:    metrics.AvgTradeDuration,
-		ProfitFactor:        metrics.ProfitFactor,
-		AvgPositionSize:     metrics.AvgPositionSize,
-		MaxPositionSize:     metrics.MaxPositionSize,
-		PositionTurnover:    metrics.PositionTurnover,
-		AvgExposure:         metrics.AvgExposure,
 		TotalCommission:     metrics.TotalCommission,
 		TotalSlippage:       metrics.TotalSlippage,
 		TransactionCostsPct: metrics.TransactionCostsPct,
@@ -681,4 +761,51 @@ func (s *backtestService) runMetricsToDTO(metrics *model.RunMetrics) *dto.RunMet
 		CreatedAt:           metrics.CreatedAt,
 		UpdatedAt:           metrics.UpdatedAt,
 	}
+
+	// Handle nullable fields
+	if metrics.RiskAdjustedReturn != nil {
+		metricsDTO.RiskAdjustedReturn = *metrics.RiskAdjustedReturn
+	}
+
+	if metrics.ValueAtRisk != nil {
+		metricsDTO.ValueAtRisk = *metrics.ValueAtRisk
+	}
+
+	if metrics.DownsideDeviation != nil {
+		metricsDTO.DownsideDeviation = *metrics.DownsideDeviation
+	}
+
+	if metrics.AvgWinSize != nil {
+		metricsDTO.AvgWinSize = *metrics.AvgWinSize
+	}
+
+	if metrics.AvgLossSize != nil {
+		metricsDTO.AvgLossSize = *metrics.AvgLossSize
+	}
+
+	if metrics.AvgTradeDuration != nil {
+		metricsDTO.AvgTradeDuration = *metrics.AvgTradeDuration
+	}
+
+	if metrics.ProfitFactor != nil {
+		metricsDTO.ProfitFactor = *metrics.ProfitFactor
+	}
+
+	if metrics.AvgPositionSize != nil {
+		metricsDTO.AvgPositionSize = *metrics.AvgPositionSize
+	}
+
+	if metrics.MaxPositionSize != nil {
+		metricsDTO.MaxPositionSize = *metrics.MaxPositionSize
+	}
+
+	if metrics.PositionTurnover != nil {
+		metricsDTO.PositionTurnover = *metrics.PositionTurnover
+	}
+
+	if metrics.AvgExposure != nil {
+		metricsDTO.AvgExposure = *metrics.AvgExposure
+	}
+
+	return metricsDTO
 }

@@ -25,32 +25,32 @@ const (
 
 // Position represents a trading position within a run
 type Position struct {
-	ID                   uuid.UUID     `json:"id"`
-	RunID                uuid.UUID     `json:"run_id"`
-	State                PositionState `json:"state"`
-	Direction            Direction     `json:"direction"`
-	EntryPriceSignal     float64       `json:"entry_price_signal"`
-	EntryTimeSignal      time.Time     `json:"entry_time_signal"`
-	EntryPriceOrder      float64       `json:"entry_price_order"`
-	EntryTimeOrder       time.Time     `json:"entry_time_order"`
-	EntrySignal          string        `json:"entry_signal"`
-	ExitPriceSignal      float64       `json:"exit_price_signal,omitempty"`
-	ExitTimeSignal       time.Time     `json:"exit_time_signal,omitempty"`
-	ExitPriceOrder       float64       `json:"exit_price_order,omitempty"`
-	ExitTimeOrder        time.Time     `json:"exit_time_order,omitempty"`
-	ExitSignal           string        `json:"exit_signal,omitempty"`
-	ExitReason           string        `json:"exit_reason,omitempty"`
-	ProfitLossAbsolute   float64       `json:"profit_loss_absolute,omitempty"`
-	ProfitLossPercentage float64       `json:"profit_loss_percentage,omitempty"`
-	TransactionCost      float64       `json:"transaction_cost,omitempty"`
-	EntryFees            float64       `json:"entry_fees,omitempty"`
-	ExitFees             float64       `json:"exit_fees,omitempty"`
-	NetProfitLoss        float64       `json:"net_profit_loss,omitempty"`
-	PositionSize         float64       `json:"position_size"`
-	EntryOrderID         *uuid.UUID    `json:"entry_order_id,omitempty"`
-	ExitOrderID          *uuid.UUID    `json:"exit_order_id,omitempty"`
-	CreatedAt            time.Time     `json:"created_at"`
-	UpdatedAt            time.Time     `json:"updated_at"`
+	ID                   uuid.UUID     `json:"id" db:"id"`
+	RunID                uuid.UUID     `json:"run_id" db:"run_id"`
+	State                PositionState `json:"state" db:"state"`
+	Direction            Direction     `json:"direction" db:"direction"`
+	EntryPriceSignal     float64       `json:"entry_price_signal" db:"entry_price_signal"`
+	EntryTimeSignal      time.Time     `json:"entry_time_signal" db:"entry_time_signal"`
+	EntryPriceOrder      *float64      `json:"entry_price_order,omitempty" db:"entry_price_order"`
+	EntryTimeOrder       *time.Time    `json:"entry_time_order,omitempty" db:"entry_time_order"`
+	EntrySignal          string        `json:"entry_signal" db:"entry_signal"`
+	ExitPriceSignal      *float64      `json:"exit_price_signal,omitempty" db:"exit_price_signal"`
+	ExitTimeSignal       *time.Time    `json:"exit_time_signal,omitempty" db:"exit_time_signal"`
+	ExitPriceOrder       *float64      `json:"exit_price_order,omitempty" db:"exit_price_order"`
+	ExitTimeOrder        *time.Time    `json:"exit_time_order,omitempty" db:"exit_time_order"`
+	ExitSignal           *string       `json:"exit_signal,omitempty" db:"exit_signal"`
+	ExitReason           *string       `json:"exit_reason,omitempty" db:"exit_reason"`
+	ProfitLossAbsolute   *float64      `json:"profit_loss_absolute,omitempty" db:"profit_loss_absolute"`
+	ProfitLossPercentage *float64      `json:"profit_loss_percentage,omitempty" db:"profit_loss_percentage"`
+	TransactionCost      *float64      `json:"transaction_cost,omitempty" db:"transaction_cost"`
+	EntryFees            *float64      `json:"entry_fees,omitempty" db:"entry_fees"`
+	ExitFees             *float64      `json:"exit_fees,omitempty" db:"exit_fees"`
+	NetProfitLoss        *float64      `json:"net_profit_loss,omitempty" db:"net_profit_loss"`
+	PositionSize         float64       `json:"position_size" db:"position_size"`
+	EntryOrderID         *uuid.UUID    `json:"entry_order_id,omitempty" db:"entry_order_id"`
+	ExitOrderID          *uuid.UUID    `json:"exit_order_id,omitempty" db:"exit_order_id"`
+	CreatedAt            time.Time     `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time     `json:"updated_at" db:"updated_at"`
 }
 
 // NewPosition creates a new trading position
@@ -80,9 +80,13 @@ func NewPosition(
 // Enter sets the position as entered
 func (p *Position) Enter(entryPriceOrder float64, entryTimeOrder time.Time, entryFees float64, entryOrderID *uuid.UUID) {
 	p.State = Entered
-	p.EntryPriceOrder = entryPriceOrder
-	p.EntryTimeOrder = entryTimeOrder
-	p.EntryFees = entryFees
+	p.EntryPriceOrder = &entryPriceOrder
+	p.EntryTimeOrder = &entryTimeOrder
+
+	if entryFees > 0 {
+		p.EntryFees = &entryFees
+	}
+
 	p.EntryOrderID = entryOrderID
 	p.UpdatedAt = time.Now()
 }
@@ -99,13 +103,17 @@ func (p *Position) Exit(
 	exitOrderID *uuid.UUID,
 ) {
 	p.State = Exited
-	p.ExitPriceSignal = exitPriceSignal
-	p.ExitTimeSignal = exitTimeSignal
-	p.ExitPriceOrder = exitPriceOrder
-	p.ExitTimeOrder = exitTimeOrder
-	p.ExitSignal = exitSignal
-	p.ExitReason = exitReason
-	p.ExitFees = exitFees
+	p.ExitPriceSignal = &exitPriceSignal
+	p.ExitTimeSignal = &exitTimeSignal
+	p.ExitPriceOrder = &exitPriceOrder
+	p.ExitTimeOrder = &exitTimeOrder
+	p.ExitSignal = &exitSignal
+	p.ExitReason = &exitReason
+
+	if exitFees > 0 {
+		p.ExitFees = &exitFees
+	}
+
 	p.ExitOrderID = exitOrderID
 
 	// Calculate profit/loss
@@ -115,27 +123,38 @@ func (p *Position) Exit(
 
 // CalculateProfitLoss calculates profit/loss for the position
 func (p *Position) CalculateProfitLoss() {
-	if p.State != Exited {
+	if p.State != Exited || p.EntryPriceOrder == nil || p.ExitPriceOrder == nil {
 		return
 	}
 
-	entryPrice := p.EntryPriceOrder
-	exitPrice := p.ExitPriceOrder
+	entryPrice := *p.EntryPriceOrder
+	exitPrice := *p.ExitPriceOrder
 
 	// Calculate absolute P/L
+	var profitLossAbsolute float64
 	switch p.Direction {
 	case Long:
-		p.ProfitLossAbsolute = (exitPrice - entryPrice) * p.PositionSize
+		profitLossAbsolute = (exitPrice - entryPrice) * p.PositionSize
 	case Short:
-		p.ProfitLossAbsolute = (entryPrice - exitPrice) * p.PositionSize
+		profitLossAbsolute = (entryPrice - exitPrice) * p.PositionSize
 	}
+	p.ProfitLossAbsolute = &profitLossAbsolute
 
 	// Calculate percentage P/L
-	p.ProfitLossPercentage = (p.ProfitLossAbsolute / (entryPrice * p.PositionSize)) * 100
+	profitLossPercentage := (profitLossAbsolute / (entryPrice * p.PositionSize)) * 100
+	p.ProfitLossPercentage = &profitLossPercentage
 
 	// Calculate transaction costs
-	p.TransactionCost = p.EntryFees + p.ExitFees
+	var transactionCost float64
+	if p.EntryFees != nil {
+		transactionCost += *p.EntryFees
+	}
+	if p.ExitFees != nil {
+		transactionCost += *p.ExitFees
+	}
+	p.TransactionCost = &transactionCost
 
 	// Calculate net P/L
-	p.NetProfitLoss = p.ProfitLossAbsolute - p.TransactionCost
+	netProfitLoss := profitLossAbsolute - transactionCost
+	p.NetProfitLoss = &netProfitLoss
 }
