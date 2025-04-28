@@ -39,7 +39,7 @@ func main() {
 	setupMiddleware(router)
 
 	// Setup API routes
-	apiRouter := router.Group("/")
+	apiRouter := router.Group("/api")
 
 	// Initialize modules
 	initializeModules(apiRouter)
