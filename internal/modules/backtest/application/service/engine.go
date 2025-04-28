@@ -3,12 +3,16 @@ package service
 import (
 	"context"
 	stdmath "math"
+	"strconv"
 	"sync"
 	"time"
 
-	backtest "algo/internal/modules/backtest/domain/model"
-	"algo/internal/modules/backtest/domain/repository"
-	strategymodel "algo/internal/modules/strategy/domain/model"
+	"algo/internal/modules/backtest/domain/model"
+	backtestRepo "algo/internal/modules/backtest/domain/repository"
+	instrumentService "algo/internal/modules/instrument/application/service"
+	instrumentModel "algo/internal/modules/instrument/domain/model"
+	strategyDto "algo/internal/modules/strategy/application/dto"
+	strategyService "algo/internal/modules/strategy/application/service"
 
 	"github.com/google/uuid"
 )
@@ -16,69 +20,44 @@ import (
 // EngineService defines the service for backtest engine operations
 type EngineService interface {
 	// Start a backtest run for the provided strategy
-	StartBacktest(ctx context.Context, strategyID uuid.UUID) (*backtest.RunGroup, error)
+	StartBacktest(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error)
 }
 
 // BacktestEngine implements the engine for running backtests
 type BacktestEngine struct {
-	backtestService   *backtestService
-	strategyService   StrategyService
-	stockService      StockService
-	expressionService ExpressionService
-	indicatorService  IndicatorService
-	runGroupRepo      repository.RunGroupRepository
-	runRepo           repository.RunRepository
-	positionRepo      repository.PositionRepository
-	runMetricsRepo    repository.RunMetricsRepository
+	backtestService   *BacktestService
+	strategyService   strategyService.StrategyService
+	instrumentService *instrumentService.InstrumentService
+	runGroupRepo      backtestRepo.RunGroupRepository
+	runRepo           backtestRepo.RunRepository
+	positionRepo      backtestRepo.PositionRepository
+	runMetricsRepo    backtestRepo.RunMetricsRepository
 }
 
-// Define Stock type for the engine
-type Stock struct {
+// Instrument represents OHLCV data for backtest processing
+type Instrument struct {
 	Timestamp time.Time
 	Open      float64
 	High      float64
 	Low       float64
 	Close     float64
-	Volume    int64
-	Direction int
-}
-
-// Interface definitions for external services
-type StrategyService interface {
-	Get(ctx context.Context, id uuid.UUID) *strategymodel.Strategy
-}
-
-type StockService interface {
-	Get(instrumentID uint32, startTime, endTime time.Time, timeframe string, lookback int32) (*[]Stock, error)
-}
-
-type ExpressionService interface {
-	GetEntryDataRange(strategy *strategymodel.Strategy) int32
-	GetExitDataRange(strategy *strategymodel.Strategy) int32
-}
-
-type IndicatorService interface {
-	// Add indicator-related methods as needed
+	Volume    float64
 }
 
 // NewBacktestEngine creates a new backtest engine
 func NewBacktestEngine(
-	backtestService *backtestService,
-	strategyService StrategyService,
-	stockService StockService,
-	expressionService ExpressionService,
-	indicatorService IndicatorService,
-	runGroupRepo repository.RunGroupRepository,
-	runRepo repository.RunRepository,
-	positionRepo repository.PositionRepository,
-	runMetricsRepo repository.RunMetricsRepository,
+	backtestService *BacktestService,
+	strategyService strategyService.StrategyService,
+	instrumentService *instrumentService.InstrumentService,
+	runGroupRepo backtestRepo.RunGroupRepository,
+	runRepo backtestRepo.RunRepository,
+	positionRepo backtestRepo.PositionRepository,
+	runMetricsRepo backtestRepo.RunMetricsRepository,
 ) EngineService {
 	return &BacktestEngine{
 		backtestService:   backtestService,
 		strategyService:   strategyService,
-		stockService:      stockService,
-		expressionService: expressionService,
-		indicatorService:  indicatorService,
+		instrumentService: instrumentService,
 		runGroupRepo:      runGroupRepo,
 		runRepo:           runRepo,
 		positionRepo:      positionRepo,
@@ -86,610 +65,496 @@ func NewBacktestEngine(
 	}
 }
 
-// StartBacktest runs a backtest for the provided strategy
-func (engine *BacktestEngine) StartBacktest(ctx context.Context, strategyID uuid.UUID) (*backtest.RunGroup, error) {
-	strategy := engine.strategyService.Get(ctx, strategyID)
-
-	// Create a new run group
-	runGroup := backtest.NewRunGroup(strategyID)
-	if err := engine.runGroupRepo.Create(ctx, runGroup); err != nil {
+// StartBacktest starts a backtest run for the provided strategy
+func (e *BacktestEngine) StartBacktest(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error) {
+	// Get the strategy
+	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
+	if err != nil {
 		return nil, err
 	}
 
-	instruments := strategy.Instruments
+	// Create a run group
+	runGroup := model.NewRunGroup(strategyID)
+	if err := e.runGroupRepo.Create(ctx, runGroup); err != nil {
+		return nil, err
+	}
+
+	// Process each instrument in the strategy
 	var wg sync.WaitGroup
-	runs := make([]*backtest.Run, 0, len(instruments))
-
-	// Get period times from strategy
-	// Default to 30 days ago to now if not available from strategy
-	periodStart := time.Now().Add(-30 * 24 * time.Hour)
-	periodEnd := time.Now()
-
-	// Note: This is an adaptation since the actual Strategy model may have different field names
-	// Adjust these field accesses according to your actual Strategy model structure
-	if strategy.StartDate != nil {
-		periodStart = *strategy.StartDate
-	}
-
-	if strategy.EndDate != nil {
-		periodEnd = *strategy.EndDate
-	}
-
-	for _, instrumentID := range instruments {
-		// Create a new run for each instrument
-		run := backtest.NewRun(
-			runGroup.ID,
-			strategyID,
-			"",                // Exchange placeholder - would need to be populated from strategy
-			int(instrumentID), // Convert to int
-			backtest.Backtest,
-			1, // Default quantity
-			periodStart,
-			periodEnd,
-		)
-
-		runs = append(runs, run)
-		if err := engine.runRepo.Create(ctx, run); err != nil {
-			return nil, err
-		}
-
+	for _, instrumentID := range strategyResp.Instruments {
 		wg.Add(1)
-		// Execute run asynchronously
-		go engine.executeRun(ctx, run, strategy, &wg)
+
+		go func(instrumentID int32) {
+			defer wg.Done()
+
+			// Convert int32 to string for the symbol lookup
+			symbol := strconv.FormatInt(int64(instrumentID), 10)
+
+			// Fetch instrument data
+			instrumentMaster, err := e.instrumentService.GetInstrumentMasterBySymbol(ctx, symbol)
+			if err != nil {
+				// Log error and continue with other instruments
+				return
+			}
+
+			// Get historical data for the instrument
+			// Handle nil time values for date range
+			var startDate, endDate time.Time
+			if strategyResp.StartDate != nil {
+				startDate = *strategyResp.StartDate
+			} else {
+				startDate = time.Now().AddDate(-1, 0, 0) // Default to 1 year back
+			}
+
+			if strategyResp.EndDate != nil {
+				endDate = *strategyResp.EndDate
+			} else {
+				endDate = time.Now()
+			}
+
+			instruments, err := e.instrumentService.GetInstrumentsByTimeRange(ctx, symbol, startDate, endDate)
+			if err != nil {
+				// Log error and continue with other instruments
+				return
+			}
+
+			// Create a run for this instrument
+			// Assuming instrumentMaster.ID is uint64, convert to int for Run
+			instrumentIDInt := int(instrumentMaster.ID)
+			qty := 1 // Default quantity
+			if strategyResp.Qty > 0 {
+				qty = strategyResp.Qty
+			}
+
+			run := model.NewRun(
+				runGroup.ID,
+				strategyID,
+				instrumentMaster.Exchange,
+				instrumentIDInt,
+				model.Backtest,
+				qty,
+				startDate,
+				endDate,
+			)
+
+			if err := e.runRepo.Create(ctx, run); err != nil {
+				// Log error and continue with other instruments
+				return
+			}
+
+			// Convert instruments to engine instrument format
+			instrumentData := e.getInstrumentById(instruments)
+
+			// Execute backtest for this instrument
+			e.executeBacktest(ctx, strategyResp, instrumentData, run)
+		}(instrumentID)
 	}
 
 	wg.Wait()
-
-	// Persist positions and metrics
-	positions := make([]*backtest.Position, 0)
-	runMetrics := make([]*backtest.RunMetrics, 0)
-
-	for _, run := range runs {
-		// We need to retrieve run from database to get latest state
-		updatedRun, err := engine.runRepo.GetByID(ctx, run.ID)
-		if err != nil {
-			continue
-		}
-
-		// Get positions and metrics
-		runPositions, err := engine.positionRepo.GetByRunID(ctx, updatedRun.ID)
-		if err == nil && len(runPositions) > 0 {
-			positions = append(positions, runPositions...)
-		}
-
-		metrics, err := engine.runMetricsRepo.GetByRunID(ctx, updatedRun.ID)
-		if err == nil {
-			runMetrics = append(runMetrics, metrics)
-		}
-	}
-
 	return runGroup, nil
 }
 
-func (engine *BacktestEngine) executeRun(
-	ctx context.Context,
-	run *backtest.Run,
-	strategy *strategymodel.Strategy,
-	wg *sync.WaitGroup,
-) {
-	defer wg.Done()
+// getInstrumentById converts instrument domain model to engine instrument model
+func (e *BacktestEngine) getInstrumentById(instruments []*instrumentModel.Instrument) []Instrument {
+	instrumentData := make([]Instrument, len(instruments))
+	for i, inst := range instruments {
+		instrumentData[i] = Instrument{
+			Timestamp: inst.Timestamp,
+			Open:      inst.Open,
+			High:      inst.High,
+			Low:       inst.Low,
+			Close:     inst.Close,
+			Volume:    float64(inst.Volume),
+		}
+	}
+	return instrumentData
+}
 
-	// Update run state to Started
-	run.State = backtest.Started
+// executeBacktest runs the backtest for a single instrument
+func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategyDto.StrategyResponse, instruments []Instrument, run *model.Run) {
+	// Initialize a parser for entry/exit expressions (assuming a factory exists in your parser domain)
+	// This is a placeholder - you'll need to implement actual expression parsing and evaluation
+	// based on your parser module structure
+
+	// Track positions
+	var positions []*model.Position
+	var openPosition *model.Position
+	capital := strategy.Capital
+	initialCapital := capital
+
+	// Mark run as started
 	startTime := time.Now()
 	run.StartedTime = &startTime
-	run.UpdatedAt = startTime
+	run.State = model.Started
+	e.runRepo.Update(ctx, run)
 
-	if err := engine.runRepo.Update(ctx, run); err != nil {
-		return
-	}
+	for i, instrument := range instruments {
+		// If we have at least 20 candles for indicators, evaluate expressions
+		if i >= 20 {
+			// Create data context for expression evaluation
+			dataContext := e.createDataContext(instruments, i)
 
-	// Set default lookback
-	var lookBack int32 = 13
+			// Check entry condition if no position is open
+			// This is simplified - you'd use your actual parser module here
+			entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, dataContext)
 
-	// Get timeframe data for entry conditions
-	// Convert chart timeframe to string
-	timeframeStr := string(strategy.ChartTimeframe)
+			if openPosition == nil && entrySignalTriggered {
+				// Calculate position size based on strategy
+				positionSize := e.calculatePositionSize(strategy, capital, instrument.Close)
 
-	timeframeData, err := engine.stockService.Get(
-		uint32(run.InstrumentID),
-		run.PeriodStartTime,
-		run.PeriodEndTime,
-		timeframeStr,
-		lookBack,
-	)
-
-	if err != nil || timeframeData == nil || len(*timeframeData) == 0 {
-		// Handle case where data is not available
-		engine.finishRun(ctx, run)
-		return
-	}
-
-	// Get 1-second data for more granular exit condition checking
-	secondData, _ := engine.stockService.Get(
-		uint32(run.InstrumentID),
-		run.PeriodStartTime,
-		run.PeriodEndTime,
-		"1s", // 1-second timeframe
-		lookBack,
-	)
-
-	// Process entry and exit conditions
-	positions := engine.processBacktest(run, strategy, timeframeData, secondData, lookBack)
-
-	// Save positions
-	for _, position := range positions {
-		if err := engine.positionRepo.Create(ctx, position); err != nil {
-			continue
-		}
-	}
-
-	// Calculate metrics
-	metrics := engine.calculateRunMetrics(run, positions)
-	if err := engine.runMetricsRepo.Create(ctx, metrics); err != nil {
-		// Log error but continue
-	}
-
-	// Mark run as complete
-	engine.finishRun(ctx, run)
-}
-
-func (engine *BacktestEngine) finishRun(ctx context.Context, run *backtest.Run) {
-	run.State = backtest.Ended
-	endTime := time.Now()
-	run.EndedTime = &endTime
-	run.UpdatedAt = endTime
-
-	// Save completed run
-	_ = engine.runRepo.Update(ctx, run)
-}
-
-func (engine *BacktestEngine) processBacktest(
-	run *backtest.Run,
-	strategy *strategymodel.Strategy,
-	timeframeData *[]Stock,
-	secondData *[]Stock,
-	lookBack int32,
-) []*backtest.Position {
-	positions := make([]*backtest.Position, 0)
-	var currentPosition *backtest.Position
-
-	// Return empty if data is missing
-	if timeframeData == nil || len(*timeframeData) == 0 {
-		return positions
-	}
-
-	// Main loop through timeframe data for entry signals
-	for i := lookBack; i < int32(len(*timeframeData)); i++ {
-		currentTimeframe := (*timeframeData)[i]
-		slicedTimeframeData := (*timeframeData)[:i+1]
-
-		// Check if we need a new position or use existing position
-		if currentPosition == nil || currentPosition.State == backtest.Exited {
-			// Create a new position
-			direction := backtest.Long
-			if strategy.PositionType == "SHORT" {
-				direction = backtest.Short
-			}
-
-			currentPosition = backtest.NewPosition(
-				run.ID,
-				direction,
-				currentTimeframe.Close,
-				currentTimeframe.Timestamp,
-				"entry_condition",
-				currentTimeframe.Close, // Using close price as position size
-			)
-			positions = append(positions, currentPosition)
-		}
-
-		if currentPosition.State == backtest.NotEntered {
-			// Check entry signal
-			entrySignal := engine.checkEntryCondition(currentPosition, strategy, &currentTimeframe, &slicedTimeframeData)
-
-			if entrySignal && secondData != nil && len(*secondData) > 0 {
-				// Position was entered, determine the boundary time for exit checking
-				var nextTimeframeBoundary time.Time
-				if i < int32(len(*timeframeData))-1 {
-					nextTimeframeBoundary = (*timeframeData)[i+1].Timestamp
+				// Determine position direction from strategy
+				var direction model.Direction
+				if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
+					direction = model.Long
 				} else {
-					nextTimeframeBoundary = run.PeriodEndTime
+					direction = model.Short
 				}
 
-				// Check for exit using second data
-				engine.processExit(currentPosition, strategy, secondData, currentTimeframe.Timestamp, nextTimeframeBoundary)
+				// Create new position
+				openPosition = model.NewPosition(
+					run.ID,
+					direction,
+					instrument.Close,
+					instrument.Timestamp,
+					strategy.EntryExpression,
+					positionSize,
+				)
 
-				// Optimize by skipping to next relevant timeframe after exit
-				if currentPosition.State == backtest.Exited && currentPosition.ExitTimeOrder != nil {
-					exitTime := *currentPosition.ExitTimeOrder
-					for j := i + 1; j < int32(len(*timeframeData)); j++ {
-						if (*timeframeData)[j].Timestamp.After(exitTime) {
-							i = j - 1 // -1 because the loop will increment i
-							break
-						}
+				// Simulate order execution
+				entryPrice := instrument.Close
+				entryFees := calculateFees(entryPrice, positionSize)
+				openPosition.Enter(entryPrice, instrument.Timestamp, entryFees, nil)
+
+				// Update capital
+				capital -= (entryPrice*positionSize + entryFees)
+			}
+
+			// Check exit condition if position is open
+			exitSignalTriggered := false
+			if strategy.ExitExpression != "" {
+				exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+			}
+
+			if openPosition != nil && (exitSignalTriggered ||
+				e.checkStopLossOrTarget(openPosition, strategy, instrument) ||
+				i == len(instruments)-1) { // Force exit on last candle
+
+				// Calculate exit price and reason
+				exitPrice := instrument.Close
+				exitReason := "Signal"
+
+				if exitSignalTriggered {
+					exitReason = "Exit signal triggered"
+				} else if i == len(instruments)-1 {
+					exitReason = "End of backtest period"
+				} else {
+					// Check if it was stop loss or target profit
+					if e.isStopLossTriggered(openPosition, strategy, instrument) {
+						exitReason = "Stop loss"
+					} else if e.isTargetProfitTriggered(openPosition, strategy, instrument) {
+						exitReason = "Target profit"
 					}
 				}
+
+				// Calculate fees
+				exitFees := calculateFees(exitPrice, openPosition.PositionSize)
+
+				// Close the position
+				openPosition.Exit(
+					instrument.Close,
+					instrument.Timestamp,
+					exitPrice,
+					instrument.Timestamp,
+					strategy.ExitExpression,
+					exitReason,
+					exitFees,
+					nil,
+				)
+
+				// Save position
+				positions = append(positions, openPosition)
+				e.positionRepo.Create(ctx, openPosition)
+
+				// Update capital if this is a real exit (not end of backtest)
+				if openPosition.NetProfitLoss != nil {
+					capital += (exitPrice*openPosition.PositionSize - exitFees)
+					if *openPosition.NetProfitLoss > 0 {
+						capital += *openPosition.NetProfitLoss
+					} else {
+						capital += *openPosition.NetProfitLoss // This is negative already
+					}
+				}
+
+				// Reset open position
+				openPosition = nil
 			}
 		}
 	}
 
-	// Handle the last open position
-	if len(positions) > 0 {
-		lastPosition := positions[len(positions)-1]
-		if lastPosition.State == backtest.Entered {
-			// Force exit the last position
-			lastData := (*timeframeData)[len(*timeframeData)-1]
-			exitPrice := lastData.Close
-			exitTime := lastData.Timestamp
-			exitReason := "end_of_backtest"
+	// Mark run as ended
+	endTime := time.Now()
+	run.EndedTime = &endTime
+	run.State = model.Ended
+	e.runRepo.Update(ctx, run)
 
-			// Create a nil UUID pointer for the order ID
-			var nilOrderID *uuid.UUID
-
-			lastPosition.Exit(
-				exitPrice,
-				exitTime,
-				exitPrice,
-				exitTime,
-				exitReason,
-				exitReason,
-				0, // No fees in backtest
-				nilOrderID,
-			)
-		} else if lastPosition.State == backtest.NotEntered {
-			// Remove the position that was never entered
-			positions = positions[:len(positions)-1]
-		}
-	}
-
-	return positions
+	// Calculate and save metrics
+	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
+	e.runMetricsRepo.Create(ctx, metrics)
 }
 
-func (engine *BacktestEngine) checkEntryCondition(
-	position *backtest.Position,
-	strategy *strategymodel.Strategy,
-	current *Stock,
-	data *[]Stock,
-) bool {
-	// In the actual implementation, use the parser module to evaluate conditions
-	entryCondition := engine.evaluateExpression(strategy.EntryExpression, data)
+// createDataContext creates a data context for expression evaluation
+func (e *BacktestEngine) createDataContext(instruments []Instrument, currentIndex int) map[string]interface{} {
+	context := make(map[string]interface{})
 
-	if entryCondition {
-		// Create a nil UUID pointer for the order ID
-		var nilOrderID *uuid.UUID
+	// Add basic OHLCV data
+	context["open"] = instruments[currentIndex].Open
+	context["high"] = instruments[currentIndex].High
+	context["low"] = instruments[currentIndex].Low
+	context["close"] = instruments[currentIndex].Close
+	context["volume"] = instruments[currentIndex].Volume
 
-		// Mark position as entered
-		position.Enter(
-			current.Close,
-			current.Timestamp,
-			0, // No fees in backtest
-			nilOrderID,
-		)
+	// Add indicator calculations (simplified)
+	// In a real implementation, these would use your parser module
+
+	// Calculate SMA(20)
+	sma20 := 0.0
+	for i := 0; i < 20; i++ {
+		sma20 += instruments[currentIndex-i].Close
+	}
+	sma20 /= 20.0
+	context["sma20"] = sma20
+
+	// Calculate SMA(50)
+	sma50 := 0.0
+	if currentIndex >= 50 {
+		for i := 0; i < 50; i++ {
+			sma50 += instruments[currentIndex-i].Close
+		}
+		sma50 /= 50.0
+	}
+	context["sma50"] = sma50
+
+	return context
+}
+
+// evaluateEntryCondition evaluates the entry condition expression
+// This is a placeholder - you'd use your actual parser module
+func (e *BacktestEngine) evaluateEntryCondition(expression string, context map[string]interface{}) bool {
+	// Simple evaluation for testing
+	// In a real implementation, this would use your parser domain
+	if context["close"].(float64) > context["sma20"].(float64) &&
+		context["sma20"].(float64) > context["sma50"].(float64) {
 		return true
 	}
-
 	return false
 }
 
-// Helper method to evaluate expressions using the parser
-func (engine *BacktestEngine) evaluateExpression(expression string, data *[]Stock) bool {
-	// This is a simplified placeholder implementation
-	// In the actual implementation, use the parser module to evaluate the expression
-	return true // For demonstration purposes
+// evaluateExitCondition evaluates the exit condition expression
+// This is a placeholder - you'd use your actual parser module
+func (e *BacktestEngine) evaluateExitCondition(expression string, context map[string]interface{}) bool {
+	// Simple evaluation for testing
+	// In a real implementation, this would use your parser domain
+	return context["close"].(float64) < context["sma20"].(float64)
 }
 
-func (engine *BacktestEngine) processExit(
-	position *backtest.Position,
-	strategy *strategymodel.Strategy,
-	secondData *[]Stock,
-	startTime time.Time,
-	endTime time.Time,
-) {
-	// Return if no second data
-	if secondData == nil || len(*secondData) == 0 {
-		return
-	}
-
-	// Find the starting point in the second data
-	var startIndex int32 = -1
-	for i := int32(0); i < int32(len(*secondData)); i++ {
-		if !(*secondData)[i].Timestamp.Before(startTime) {
-			startIndex = i
-			break
-		}
-	}
-
-	// If no valid start point, use fallback
-	if startIndex == -1 {
-		return
-	}
-
-	// Find the end index
-	var endIndex int32 = int32(len(*secondData)) - 1
-	for i := startIndex; i < int32(len(*secondData)); i++ {
-		if !(*secondData)[i].Timestamp.Before(endTime) {
-			endIndex = i - 1
-			break
-		}
-	}
-
-	// If invalid range, return
-	if endIndex < startIndex {
-		return
-	}
-
-	// Process each second data point
-	for i := startIndex; i <= endIndex; i++ {
-		current := (*secondData)[i]
-
-		// Skip if position already exited
-		if position.State == backtest.Exited {
-			break
-		}
-
-		// Slice the data for context
-		slicedData := (*secondData)[:i+1]
-
-		// Try to exit the position
-		engine.checkExitCondition(position, strategy, &current, &slicedData)
-	}
+// checkStopLossOrTarget checks if a position should be closed due to stop loss or target price
+func (e *BacktestEngine) checkStopLossOrTarget(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+	return e.isStopLossTriggered(position, strategy, instrument) ||
+		e.isTargetProfitTriggered(position, strategy, instrument)
 }
 
-func (engine *BacktestEngine) checkExitCondition(
-	position *backtest.Position,
-	strategy *strategymodel.Strategy,
-	current *Stock,
-	data *[]Stock,
-) {
-	// Calculate stop loss and take profit levels
-	var stopLossPrice float64
-	if strategy.StopLoss > 0 {
-		if position.Direction == backtest.Long {
-			// Handle pointer dereference
-			if position.EntryPriceOrder != nil {
-				entryPrice := *position.EntryPriceOrder // Correctly dereference pointer
-				stopLossPrice = entryPrice * (1 - strategy.StopLoss/100)
-			}
+// isStopLossTriggered checks if stop loss is triggered
+func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+	if strategy.StopLoss <= 0 || position.EntryPriceOrder == nil {
+		return false
+	}
+
+	entryPrice := *position.EntryPriceOrder
+	stopPrice := 0.0
+
+	if position.Direction == model.Long {
+		if strategy.StopLossType == "percent" {
+			stopPrice = entryPrice * (1 - strategy.StopLoss/100)
 		} else {
-			// Handle pointer dereference
-			if position.EntryPriceOrder != nil {
-				entryPrice := *position.EntryPriceOrder // Correctly dereference pointer
-				stopLossPrice = entryPrice * (1 + strategy.StopLoss/100)
-			}
+			stopPrice = entryPrice - strategy.StopLoss
 		}
-	}
-
-	var targetProfitPrice float64
-	if strategy.TargetProfit > 0 {
-		if position.Direction == backtest.Long {
-			// Handle pointer dereference
-			if position.EntryPriceOrder != nil {
-				entryPrice := *position.EntryPriceOrder // Correctly dereference pointer
-				targetProfitPrice = entryPrice * (1 + strategy.TargetProfit/100)
-			}
+		return instrument.Low <= stopPrice
+	} else { // Short position
+		if strategy.StopLossType == "percent" {
+			stopPrice = entryPrice * (1 + strategy.StopLoss/100)
 		} else {
-			// Handle pointer dereference
-			if position.EntryPriceOrder != nil {
-				entryPrice := *position.EntryPriceOrder // Correctly dereference pointer
-				targetProfitPrice = entryPrice * (1 - strategy.TargetProfit/100)
-			}
+			stopPrice = entryPrice + strategy.StopLoss
 		}
-	}
-
-	// Check exit conditions using the parser
-	exitConditionResult := engine.evaluateExpression(strategy.ExitExpression, data)
-
-	// Determine if we should exit
-	var shouldExit bool
-	var exitReason string
-
-	// Check stop loss
-	if strategy.StopLoss > 0 {
-		if (position.Direction == backtest.Long && current.Close <= stopLossPrice) ||
-			(position.Direction == backtest.Short && current.Close >= stopLossPrice) {
-			shouldExit = true
-			exitReason = "stop_loss"
-		}
-	}
-
-	// Check take profit
-	if !shouldExit && strategy.TargetProfit > 0 {
-		if (position.Direction == backtest.Long && current.Close >= targetProfitPrice) ||
-			(position.Direction == backtest.Short && current.Close <= targetProfitPrice) {
-			shouldExit = true
-			exitReason = "take_profit"
-		}
-	}
-
-	// Check custom exit condition
-	if !shouldExit && exitConditionResult {
-		shouldExit = true
-		exitReason = "exit_condition"
-	}
-
-	// Exit the position if needed
-	if shouldExit {
-		// Create a nil UUID pointer for the order ID
-		var nilOrderID *uuid.UUID
-
-		position.Exit(
-			current.Close,
-			current.Timestamp,
-			current.Close,
-			current.Timestamp,
-			exitReason,
-			exitReason,
-			0, // No fees in backtest
-			nilOrderID,
-		)
+		return instrument.High >= stopPrice
 	}
 }
 
-func (engine *BacktestEngine) calculateRunMetrics(run *backtest.Run, positions []*backtest.Position) *backtest.RunMetrics {
-	metrics := backtest.NewRunMetrics(run.ID)
-
-	if len(positions) == 0 {
-		return metrics
+// isTargetProfitTriggered checks if target profit is triggered
+func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+	if strategy.TargetProfit <= 0 || position.EntryPriceOrder == nil {
+		return false
 	}
+
+	entryPrice := *position.EntryPriceOrder
+	targetPrice := 0.0
+
+	if position.Direction == model.Long {
+		if strategy.TargetProfitType == "percent" {
+			targetPrice = entryPrice * (1 + strategy.TargetProfit/100)
+		} else {
+			targetPrice = entryPrice + strategy.TargetProfit
+		}
+		return instrument.High >= targetPrice
+	} else { // Short position
+		if strategy.TargetProfitType == "percent" {
+			targetPrice = entryPrice * (1 - strategy.TargetProfit/100)
+		} else {
+			targetPrice = entryPrice - strategy.TargetProfit
+		}
+		return instrument.Low <= targetPrice
+	}
+}
+
+// calculatePositionSize calculates the position size based on strategy settings
+func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyResponse, capital float64, price float64) float64 {
+	// If strategy specifies fixed quantity, use that
+	if strategy.Qty > 0 {
+		return float64(strategy.Qty)
+	}
+
+	// Otherwise, use a percentage of capital
+	// Default to 10% if not specified
+	capitalPercentage := 10.0
+	capitalToRisk := capital * (capitalPercentage / 100)
+
+	// Calculate position size based on available capital
+	return capitalToRisk / price
+}
+
+// calculateFees calculates the trading fees
+func calculateFees(price float64, quantity float64) float64 {
+	// Implement your fee structure
+	// For example, 0.1% of transaction value
+	return price * quantity * 0.001
+}
+
+// calculateMetrics calculates backtest performance metrics
+func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCapital, finalCapital float64, run *model.Run) *model.RunMetrics {
+	metrics := model.NewRunMetrics(run.ID)
 
 	// Calculate basic metrics
-	var totalPnL float64
-	var totalWins int
-	var totalLosses int
-	var totalTradeDuration float64
-	var winAmount float64
-	var lossAmount float64
-	var maxDrawdown float64
-	var peakValue float64
-	var maxPositionSize float64
-	var totalPositionSize float64
+	totalTrades := len(positions)
+	winningTrades := 0
+	losingTrades := 0
+	breakEvenTrades := 0
+	totalProfitLoss := 0.0
+	totalWinAmount := 0.0
+	totalLossAmount := 0.0
+	totalCommission := 0.0
+	totalSlippage := 0.0
 
-	// Daily returns for standard deviation
-	dailyReturns := make([]float64, 0, len(positions))
-
-	// Process each position
-	for i, pos := range positions {
-		if pos.State != backtest.Exited || pos.EntryTimeOrder == nil || pos.ExitTimeOrder == nil {
+	// Process all positions
+	for _, position := range positions {
+		if position.NetProfitLoss == nil {
 			continue
 		}
 
-		// Position size
-		posSize := pos.PositionSize
-		if posSize > maxPositionSize {
-			maxPositionSize = posSize
-		}
-		totalPositionSize += posSize
+		profitLoss := *position.NetProfitLoss
 
-		// Calculate P&L - handle pointer dereferencing
-		var pnl float64
-		if pos.Direction == backtest.Long && pos.ExitPriceOrder != nil && pos.EntryPriceOrder != nil {
-			// Dereference the pointers for calculation
-			exitPrice := *pos.ExitPriceOrder
-			entryPrice := *pos.EntryPriceOrder
-			pnl = exitPrice - entryPrice
-		} else if pos.ExitPriceOrder != nil && pos.EntryPriceOrder != nil {
-			// Dereference the pointers for calculation
-			exitPrice := *pos.ExitPriceOrder
-			entryPrice := *pos.EntryPriceOrder
-			pnl = entryPrice - exitPrice
-		}
-		totalPnL += pnl
-
-		// Calculate return
-		dailyReturn := pnl / posSize
-		dailyReturns = append(dailyReturns, dailyReturn)
-
-		// Update drawdown tracking
-		currentValue := totalPnL
-		if i == 0 || currentValue > peakValue {
-			peakValue = currentValue
-		}
-		currentDrawdown := peakValue - currentValue
-		if currentDrawdown > maxDrawdown {
-			maxDrawdown = currentDrawdown
-		}
-
-		// Win/loss stats
-		if (pos.Direction == backtest.Long && pnl > 0) || (pos.Direction == backtest.Short && pnl < 0) {
-			totalWins++
-			winAmount += stdmath.Abs(pnl)
+		if profitLoss > 0 {
+			winningTrades++
+			totalWinAmount += profitLoss
+		} else if profitLoss < 0 {
+			losingTrades++
+			totalLossAmount += profitLoss // This is negative
 		} else {
-			totalLosses++
-			lossAmount += stdmath.Abs(pnl)
+			breakEvenTrades++
 		}
 
-		// Trade duration
-		duration := pos.ExitTimeOrder.Sub(*pos.EntryTimeOrder)
-		totalTradeDuration += duration.Hours()
+		totalProfitLoss += profitLoss
+
+		// Add transaction costs
+		if position.EntryFees != nil {
+			totalCommission += *position.EntryFees
+		}
+		if position.ExitFees != nil {
+			totalCommission += *position.ExitFees
+		}
 	}
 
-	// Set calculated metrics
-	totalTrades := totalWins + totalLosses
+	// Set metrics
+	metrics.TotalTrades = totalTrades
+
 	if totalTrades > 0 {
-		metrics.TotalTrades = int(totalTrades) // Convert to int as required by model
-		metrics.WinRate = float64(totalWins) / float64(totalTrades)
+		metrics.WinRate = float64(winningTrades) / float64(totalTrades) * 100
+	}
 
-		avgTradeDuration := totalTradeDuration / float64(totalTrades)
-		metrics.AvgTradeDuration = &avgTradeDuration
+	// Calculate profit factor
+	profitFactor := 0.0
+	if totalLossAmount != 0 {
+		profitFactor = totalWinAmount / stdmath.Abs(totalLossAmount)
+	}
+	metrics.ProfitFactor = &profitFactor
 
-		maxPositionSizeVal := maxPositionSize
-		metrics.MaxPositionSize = &maxPositionSizeVal
+	// Calculate average win and loss sizes
+	avgWinSize := 0.0
+	if winningTrades > 0 {
+		avgWinSize = totalWinAmount / float64(winningTrades)
+	}
+	metrics.AvgWinSize = &avgWinSize
 
-		avgPositionSize := totalPositionSize / float64(totalTrades)
-		metrics.AvgPositionSize = &avgPositionSize
+	avgLossSize := 0.0
+	if losingTrades > 0 {
+		avgLossSize = totalLossAmount / float64(losingTrades)
+	}
+	metrics.AvgLossSize = &avgLossSize
 
-		// P&L metrics
-		if totalPositionSize > 0 {
-			metrics.TotalReturnPct = (totalPnL / totalPositionSize) * 100
+	// Set transaction costs
+	metrics.TotalCommission = totalCommission
+	metrics.TotalSlippage = totalSlippage
 
-			// Calculate annualized return
-			if run.StartedTime != nil && run.EndedTime != nil {
-				durationDays := run.EndedTime.Sub(*run.StartedTime).Hours() / 24
-				if durationDays > 0 {
-					annualFactor := 365.0 / durationDays
-					metrics.AnnualizedReturn = (stdmath.Pow(1+totalPnL/totalPositionSize, annualFactor) - 1) * 100
-				}
-			}
-		}
+	if initialCapital > 0 {
+		metrics.TransactionCostsPct = (totalCommission + totalSlippage) / initialCapital * 100
+		metrics.TotalReturnPct = (finalCapital - initialCapital) / initialCapital * 100
+	}
 
-		// Win/loss metrics
-		if totalWins > 0 {
-			avgWinSize := winAmount / float64(totalWins)
-			metrics.AvgWinSize = &avgWinSize
-		}
+	// Calculate duration-based metrics
+	// Assuming you have appropriate start/end times in each position
+	totalDurationSeconds := 0.0
+	count := 0
 
-		if totalLosses > 0 {
-			avgLossSize := lossAmount / float64(totalLosses)
-			metrics.AvgLossSize = &avgLossSize
-		}
-
-		if totalLosses > 0 && lossAmount > 0 {
-			profitFactor := winAmount / lossAmount
-			metrics.ProfitFactor = &profitFactor
-		}
-
-		// Risk metrics
-		metrics.MaxDrawdown = maxDrawdown
-		if peakValue > 0 {
-			metrics.MaxDrawdownDuration = maxDrawdown / peakValue * 100
-		}
-
-		// Calculate standard deviation
-		if len(dailyReturns) > 0 {
-			mean := 0.0
-			for _, ret := range dailyReturns {
-				mean += ret
-			}
-			mean /= float64(len(dailyReturns))
-
-			variance := 0.0
-			for _, ret := range dailyReturns {
-				variance += (ret - mean) * (ret - mean)
-			}
-			variance /= float64(len(dailyReturns))
-			stdDev := stdmath.Sqrt(variance)
-			metrics.StdDeviation = stdDev
-
-			// Calculate Sharpe ratio (assuming risk-free rate of 0)
-			if stdDev > 0 {
-				metrics.SharpeRatio = mean / stdDev * stdmath.Sqrt(252)
-			}
-
-			// Calculate Sortino ratio
-			downsideVariance := 0.0
-			for _, ret := range dailyReturns {
-				if ret < 0 {
-					downsideVariance += ret * ret
-				}
-			}
-			downsideVariance /= float64(len(dailyReturns))
-			downsideDeviation := stdmath.Sqrt(downsideVariance)
-
-			if downsideDeviation > 0 {
-				metrics.SortinoRatio = mean / downsideDeviation * stdmath.Sqrt(252)
-			}
+	for _, position := range positions {
+		if position.EntryTimeOrder != nil && position.ExitTimeOrder != nil {
+			durationSeconds := position.ExitTimeOrder.Sub(*position.EntryTimeOrder).Seconds()
+			totalDurationSeconds += durationSeconds
+			count++
 		}
 	}
+
+	if count > 0 {
+		avgTradeDuration := totalDurationSeconds / float64(count) / 3600 // Convert to hours
+		metrics.AvgTradeDuration = &avgTradeDuration
+	}
+
+	// Calculate more advanced metrics (simplified)
+	metrics.SharpeRatio = 0.0  // Would require daily returns calculation
+	metrics.SortinoRatio = 0.0 // Would require daily returns calculation
+	metrics.MaxDrawdown = 0.0  // Would require equity curve calculation
+
+	// Store additional metrics as JSON
+	additionalMetrics := map[string]interface{}{
+		"initialCapital":  initialCapital,
+		"finalCapital":    finalCapital,
+		"netProfit":       finalCapital - initialCapital,
+		"winningTrades":   winningTrades,
+		"losingTrades":    losingTrades,
+		"breakEvenTrades": breakEvenTrades,
+	}
+
+	metrics.SetMetricData(additionalMetrics)
+
+	// Update metrics timestamp
+	metrics.UpdatedAt = time.Now()
 
 	return metrics
 }
