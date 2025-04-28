@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"algo/internal/modules/community/domain/model"
-	"algo/internal/modules/community/domain/repository"
 
 	"github.com/google/uuid"
 )
@@ -18,10 +17,8 @@ type TopicRepository struct {
 	db *sql.DB
 }
 
-// NewTopicRepository creates a new PostgreSQL topic repository
-func NewTopicRepository(db *sql.DB) repository.TopicRepository {
-	return &TopicRepository{db: db}
-}
+// NewTopicRepository is defined in repository_factory.go
+// This implementation satisfies the repository.TopicRepository interface
 
 // Create creates a new topic in the database
 func (r *TopicRepository) Create(ctx context.Context, topic *model.Topic) error {
