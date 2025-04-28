@@ -55,24 +55,11 @@ func (c *UserController) Register(ctx *gin.Context) {
 		return
 	}
 
-	// Convert user model to DTO
-	userDTO := modelToDTO(authResp.User)
-
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Create response
-	response := dto.AuthResponse{
-		Token:     authResp.Token,
-		User:      userDTO,
-		ExpiresAt: authResp.ExpiresAt.Unix(),
-	}
-
-	ctx.JSON(http.StatusCreated, dto.ApiResponse{
-		Success: true,
-		Message: "User registered successfully",
-		Data:    response,
-	})
+	// Redirect to home page after successful registration
+	ctx.Redirect(http.StatusFound, "/home")
 }
 
 // Login handles user login
@@ -100,24 +87,11 @@ func (c *UserController) Login(ctx *gin.Context) {
 		return
 	}
 
-	// Convert user model to DTO
-	userDTO := modelToDTO(authResp.User)
-
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Create response
-	response := dto.AuthResponse{
-		Token:     authResp.Token,
-		User:      userDTO,
-		ExpiresAt: authResp.ExpiresAt.Unix(),
-	}
-
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Message: "Login successful",
-		Data:    response,
-	})
+	// Redirect to home page after successful login
+	ctx.Redirect(http.StatusFound, "/home")
 }
 
 // RefreshToken refreshes a user's token
@@ -142,24 +116,11 @@ func (c *UserController) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	// Convert user model to DTO
-	userDTO := modelToDTO(authResp.User)
-
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Create response
-	response := dto.AuthResponse{
-		Token:     authResp.Token,
-		User:      userDTO,
-		ExpiresAt: authResp.ExpiresAt.Unix(),
-	}
-
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Message: "Token refreshed successfully",
-		Data:    response,
-	})
+	// Redirect to home page after successful token refresh
+	ctx.Redirect(http.StatusFound, "/home")
 }
 
 // GetProfile gets the current user's profile

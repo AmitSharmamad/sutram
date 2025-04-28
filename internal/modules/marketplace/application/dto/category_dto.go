@@ -10,5 +10,5 @@ type CategoryResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
-	Icon        string    `json:"icon,omitempty"`
+	Icon        *string    `json:"icon,omitempty"`
 }
