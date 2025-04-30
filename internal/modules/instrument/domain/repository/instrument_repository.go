@@ -15,8 +15,9 @@ type InstrumentRepository interface {
 	// FindBySymbol finds instruments by symbol
 	FindBySymbol(ctx context.Context, symbol string) ([]*model.Instrument, error)
 
-	// FindBySymbolAndTimeRange finds instruments by symbol within a time range
-	FindBySymbolAndTimeRange(ctx context.Context, symbol string, start, end time.Time) ([]*model.Instrument, error)
+	// FindByIDAndTimeRange finds instruments by ID within a time range and aggregated by timeFrame
+	// timeFrame parameter allows data aggregation by different time intervals ('1s', '1m', '3m', '5m', '15m', '30m', '1h', '3h', '1d', '1M')
+	FindByIDAndTimeRange(ctx context.Context, id uint64, start, end time.Time, timeFrame string) ([]*model.Instrument, error)
 
 	// Create creates a new instrument
 	Create(ctx context.Context, instrument *model.Instrument) error

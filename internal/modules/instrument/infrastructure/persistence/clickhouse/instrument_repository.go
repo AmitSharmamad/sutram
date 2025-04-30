@@ -80,30 +80,50 @@ func (r *InstrumentRepository) FindBySymbol(ctx context.Context, symbol string) 
 	return instruments, nil
 }
 
-// FindBySymbolAndTimeRange finds instruments by symbol within a time range
-func (r *InstrumentRepository) FindBySymbolAndTimeRange(ctx context.Context, symbol string, start, end time.Time) ([]*model.Instrument, error) {
+// FindByIDAndTimeRange finds instruments by ID within a time range
+// timeFrame parameter allows data aggregation by different time intervals ('1s', '1m', '3m', '5m', '15m', '30m', '1h', '3h', '1d', '1M')
+func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint64, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
 	query := `
-		SELECT 
-			id, 
-			instrument, 
-			open, 
-			high, 
-			low, 
-			close, 
-			volume, 
-			timestamp, 
-			created_at, 
-			updated_at
+		SELECT
+			id,
+			instrument,
+			CASE
+				WHEN ? = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
+				WHEN ? = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
+				WHEN ? = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
+				WHEN ? = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
+				WHEN ? = '15m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 15 MINUTE)
+				WHEN ? = '30m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 30 MINUTE)
+				WHEN ? = '1h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 HOUR)
+				WHEN ? = '3h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 HOUR)
+				WHEN ? = '1d' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 DAY)
+				WHEN ? = '1M' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MONTH)
+			END AS timestamp,
+			MIN(low) AS low,
+			MAX(high) AS high,
+			first_value(open) AS open,
+			last_value(close) AS close,
+			SUM(volume) AS volume,
+			MIN(created_at) AS created_at,
+			MAX(updated_at) AS updated_at
 		FROM instrument
 		WHERE 
-			instrument = ? AND
-			timestamp >= ? AND
-			timestamp <= ?
-		ORDER BY timestamp ASC
+			id = ? AND
+			toTimeZone(timestamp, 'Asia/Kolkata') BETWEEN ? AND ?
+		GROUP BY
+			id,
+			instrument,
+			timestamp
+		ORDER BY
+			timestamp ASC
 	`
 
 	var instruments []*model.Instrument
-	err := r.db.SelectContext(ctx, &instruments, query, symbol, start, end)
+	err := r.db.SelectContext(ctx, &instruments, query,
+		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
+		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
+		id, start, end)
+
 	if err != nil {
 		return nil, fmt.Errorf("error querying instruments by time range: %w", err)
 	}

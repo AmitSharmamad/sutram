@@ -12,10 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Common errors
-var (
-	ErrPositionNotFound = errors.New("position not found")
-)
+// PositionRepository implements the repository.PositionRepository interface
 
 // PositionRepository implements the repository.PositionRepository interface
 type PositionRepository struct {
@@ -335,6 +332,78 @@ func (r *PositionRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 	if rowsAffected == 0 {
 		return ErrPositionNotFound
+	}
+
+	return nil
+}
+
+// BulkCreate saves multiple positions in the database in a single operation
+func (r *PositionRepository) BulkCreate(ctx context.Context, positions []*model.Position) error {
+	// Start a transaction
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer tx.Rollback()
+
+	// Prepare the statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO position (
+			id, run_id, state, direction, entry_price_signal, entry_time_signal,
+			entry_price_order, entry_time_order, entry_signal, exit_price_signal,
+			exit_time_signal, exit_price_order, exit_time_order, exit_signal,
+			exit_reason, profit_loss_absolute, profit_loss_percentage, 
+			transaction_cost, entry_fees, exit_fees, net_profit_loss,
+			position_size, entry_order_id, exit_order_id, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer stmt.Close()
+
+	// Execute for each position
+	for _, position := range positions {
+		_, err := stmt.ExecContext(
+			ctx,
+			position.ID,
+			position.RunID,
+			position.State,
+			position.Direction,
+			position.EntryPriceSignal,
+			position.EntryTimeSignal,
+			position.EntryPriceOrder,
+			position.EntryTimeOrder,
+			position.EntrySignal,
+			position.ExitPriceSignal,
+			position.ExitTimeSignal,
+			position.ExitPriceOrder,
+			position.ExitTimeOrder,
+			position.ExitSignal,
+			position.ExitReason,
+			position.ProfitLossAbsolute,
+			position.ProfitLossPercentage,
+			position.TransactionCost,
+			position.EntryFees,
+			position.ExitFees,
+			position.NetProfitLoss,
+			position.PositionSize,
+			position.EntryOrderID,
+			position.ExitOrderID,
+			position.CreatedAt,
+			position.UpdatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
 	}
 
 	return nil

@@ -12,11 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Common errors
-var (
-	ErrRunGroupNotFound = errors.New("run group not found")
-	ErrDatabaseError    = errors.New("database error")
-)
+// RunGroupRepository implements the repository.RunGroupRepository interface
 
 // RunGroupRepository implements the repository.RunGroupRepository interface
 type RunGroupRepository struct {

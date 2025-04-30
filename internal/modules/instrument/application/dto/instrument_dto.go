@@ -79,6 +79,7 @@ type GetInstrumentsByTimeRangeRequest struct {
 	Symbol    string    `json:"symbol" binding:"required"`
 	StartTime time.Time `json:"start_time" binding:"required"`
 	EndTime   time.Time `json:"end_time" binding:"required"`
+	TimeFrame string    `json:"time_frame" binding:"omitempty,oneof=1s 1m 3m 5m 15m 30m 1h 3h 1d 1M"`
 }
 
 // InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters

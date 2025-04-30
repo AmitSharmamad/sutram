@@ -35,20 +35,22 @@ type RunGroup struct {
 
 // Run represents a backtest, paper trade, or live trade run
 type Run struct {
-	ID              uuid.UUID  `json:"id" db:"id"`
-	RunGroupID      uuid.UUID  `json:"run_group_id" db:"run_group_id"`
-	StrategyID      uuid.UUID  `json:"strategy_id" db:"strategy_id"`
-	Exchange        string     `json:"exchange" db:"exchange"`
-	InstrumentID    int        `json:"instrument_id" db:"instrument_id"`
-	Type            RunType    `json:"type" db:"type"`
-	State           RunState   `json:"state" db:"state"`
-	Qty             int        `json:"qty" db:"qty"`
-	PeriodStartTime time.Time  `json:"period_start_time" db:"period_start_time"`
-	PeriodEndTime   time.Time  `json:"period_end_time" db:"period_end_time"`
-	StartedTime     *time.Time `json:"started_time,omitempty" db:"started_time"`
-	EndedTime       *time.Time `json:"ended_time,omitempty" db:"ended_time"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID   `json:"id" db:"id"`
+	RunGroupID      uuid.UUID   `json:"run_group_id" db:"run_group_id"`
+	StrategyID      uuid.UUID   `json:"strategy_id" db:"strategy_id"`
+	Exchange        string      `json:"exchange" db:"exchange"`
+	InstrumentID    int         `json:"instrument_id" db:"instrument_id"`
+	Type            RunType     `json:"type" db:"type"`
+	State           RunState    `json:"state" db:"state"`
+	Qty             int         `json:"qty" db:"qty"`
+	PeriodStartTime time.Time   `json:"period_start_time" db:"period_start_time"`
+	PeriodEndTime   time.Time   `json:"period_end_time" db:"period_end_time"`
+	StartedTime     *time.Time  `json:"started_time,omitempty" db:"started_time"`
+	EndedTime       *time.Time  `json:"ended_time,omitempty" db:"ended_time"`
+	CreatedAt       time.Time   `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at" db:"updated_at"`
+	Positions       []*Position `json:"positions,omitempty" db:"-"`
+	RunMetrics      *RunMetrics `json:"run_metrics,omitempty" db:"-"`
 }
 
 // NewRunGroup creates a new run group

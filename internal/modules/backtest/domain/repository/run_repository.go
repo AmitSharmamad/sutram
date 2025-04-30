@@ -13,6 +13,9 @@ type RunRepository interface {
 	// Create saves a new run in the database
 	Create(ctx context.Context, run *model.Run) error
 
+	// BulkCreate saves multiple runs in the database in a single operation
+	BulkCreate(ctx context.Context, runs []*model.Run) error
+
 	// GetByID retrieves a run by its ID
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Run, error)
 

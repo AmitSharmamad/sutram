@@ -13,6 +13,9 @@ type PositionRepository interface {
 	// Create saves a new position in the database
 	Create(ctx context.Context, position *model.Position) error
 
+	// BulkCreate saves multiple positions in the database in a single operation
+	BulkCreate(ctx context.Context, positions []*model.Position) error
+
 	// GetByID retrieves a position by its ID
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Position, error)
 
