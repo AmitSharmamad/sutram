@@ -13,11 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-// Common errors
-var (
-	ErrRunMetricsNotFound = errors.New("run metrics not found")
-)
-
 // RunMetricsRepository implements the repository.RunMetricsRepository interface
 type RunMetricsRepository struct {
 	db *sql.DB
@@ -258,6 +253,83 @@ func (r *RunMetricsRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 	if rowsAffected == 0 {
 		return ErrRunMetricsNotFound
+	}
+
+	return nil
+}
+
+// BulkCreate saves multiple run metrics in the database in a single operation
+func (r *RunMetricsRepository) BulkCreate(ctx context.Context, metrics []*model.RunMetrics) error {
+	// Start a transaction
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer tx.Rollback()
+
+	// Prepare the statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO run_metrics (
+			id, run_id, total_return_pct, annualized_return, risk_adjusted_return,
+			daily_returns, monthly_returns, sharpe_ratio, sortino_ratio, max_drawdown,
+			max_drawdown_duration, value_at_risk, std_deviation, downside_deviation,
+			total_trades, win_rate, avg_win_size, avg_loss_size, avg_trade_duration,
+			profit_factor, avg_position_size, max_position_size, position_turnover,
+			avg_exposure, total_commission, total_slippage, transaction_costs_pct,
+			metric_json, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+			$16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer stmt.Close()
+
+	// Execute for each metric
+	for _, metric := range metrics {
+		_, err := stmt.ExecContext(
+			ctx,
+			metric.ID,
+			metric.RunID,
+			metric.TotalReturnPct,
+			metric.AnnualizedReturn,
+			metric.RiskAdjustedReturn,
+			pq.Array(metric.DailyReturns),
+			pq.Array(metric.MonthlyReturns),
+			metric.SharpeRatio,
+			metric.SortinoRatio,
+			metric.MaxDrawdown,
+			metric.MaxDrawdownDuration,
+			metric.ValueAtRisk,
+			metric.StdDeviation,
+			metric.DownsideDeviation,
+			metric.TotalTrades,
+			metric.WinRate,
+			metric.AvgWinSize,
+			metric.AvgLossSize,
+			metric.AvgTradeDuration,
+			metric.ProfitFactor,
+			metric.AvgPositionSize,
+			metric.MaxPositionSize,
+			metric.PositionTurnover,
+			metric.AvgExposure,
+			metric.TotalCommission,
+			metric.TotalSlippage,
+			metric.TransactionCostsPct,
+			metric.MetricJSON,
+			metric.CreatedAt,
+			metric.UpdatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
 	}
 
 	return nil

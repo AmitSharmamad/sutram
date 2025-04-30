@@ -13,6 +13,9 @@ type RunMetricsRepository interface {
 	// Create saves new run metrics in the database
 	Create(ctx context.Context, metrics *model.RunMetrics) error
 
+	// BulkCreate saves multiple run metrics in the database in a single operation
+	BulkCreate(ctx context.Context, metrics []*model.RunMetrics) error
+
 	// GetByRunID retrieves metrics for a specific run
 	GetByRunID(ctx context.Context, runID uuid.UUID) (*model.RunMetrics, error)
 

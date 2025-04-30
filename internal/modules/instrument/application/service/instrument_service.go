@@ -66,14 +66,19 @@ func (s *InstrumentService) GetInstrumentsBySymbol(ctx context.Context, symbol s
 	return instruments, nil
 }
 
-// GetInstrumentsByTimeRange gets instruments by symbol within a time range
-func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, symbol string, start, end time.Time) ([]*model.Instrument, error) {
+// GetInstrumentsByTimeRange gets instruments by ID within a time range
+func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, id uint64, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
 	// Validate time range
 	if start.After(end) {
 		return nil, ErrInvalidTimeRange
 	}
 
-	instruments, err := s.instrumentRepo.FindBySymbolAndTimeRange(ctx, symbol, start, end)
+	// Default to '1m' if timeFrame is empty
+	if timeFrame == "" {
+		timeFrame = "1m"
+	}
+
+	instruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, start, end, timeFrame)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instruments by time range: %w", err)
 	}
@@ -211,4 +216,59 @@ func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, id uint6
 		return fmt.Errorf("error deleting instrument master: %w", err)
 	}
 	return nil
+}
+
+// GetInstrumentDataWithLookback gets instrument data for a given time range plus historical lookback data
+// Combines both the requested date range data and lookback data into a single result
+func (s *InstrumentService) GetInstrumentDataWithLookback(
+	ctx context.Context,
+	id uint64,
+	start, end time.Time,
+	timeFrame string,
+	lookBack int,
+) (*model.StockData, error) {
+	// Validate time range
+	if start.After(end) {
+		return nil, ErrInvalidTimeRange
+	}
+
+	// Get data for the requested date range
+	rangeInstruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, start, end, timeFrame)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instruments for date range: %w", err)
+	}
+
+	// Convert pointers to values for StockData
+	dateRangeData := make(model.StockData, len(rangeInstruments))
+	for i, instrument := range rangeInstruments {
+		dateRangeData[i] = *instrument
+	}
+
+	// Calculate lookback start time (this would depend on timeFrame implementation)
+	// For now, we'll assume lookBack is in days
+	lookBackStart := start.AddDate(0, 0, -lookBack)
+
+	// Get lookback data
+	lookBackInstruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, lookBackStart, start, timeFrame)
+	if err != nil {
+		// If there's an error with lookback, just return the date range data
+		return &dateRangeData, nil
+	}
+
+	// Convert pointers to values for StockData
+	lookBackData := make(model.StockData, len(lookBackInstruments))
+	for i, instrument := range lookBackInstruments {
+		lookBackData[i] = *instrument
+	}
+
+	// Reverse the lookback data (older to newer)
+	for i, j := 0, len(lookBackData)-1; i < j; i, j = i+1, j-1 {
+		lookBackData[i], lookBackData[j] = lookBackData[j], lookBackData[i]
+	}
+
+	// Combine lookback and date range data
+	result := append(make(model.StockData, 0), lookBackData...)
+	result = append(result, dateRangeData...)
+
+	return &result, nil
 }

@@ -126,11 +126,27 @@ func (c *InstrumentController) GetInstrumentsByTimeRange(ctx *gin.Context) {
 	}
 
 	// Get instruments by time range
+	timeFrame := req.TimeFrame
+	if timeFrame == "" {
+		timeFrame = "1m" // Default to 1-minute timeframe if not specified
+	}
+
+	// Convert symbol string to uint64
+	symbolID, err := strconv.ParseUint(req.Symbol, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid symbol format: " + err.Error(),
+		})
+		return
+	}
+
 	instruments, err := c.instrumentService.GetInstrumentsByTimeRange(
 		ctx.Request.Context(),
-		req.Symbol,
+		symbolID,
 		req.StartTime,
 		req.EndTime,
+		timeFrame,
 	)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{

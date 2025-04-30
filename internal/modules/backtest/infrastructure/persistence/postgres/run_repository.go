@@ -12,11 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Common errors
-var (
-	ErrRunNotFound = errors.New("run not found")
-)
-
 // RunRepository implements the repository.RunRepository interface
 type RunRepository struct {
 	db *sql.DB
@@ -359,4 +354,60 @@ func (r *RunRepository) queryRuns(ctx context.Context, query string, args ...int
 	}
 
 	return runs, nil
+}
+
+// BulkCreate saves multiple runs in the database in a single operation
+func (r *RunRepository) BulkCreate(ctx context.Context, runs []*model.Run) error {
+	// Start a transaction
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer tx.Rollback()
+
+	// Prepare the statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO run (
+			id, run_group_id, strategy_id, exchange, instrument_id, 
+			type, state, qty, period_start_time, period_end_time, 
+			started_time, ended_time, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer stmt.Close()
+
+	// Execute for each run
+	for _, run := range runs {
+		_, err := stmt.ExecContext(
+			ctx,
+			run.ID,
+			run.RunGroupID,
+			run.StrategyID,
+			run.Exchange,
+			run.InstrumentID,
+			run.Type,
+			run.State,
+			run.Qty,
+			run.PeriodStartTime,
+			run.PeriodEndTime,
+			run.StartedTime,
+			run.EndedTime,
+			run.CreatedAt,
+			run.UpdatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+
+	return nil
 }

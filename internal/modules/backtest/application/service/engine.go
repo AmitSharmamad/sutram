@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	stdmath "math"
-	"strconv"
 	"sync"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 // EngineService defines the service for backtest engine operations
 type EngineService interface {
 	// Start a backtest run for the provided strategy
-	StartBacktest(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error)
+	Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error)
 }
 
 // BacktestEngine implements the engine for running backtests
@@ -34,15 +33,7 @@ type BacktestEngine struct {
 	runMetricsRepo    backtestRepo.RunMetricsRepository
 }
 
-// Instrument represents OHLCV data for backtest processing
-type Instrument struct {
-	Timestamp time.Time
-	Open      float64
-	High      float64
-	Low       float64
-	Close     float64
-	Volume    float64
-}
+// We're using instrumentModel.Instrument instead of defining our own struct
 
 // NewBacktestEngine creates a new backtest engine
 func NewBacktestEngine(
@@ -65,113 +56,158 @@ func NewBacktestEngine(
 	}
 }
 
-// StartBacktest starts a backtest run for the provided strategy
-func (e *BacktestEngine) StartBacktest(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error) {
+// Start starts a backtest run for the provided strategy
+func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error) {
 	// Get the strategy
 	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a run group
+	// Create a run group in memory
 	runGroup := model.NewRunGroup(strategyID)
+
+	// Create runs for each instrument
+	runs := make([]*model.Run, 0)
+	var wg sync.WaitGroup
+
+	for _, instrumentID := range strategyResp.Instruments {
+		// Fetch instrument data using ID directly
+		// TODO: Move this outside of the loop
+		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByID(
+			ctx,
+			uint64(instrumentID),
+		)
+		if err != nil {
+			// Log error and continue with other instruments
+			continue
+		}
+
+		// Get historical data for the instrument
+		// Handle nil time values for date range
+		var startDate, endDate time.Time
+		if strategyResp.StartDate != nil {
+			startDate = *strategyResp.StartDate
+		} else {
+			startDate = time.Now().AddDate(-1, 0, 0) // Default to 1 year back
+		}
+
+		if strategyResp.EndDate != nil {
+			endDate = *strategyResp.EndDate
+		} else {
+			endDate = time.Now()
+		}
+
+		instrumentIDInt := int(instrumentMaster.ID)
+		qty := 1 // Default quantity
+		if strategyResp.Qty > 0 {
+			qty = strategyResp.Qty
+		}
+
+		// Create a run for this instrument (in memory)
+		run := model.NewRun(
+			runGroup.ID,
+			strategyID,
+			instrumentMaster.Exchange,
+			instrumentIDInt,
+			model.Backtest,
+			qty,
+			startDate,
+			endDate,
+		)
+
+		runs = append(runs, run)
+
+		wg.Add(1)
+
+		// Execute run asynchronously as goroutine
+		go e.executeRunBacktest(ctx, run, int64(instrumentID), strategyResp, &wg)
+	}
+
+	// Wait for all backtest runs to complete
+	wg.Wait()
+
+	// Save run group to database
 	if err := e.runGroupRepo.Create(ctx, runGroup); err != nil {
 		return nil, err
 	}
 
-	// Process each instrument in the strategy
-	var wg sync.WaitGroup
-	for _, instrumentID := range strategyResp.Instruments {
-		wg.Add(1)
-
-		go func(instrumentID int32) {
-			defer wg.Done()
-
-			// Convert int32 to string for the symbol lookup
-			symbol := strconv.FormatInt(int64(instrumentID), 10)
-
-			// Fetch instrument data
-			instrumentMaster, err := e.instrumentService.GetInstrumentMasterBySymbol(ctx, symbol)
-			if err != nil {
-				// Log error and continue with other instruments
-				return
-			}
-
-			// Get historical data for the instrument
-			// Handle nil time values for date range
-			var startDate, endDate time.Time
-			if strategyResp.StartDate != nil {
-				startDate = *strategyResp.StartDate
-			} else {
-				startDate = time.Now().AddDate(-1, 0, 0) // Default to 1 year back
-			}
-
-			if strategyResp.EndDate != nil {
-				endDate = *strategyResp.EndDate
-			} else {
-				endDate = time.Now()
-			}
-
-			instruments, err := e.instrumentService.GetInstrumentsByTimeRange(ctx, symbol, startDate, endDate)
-			if err != nil {
-				// Log error and continue with other instruments
-				return
-			}
-
-			// Create a run for this instrument
-			// Assuming instrumentMaster.ID is uint64, convert to int for Run
-			instrumentIDInt := int(instrumentMaster.ID)
-			qty := 1 // Default quantity
-			if strategyResp.Qty > 0 {
-				qty = strategyResp.Qty
-			}
-
-			run := model.NewRun(
-				runGroup.ID,
-				strategyID,
-				instrumentMaster.Exchange,
-				instrumentIDInt,
-				model.Backtest,
-				qty,
-				startDate,
-				endDate,
-			)
-
-			if err := e.runRepo.Create(ctx, run); err != nil {
-				// Log error and continue with other instruments
-				return
-			}
-
-			// Convert instruments to engine instrument format
-			instrumentData := e.getInstrumentById(instruments)
-
-			// Execute backtest for this instrument
-			e.executeBacktest(ctx, strategyResp, instrumentData, run)
-		}(instrumentID)
+	// Bulk create all runs
+	if len(runs) > 0 {
+		if err := e.runRepo.BulkCreate(ctx, runs); err != nil {
+			return nil, err
+		}
 	}
 
-	wg.Wait()
+	// Collect all positions and metrics from runs
+	positions := make([]*model.Position, 0)
+	metrics := make([]*model.RunMetrics, 0)
+
+	for _, run := range runs {
+		if run.RunMetrics != nil {
+			metrics = append(metrics, run.RunMetrics)
+		}
+		positions = append(positions, run.Positions...)
+	}
+
+	// Bulk create all positions
+	if len(positions) > 0 {
+		if err := e.positionRepo.BulkCreate(ctx, positions); err != nil {
+			return nil, err
+		}
+	}
+
+	// Bulk create all metrics
+	if len(metrics) > 0 {
+		if err := e.runMetricsRepo.BulkCreate(ctx, metrics); err != nil {
+			return nil, err
+		}
+	}
+
 	return runGroup, nil
 }
 
-// getInstrumentById converts instrument domain model to engine instrument model
-func (e *BacktestEngine) getInstrumentById(instruments []*instrumentModel.Instrument) []Instrument {
-	instrumentData := make([]Instrument, len(instruments))
-	for i, inst := range instruments {
-		instrumentData[i] = Instrument{
-			Timestamp: inst.Timestamp,
-			Open:      inst.Open,
-			High:      inst.High,
-			Low:       inst.Low,
-			Close:     inst.Close,
-			Volume:    float64(inst.Volume),
-		}
+// executeRunBacktest runs a backtest for a single instrument run
+func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run, instrumentID int64, strategy *strategyDto.StrategyResponse, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	instrumentMaster, err := e.instrumentService.GetInstrumentMasterByID(
+		ctx,
+		uint64(instrumentID),
+	)
+	if err != nil {
+		return
 	}
-	return instrumentData
+
+	instruments, err := e.instrumentService.GetInstrumentsByTimeRange(
+		ctx,
+		instrumentMaster.ID,
+		run.PeriodStartTime,
+		run.PeriodEndTime,
+		string(strategy.ChartTimeframe),
+	)
+	if err != nil {
+		return
+	}
+
+	// Convert instruments to engine instrument format
+	instrumentData := e.getInstrumentById(instruments)
+
+	// Execute backtest for this instrument and gather positions and metrics
+	positions, metrics := e.executeBacktestInMemory(strategy, instrumentData, run)
+
+	// Store the positions and metrics in the run
+	run.Positions = positions
+	run.RunMetrics = metrics
 }
 
-// executeBacktest runs the backtest for a single instrument
-func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategyDto.StrategyResponse, instruments []Instrument, run *model.Run) {
+// getInstrumentById returns the instrument data directly without conversion
+func (e *BacktestEngine) getInstrumentById(instruments []*instrumentModel.Instrument) []*instrumentModel.Instrument {
+	return instruments
+}
+
+// executeBacktestInMemory runs the backtest for a single instrument and returns the results without saving to database
+func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
 	// Initialize a parser for entry/exit expressions (assuming a factory exists in your parser domain)
 	// This is a placeholder - you'll need to implement actual expression parsing and evaluation
 	// based on your parser module structure
@@ -186,7 +222,6 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	startTime := time.Now()
 	run.StartedTime = &startTime
 	run.State = model.Started
-	e.runRepo.Update(ctx, run)
 
 	for i, instrument := range instruments {
 		// If we have at least 20 candles for indicators, evaluate expressions
@@ -271,9 +306,8 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 					nil,
 				)
 
-				// Save position
+				// Collect position
 				positions = append(positions, openPosition)
-				e.positionRepo.Create(ctx, openPosition)
 
 				// Update capital if this is a real exit (not end of backtest)
 				if openPosition.NetProfitLoss != nil {
@@ -295,15 +329,41 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	endTime := time.Now()
 	run.EndedTime = &endTime
 	run.State = model.Ended
+
+	// Calculate metrics
+	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
+
+	return positions, metrics
+}
+
+// executeBacktest runs the backtest for a single instrument and saves results to the database
+// This legacy method is kept for backward compatibility
+func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, run *model.Run) {
+	// Mark run as started
+	startTime := time.Now()
+	run.StartedTime = &startTime
+	run.State = model.Started
 	e.runRepo.Update(ctx, run)
 
-	// Calculate and save metrics
-	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
-	e.runMetricsRepo.Create(ctx, metrics)
+	// Run the backtest in memory
+	positions, metrics := e.executeBacktestInMemory(strategy, instruments, run)
+
+	// Save positions one by one
+	for _, position := range positions {
+		e.positionRepo.Create(ctx, position)
+	}
+
+	// Update run state
+	e.runRepo.Update(ctx, run)
+
+	// Save metrics
+	if metrics != nil {
+		e.runMetricsRepo.Create(ctx, metrics)
+	}
 }
 
 // createDataContext creates a data context for expression evaluation
-func (e *BacktestEngine) createDataContext(instruments []Instrument, currentIndex int) map[string]interface{} {
+func (e *BacktestEngine) createDataContext(instruments []*instrumentModel.Instrument, currentIndex int) map[string]interface{} {
 	context := make(map[string]interface{})
 
 	// Add basic OHLCV data
@@ -358,13 +418,13 @@ func (e *BacktestEngine) evaluateExitCondition(expression string, context map[st
 }
 
 // checkStopLossOrTarget checks if a position should be closed due to stop loss or target price
-func (e *BacktestEngine) checkStopLossOrTarget(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+func (e *BacktestEngine) checkStopLossOrTarget(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
 	return e.isStopLossTriggered(position, strategy, instrument) ||
 		e.isTargetProfitTriggered(position, strategy, instrument)
 }
 
 // isStopLossTriggered checks if stop loss is triggered
-func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
 	if strategy.StopLoss <= 0 || position.EntryPriceOrder == nil {
 		return false
 	}
@@ -390,7 +450,7 @@ func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy 
 }
 
 // isTargetProfitTriggered checks if target profit is triggered
-func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument Instrument) bool {
+func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
 	if strategy.TargetProfit <= 0 || position.EntryPriceOrder == nil {
 		return false
 	}
