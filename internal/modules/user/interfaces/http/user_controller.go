@@ -58,8 +58,15 @@ func (c *UserController) Register(ctx *gin.Context) {
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Redirect to home page after successful registration
-	ctx.Redirect(http.StatusFound, "/home")
+	// Return success response with token and user data
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data: gin.H{
+			"token":     authResp.Token,
+			"expiresAt": authResp.ExpiresAt,
+			"user":      authResp.User,
+		},
+	})
 }
 
 // Login handles user login
@@ -90,8 +97,15 @@ func (c *UserController) Login(ctx *gin.Context) {
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Redirect to home page after successful login
-	ctx.Redirect(http.StatusFound, "/home")
+	// Return success response with token and user data
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data: gin.H{
+			"token":     authResp.Token,
+			"expiresAt": authResp.ExpiresAt,
+			"user":      authResp.User,
+		},
+	})
 }
 
 // RefreshToken refreshes a user's token
@@ -119,8 +133,14 @@ func (c *UserController) RefreshToken(ctx *gin.Context) {
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Redirect to home page after successful token refresh
-	ctx.Redirect(http.StatusFound, "/home")
+	// Return success response with new token
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data: gin.H{
+			"token":     authResp.Token,
+			"expiresAt": authResp.ExpiresAt,
+		},
+	})
 }
 
 // GetProfile gets the current user's profile
