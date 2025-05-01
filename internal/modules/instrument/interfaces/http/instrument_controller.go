@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"algo/internal/modules/instrument/application/dto"
 	"algo/internal/modules/instrument/application/service"
@@ -502,6 +503,56 @@ func (c *InstrumentController) DeleteInstrumentMaster(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
 		Message: "Instrument master deleted successfully",
+	})
+}
+
+// GetInstrumentMastersByIDs gets instrument masters by their IDs
+func (c *InstrumentController) GetInstrumentMastersByIDs(ctx *gin.Context) {
+	// Get ids from query parameter
+	idsParam := ctx.Query("ids")
+	if idsParam == "" {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Missing required query parameter: ids",
+		})
+		return
+	}
+
+	// Parse and validate IDs
+	idStrings := strings.Split(idsParam, ",")
+	ids := make([]uint64, 0, len(idStrings))
+
+	for _, idStr := range idStrings {
+		id, err := strconv.ParseUint(strings.TrimSpace(idStr), 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid ID format: " + idStr,
+			})
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	// Get the instrument masters
+	instrumentMasters, err := c.instrumentService.GetInstrumentMastersByIDs(ctx.Request.Context(), ids)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get instrument masters: " + err.Error(),
+		})
+		return
+	}
+
+	// Convert instrument master models to DTOs
+	instrumentMasterDTOs := make([]*dto.InstrumentMasterDTO, len(instrumentMasters))
+	for i, instrumentMaster := range instrumentMasters {
+		instrumentMasterDTOs[i] = masterModelToDTO(instrumentMaster)
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    instrumentMasterDTOs,
 	})
 }
 

@@ -272,3 +272,12 @@ func (s *InstrumentService) GetInstrumentDataWithLookback(
 
 	return &result, nil
 }
+
+// GetInstrumentMastersByIDs gets multiple instrument masters by their IDs
+func (s *InstrumentService) GetInstrumentMastersByIDs(ctx context.Context, ids []uint64) ([]*model.InstrumentMaster, error) {
+	instrumentMasters, err := s.instrumentMasterRepo.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instrument masters by IDs: %w", err)
+	}
+	return instrumentMasters, nil
+}

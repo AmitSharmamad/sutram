@@ -34,4 +34,7 @@ type InstrumentMasterRepository interface {
 
 	// Delete deletes an instrument master
 	Delete(ctx context.Context, id uint64) error
+
+	// FindByIDs finds multiple instrument masters by their IDs
+	FindByIDs(ctx context.Context, ids []uint64) ([]*model.InstrumentMaster, error)
 }
