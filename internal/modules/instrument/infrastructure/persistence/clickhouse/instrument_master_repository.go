@@ -34,7 +34,7 @@ func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 		WHERE id = ?
 		LIMIT 1
 	`
@@ -59,7 +59,7 @@ func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol st
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 		WHERE symbol = ?
 		LIMIT 1
 	`
@@ -84,7 +84,7 @@ func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchang
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 		WHERE exchange = ?
 	`
 
@@ -108,7 +108,7 @@ func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment 
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 		WHERE segment = ?
 	`
 
@@ -132,7 +132,7 @@ func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.Inst
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 	`
 
 	var instrumentMasters []*model.InstrumentMaster
@@ -257,7 +257,7 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 			instrument, 
 			start_date, 
 			expiry
-		FROM instrument_master
+		FROM sutram.instrument_master
 		%s
 		LIMIT ? OFFSET ?
 	`, whereClause)
@@ -275,7 +275,7 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	// Count query to get total records matching the filter
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM instrument_master
+		FROM sutram.instrument_master
 		%s
 	`, whereClause)
 
@@ -287,4 +287,40 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	}
 
 	return instrumentMasters, totalCount, nil
+}
+
+// FindByIDs finds multiple instrument masters by their IDs
+func (r *InstrumentMasterRepository) FindByIDs(ctx context.Context, ids []uint64) ([]*model.InstrumentMaster, error) {
+	if len(ids) == 0 {
+		return []*model.InstrumentMaster{}, nil
+	}
+
+	// Convert the slice of IDs to a comma-separated string for the IN clause
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			id, 
+			exchange, 
+			segment, 
+			symbol, 
+			instrument, 
+			start_date, 
+			expiry
+		FROM sutram.instrument_master
+		WHERE id IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	instrumentMasters := []*model.InstrumentMaster{}
+	err := r.db.SelectContext(ctx, &instrumentMasters, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying instrument masters by IDs: %w", err)
+	}
+
+	return instrumentMasters, nil
 }

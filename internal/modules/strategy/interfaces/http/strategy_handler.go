@@ -179,6 +179,11 @@ func (h *StrategyHandler) GetUserStrategies(c *gin.Context) {
 		return
 	}
 
+	// Ensure we return an empty array instead of null if strategies is nil
+	if strategies == nil {
+		strategies = []*dto.StrategyResponse{}
+	}
+
 	// Return strategies
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -506,6 +511,11 @@ func (h *StrategyHandler) SearchStrategies(c *gin.Context) {
 			"error":   "Internal server error: " + err.Error(),
 		})
 		return
+	}
+
+	// Ensure we return an empty array instead of null if strategies is nil
+	if strategies == nil {
+		strategies = []*dto.StrategyResponse{}
 	}
 
 	// Return strategies

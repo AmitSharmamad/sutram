@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,10 +18,10 @@ type AuthService interface {
 // Looks for token in Authorization header (Bearer token) or in cookie
 func ExtractToken(ctx *gin.Context) string {
 	// First, try to get token from Authorization header
-	bearerToken := ctx.GetHeader("Authorization")
-	if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
-		return bearerToken[7:]
-	}
+	// bearerToken := ctx.GetHeader("Authorization")
+	// if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
+	// 	return bearerToken[7:]
+	// }
 
 	// If not in header, try to get from cookie
 	cookie, err := ctx.Request.Cookie("token")

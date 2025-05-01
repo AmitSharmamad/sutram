@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"algo/internal/modules/user/application/dto"
@@ -62,9 +61,9 @@ func (c *UserController) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
 		Data: gin.H{
-			"token":     authResp.Token,
-			"expiresAt": authResp.ExpiresAt,
-			"user":      authResp.User,
+			"token":      authResp.Token,
+			"expires_at": authResp.ExpiresAt,
+			"user":       authResp.User,
 		},
 	})
 }
@@ -101,9 +100,9 @@ func (c *UserController) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
 		Data: gin.H{
-			"token":     authResp.Token,
-			"expiresAt": authResp.ExpiresAt,
-			"user":      authResp.User,
+			"token":      authResp.Token,
+			"expires_at": authResp.ExpiresAt,
+			"user":       authResp.User,
 		},
 	})
 }
@@ -772,10 +771,10 @@ func (c *UserController) CheckMe(ctx *gin.Context) {
 // This function is exported so it can be used by other modules
 func ExtractToken(ctx *gin.Context) string {
 	// First, try to get token from Authorization header
-	bearerToken := ctx.GetHeader("Authorization")
-	if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
-		return bearerToken[7:]
-	}
+	// bearerToken := ctx.GetHeader("Authorization")
+	// if len(bearerToken) > 7 && strings.HasPrefix(strings.ToUpper(bearerToken), "BEARER ") {
+	// 	return bearerToken[7:]
+	// }
 
 	// If not in header, try to get from cookie
 	cookie, err := ctx.Request.Cookie("token")
