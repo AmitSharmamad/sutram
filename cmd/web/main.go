@@ -148,6 +148,9 @@ func initializeModules(router *gin.RouterGroup) {
 	userModule := user.New()
 	userModule.RegisterRoutes(router)
 
+	// Get the user controller to pass to other modules for auth
+	userController := userModule.GetController()
+
 	// Initialize instrument module
 	instrumentModule := instrument.New()
 	instrumentModule.RegisterRoutes(router)
@@ -156,19 +159,22 @@ func initializeModules(router *gin.RouterGroup) {
 	strategyModule := strategy.New()
 	// Set user controller to enable auth middleware for all strategy endpoints
 	// This ensures that all strategy endpoints are protected by authentication
-	strategyModule.SetUserController(userModule.GetController())
+	strategyModule.SetUserController(userController)
 	strategyModule.RegisterRoutes(router)
 
 	// Initialize backtest module
 	backtestModule := backtest.New()
+	backtestModule.SetUserController(userController)
 	backtestModule.RegisterRoutes(router)
 
 	// Initialize marketplace module
 	marketplaceModule := marketplace.New()
+	marketplaceModule.SetUserController(userController)
 	marketplaceModule.RegisterRoutes(router)
 
 	// Initialize community module
 	communityModule := community.New()
+	communityModule.SetUserController(userController)
 	communityModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here

@@ -7,6 +7,7 @@ import (
 	"algo/internal/modules/backtest/application/service"
 	"algo/internal/modules/backtest/infrastructure/persistence/postgres"
 	backtestHttp "algo/internal/modules/backtest/interfaces/http"
+	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -14,8 +15,9 @@ import (
 
 // Module represents the backtest module
 type Module struct {
-	db         *sql.DB
-	controller *backtestHttp.BacktestController
+	db             *sql.DB
+	controller     *backtestHttp.BacktestController
+	userController interface{}
 }
 
 // ProvideModule provides a wire provider set for the backtest module
@@ -68,10 +70,23 @@ func (m *Module) initialize() {
 
 // RegisterRoutes registers the backtest module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
-	backtestHttp.RegisterRoutes(router, m.controller)
+	// Cast userController to the expected type
+	userController, ok := m.userController.(*userHttp.UserController)
+	if !ok {
+		// If userController is not set or is of wrong type, we can't proceed with auth
+		// In a production app, you'd want to log this error properly
+		panic("Backtest module: UserController not set or invalid type")
+	}
+
+	backtestHttp.RegisterRoutes(router, m.controller, userController)
 }
 
 // GetController returns the backtest controller
 func (m *Module) GetController() *backtestHttp.BacktestController {
 	return m.controller
+}
+
+// SetUserController sets the user controller for auth middleware
+func (m *Module) SetUserController(userController interface{}) {
+	m.userController = userController
 }

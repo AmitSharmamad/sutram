@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 
+	"algo/internal/infra/http/middleware"
 	"algo/internal/modules/strategy/application/dto"
 	"algo/internal/modules/strategy/application/service"
 	userHttp "algo/internal/modules/user/interfaces/http"
@@ -26,16 +27,19 @@ func NewStrategyHandler(strategyService service.StrategyService) *StrategyHandle
 // RegisterRoutes registers the routes for the strategy handler
 // All routes are protected by authentication middleware
 func (h *StrategyHandler) RegisterRoutes(r *gin.RouterGroup, userController *userHttp.UserController) {
+	// Create auth service adapter
+	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
+
 	strategies := r.Group("/strategy")
 	// Apply authentication middleware to all strategy endpoints
-	strategies.Use(userHttp.AuthMiddleware(userController))
+	strategies.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
 		// Handle both with and without trailing slash for POST and GET
 		strategies.POST("", h.CreateStrategy)
 		strategies.POST("/", h.CreateStrategy)
 		strategies.GET("", h.GetUserStrategies)
 		strategies.GET("/", h.GetUserStrategies)
-		
+
 		// Other routes remain the same
 		strategies.GET("/:id", h.GetStrategyByID)
 		strategies.PUT("/:id", h.UpdateStrategy)

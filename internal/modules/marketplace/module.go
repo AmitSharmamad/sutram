@@ -8,6 +8,7 @@ import (
 	"algo/internal/modules/marketplace/application/service"
 	"algo/internal/modules/marketplace/infrastructure/persistence/postgres"
 	"algo/internal/modules/marketplace/interfaces/http"
+	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -15,8 +16,9 @@ import (
 
 // Module represents the marketplace module
 type Module struct {
-	db         *sql.DB
-	controller *http.MarketplaceController
+	db             *sql.DB
+	controller     *http.MarketplaceController
+	userController interface{}
 }
 
 // ProvideModule provides a wire provider set for the marketplace module
@@ -78,10 +80,23 @@ func (m *Module) initialize() {
 
 // RegisterRoutes registers the marketplace module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
-	http.RegisterRoutes(router, m.controller)
+	// Cast userController to the expected type
+	userController, ok := m.userController.(*userHttp.UserController)
+	if !ok {
+		// If userController is not set or is of wrong type, we can't proceed with auth
+		// In a production app, you'd want to log this error properly
+		panic("Marketplace module: UserController not set or invalid type")
+	}
+
+	http.RegisterRoutes(router, m.controller, userController)
 }
 
 // GetController returns the marketplace controller
 func (m *Module) GetController() *http.MarketplaceController {
 	return m.controller
+}
+
+// SetUserController sets the user controller for auth middleware
+func (m *Module) SetUserController(userController interface{}) {
+	m.userController = userController
 }

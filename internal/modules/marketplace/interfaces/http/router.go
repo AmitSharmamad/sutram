@@ -1,12 +1,17 @@
-// filepath: /Users/amit/workspace/sutram/internal/modules/marketplace/interfaces/http/router.go
 package http
 
 import (
+	"algo/internal/infra/http/middleware"
+	userHttp "algo/internal/modules/user/interfaces/http"
+
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes registers the marketplace module routes
-func RegisterRoutes(router *gin.RouterGroup, controller *MarketplaceController) {
+func RegisterRoutes(router *gin.RouterGroup, controller *MarketplaceController, userController *userHttp.UserController) {
+	// Create auth service adapter
+	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
+
 	// Public routes (no authentication required)
 	router.GET("/marketplace/listings", controller.GetListings)
 	router.GET("/marketplace/listings/:listing_id", controller.GetListingByID)
@@ -15,7 +20,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *MarketplaceController) 
 
 	// Authenticated routes
 	marketplaceAuth := router.Group("/marketplace")
-	marketplaceAuth.Use(AuthMiddleware())
+	marketplaceAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
 		// Listing management
 		marketplaceAuth.POST("/listings", controller.CreateListing)
@@ -40,35 +45,5 @@ func RegisterRoutes(router *gin.RouterGroup, controller *MarketplaceController) 
 		// Seller endpoints
 		marketplaceAuth.GET("/seller/listings", controller.GetSellerListings)
 		marketplaceAuth.GET("/seller/analytics", controller.GetSellerAnalytics)
-	}
-}
-
-// AuthMiddleware implements authentication middleware
-func AuthMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		// Get the token from header
-		tokenString := ExtractToken(ctx)
-		if tokenString == "" {
-			ctx.AbortWithStatusJSON(401, gin.H{
-				"success": false,
-				"error":   "No token provided",
-			})
-			return
-		}
-
-		// In a real implementation, validate the token and extract user ID and roles
-		// For now, we're assuming this is handled by a common middleware
-		// and we're just checking if a user ID exists in the context
-
-		// If the user ID is not set in the context, abort
-		if _, exists := ctx.Get("userID"); !exists {
-			ctx.AbortWithStatusJSON(401, gin.H{
-				"success": false,
-				"error":   "Unauthorized",
-			})
-			return
-		}
-
-		ctx.Next()
 	}
 }
