@@ -1,12 +1,17 @@
-// filepath: /Users/amit/workspace/sutram/internal/modules/community/interfaces/http/router.go
 package http
 
 import (
+	"algo/internal/infra/http/middleware"
+	userHttp "algo/internal/modules/user/interfaces/http"
+
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes registers the community module routes
-func RegisterRoutes(router *gin.RouterGroup, controller *CommunityController) {
+func RegisterRoutes(router *gin.RouterGroup, controller *CommunityController, userController *userHttp.UserController) {
+	// Create auth service adapter
+	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
+
 	// Public routes (no authentication required)
 	router.GET("/community/topics", controller.GetTopics)
 	router.GET("/community/topics/:topic_id", controller.GetTopicByID)
@@ -18,7 +23,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *CommunityController) {
 
 	// Authenticated routes
 	communityAuth := router.Group("/community")
-	communityAuth.Use(AuthMiddleware())
+	communityAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
 		// Topic management
 		communityAuth.POST("/topics", controller.CreateTopic)
@@ -39,52 +44,4 @@ func RegisterRoutes(router *gin.RouterGroup, controller *CommunityController) {
 		communityAuth.DELETE("/topics/:topic_id/bookmark", controller.UnbookmarkTopic)
 		communityAuth.GET("/bookmarks", controller.GetUserBookmarks)
 	}
-}
-
-// AuthMiddleware implements authentication middleware
-func AuthMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		// Get the token from header
-		tokenString := ExtractToken(ctx)
-		if tokenString == "" {
-			ctx.JSON(401, gin.H{"error": "Unauthorized"})
-			ctx.Abort()
-			return
-		}
-
-		// In a real implementation, validate the token and extract user ID
-		// For now, just set a placeholder user ID
-		userID, err := ExtractUserIDFromToken(tokenString)
-		if err != nil {
-			ctx.JSON(401, gin.H{"error": "Invalid token"})
-			ctx.Abort()
-			return
-		}
-
-		ctx.Set("user_id", userID)
-		ctx.Next()
-	}
-}
-
-// ExtractToken extracts the token from the Authorization header
-func ExtractToken(ctx *gin.Context) string {
-	bearerToken := ctx.GetHeader("Authorization")
-	if len(bearerToken) > 7 && bearerToken[:7] == "Bearer " {
-		return bearerToken[7:]
-	}
-	return ""
-}
-
-// ExtractUserIDFromToken extracts the user ID from the token
-// This is a placeholder - in a real app, this would validate the JWT and extract the user ID
-func ExtractUserIDFromToken(tokenString string) (interface{}, error) {
-	// Placeholder - in a real app, this would parse and validate a JWT
-	// Mock user ID for development
-	return MockUserID(), nil
-}
-
-// MockUserID returns a mock user ID for development
-func MockUserID() interface{} {
-	// Return a mock UUID for testing
-	return "00000000-0000-0000-0000-000000000000"
 }
