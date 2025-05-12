@@ -10,6 +10,7 @@ import (
 	backtestRepo "algo/internal/modules/backtest/domain/repository"
 	instrumentService "algo/internal/modules/instrument/application/service"
 	instrumentModel "algo/internal/modules/instrument/domain/model"
+	parser "algo/internal/modules/parser/domain/model"
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyService "algo/internal/modules/strategy/application/service"
 
@@ -179,7 +180,8 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		return
 	}
 
-	instruments, err := e.instrumentService.GetInstrumentsByTimeRange(
+	// Get data for the main chart timeframe
+	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ID,
 		run.PeriodStartTime,
@@ -190,29 +192,42 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		return
 	}
 
-	// Convert instruments to engine instrument format
-	instrumentData := e.getInstrumentById(instruments)
+	// Get second-level data for more accurate exit condition checking
+	secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
+		ctx,
+		instrumentMaster.ID,
+		run.PeriodStartTime,
+		run.PeriodEndTime,
+		"1s", // 1-second data for granular exit condition checking
+	)
+	if err != nil {
+		// If we can't get second-level data, we'll just use the timeframe data
+		// Continue with the backtest using only timeframe data
+		secondLevelData = nil
+	}
 
 	// Execute backtest for this instrument and gather positions and metrics
-	positions, metrics := e.executeBacktestInMemory(strategy, instrumentData, run)
+	positions, metrics := e.executeBacktestInMemory(strategy, timeFrameData, secondLevelData, run)
 
 	// Store the positions and metrics in the run
 	run.Positions = positions
 	run.RunMetrics = metrics
 }
 
-// getInstrumentById returns the instrument data directly without conversion
-func (e *BacktestEngine) getInstrumentById(instruments []*instrumentModel.Instrument) []*instrumentModel.Instrument {
-	return instruments
+func (e *BacktestEngine) toDataContext(
+	instruments []*instrumentModel.Instrument,
+) *instrumentModel.StockData {
+	// Convert the slice of instruments to a StockData type
+	stockData := make(instrumentModel.StockData, len(instruments))
+	for i, instrument := range instruments {
+		stockData[i] = *instrument
+	}
+	return &stockData
 }
 
 // executeBacktestInMemory runs the backtest for a single instrument and returns the results without saving to database
-func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
-	// Initialize a parser for entry/exit expressions (assuming a factory exists in your parser domain)
-	// This is a placeholder - you'll need to implement actual expression parsing and evaluation
-	// based on your parser module structure
-
-	// Track positions
+func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, secondLevelData []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
+	// Initialize variables to track positions and capital
 	var positions []*model.Position
 	var openPosition *model.Position
 	capital := strategy.Capital
@@ -223,19 +238,21 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	run.StartedTime = &startTime
 	run.State = model.Started
 
-	for i, instrument := range instruments {
-		// If we have at least 20 candles for indicators, evaluate expressions
-		if i >= 20 {
-			// Create data context for expression evaluation
-			dataContext := e.createDataContext(instruments, i)
+	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
+	minLookback := 20
 
-			// Check entry condition if no position is open
-			// This is simplified - you'd use your actual parser module here
-			entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, dataContext)
+	// Process each candle from the minimum lookback period to the end of the data
+	for i := minLookback; i < len(instruments); i++ {
+		// Create data context using the data slice from the beginning up to the current position
+		data := e.toDataContext(instruments[:i+1])
 
-			if openPosition == nil && entrySignalTriggered {
+		// Check entry condition if no position is open
+		if openPosition == nil {
+			entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, data)
+
+			if entrySignalTriggered {
 				// Calculate position size based on strategy
-				positionSize := e.calculatePositionSize(strategy, capital, instrument.Close)
+				positionSize := e.calculatePositionSize(strategy, capital, instruments[i].Close)
 
 				// Determine position direction from strategy
 				var direction model.Direction
@@ -249,33 +266,62 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				openPosition = model.NewPosition(
 					run.ID,
 					direction,
-					instrument.Close,
-					instrument.Timestamp,
+					instruments[i].Close,
+					instruments[i].Timestamp,
 					strategy.EntryExpression,
 					positionSize,
 				)
 
 				// Simulate order execution
-				entryPrice := instrument.Close
+				entryPrice := instruments[i].Close
 				entryFees := calculateFees(entryPrice, positionSize)
-				openPosition.Enter(entryPrice, instrument.Timestamp, entryFees, nil)
+				openPosition.Enter(entryPrice, instruments[i].Timestamp, entryFees, nil)
 
 				// Update capital
 				capital -= (entryPrice*positionSize + entryFees)
-			}
 
-			// Check exit condition if position is open
+				// If second-level data is available, we'll use it for a more granular exit check
+				// We need to find the current timeframe boundaries for second-level data processing
+				if secondLevelData != nil && i < len(instruments)-1 {
+					currentTime := instruments[i].Timestamp
+					nextTime := instruments[i+1].Timestamp
+
+					// Process second-level data between current timeframe and next timeframe
+					isExited := e.processSecondLevelData(openPosition, strategy, secondLevelData, currentTime, nextTime)
+
+					// If position was exited using second-level data, update capital and add to positions list
+					if isExited {
+						exitPrice := *openPosition.ExitPriceOrder
+						exitFees := calculateFees(exitPrice, openPosition.PositionSize)
+
+						// Update capital
+						capital += (exitPrice*openPosition.PositionSize - exitFees)
+						if openPosition.NetProfitLoss != nil {
+							capital += *openPosition.NetProfitLoss
+						}
+
+						// Add to positions
+						positions = append(positions, openPosition)
+						openPosition = nil
+						continue
+					}
+				}
+			}
+		}
+
+		// If position is still open, check exit condition using timeframe data
+		if openPosition != nil {
 			exitSignalTriggered := false
 			if strategy.ExitExpression != "" {
-				exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+				exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, data)
 			}
 
-			if openPosition != nil && (exitSignalTriggered ||
-				e.checkStopLossOrTarget(openPosition, strategy, instrument) ||
-				i == len(instruments)-1) { // Force exit on last candle
+			if exitSignalTriggered ||
+				e.checkStopLossOrTarget(openPosition, strategy, instruments[i]) ||
+				i == len(instruments)-1 { // Force exit on last candle
 
 				// Calculate exit price and reason
-				exitPrice := instrument.Close
+				exitPrice := instruments[i].Close
 				exitReason := "Signal"
 
 				if exitSignalTriggered {
@@ -284,9 +330,9 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					exitReason = "End of backtest period"
 				} else {
 					// Check if it was stop loss or target profit
-					if e.isStopLossTriggered(openPosition, strategy, instrument) {
+					if e.isStopLossTriggered(openPosition, strategy, instruments[i]) {
 						exitReason = "Stop loss"
-					} else if e.isTargetProfitTriggered(openPosition, strategy, instrument) {
+					} else if e.isTargetProfitTriggered(openPosition, strategy, instruments[i]) {
 						exitReason = "Target profit"
 					}
 				}
@@ -296,10 +342,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				// Close the position
 				openPosition.Exit(
-					instrument.Close,
-					instrument.Timestamp,
 					exitPrice,
-					instrument.Timestamp,
+					instruments[i].Timestamp,
+					exitPrice,
+					instruments[i].Timestamp,
 					strategy.ExitExpression,
 					exitReason,
 					exitFees,
@@ -309,14 +355,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Collect position
 				positions = append(positions, openPosition)
 
-				// Update capital if this is a real exit (not end of backtest)
+				// Update capital
+				capital += (exitPrice*openPosition.PositionSize - exitFees)
 				if openPosition.NetProfitLoss != nil {
-					capital += (exitPrice*openPosition.PositionSize - exitFees)
-					if *openPosition.NetProfitLoss > 0 {
-						capital += *openPosition.NetProfitLoss
-					} else {
-						capital += *openPosition.NetProfitLoss // This is negative already
-					}
+					capital += *openPosition.NetProfitLoss
 				}
 
 				// Reset open position
@@ -346,7 +388,7 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	e.runRepo.Update(ctx, run)
 
 	// Run the backtest in memory
-	positions, metrics := e.executeBacktestInMemory(strategy, instruments, run)
+	positions, metrics := e.executeBacktestInMemory(strategy, instruments, nil, run)
 
 	// Save positions one by one
 	for _, position := range positions {
@@ -364,57 +406,17 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 
 // createDataContext creates a data context for expression evaluation
 func (e *BacktestEngine) createDataContext(instruments []*instrumentModel.Instrument, currentIndex int) map[string]interface{} {
-	context := make(map[string]interface{})
-
-	// Add basic OHLCV data
-	context["open"] = instruments[currentIndex].Open
-	context["high"] = instruments[currentIndex].High
-	context["low"] = instruments[currentIndex].Low
-	context["close"] = instruments[currentIndex].Close
-	context["volume"] = instruments[currentIndex].Volume
-
-	// Add indicator calculations (simplified)
-	// In a real implementation, these would use your parser module
-
-	// Calculate SMA(20)
-	sma20 := 0.0
-	for i := 0; i < 20; i++ {
-		sma20 += instruments[currentIndex-i].Close
-	}
-	sma20 /= 20.0
-	context["sma20"] = sma20
-
-	// Calculate SMA(50)
-	sma50 := 0.0
-	if currentIndex >= 50 {
-		for i := 0; i < 50; i++ {
-			sma50 += instruments[currentIndex-i].Close
-		}
-		sma50 /= 50.0
-	}
-	context["sma50"] = sma50
-
+	context := make(map[string]any)
+	context["data"] = instruments
 	return context
 }
 
-// evaluateEntryCondition evaluates the entry condition expression
-// This is a placeholder - you'd use your actual parser module
-func (e *BacktestEngine) evaluateEntryCondition(expression string, context map[string]interface{}) bool {
-	// Simple evaluation for testing
-	// In a real implementation, this would use your parser domain
-	if context["close"].(float64) > context["sma20"].(float64) &&
-		context["sma20"].(float64) > context["sma50"].(float64) {
-		return true
-	}
-	return false
+func (e *BacktestEngine) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
+	return parser.Execute(expression, parser.NewEvaluationContext(data))
 }
 
-// evaluateExitCondition evaluates the exit condition expression
-// This is a placeholder - you'd use your actual parser module
-func (e *BacktestEngine) evaluateExitCondition(expression string, context map[string]interface{}) bool {
-	// Simple evaluation for testing
-	// In a real implementation, this would use your parser domain
-	return context["close"].(float64) < context["sma20"].(float64)
+func (e *BacktestEngine) evaluateExitCondition(expression string, data *instrumentModel.StockData) bool {
+	return parser.Execute(expression, parser.NewEvaluationContext(data))
 }
 
 // checkStopLossOrTarget checks if a position should be closed due to stop loss or target price
@@ -617,4 +619,120 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	metrics.UpdatedAt = time.Now()
 
 	return metrics
+}
+
+// processSecondLevelData processes second-level data for granular exit condition checking
+func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time) bool {
+	// Find the range of second-level data within the current timeframe window
+	var relevantData []*instrumentModel.Instrument
+	for _, data := range secondLevelData {
+		if data.Timestamp.After(currentTime) && data.Timestamp.Before(nextTime) {
+			relevantData = append(relevantData, data)
+		}
+	}
+
+	if len(relevantData) == 0 {
+		return false
+	}
+
+	// Process each second-level data point
+	for i, data := range relevantData {
+		// Create data context for evaluation using available second-level data
+		// We use the toDataContext method to create a compatible StockData object
+		dataContext := e.toDataContext(relevantData[:i+1])
+
+		// Check exit conditions
+		exitSignalTriggered := false
+		if strategy.ExitExpression != "" {
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+		}
+
+		// Check stop loss or target profit hit
+		stopLossHit := e.isStopLossTriggered(position, strategy, data)
+		targetProfitHit := e.isTargetProfitTriggered(position, strategy, data)
+
+		if exitSignalTriggered || stopLossHit || targetProfitHit {
+			// Determine exit reason
+			exitReason := "Exit signal"
+			if stopLossHit {
+				exitReason = "Stop loss"
+			} else if targetProfitHit {
+				exitReason = "Target profit"
+			}
+
+			// Calculate fees
+			exitFees := calculateFees(data.Close, position.PositionSize)
+
+			// Close the position
+			position.Exit(
+				data.Close,
+				data.Timestamp,
+				data.Close,
+				data.Timestamp,
+				strategy.ExitExpression,
+				exitReason,
+				exitFees,
+				nil,
+			)
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// createSecondLevelContext creates a data context for second-level data evaluation
+func (e *BacktestEngine) createSecondLevelContext(instruments []*instrumentModel.Instrument) map[string]interface{} {
+	if len(instruments) == 0 {
+		return make(map[string]interface{})
+	}
+
+	context := make(map[string]interface{})
+	currentIndex := len(instruments) - 1
+
+	// Add basic OHLCV data from current tick
+	context["open"] = instruments[currentIndex].Open
+	context["high"] = instruments[currentIndex].High
+	context["low"] = instruments[currentIndex].Low
+	context["close"] = instruments[currentIndex].Close
+	context["volume"] = instruments[currentIndex].Volume
+
+	// Add recent price trends for analysis
+	// Average price of the last n ticks
+	lastNPrices := min(10, len(instruments))
+	if lastNPrices > 0 {
+		avgPrice := 0.0
+		for i := 0; i < lastNPrices; i++ {
+			avgPrice += instruments[currentIndex-i].Close
+		}
+		avgPrice /= float64(lastNPrices)
+		context["avgPrice"] = avgPrice
+	}
+
+	// Calculate simple volatility metric (standard deviation of recent prices)
+	if len(instruments) > 5 {
+		mean := 0.0
+		for i := 0; i < 5; i++ {
+			mean += instruments[currentIndex-i].Close
+		}
+		mean /= 5.0
+
+		variance := 0.0
+		for i := 0; i < 5; i++ {
+			diff := instruments[currentIndex-i].Close - mean
+			variance += diff * diff
+		}
+		variance /= 5.0
+		context["recentVolatility"] = stdmath.Sqrt(variance)
+	}
+
+	// Add price change rate for micro-trend detection
+	if len(instruments) > 1 {
+		priceChangePct := (instruments[currentIndex].Close - instruments[currentIndex-1].Close) /
+			instruments[currentIndex-1].Close * 100
+		context["priceChangePct"] = priceChangePct
+	}
+
+	return context
 }

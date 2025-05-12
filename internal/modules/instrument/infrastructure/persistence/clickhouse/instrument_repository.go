@@ -37,7 +37,7 @@ func (r *InstrumentRepository) FindByID(ctx context.Context, id uint64) (*model.
 			timestamp, 
 			created_at, 
 			updated_at
-		FROM instrument
+		FROM sutram.instrument
 		WHERE id = ?
 		LIMIT 1
 	`
@@ -65,7 +65,7 @@ func (r *InstrumentRepository) FindBySymbol(ctx context.Context, symbol string) 
 			timestamp, 
 			created_at, 
 			updated_at
-		FROM instrument
+		FROM sutram.instrument
 		WHERE instrument = ?
 		ORDER BY timestamp DESC
 		LIMIT 1000
@@ -106,10 +106,9 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 			SUM(volume) AS volume,
 			MIN(created_at) AS created_at,
 			MAX(updated_at) AS updated_at
-		FROM instrument
+		FROM sutram.instrument
 		WHERE 
-			id = ? AND
-			toTimeZone(timestamp, 'Asia/Kolkata') BETWEEN ? AND ?
+			id = ?
 		GROUP BY
 			id,
 			instrument,
@@ -122,7 +121,7 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 	err := r.db.SelectContext(ctx, &instruments, query,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
-		id, start, end)
+		id)
 
 	if err != nil {
 		return nil, fmt.Errorf("error querying instruments by time range: %w", err)

@@ -7,6 +7,8 @@ import (
 	"algo/internal/modules/backtest/application/service"
 	"algo/internal/modules/backtest/infrastructure/persistence/postgres"
 	backtestHttp "algo/internal/modules/backtest/interfaces/http"
+	instrumentModule "algo/internal/modules/instrument"
+	strategyModule "algo/internal/modules/strategy"
 	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,9 +17,11 @@ import (
 
 // Module represents the backtest module
 type Module struct {
-	db             *sql.DB
-	controller     *backtestHttp.BacktestController
-	userController interface{}
+	db               *sql.DB
+	controller       *backtestHttp.BacktestController
+	userController   interface{}
+	strategyModule   *strategyModule.Module
+	instrumentModule *instrumentModule.Module
 }
 
 // ProvideModule provides a wire provider set for the backtest module
@@ -38,8 +42,22 @@ func New() *Module {
 		panic(err) // In a real app, handle this more gracefully
 	}
 
+	// Create strategy module
+	strategyMod, err := strategyModule.ProvideStrategyModule()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create instrument module
+	instrumentMod, err := instrumentModule.ProvideInstrumentModule()
+	if err != nil {
+		panic(err)
+	}
+
 	module := &Module{
-		db: db,
+		db:               db,
+		strategyModule:   strategyMod,
+		instrumentModule: instrumentMod,
 	}
 
 	// Initialize module components
@@ -64,8 +82,26 @@ func (m *Module) initialize() {
 		runMetricsRepo,
 	)
 
-	// Create controller
-	m.controller = backtestHttp.NewBacktestController(backtestService)
+	// Get strategy service
+	strategyService := m.strategyModule.GetStrategyService()
+
+	// Get instrument service
+	instrumentService := m.instrumentModule.GetInstrumentService()
+
+	// Create backtest engine service - fix the type mismatch
+	// Either by changing how we pass the backtestService or adjusting the signature of NewBacktestEngine
+	engineService := service.NewBacktestEngine(
+		&backtestService, // Change to pointer if NewBacktestEngine expects a pointer
+		strategyService,
+		instrumentService,
+		runGroupRepo,
+		runRepo,
+		positionRepo,
+		runMetricsRepo,
+	)
+
+	// Create controller with both services
+	m.controller = backtestHttp.NewBacktestController(backtestService, engineService)
 }
 
 // RegisterRoutes registers the backtest module routes with the given router

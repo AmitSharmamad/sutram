@@ -19,6 +19,7 @@ type Module struct {
 	db             *sql.DB
 	controller     *strategyHttp.StrategyHandler
 	userController *userHttp.UserController
+	service        service.StrategyService
 }
 
 // ProvideModule provides a wire provider set for the strategy module
@@ -55,10 +56,10 @@ func (m *Module) initialize() {
 	strategyRepo := ProvideStrategyRepository(m.db)
 
 	// Create service
-	strategyService := ProvideStrategyService(strategyRepo)
+	m.service = ProvideStrategyService(strategyRepo)
 
 	// Create controller
-	m.controller = ProvideStrategyHandler(strategyService)
+	m.controller = ProvideStrategyHandler(m.service)
 }
 
 // RegisterRoutes registers the strategy module routes with the given router
@@ -74,6 +75,11 @@ func (m *Module) SetUserController(userController *userHttp.UserController) {
 // GetController returns the strategy controller
 func (m *Module) GetController() *strategyHttp.StrategyHandler {
 	return m.controller
+}
+
+// GetStrategyService returns the strategy service
+func (m *Module) GetStrategyService() service.StrategyService {
+	return m.service
 }
 
 // ProvideStrategyRepository provides a strategy repository
