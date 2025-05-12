@@ -23,7 +23,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 	backtestAuth := router.Group("/backtest")
 	backtestAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
-		// Add authenticated endpoints here when needed
-		// This is a placeholder for future authenticated endpoints
+		// Add run backtest endpoint
+		backtestAuth.GET("/run", controller.RunBacktest)
 	}
 }

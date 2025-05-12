@@ -13,8 +13,9 @@ import (
 
 // Module represents the instrument module
 type Module struct {
-	db         *sqlx.DB
-	controller *http.InstrumentController
+	db                *sqlx.DB
+	controller        *http.InstrumentController
+	instrumentService *service.InstrumentService
 }
 
 // ProvideModule provides a wire provider set for the instrument module
@@ -52,10 +53,10 @@ func (m *Module) initialize() {
 	instrumentMasterRepo := clickhouse.NewInstrumentMasterRepository(m.db)
 
 	// Create services
-	instrumentService := service.NewInstrumentService(instrumentRepo, instrumentMasterRepo)
+	m.instrumentService = service.NewInstrumentService(instrumentRepo, instrumentMasterRepo)
 
 	// Create controller
-	m.controller = http.NewInstrumentController(instrumentService)
+	m.controller = http.NewInstrumentController(m.instrumentService)
 }
 
 // RegisterRoutes registers the instrument module routes with the given router
@@ -66,4 +67,9 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 // GetController returns the instrument controller
 func (m *Module) GetController() *http.InstrumentController {
 	return m.controller
+}
+
+// GetInstrumentService returns the instrument service
+func (m *Module) GetInstrumentService() *service.InstrumentService {
+	return m.instrumentService
 }
