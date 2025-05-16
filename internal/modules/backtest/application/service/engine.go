@@ -277,8 +277,8 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				entryFees := calculateFees(entryPrice, positionSize)
 				openPosition.Enter(entryPrice, instruments[i].Timestamp, entryFees, nil)
 
-				// Update capital
-				capital -= (entryPrice*positionSize + entryFees)
+				// Update capital for position entry
+				capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
 
 				// If second-level data is available, we'll use it for a more granular exit check
 				// We need to find the current timeframe boundaries for second-level data processing
@@ -294,8 +294,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 						exitPrice := *openPosition.ExitPriceOrder
 						exitFees := calculateFees(exitPrice, openPosition.PositionSize)
 
-						// Update capital
-						capital += (exitPrice*openPosition.PositionSize - exitFees)
+						// Update capital for position exit
+						capital = e.updateCapitalOnPositionChange(capital, openPosition, exitPrice, exitFees, false)
+
+						// Add net profit/loss if available
 						if openPosition.NetProfitLoss != nil {
 							capital += *openPosition.NetProfitLoss
 						}
@@ -355,8 +357,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Collect position
 				positions = append(positions, openPosition)
 
-				// Update capital
-				capital += (exitPrice*openPosition.PositionSize - exitFees)
+				// Update capital for position exit
+				capital = e.updateCapitalOnPositionChange(capital, openPosition, exitPrice, exitFees, false)
+
+				// Add net profit/loss if available
 				if openPosition.NetProfitLoss != nil {
 					capital += *openPosition.NetProfitLoss
 				}
@@ -498,6 +502,31 @@ func calculateFees(price float64, quantity float64) float64 {
 	// Implement your fee structure
 	// For example, 0.1% of transaction value
 	return price * quantity * 0.001
+}
+
+// updateCapitalOnPositionChange updates the capital based on the position direction and event type (entry or exit)
+func (e *BacktestEngine) updateCapitalOnPositionChange(capital float64, position *model.Position, price float64, fees float64, isEntry bool) float64 {
+	if isEntry {
+		// For position entry
+		if position.Direction == model.Long {
+			// For long positions, capital decreases (buying)
+			capital -= (price*position.PositionSize + fees)
+		} else {
+			// For short positions, capital increases (selling)
+			capital += (price*position.PositionSize - fees)
+		}
+	} else {
+		// For position exit
+		if position.Direction == model.Long {
+			// For long positions, capital increases when exiting (selling)
+			capital += (price*position.PositionSize - fees)
+		} else {
+			// For short positions, capital decreases when exiting (buying to cover)
+			capital -= (price*position.PositionSize + fees)
+		}
+	}
+
+	return capital
 }
 
 // calculateMetrics calculates backtest performance metrics
