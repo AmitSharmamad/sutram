@@ -134,7 +134,7 @@ s-migrate
 main
 
 # data
-data/historical
+# data/historical
 
 # DB data folders
 db/pg
