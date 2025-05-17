@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	stdmath "math"
+	"math"
 	"sync"
 	"time"
 
@@ -226,7 +226,7 @@ func (e *BacktestEngine) toDataContext(
 }
 
 // executeBacktestInMemory runs the backtest for a single instrument and returns the results without saving to database
-func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, secondLevelData []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
+func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, stockData []*instrumentModel.Instrument, secondLevelData []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
 	// Initialize variables to track positions and capital
 	var positions []*model.Position
 	var openPosition *model.Position
@@ -242,9 +242,9 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	minLookback := 20
 
 	// Process each candle from the minimum lookback period to the end of the data
-	for i := minLookback; i < len(instruments); i++ {
+	for i := minLookback; i < len(stockData); i++ {
 		// Create data context using the data slice from the beginning up to the current position
-		data := e.toDataContext(instruments[:i+1])
+		data := e.toDataContext(stockData[:i+1])
 
 		// Check entry condition if no position is open
 		if openPosition == nil {
@@ -252,7 +252,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			if entrySignalTriggered {
 				// Calculate position size based on strategy
-				positionSize := e.calculatePositionSize(strategy, capital, instruments[i].Close)
+				positionSize := e.calculatePositionSize(strategy, capital, stockData[i].Close)
 
 				// Determine position direction from strategy
 				var direction model.Direction
@@ -266,99 +266,34 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				openPosition = model.NewPosition(
 					run.ID,
 					direction,
-					instruments[i].Close,
-					instruments[i].Timestamp,
+					stockData[i].Close,
+					stockData[i].Timestamp,
 					strategy.EntryExpression,
 					positionSize,
 				)
 
 				// Simulate order execution
-				entryPrice := instruments[i].Close
+				entryPrice := stockData[i].Close
 				entryFees := calculateFees(entryPrice, positionSize)
-				openPosition.Enter(entryPrice, instruments[i].Timestamp, entryFees, nil)
+				openPosition.Enter(entryPrice, stockData[i].Timestamp, entryFees, nil)
 
 				// Update capital for position entry
 				capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
 
-				// If second-level data is available, we'll use it for a more granular exit check
-				// We need to find the current timeframe boundaries for second-level data processing
-				if secondLevelData != nil && i < len(instruments)-1 {
-					currentTime := instruments[i].Timestamp
-					nextTime := instruments[i+1].Timestamp
-
-					// Process second-level data between current timeframe and next timeframe
-					isExited := e.processSecondLevelData(openPosition, strategy, secondLevelData, currentTime, nextTime)
-
-					// If position was exited using second-level data, update capital and add to positions list
-					if isExited {
-						exitPrice := *openPosition.ExitPriceOrder
-						exitFees := calculateFees(exitPrice, openPosition.PositionSize)
-
-						// Update capital for position exit
-						capital = e.updateCapitalOnPositionChange(capital, openPosition, exitPrice, exitFees, false)
-
-						// Add net profit/loss if available
-						if openPosition.NetProfitLoss != nil {
-							capital += *openPosition.NetProfitLoss
-						}
-
-						// Add to positions
-						positions = append(positions, openPosition)
-						openPosition = nil
-						continue
-					}
-				}
 			}
 		}
 
 		// If position is still open, check exit condition using timeframe data
 		if openPosition != nil {
-			exitSignalTriggered := false
-			if strategy.ExitExpression != "" {
-				exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, data)
-			}
-
-			if exitSignalTriggered ||
-				e.checkStopLossOrTarget(openPosition, strategy, instruments[i]) ||
-				i == len(instruments)-1 { // Force exit on last candle
-
-				// Calculate exit price and reason
-				exitPrice := instruments[i].Close
-				exitReason := "Signal"
-
-				if exitSignalTriggered {
-					exitReason = "Exit signal triggered"
-				} else if i == len(instruments)-1 {
-					exitReason = "End of backtest period"
-				} else {
-					// Check if it was stop loss or target profit
-					if e.isStopLossTriggered(openPosition, strategy, instruments[i]) {
-						exitReason = "Stop loss"
-					} else if e.isTargetProfitTriggered(openPosition, strategy, instruments[i]) {
-						exitReason = "Target profit"
-					}
-				}
-
-				// Calculate fees
-				exitFees := calculateFees(exitPrice, openPosition.PositionSize)
-
-				// Close the position
-				openPosition.Exit(
-					exitPrice,
-					instruments[i].Timestamp,
-					exitPrice,
-					instruments[i].Timestamp,
-					strategy.ExitExpression,
-					exitReason,
-					exitFees,
-					nil,
-				)
+				e.TryExit(openPosition, strategy, secondLevelData)
 
 				// Collect position
 				positions = append(positions, openPosition)
 
 				// Update capital for position exit
-				capital = e.updateCapitalOnPositionChange(capital, openPosition, exitPrice, exitFees, false)
+				capital = e.updateCapitalOnPositionChange(
+					capital, openPosition, *openPosition.ExitPriceOrder, *openPosition.ExitFees, false,
+				)
 
 				// Add net profit/loss if available
 				if openPosition.NetProfitLoss != nil {
@@ -368,7 +303,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Reset open position
 				openPosition = nil
 			}
-		}
 	}
 
 	// Mark run as ended
@@ -439,14 +373,14 @@ func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy 
 	stopPrice := 0.0
 
 	if position.Direction == model.Long {
-		if strategy.StopLossType == "percent" {
+		if strategy.StopLossType == "PERCENTAGE" {
 			stopPrice = entryPrice * (1 - strategy.StopLoss/100)
 		} else {
 			stopPrice = entryPrice - strategy.StopLoss
 		}
 		return instrument.Low <= stopPrice
 	} else { // Short position
-		if strategy.StopLossType == "percent" {
+		if strategy.StopLossType == "PERCENTAGE" {
 			stopPrice = entryPrice * (1 + strategy.StopLoss/100)
 		} else {
 			stopPrice = entryPrice + strategy.StopLoss
@@ -465,14 +399,14 @@ func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strat
 	targetPrice := 0.0
 
 	if position.Direction == model.Long {
-		if strategy.TargetProfitType == "percent" {
+		if strategy.TargetProfitType == "PERCENTAGE" {
 			targetPrice = entryPrice * (1 + strategy.TargetProfit/100)
 		} else {
 			targetPrice = entryPrice + strategy.TargetProfit
 		}
 		return instrument.High >= targetPrice
 	} else { // Short position
-		if strategy.TargetProfitType == "percent" {
+		if strategy.TargetProfitType == "PERCENTAGE" {
 			targetPrice = entryPrice * (1 - strategy.TargetProfit/100)
 		} else {
 			targetPrice = entryPrice - strategy.TargetProfit
@@ -583,7 +517,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	// Calculate profit factor
 	profitFactor := 0.0
 	if totalLossAmount != 0 {
-		profitFactor = totalWinAmount / stdmath.Abs(totalLossAmount)
+		profitFactor = totalWinAmount / math.Abs(totalLossAmount)
 	}
 	metrics.ProfitFactor = &profitFactor
 
@@ -753,7 +687,7 @@ func (e *BacktestEngine) createSecondLevelContext(instruments []*instrumentModel
 			variance += diff * diff
 		}
 		variance /= 5.0
-		context["recentVolatility"] = stdmath.Sqrt(variance)
+		context["recentVolatility"] = math.Sqrt(variance)
 	}
 
 	// Add price change rate for micro-trend detection
@@ -764,4 +698,113 @@ func (e *BacktestEngine) createSecondLevelContext(instruments []*instrumentModel
 	}
 
 	return context
+}
+
+func (e *BacktestEngine) TryExit(
+	position *model.Position,
+	strategy *strategyDto.StrategyResponse,
+	secondLevelData []*instrumentModel.Instrument,
+) bool {
+	// If the position is already closed, return
+	if position.State == model.Exited {
+		return false
+	}
+
+	// Cut the data right after the entry time till the end
+	var relevantData []*instrumentModel.Instrument
+	if position.EntryTimeOrder == nil {
+		return false
+	}
+
+	for _, data := range secondLevelData {
+		if data.Timestamp.After(*position.EntryTimeOrder) {
+			relevantData = append(relevantData, data)
+		}
+	}
+
+	if len(relevantData) == 0 {
+		return false
+	}
+
+	// Iterate through the second-level data to check for exit conditions
+	for i, data := range relevantData {
+		// Create data context for evaluation using available second-level data
+		dataContext := e.toDataContext(relevantData[:i+1])
+
+		// Check exit conditions
+		exitSignalTriggered := false
+		if strategy.ExitExpression != "" {
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+		}
+
+		// Check stop loss or target profit hit
+		stopLossHit := e.isStopLossTriggered(position, strategy, data)
+		targetProfitHit := e.isTargetProfitTriggered(position, strategy, data)
+
+		if exitSignalTriggered || stopLossHit || targetProfitHit {
+			// Determine exit reason
+			exitReason := "Exit signal"
+			if stopLossHit {
+				exitReason = "Stop loss"
+			} else if targetProfitHit {
+				exitReason = "Target profit"
+			}
+
+			// Calculate fees
+			exitFees := calculateFees(data.Close, position.PositionSize)
+
+			// Calculate exit order price with slippage
+			exitOrderPrice := calculateExitOrderSlippage(
+				data.Close,
+				position.Direction,
+				data,
+			)
+
+			// Close the position
+			position.Exit(
+				data.Close,
+				data.Timestamp,
+				exitOrderPrice,
+				data.Timestamp,
+				strategy.ExitExpression,
+				exitReason,
+				exitFees,
+				nil,
+			)
+
+			return true
+		}
+	}
+
+	// If no exit condition was met, return false
+	return false
+}
+
+// calculateExitOrderSlippage simulates slippage between exit signal and exit order execution
+func calculateExitOrderSlippage(
+	signalPrice float64,
+	direction model.Direction,
+	instrument *instrumentModel.Instrument,
+) float64 {
+	// Default slippage percentage (0.1% of price)
+	slippagePct := 0.1
+
+	// Calculate base slippage amount
+	baseSlippage := signalPrice * (slippagePct / 100.0)
+
+	// Adjust slippage based on volatility (using high-low range as a simple volatility proxy)
+	volatilityFactor := (instrument.High - instrument.Low) / instrument.Low
+	// Scale volatility factor to not be too extreme (cap at 2x default slippage)
+	adjustedVolatilityFactor := math.Min(volatilityFactor*10, 2.0)
+
+	// Calculate final slippage amount accounting for volatility
+	slippageAmount := baseSlippage * adjustedVolatilityFactor
+
+	// For long positions, exit price is typically worse (lower) due to slippage
+	// For short positions, exit price is typically worse (higher) due to slippage
+	if direction == model.Long {
+		return signalPrice - slippageAmount
+	} else {
+		return signalPrice + slippageAmount
+	}
 }
