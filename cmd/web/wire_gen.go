@@ -7,95 +7,40 @@
 package main
 
 import (
-	"algo/src/algo/expression"
-	"algo/src/algo/indicator"
-	"algo/src/auth"
-	"algo/src/bt"
-	"algo/src/core/config"
-	"algo/src/core/db"
-	"algo/src/core/http"
-	"algo/src/di"
-	"algo/src/marketplace"
-	"algo/src/stock"
-	"algo/src/strategy"
-	"algo/src/template"
-	"algo/src/user"
-	"github.com/gin-gonic/gin"
+	"algo/internal/modules/backtest"
+	"algo/internal/modules/instrument"
+	"algo/internal/modules/strategy"
+	"algo/internal/modules/user"
 )
 
 // Injectors from wire.go:
 
-func BuildContainer(engine *gin.Engine) *WebContainer {
-	envProv := env.NewEnvProv()
-	clickhouse := db.NewClickHouseProv(envProv)
-	postgres := db.NewPostgresProv(envProv)
-	dbFactory := db.NewFactoryProv(clickhouse, postgres)
-	repo := strategy.NewRepoProv(dbFactory)
-	service := strategy.NewServiceProv(repo)
-	userRepo := user.NewRepoProv(dbFactory)
-	userService := user.NewServiceProv(envProv, userRepo)
-	controller := strategy.NewControllerProv(service, userService)
-	authRepo := auth.NewRepoProv(dbFactory)
-	authService := auth.NewServiceProv(envProv, authRepo)
-	authMiddleware := http.NewAuthMiddleware(authService)
-	router := strategy.NewRoutesProv(engine, controller, authMiddleware)
-	root := strategy.NewRootProv(router)
-	googleService := auth.NewGoogleServiceProv(envProv, userService)
-	authController := auth.NewControllerProv(authService, userService, googleService)
-	authRouter := auth.NewRoutesProv(engine, authController)
-	authRoot := auth.NewRootProv(authRouter)
-	diContainer := di.NewDIContainer(root, authRoot)
-	masterRepo := stock.NewMasterRepoProv(dbFactory)
-	stockRepo := stock.NewRepoProv(dbFactory)
-	stockService := stock.NewServiceProv(masterRepo, stockRepo)
-	stockController := stock.NewControllerProv(stockService)
-	stockRouter := stock.NewRoutesProv(engine, stockController)
-	stockRoot := stock.NewRoot(stockRouter)
-	templateRepo := template.NewRepoProv(dbFactory)
-	templateService := template.NewServiceProv(templateRepo)
-	templateController := template.NewControllerProv(templateService)
-	templateRouter := template.NewRoutesProv(engine, templateController)
-	templateRoot := template.NewRootProv(templateRouter)
-	userController := user.NewControllerProv(userService)
-	userRouter := user.NewRoutesProv(engine, userController)
-	userRoot := user.NewRootProv(userRouter)
-	httpRoot := http.NewRoot(authMiddleware)
-	runGroupRepo := bt.NewRunGroupRepoProv(dbFactory)
-	runRepo := bt.NewRunRepoProv(dbFactory)
-	positionRepo := bt.NewPositionRepoProv(dbFactory)
-	positionLogRepo := bt.NewPositionLogRepoProv(dbFactory)
-	runMetricsRepo := bt.NewRunMetricsRepoProv(dbFactory)
-	btService := bt.NewServiceProv(runGroupRepo, runRepo, positionRepo, positionLogRepo, runMetricsRepo)
-	expressionService := expression.NewService()
-	indicatorService := indicator.NewServiceProv()
-	btEngine := bt.NewEngineProv(btService, service, stockService, expressionService, indicatorService)
-	btController := bt.NewControllerProv(btService, btEngine)
-	btRouter := bt.NewRoutesProv(engine, btController)
-	btRoot := bt.NewRoot(btRouter)
-	repository := marketplace.NewRepoProv(dbFactory)
-	marketplaceService := marketplace.NewServiceProv(repository)
-	marketplaceController := marketplace.NewControllerProv(marketplaceService)
-	routerGroup := marketplace.NewRoutesProv(engine, marketplaceController)
-	marketplaceRoot := marketplace.NewRootProv(routerGroup)
-	webContainer := NewWebContainer(diContainer, engine, root, stockRoot, templateRoot, userRoot, authRoot, httpRoot, btRoot, marketplaceRoot)
-	return webContainer
+// InitializeApp sets up the application with all its dependencies
+func InitializeApp() (*App, error) {
+	module := user.New()
+	instrumentModule := instrument.New()
+	strategyModule := strategy.New()
+	backtestModule := backtest.New()
+	app := NewApp(module, instrumentModule, strategyModule, backtestModule)
+	return app, nil
 }
 
 // wire.go:
 
-type WebContainer struct{}
+// App represents the application container
+type App struct {
+	UserModule       *user.Module
+	InstrumentModule *instrument.Module
+	StrategyModule   *strategy.Module
+	BacktestModule   *backtest.Module
+}
 
-func NewWebContainer(
-	DiContainer *di.DIContainer,
-	Engine *gin.Engine,
-	StrategyRoot *strategy.Root,
-	StockRoot *stock.Root,
-	TemplateRoot *template.Root,
-	UserRoot *user.Root,
-	AuthRoot *auth.Root,
-	HTTPRoot *http.Root,
-	BTRoot *bt.Root,
-	MarketplaceController *marketplace.Root,
-) *WebContainer {
-	return &WebContainer{}
+// NewApp creates a new application instance
+func NewApp(userModule *user.Module, instrumentModule *instrument.Module, strategyModule *strategy.Module, backtestModule *backtest.Module) *App {
+	return &App{
+		UserModule:       userModule,
+		InstrumentModule: instrumentModule,
+		StrategyModule:   strategyModule,
+		BacktestModule:   backtestModule,
+	}
 }
