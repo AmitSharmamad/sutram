@@ -4,45 +4,49 @@
 package main
 
 import (
-	"algo/src/auth"
-	"algo/src/bt"
-	"algo/src/core/http"
-	"algo/src/di"
-	"algo/src/marketplace"
-	"algo/src/stock"
-	"algo/src/strategy"
-	"algo/src/template"
-	"algo/src/user"
+	"algo/internal/modules/backtest"
+	"algo/internal/modules/instrument"
+	"algo/internal/modules/strategy"
+	"algo/internal/modules/user"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
-type WebContainer struct{}
+// InitializeApp sets up the application with all its dependencies
+func InitializeApp() (*App, error) {
+	wire.Build(
+		// Core components
+		NewApp,
 
-func NewWebContainer(
-	DiContainer *di.DIContainer,
-	Engine *gin.Engine,
-	StrategyRoot *strategy.Root,
-	StockRoot *stock.Root,
-	TemplateRoot *template.Root,
-	UserRoot *user.Root,
-	AuthRoot *auth.Root,
-	HTTPRoot *http.Root,
-	BTRoot *bt.Root,
-	MarketplaceController *marketplace.Root,
-) *WebContainer {
-	return &WebContainer{}
+		// User module
+		user.New,
+
+		// Instrument module
+		instrument.New,
+
+		// Strategy module
+		strategy.New,
+
+		// Backtest module
+		backtest.New,
+	)
+	return &App{}, nil
 }
 
-func BuildContainer(
-	engine *gin.Engine,
-) *WebContainer {
-	panic(
-		wire.Build(
-			NewWebContainer,
-			di.Set,
-			marketplace.Set,
-		),
-	)
+// App represents the application container
+type App struct {
+	UserModule       *user.Module
+	InstrumentModule *instrument.Module
+	StrategyModule   *strategy.Module
+	BacktestModule   *backtest.Module
+}
+
+// NewApp creates a new application instance
+func NewApp(userModule *user.Module, instrumentModule *instrument.Module, strategyModule *strategy.Module, backtestModule *backtest.Module) *App {
+	return &App{
+		UserModule:       userModule,
+		InstrumentModule: instrumentModule,
+		StrategyModule:   strategyModule,
+		BacktestModule:   backtestModule,
+	}
 }

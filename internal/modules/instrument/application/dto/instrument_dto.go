@@ -1,0 +1,108 @@
+package dto
+
+import (
+	"time"
+)
+
+// InstrumentDTO represents instrument data for API responses
+type InstrumentDTO struct {
+	ID        uint64    `json:"id"`
+	Symbol    string    `json:"symbol"`
+	Open      float64   `json:"open"`
+	High      float64   `json:"high"`
+	Low       float64   `json:"low"`
+	Close     float64   `json:"close"`
+	Volume    float64   `json:"volume"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// InstrumentMasterDTO represents instrument master data for API responses
+type InstrumentMasterDTO struct {
+	ID        uint64    `json:"id"`
+	Exchange  string    `json:"exchange"`
+	Segment   string    `json:"segment"`
+	Symbol    string    `json:"symbol"`
+	Name      string    `json:"name"`
+	StartDate time.Time `json:"start_date"`
+	Expiry    time.Time `json:"expiry,omitempty"`
+}
+
+// InstrumentWithMetadataDTO combines instrument data with its metadata
+type InstrumentWithMetadataDTO struct {
+	Instrument       *InstrumentDTO       `json:"instrument"`
+	InstrumentMaster *InstrumentMasterDTO `json:"instrument_master"`
+}
+
+// CreateInstrumentRequest represents request to create an instrument
+type CreateInstrumentRequest struct {
+	Symbol    string    `json:"symbol" binding:"required"`
+	Open      float64   `json:"open" binding:"required"`
+	High      float64   `json:"high" binding:"required"`
+	Low       float64   `json:"low" binding:"required"`
+	Close     float64   `json:"close" binding:"required"`
+	Volume    float64   `json:"volume" binding:"required"`
+	Timestamp time.Time `json:"timestamp" binding:"required"`
+}
+
+// UpdateInstrumentRequest represents request to update an instrument
+type UpdateInstrumentRequest struct {
+	Open      float64   `json:"open" binding:"required"`
+	High      float64   `json:"high" binding:"required"`
+	Low       float64   `json:"low" binding:"required"`
+	Close     float64   `json:"close" binding:"required"`
+	Volume    float64   `json:"volume" binding:"required"`
+	Timestamp time.Time `json:"timestamp" binding:"required"`
+}
+
+// CreateInstrumentMasterRequest represents request to create an instrument master
+type CreateInstrumentMasterRequest struct {
+	Exchange  string    `json:"exchange" binding:"required"`
+	Segment   string    `json:"segment" binding:"required"`
+	Symbol    string    `json:"symbol" binding:"required"`
+	Name      string    `json:"name" binding:"required"`
+	StartDate time.Time `json:"start_date" binding:"required"`
+	Expiry    time.Time `json:"expiry,omitempty"`
+}
+
+// UpdateInstrumentMasterRequest represents request to update an instrument master
+type UpdateInstrumentMasterRequest struct {
+	Exchange  string    `json:"exchange"`
+	Segment   string    `json:"segment"`
+	Symbol    string    `json:"symbol"`
+	Name      string    `json:"name"`
+	StartDate time.Time `json:"start_date"`
+	Expiry    time.Time `json:"expiry,omitempty"`
+}
+
+// GetInstrumentsByTimeRangeRequest represents a request to fetch instruments by time range
+type GetInstrumentsByTimeRangeRequest struct {
+	Symbol    string    `json:"symbol" binding:"required"`
+	StartTime time.Time `json:"start_time" binding:"required"`
+	EndTime   time.Time `json:"end_time" binding:"required"`
+	TimeFrame string    `json:"time_frame" binding:"omitempty,oneof=1s 1m 3m 5m 15m 30m 1h 3h 1d 1M"`
+}
+
+// InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters
+type InstrumentMasterFilterDTO struct {
+	Exchange string `form:"exchange"`
+	Segment  string `form:"segment"`
+	Page     int    `form:"page,default=1"`
+	PageSize int    `form:"pageSize,default=10"`
+}
+
+// PaginatedResponse represents a paginated API response
+type PaginatedResponse struct {
+	Data       interface{} `json:"data"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"pageSize"`
+	TotalCount int         `json:"totalCount"`
+	TotalPages int         `json:"totalPages"`
+}
+
+// ApiResponse represents a standard API response structure
+type ApiResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message,omitempty"`
+	Error   string      `json:"error,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+}

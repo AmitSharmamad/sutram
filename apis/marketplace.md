@@ -9,7 +9,7 @@ This document outlines all the API endpoints required for the marketplace featur
 Retrieves a paginated list of all available strategy listings in the marketplace.
 
 ```bash
-curl -X GET "/marketplace/listings" \
+curl -X GET "http://localhost:9090/api/marketplace/listings" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -19,7 +19,7 @@ curl -X GET "/marketplace/listings" \
 Retrieves a filtered list of marketplace listings based on category, sorting preference, and search terms.
 
 ```bash
-curl -X GET "/marketplace/listings?category=trend-following&sort=rating&search=momentum" \
+curl -X GET "http://localhost:9090/api/marketplace/listings?category=trend-following&sort=rating&search=momentum" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -29,7 +29,7 @@ curl -X GET "/marketplace/listings?category=trend-following&sort=rating&search=m
 Retrieves detailed information about a specific marketplace listing.
 
 ```bash
-curl -X GET "/marketplace/listings/{listing_id}" \
+curl -X GET "http://localhost:9090/api/marketplace/listings/{listing_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -39,7 +39,7 @@ curl -X GET "/marketplace/listings/{listing_id}" \
 Creates a new marketplace listing for a strategy.
 
 ```bash
-curl -X POST "/marketplace/listings" \
+curl -X POST "http://localhost:9090/api/marketplace/listings" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -64,7 +64,7 @@ curl -X POST "/marketplace/listings" \
 Updates an existing marketplace listing.
 
 ```bash
-curl -X PUT "/marketplace/listings/{listing_id}" \
+curl -X PUT "http://localhost:9090/api/marketplace/listings/{listing_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -90,7 +90,7 @@ curl -X PUT "/marketplace/listings/{listing_id}" \
 Removes a marketplace listing from the platform.
 
 ```bash
-curl -X DELETE "/marketplace/listings/{listing_id}" \
+curl -X DELETE "http://localhost:9090/api/marketplace/listings/{listing_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -102,7 +102,7 @@ curl -X DELETE "/marketplace/listings/{listing_id}" \
 Retrieves all available strategy categories for the marketplace.
 
 ```bash
-curl -X GET "/marketplace/categories" \
+curl -X GET "http://localhost:9090/api/marketplace/categories" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -114,7 +114,7 @@ curl -X GET "/marketplace/categories" \
 Updates performance metrics for a specific marketplace listing.
 
 ```bash
-curl -X PUT "/marketplace/listings/{listing_id}/performance" \
+curl -X PUT "http://localhost:9090/api/marketplace/listings/{listing_id}/performance" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -136,7 +136,7 @@ curl -X PUT "/marketplace/listings/{listing_id}/performance" \
 Creates a new subscription for the user to access a strategy.
 
 ```bash
-curl -X POST "/marketplace/subscriptions" \
+curl -X POST "http://localhost:9090/api/marketplace/subscriptions" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -153,7 +153,7 @@ curl -X POST "/marketplace/subscriptions" \
 Retrieves all subscriptions for the authenticated user.
 
 ```bash
-curl -X GET "/marketplace/subscriptions/user" \
+curl -X GET "http://localhost:9090/api/marketplace/subscriptions/user" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -163,7 +163,7 @@ curl -X GET "/marketplace/subscriptions/user" \
 Cancels an active subscription.
 
 ```bash
-curl -X PUT "/marketplace/subscriptions/{subscription_id}" \
+curl -X PUT "http://localhost:9090/api/marketplace/subscriptions/{subscription_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -179,7 +179,7 @@ curl -X PUT "/marketplace/subscriptions/{subscription_id}" \
 Retrieves all reviews for a specific marketplace listing.
 
 ```bash
-curl -X GET "/marketplace/listings/{listing_id}/reviews" \
+curl -X GET "http://localhost:9090/api/marketplace/listings/{listing_id}/reviews" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -189,7 +189,7 @@ curl -X GET "/marketplace/listings/{listing_id}/reviews" \
 Submits a new review for a marketplace listing.
 
 ```bash
-curl -X POST "/marketplace/listings/{listing_id}/reviews" \
+curl -X POST "http://localhost:9090/api/marketplace/listings/{listing_id}/reviews" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -203,7 +203,7 @@ curl -X POST "/marketplace/listings/{listing_id}/reviews" \
 Updates an existing review submitted by the user.
 
 ```bash
-curl -X PUT "/marketplace/reviews/{review_id}" \
+curl -X PUT "http://localhost:9090/api/marketplace/reviews/{review_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -217,7 +217,7 @@ curl -X PUT "/marketplace/reviews/{review_id}" \
 Removes a review submitted by the user.
 
 ```bash
-curl -X DELETE "/marketplace/reviews/{review_id}" \
+curl -X DELETE "http://localhost:9090/api/marketplace/reviews/{review_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -229,7 +229,7 @@ curl -X DELETE "/marketplace/reviews/{review_id}" \
 Retrieves the transaction history for the authenticated user.
 
 ```bash
-curl -X GET "/marketplace/transactions" \
+curl -X GET "http://localhost:9090/api/marketplace/transactions" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -239,7 +239,7 @@ curl -X GET "/marketplace/transactions" \
 Retrieves details for a specific transaction.
 
 ```bash
-curl -X GET "/marketplace/transactions/{transaction_id}" \
+curl -X GET "http://localhost:9090/api/marketplace/transactions/{transaction_id}" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -251,7 +251,7 @@ curl -X GET "/marketplace/transactions/{transaction_id}" \
 Retrieves earnings and analytics data for a seller.
 
 ```bash
-curl -X GET "/marketplace/seller/analytics" \
+curl -X GET "http://localhost:9090/api/marketplace/seller/analytics" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
@@ -261,146 +261,7 @@ curl -X GET "/marketplace/seller/analytics" \
 Retrieves all listings created by the authenticated seller.
 
 ```bash
-curl -X GET "/marketplace/seller/listings" \
+curl -X GET "http://localhost:9090/api/marketplace/seller/listings" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 ```
-
--- Marketplace Database Schema for Algorithmic Trading Platform
-
--- Strategy Marketplace Table
-CREATE TABLE IF NOT EXISTS marketplace_listing (
-    id UUID DEFAULT gen_random_uuid(),
-    strategy_id UUID NOT NULL,
-    user_id UUID NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    price DECIMAL(18, 2) NOT NULL,
-    subscription_type VARCHAR(50) NOT NULL, -- 'one-time', 'monthly', 'yearly'
-    is_featured BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
-    views INT DEFAULT 0,
-    ratings DECIMAL(3, 2),
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (id),
-    FOREIGN KEY (strategy_id) REFERENCES strategy(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
-);
-
--- Strategy Performance Metrics (for marketplace display)
-CREATE TABLE IF NOT EXISTS marketplace_performance (
-    listing_id UUID NOT NULL,
-    sharpe_ratio DECIMAL(10, 4),
-    sortino_ratio DECIMAL(10, 4),
-    total_return_pct DECIMAL(10, 4),
-    annualized_return DECIMAL(10, 4),
-    max_drawdown DECIMAL(10, 4),
-    win_rate DECIMAL(10, 4),
-    profit_factor DECIMAL(10, 4),
-    backtest_period_days INT,
-    updated_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (listing_id),
-    FOREIGN KEY (listing_id) REFERENCES marketplace_listing(id) ON DELETE CASCADE
-);
-
--- Strategy Subscriptions
-CREATE TABLE IF NOT EXISTS marketplace_subscription (
-    id UUID DEFAULT gen_random_uuid(),
-    listing_id UUID NOT NULL,
-    subscriber_id UUID NOT NULL,
-    status VARCHAR(50) NOT NULL, -- 'active', 'expired', 'cancelled'
-    subscription_type VARCHAR(50) NOT NULL, -- 'one-time', 'monthly', 'yearly'
-    price_paid DECIMAL(18, 2) NOT NULL,
-    start_date TIMESTAMP NOT NULL DEFAULT now(),
-    end_date TIMESTAMP,
-    renewal_date TIMESTAMP,
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (id),
-    FOREIGN KEY (listing_id) REFERENCES marketplace_listing(id),
-    FOREIGN KEY (subscriber_id) REFERENCES "user"(id) ON DELETE CASCADE
-);
-
--- Reviews and Ratings
-CREATE TABLE IF NOT EXISTS marketplace_review (
-    id UUID DEFAULT gen_random_uuid(),
-    listing_id UUID NOT NULL,
-    user_id UUID NOT NULL,
-    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    comment TEXT,
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (id),
-    FOREIGN KEY (listing_id) REFERENCES marketplace_listing(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE,
-    UNIQUE (listing_id, user_id) -- One review per user per listing
-);
-
--- Transaction History
-CREATE TABLE IF NOT EXISTS marketplace_transaction (
-    id UUID DEFAULT gen_random_uuid(),
-    subscription_id UUID NOT NULL,
-    amount DECIMAL(18, 2) NOT NULL,
-    status VARCHAR(50) NOT NULL, -- 'completed', 'pending', 'failed', 'refunded'
-    payment_method VARCHAR(50),
-    payment_id VARCHAR(255), -- External payment reference ID
-    created_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (id),
-    FOREIGN KEY (subscription_id) REFERENCES marketplace_subscription(id) ON DELETE CASCADE
-);
-
--- Categories for organizing strategies
-CREATE TABLE IF NOT EXISTS marketplace_category (
-    id UUID DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    icon VARCHAR(255),
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    
-    PRIMARY KEY (id)
-);
-
--- Many-to-many relationship between listings and categories
-CREATE TABLE IF NOT EXISTS marketplace_listing_category (
-    listing_id UUID NOT NULL,
-    category_id UUID NOT NULL,
-    
-    PRIMARY KEY (listing_id, category_id),
-    FOREIGN KEY (listing_id) REFERENCES marketplace_listing(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES marketplace_category(id) ON DELETE CASCADE
-);
-
--- Feature Toggles for the marketplace
-CREATE TABLE IF NOT EXISTS marketplace_settings (
-    key VARCHAR(100) PRIMARY KEY,
-    value TEXT NOT NULL,
-    description TEXT,
-    updated_at TIMESTAMP DEFAULT now(),
-    updated_by UUID REFERENCES "user"(id)
-);
-
--- Indexes for performance
-CREATE INDEX idx_marketplace_listing_user ON marketplace_listing(user_id);
-CREATE INDEX idx_marketplace_listing_active ON marketplace_listing(is_active);
-CREATE INDEX idx_marketplace_subscription_subscriber ON marketplace_subscription(subscriber_id);
-CREATE INDEX idx_marketplace_subscription_status ON marketplace_subscription(status);
-CREATE INDEX idx_marketplace_review_listing ON marketplace_review(listing_id);
-
--- Insert default categories
-INSERT INTO marketplace_category (name, description)
-VALUES 
-('Trend Following', 'Strategies that follow market trends'),
-('Mean Reversion', 'Strategies that capitalize on price reversals'),
-('Momentum', 'Strategies based on momentum indicators'),
-('Arbitrage', 'Strategies that exploit price differences'),
-('Breakout', 'Strategies that trade on price breakouts'),
-('Volatility', 'Strategies that trade based on market volatility'),
-('Options', 'Strategies focused on options trading'),
-('Multi-Factor', 'Strategies using multiple factors for decisions');

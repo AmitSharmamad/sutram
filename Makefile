@@ -1,63 +1,53 @@
-# .PHONY: build && run
-#
-# build:
-# 	docker-compose build
-#
-# run:
-# 	docker-compose up -d
-#
-# down:
-# 	docker-compose down
-#
-# deploy:
-# 	docker-compose up --build -d
+.PHONY: build run clean test docker-build docker-run db-start db-stop
 
-help:
-	@cat Makefile
+# Build the web application
+build:
+	@echo "Building the web application..."
+	@mkdir -p bin
+	@wire ./cmd/web
+	@go build -o bin/web-server cmd/web/main.go cmd/web/wire_gen.go
 
-### prod
+# Run the web application
+run: build
+	@echo "Running the web server..."
+	@./bin/web-server
 
-webb:
-	wire cmd/web/wire.go
-	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
-	./s-web
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf bin/
 
-webr:
-	go build -o s-web cmd/web/wire_gen.go cmd/web/main.go
-	./s-web
-
-webd:
-	lsof -ti tcp:9090 | xargs kill -9
-	# wire src/web/wire.go
-	go build -gcflags="all=-N -l" -o s-web src/web/wire_gen.go src/web/main.go 
-	air
-
-migrateb:
-	@wire cmd/migrate/wire.go
-	@go build -o s-migrate cmd/migrate/wire_gen.go cmd/migrate/main.go
-	@./s-migrate
-
-migrated:
-	wire cmd/migrate/wire.go
-	go build -gcflags="all=-N -l" -o s-migrate cmd/migrate/main.go
-	./s-migrate
-
-### local
-
-client:
-	go run src/web/client.go
-
-dbuild:
-	docker build -t sutram-go .
-
-drun:
-	docker run -it -p 9999:9999 sutram-go
-
-### testing
-
+# Run tests
 test:
-	go test ./...
+	@echo "Running tests..."
+	@go test -v ./...
 
-coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out
+# Build Docker image
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t sutram-web -f Dockerfile.web .
+
+# Run Docker container
+docker-run: docker-build
+	@echo "Running Docker container..."
+	@docker run -p 8080:8080 --env-file .env sutram-web
+
+# Start the database
+db-start:
+	@echo "Starting the database..."
+	@cd db && docker-compose up -d
+
+# Stop the database
+db-stop:
+	@echo "Stopping the database..."
+	@cd db && docker-compose down
+
+# Start everything with docker-compose
+all-up:
+	@echo "Starting all services..."
+	@docker-compose up -d
+
+# Stop everything
+all-down:
+	@echo "Stopping all services..."
+	@docker-compose down
