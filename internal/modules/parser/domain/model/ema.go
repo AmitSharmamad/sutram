@@ -10,8 +10,16 @@ type EMA struct {
 }
 
 func (indicator *EMA) SliceData(prices Prices) Prices {
-	start := len(prices) - indicator.offset - indicator.period
+	// We need enough data to calculate EMA properly
+	// For EMA calculation we need at least 2*period data points
+	// This ensures we have enough data for initial SMA and subsequent EMA calculation
+	start := max(0, len(prices)-(indicator.offset+2*indicator.period))
 	end := len(prices) - indicator.offset
+
+	if start < 0 || end <= start || end > len(prices) {
+		return Prices{}
+	}
+
 	return prices[start:end]
 }
 
@@ -28,26 +36,38 @@ func (indicator *EMA) Calculate(
 
 	prices := GetPrices(*ctx.Data, point)
 
+	// Check if we have enough data points
 	if len(prices) < period+offset {
 		return 0.0
 	}
 
 	prices = indicator.SliceData(prices)
 
-	// Calculate multiplier
+	// Need at least period data points to calculate
+	if len(prices) < period {
+		return 0.0
+	}
+
+	// Calculate multiplier (alpha)
 	multiplier := 2.0 / float64(period+1)
 
-	// Calculate initial SMA
+	// Calculate initial SMA for the first EMA value
 	var sma float64
 	for i := 0; i < period; i++ {
 		sma += prices[i]
 	}
 	sma /= float64(period)
 
-	// Calculate EMA
+	// Calculate EMA recursively
+	// Start with the initial SMA value
 	ema := sma
+
+	// Only process remaining data points after the initial period
 	for i := period; i < len(prices); i++ {
-		ema = (prices[i]-ema)*multiplier + ema
+		// EMA formula: EMA(today) = (Price(today) * multiplier) + (EMA(yesterday) * (1 - multiplier))
+		// Alternative form: EMA = Price * multiplier + EMA * (1 - multiplier)
+		// Simplified: EMA = EMA + multiplier * (Price - EMA)
+		ema = ema + multiplier*(prices[i]-ema)
 	}
 
 	return util.Round(ema)
