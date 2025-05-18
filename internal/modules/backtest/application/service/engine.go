@@ -198,7 +198,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		instrumentMaster.ID,
 		run.PeriodStartTime,
 		run.PeriodEndTime,
-		"1m", // 1-second data for granular exit condition checking
+		"1s", // 1-second data for granular exit condition checking
 	)
 	if err != nil {
 		// If we can't get second-level data, we'll just use the timeframe data
