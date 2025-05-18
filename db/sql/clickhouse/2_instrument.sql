@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS instrument (
     low Float32,
     close Float32,
     volume Float32,
-    `timestamp` DateTime64(6),
-    created_at DateTime64(6),
-    updated_at DateTime64(6)
+    `timestamp` DateTime64(6, 'Asia/Kolkata'),
+    `created_at` DateTime64(6, 'Asia/Kolkata'),
+    `updated_at` DateTime64(6, 'Asia/Kolkata')
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(`timestamp`) -- Partition by year and month
 ORDER BY (

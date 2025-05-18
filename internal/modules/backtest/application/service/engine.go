@@ -198,7 +198,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		instrumentMaster.ID,
 		run.PeriodStartTime,
 		run.PeriodEndTime,
-		"1s", // 1-second data for granular exit condition checking
+		"1m", // 1-second data for granular exit condition checking
 	)
 	if err != nil {
 		// If we can't get second-level data, we'll just use the timeframe data
@@ -285,24 +285,29 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// If position is still open, check exit condition using timeframe data
 		if openPosition != nil {
-				e.TryExit(openPosition, strategy, secondLevelData)
+			isExit := e.TryExit(openPosition, strategy, secondLevelData)
 
+			// If the position was exited
+			if isExit && openPosition.ExitTimeOrder != nil {
 				// Collect position
 				positions = append(positions, openPosition)
-
-				// Update capital for position exit
-				capital = e.updateCapitalOnPositionChange(
-					capital, openPosition, *openPosition.ExitPriceOrder, *openPosition.ExitFees, false,
-				)
 
 				// Add net profit/loss if available
 				if openPosition.NetProfitLoss != nil {
 					capital += *openPosition.NetProfitLoss
 				}
 
+				// Find the next index to resume entry checks based on the timeframe
+				// This ensures we don't check for entry until the next candle in the chart timeframe
+				i = e.findNextCandleIndex(stockData, *openPosition.ExitTimeOrder, string(strategy.ChartTimeframe)) - 1
+
 				// Reset open position
 				openPosition = nil
+
+				// Skip to the next candle - this will be incremented by the for loop
+				continue
 			}
+		}
 	}
 
 	// Mark run as ended
@@ -707,7 +712,7 @@ func (e *BacktestEngine) TryExit(
 ) bool {
 	// If the position is already closed, return
 	if position.State == model.Exited {
-		return false
+		return true // Return true since it is already exited
 	}
 
 	// Cut the data right after the entry time till the end
@@ -807,4 +812,20 @@ func calculateExitOrderSlippage(
 	} else {
 		return signalPrice + slippageAmount
 	}
+}
+
+// findNextCandleIndex finds the index of the next candle matching the chart timeframe after the given timestamp
+func (e *BacktestEngine) findNextCandleIndex(stockData []*instrumentModel.Instrument, exitTime time.Time, chartTimeframe string) int {
+	// Find the next candle in the chart timeframe after the exit time
+	for i, candle := range stockData {
+		if candle.Timestamp.After(exitTime) {
+			// Round up to the next available candle based on the chart timeframe
+			// For example, if exit happened at 11:08 and timeframe is 5m,
+			// the next entry should be checked at 11:10 (next 5m candle)
+			return i
+		}
+	}
+
+	// If no next candle is found, return the last index + 1 (end of data)
+	return len(stockData)
 }
