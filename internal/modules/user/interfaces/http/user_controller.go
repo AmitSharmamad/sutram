@@ -96,15 +96,13 @@ func (c *UserController) Login(ctx *gin.Context) {
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Return success response with token and user data
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Data: gin.H{
-			"token":      authResp.Token,
-			"expires_at": authResp.ExpiresAt,
-			"user":       authResp.User,
-		},
-	})
+	// Check if this is an API request or a browser request
+	if ctx.GetHeader("Content-Type") == "application/json" || ctx.GetHeader("Accept") == "application/json" {
+		ctx.Redirect(http.StatusFound, "/home")
+	} else {
+		// Redirect to home page for browser clients
+		ctx.Redirect(http.StatusFound, "/home")
+	}
 }
 
 // RefreshToken refreshes a user's token
@@ -807,6 +805,26 @@ func setTokenCookie(ctx *gin.Context, token string, expiresAt time.Time) {
 		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(ctx.Writer, cookie)
+}
+
+// Logout handles user logout by clearing the token cookie
+func (c *UserController) Logout(ctx *gin.Context) {
+	// Create an expired cookie with the same attributes to clear it
+	cookie := &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Now().Add(-1 * time.Hour), // Set expiry in the past
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1, // Instruct browser to delete the cookie immediately
+	}
+	http.SetCookie(ctx.Writer, cookie)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Successfully logged out",
+	})
 }
 
 // Helper function to convert user model to DTO
