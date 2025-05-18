@@ -1,0 +1,157 @@
+package parser
+
+import (
+	util "algo/internal/util/math"
+)
+
+type MACD struct {
+	fastPeriod   int
+	slowPeriod   int
+	signalPeriod int
+	offset       int
+}
+
+func (indicator *MACD) SliceData(prices Prices) Prices {
+	// We need enough data to calculate MACD properly
+	// For MACD calculation we need at least 2*slowPeriod data points
+	maxPeriod := max(indicator.slowPeriod, indicator.fastPeriod)
+	start := max(0, len(prices)-(indicator.offset+2*maxPeriod+indicator.signalPeriod))
+	end := len(prices) - indicator.offset
+
+	if start < 0 || end <= start || end > len(prices) {
+		return Prices{}
+	}
+
+	return prices[start:end]
+}
+
+func (indicator *MACD) Calculate(
+	config []any,
+	ctx *EvaluationContext,
+) float64 {
+	point := config[0].(string)
+	fastPeriod := int(config[1].(float64))
+	slowPeriod := int(config[2].(float64))
+	signalPeriod := int(config[3].(float64))
+	offset := int(config[4].(float64))
+
+	indicator.fastPeriod = fastPeriod
+	indicator.slowPeriod = slowPeriod
+	indicator.signalPeriod = signalPeriod
+	indicator.offset = offset
+
+	prices := GetPrices(*ctx.Data, point)
+
+	// Check if we have enough data points
+	minDataPoints := indicator.slowPeriod + indicator.signalPeriod + indicator.offset
+	if len(prices) < minDataPoints {
+		return 0.0
+	}
+
+	prices = indicator.SliceData(prices)
+
+	// Need at least slowPeriod data points to calculate
+	if len(prices) < indicator.slowPeriod {
+		return 0.0
+	}
+
+	// Calculate fast EMA
+	fastMultiplier := 2.0 / float64(indicator.fastPeriod+1)
+	var fastSMA float64
+	for i := 0; i < indicator.fastPeriod; i++ {
+		fastSMA += prices[i]
+	}
+	fastSMA /= float64(indicator.fastPeriod)
+
+	fastEMA := fastSMA
+	var fastEMAs = make([]float64, len(prices))
+	fastEMAs[indicator.fastPeriod-1] = fastEMA
+
+	// Calculate slow EMA
+	slowMultiplier := 2.0 / float64(indicator.slowPeriod+1)
+	var slowSMA float64
+	for i := 0; i < indicator.slowPeriod; i++ {
+		slowSMA += prices[i]
+	}
+	slowSMA /= float64(indicator.slowPeriod)
+
+	slowEMA := slowSMA
+	var slowEMAs = make([]float64, len(prices))
+	slowEMAs[indicator.slowPeriod-1] = slowEMA
+
+	// Calculate fast and slow EMAs
+	for i := indicator.fastPeriod; i < len(prices); i++ {
+		fastEMA = prices[i]*fastMultiplier + fastEMA*(1-fastMultiplier)
+		fastEMAs[i] = fastEMA
+	}
+
+	for i := indicator.slowPeriod; i < len(prices); i++ {
+		slowEMA = prices[i]*slowMultiplier + slowEMA*(1-slowMultiplier)
+		slowEMAs[i] = slowEMA
+	}
+
+	// Calculate MACD line
+	var macdLine = make([]float64, len(prices))
+	for i := indicator.slowPeriod - 1; i < len(prices); i++ {
+		macdLine[i] = fastEMAs[i] - slowEMAs[i]
+	}
+
+	// Calculate signal line using EMA of MACD line
+	var signalLine = make([]float64, len(prices))
+	signalMultiplier := 2.0 / float64(indicator.signalPeriod+1)
+
+	// Calculate initial signal line value as SMA of MACD
+	startIndex := indicator.slowPeriod + indicator.signalPeriod - 2
+	var signalSMA float64
+	for i := 0; i < indicator.signalPeriod; i++ {
+		signalSMA += macdLine[indicator.slowPeriod-1+i]
+	}
+	signalSMA /= float64(indicator.signalPeriod)
+
+	signalLine[startIndex] = signalSMA
+	var signalEMA = signalSMA
+
+	// Calculate subsequent signal line values
+	for i := startIndex + 1; i < len(prices); i++ {
+		signalEMA = macdLine[i]*signalMultiplier + signalEMA*(1-signalMultiplier)
+		signalLine[i] = signalEMA
+	}
+
+	// Calculate histogram (MACD line - signal line)
+	var histogram = make([]float64, len(prices))
+	for i := startIndex; i < len(prices); i++ {
+		histogram[i] = macdLine[i] - signalLine[i]
+	}
+
+	// Return the last calculated MACD line value
+	return util.Round(macdLine[len(macdLine)-1])
+}
+
+func (indicator *MACD) GetDataRange(config map[string]any) int32 {
+	if p, ok := config["fastPeriod"].(float64); ok {
+		indicator.fastPeriod = int(p)
+	} else {
+		indicator.fastPeriod = 12 // default fast period
+	}
+
+	if p, ok := config["slowPeriod"].(float64); ok {
+		indicator.slowPeriod = int(p)
+	} else {
+		indicator.slowPeriod = 26 // default slow period
+	}
+
+	if p, ok := config["signalPeriod"].(float64); ok {
+		indicator.signalPeriod = int(p)
+	} else {
+		indicator.signalPeriod = 9 // default signal period
+	}
+
+	if o, ok := config["offset"].(float64); ok {
+		indicator.offset = int(o)
+	} else {
+		indicator.offset = 0
+	}
+
+	// Return the maximum data range required
+	return int32(indicator.slowPeriod + indicator.signalPeriod + indicator.offset)
+}

@@ -239,7 +239,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	run.State = model.Started
 
 	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
-	minLookback := 20
+	minLookback := 1000
 
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {

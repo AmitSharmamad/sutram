@@ -20,6 +20,21 @@ func NewFactory() *IndicatorFactory {
 	factory.indicators["SMA"] = &SMA{}
 	factory.indicators["EMA"] = &EMA{}
 
+	// Technical Indicators
+	factory.indicators["SUPERTREND"] = &Supertrend{}
+	factory.indicators["MACD"] = &MACD{}
+	factory.indicators["VORTEX"] = &Vortex{}
+	factory.indicators["BOLLINGER"] = &BollingerBands{}
+	factory.indicators["DMI"] = &DMI{}
+	factory.indicators["KELTNER"] = &KeltnerChannels{}
+	factory.indicators["PSAR"] = &ParabolicSAR{}
+	factory.indicators["FISHER"] = &FisherTransform{}
+	factory.indicators["MFI"] = &MFI{}
+	factory.indicators["VWAP"] = &VWAP{}
+	factory.indicators["TSI"] = &TSI{}
+	factory.indicators["VO"] = &VolumeOscillator{}
+	factory.indicators["UO"] = &UltimateOscillator{}
+
 	// Utility Indicator
 	factory.indicators["Number"] = &IndNumber{}
 
