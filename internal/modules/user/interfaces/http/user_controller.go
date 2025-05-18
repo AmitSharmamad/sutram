@@ -96,15 +96,13 @@ func (c *UserController) Login(ctx *gin.Context) {
 	// Set JWT token as a cookie
 	setTokenCookie(ctx, authResp.Token, authResp.ExpiresAt)
 
-	// Return success response with token and user data
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Data: gin.H{
-			"token":      authResp.Token,
-			"expires_at": authResp.ExpiresAt,
-			"user":       authResp.User,
-		},
-	})
+	// Check if this is an API request or a browser request
+	if ctx.GetHeader("Content-Type") == "application/json" || ctx.GetHeader("Accept") == "application/json" {
+		ctx.Redirect(http.StatusFound, "/home")
+	} else {
+		// Redirect to home page for browser clients
+		ctx.Redirect(http.StatusFound, "/home")
+	}
 }
 
 // RefreshToken refreshes a user's token
