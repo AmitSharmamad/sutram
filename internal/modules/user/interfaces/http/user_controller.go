@@ -807,6 +807,26 @@ func setTokenCookie(ctx *gin.Context, token string, expiresAt time.Time) {
 	http.SetCookie(ctx.Writer, cookie)
 }
 
+// Logout handles user logout by clearing the token cookie
+func (c *UserController) Logout(ctx *gin.Context) {
+	// Create an expired cookie with the same attributes to clear it
+	cookie := &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Now().Add(-1 * time.Hour), // Set expiry in the past
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1, // Instruct browser to delete the cookie immediately
+	}
+	http.SetCookie(ctx.Writer, cookie)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Successfully logged out",
+	})
+}
+
 // Helper function to convert user model to DTO
 func modelToDTO(user *model.User) *dto.UserDTO {
 	if user == nil {
