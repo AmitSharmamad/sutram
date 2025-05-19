@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Gin Server",
+            "name": "Web",
             "type": "go",
             "request": "launch",
             "mode": "exec",              // Use prebuilt binary
@@ -13,6 +13,16 @@
             "env": {},
             "args": [],
             "preLaunchTask": "build"     // Optional: Automate build
+        },
+        {
+            "name": "Live",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",              // Use prebuilt binary
+            "program": "${workspaceFolder}/s-live", // Path to your binary
+            "env": {},
+            "args": [],
+            "preLaunchTask": "l-build"     // Optional: Automate build
         }
     ]
 }
