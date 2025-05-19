@@ -133,7 +133,7 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 // Create creates a new instrument
 func (r *InstrumentRepository) Create(ctx context.Context, instrument *model.Instrument) error {
 	query := `
-		INSERT INTO instrument (
+		INSERT INTO sutram.instrument (
 			id,
 			instrument,
 			open,
