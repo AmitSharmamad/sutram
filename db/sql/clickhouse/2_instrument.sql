@@ -2,6 +2,7 @@ USE sutram;
 
 CREATE TABLE IF NOT EXISTS instrument_master (
     id UInt64,
+    exchange_security_id Int32,
     exchange LowCardinality(String),
     segment LowCardinality(String),
     symbol String,
@@ -15,8 +16,7 @@ ORDER BY (
 );
 
 CREATE TABLE IF NOT EXISTS instrument (
-    id UInt64,
-    instrument String,
+    exchange_security_id Int32,
     open Float32,
     high Float32,
     low Float32,
@@ -28,17 +28,18 @@ CREATE TABLE IF NOT EXISTS instrument (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(`timestamp`) -- Partition by year and month
 ORDER BY (
-    id,
+    exchange_security_id,
     `timestamp`
 );
 
-CREATE INDEX IF NOT EXISTS idx_instrument_id
+CREATE INDEX IF NOT EXISTS idx_instrument_exchange_security_id
 ON instrument (
-    id
+    exchange_security_id
 ) TYPE bloom_filter GRANULARITY 4;
 
 INSERT INTO instrument_master (
     id,
+    exchange_security_id,
     exchange,
     segment,
     symbol,
@@ -47,6 +48,7 @@ INSERT INTO instrument_master (
     expiry
 ) VALUES (
     1,
+    12345,
     'NSE',
     'F&O',
     'Tata Motors',

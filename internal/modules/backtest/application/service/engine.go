@@ -183,7 +183,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Get data for the main chart timeframe
 	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
-		instrumentMaster.ID,
+		instrumentMaster.ExchangeSecurityID,
 		run.PeriodStartTime,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
@@ -195,7 +195,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Get second-level data for more accurate exit condition checking
 	secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
-		instrumentMaster.ID,
+		instrumentMaster.ExchangeSecurityID,
 		run.PeriodStartTime,
 		run.PeriodEndTime,
 		"1s", // 1-second data for granular exit condition checking

@@ -27,7 +27,8 @@ func NewInstrumentMasterRepository(db *sqlx.DB) repository.InstrumentMasterRepos
 func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id, 
+			id,
+			exchange_security_id,
 			exchange, 
 			segment, 
 			symbol, 
