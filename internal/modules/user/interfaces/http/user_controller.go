@@ -851,7 +851,12 @@ func modelToDTO(user *model.User) *dto.UserDTO {
 	}
 }
 
-// GetAuthService returns the auth service instance
+// GetUserService returns the user service
+func (c *UserController) GetUserService() *service.UserService {
+	return c.userService
+}
+
+// GetAuthService returns the auth service
 func (c *UserController) GetAuthService() *service.AuthService {
 	return c.authService
 }

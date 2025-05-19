@@ -127,10 +127,37 @@ func (s *UserService) Authenticate(ctx context.Context, email, password string) 
 		return nil, errors.New("user account is not active")
 	}
 
-	// Verify password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	// If password is empty, it's an OAuth authentication attempt
+	// Only skip password verification for OAuth flows
+	if password != "" {
+		// Verify password for normal authentication
+		err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+		if err != nil {
+			return nil, ErrInvalidCredentials
+		}
+	}
+
+	// Load user roles if not already loaded
+	if len(user.Roles) == 0 {
+		roles, err := s.roleRepo.GetUserRoles(ctx, user.ID)
+		if err != nil {
+			return nil, fmt.Errorf("error loading user roles: %w", err)
+		}
+		user.Roles = roles
+	}
+
+	return user, nil
+}
+
+// FindUserByEmail finds a user by email
+func (s *UserService) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	// Find user by email
+	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, fmt.Errorf("error finding user by email: %w", err)
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
 	}
 
 	// Load user roles if not already loaded
@@ -147,13 +174,27 @@ func (s *UserService) Authenticate(ctx context.Context, email, password string) 
 
 // GetUserByID gets a user by ID
 func (s *UserService) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	// Attempt to find the user with the provided context
 	user, err := s.userRepo.FindByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error finding user: %w", err)
+
+	// If there's a context cancellation error, retry with a fresh context
+	if err != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+		// Create a new context with timeout
+		retryCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Retry the operation
+		user, err = s.userRepo.FindByID(retryCtx, id)
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by ID: %w", err)
+	}
+
 	if user == nil {
 		return nil, ErrUserNotFound
 	}
+
 	return user, nil
 }
 
