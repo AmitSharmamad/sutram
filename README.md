@@ -20,6 +20,28 @@ The easiest way to run the application is using Docker Compose:
 docker-compose up -d
 ```
 
+### Running WebSocket Server for Live Data
+
+The platform includes a WebSocket server for streaming live market data:
+
+1. Configure your WebSocket environment variables:
+```bash
+cp .env.websocket.example .env
+# Edit .env with your actual credentials
+```
+
+2. Run the WebSocket server using make:
+```bash
+# Using make directly
+make run-live
+
+# Or using the convenience script
+./run-live.sh
+```
+
+The WebSocket server will run on port 9091 by default and will connect to the upstream
+WebSocket provider (wss://api-feed.dhan.co) with the credentials provided in the .env file.
+
 ### Running Locally
 
 1. Start the databases:
