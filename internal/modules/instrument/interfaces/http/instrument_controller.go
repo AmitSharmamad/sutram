@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"algo/internal/modules/instrument/application/dto"
 	"algo/internal/modules/instrument/application/service"
@@ -190,20 +191,35 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 
 // GetInstrumentMastersByIDs gets instrument masters by their IDs
 func (c *InstrumentController) GetInstrumentMastersByIDs(ctx *gin.Context) {
-	var req struct {
-		IDs []uint64 `json:"ids" binding:"required"`
-	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	// Get IDs from query parameter - expected format: ?ids=1,2,3,4
+	idsParam := ctx.Query("ids")
+	if idsParam == "" {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid request: " + err.Error(),
+			Error:   "Missing required query parameter: ids",
 		})
 		return
 	}
 
+	// Split the comma-separated IDs and parse them to uint64
+	idStrings := strings.Split(idsParam, ",")
+	ids := make([]uint64, 0, len(idStrings))
+
+	for _, idStr := range idStrings {
+		id, err := strconv.ParseUint(strings.TrimSpace(idStr), 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid ID format: " + idStr,
+			})
+			return
+		}
+		ids = append(ids, id)
+	}
+
 	// Get instrument masters
-	instrumentMasters := make([]*model.InstrumentMaster, 0, len(req.IDs))
-	for _, id := range req.IDs {
+	instrumentMasters := make([]*model.InstrumentMaster, 0, len(ids))
+	for _, id := range ids {
 		instrumentMaster, err := c.instrumentService.GetInstrumentMasterByID(ctx.Request.Context(), id)
 		if err == nil && instrumentMaster != nil {
 			instrumentMasters = append(instrumentMasters, instrumentMaster)
