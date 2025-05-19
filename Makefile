@@ -1,4 +1,4 @@
-.PHONY: build run clean test docker-build docker-run db-start db-stop
+.PHONY: build run clean test docker-build docker-run db-start db-stop build-live run-live
 
 # Build the web application
 build:
@@ -49,5 +49,17 @@ all-up:
 
 # Stop everything
 all-down:
+	@echo "Stopping all services..."
+	@docker-compose down
+
+# Build the live WebSocket server
+build-live:
+	@echo "Building the live WebSocket server..."
+	@go build -gcflags="all=-N -l" -o s-live cmd/live/main.go
+
+# Run the live WebSocket server
+live: build-live
+	@echo "Running the live WebSocket server..."
+	@./s-live
 	@echo "Stopping all services..."
 	@docker-compose down
