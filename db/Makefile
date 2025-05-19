@@ -4,7 +4,7 @@ pg:
 	docker-compose up -d sutram-postgres
 
 all:
-	docker-compose up -d --build
+	docker-compose up --build
 
 down:
 	docker-compose down

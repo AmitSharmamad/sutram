@@ -14,6 +14,7 @@ import (
 	"algo/internal/modules/community"
 	"algo/internal/modules/instrument"
 	"algo/internal/modules/marketplace"
+	"algo/internal/modules/oauth"
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
 
@@ -176,6 +177,11 @@ func initializeModules(router *gin.RouterGroup) {
 	communityModule := community.New()
 	communityModule.SetUserController(userController)
 	communityModule.RegisterRoutes(router)
+
+	// Initialize oauth module
+	oauthModule := oauth.New()
+	oauthModule.Initialize(userController)
+	oauthModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }

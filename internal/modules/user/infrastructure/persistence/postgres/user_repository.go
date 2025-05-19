@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -52,10 +53,22 @@ func (r *UserRepository) Create(ctx context.Context, user *model.User) error {
 
 // FindByID finds a user by their ID
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	// Set a timeout for this database operation if not already set
+	dbCtx := ctx
+	_, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		var cancel context.CancelFunc
+		dbCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+
 	query := `SELECT id, name, username, email, phone_number, password, verified, created_at, updated_at, is_active FROM "user" WHERE id = $1`
 
+	// Create a database connection with a timeout
+	row := r.db.QueryRowContext(dbCtx, query, id)
+
 	var user model.User
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := row.Scan(
 		&user.ID,
 		&user.Name,
 		&user.Username,
@@ -73,11 +86,21 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Use
 	}
 
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("database operation timed out: %w", err)
+		}
 		return nil, fmt.Errorf("failed to find user by ID: %w", err)
 	}
 
-	// Get user roles
-	roles, err := r.getUserRoles(ctx, user.ID)
+	// Get user roles with a potentially new context if the original was canceled
+	roleCtx := ctx
+	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		var roleCancel context.CancelFunc
+		roleCtx, roleCancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer roleCancel()
+	}
+
+	roles, err := r.getUserRoles(roleCtx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +111,21 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Use
 
 // FindByEmail finds a user by their email
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+	// Set a timeout for this database operation if not already set
+	dbCtx := ctx
+	_, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		var cancel context.CancelFunc
+		dbCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+
 	query := `SELECT id, name, username, email, phone_number, password, verified, created_at, updated_at, is_active FROM "user" WHERE email = $1`
 
+	row := r.db.QueryRowContext(dbCtx, query, email)
+
 	var user model.User
-	err := r.db.QueryRowContext(ctx, query, email).Scan(
+	err := row.Scan(
 		&user.ID,
 		&user.Name,
 		&user.Username,
@@ -109,11 +143,46 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			// If the context was canceled, retry with a fresh context
+			retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer retryCancel()
+
+			retryRow := r.db.QueryRowContext(retryCtx, query, email)
+			err = retryRow.Scan(
+				&user.ID,
+				&user.Name,
+				&user.Username,
+				&user.Email,
+				&user.PhoneNumber,
+				&user.Password,
+				&user.Verified,
+				&user.CreatedAt,
+				&user.UpdatedAt,
+				&user.IsActive,
+			)
+
+			if err == sql.ErrNoRows {
+				return nil, nil
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to find user by email after retry: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to find user by email: %w", err)
+		}
 	}
 
-	// Get user roles
-	roles, err := r.getUserRoles(ctx, user.ID)
+	// Get user roles with a potentially new context if the original was canceled
+	roleCtx := ctx
+	if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		var roleCancel context.CancelFunc
+		roleCtx, roleCancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer roleCancel()
+	}
+
+	roles, err := r.getUserRoles(roleCtx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +273,15 @@ func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 // getUserRoles is a helper method to get all roles for a user
 func (r *UserRepository) getUserRoles(ctx context.Context, userID uuid.UUID) ([]model.Role, error) {
+	// Set a timeout for this database operation if not already set
+	dbCtx := ctx
+	_, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		var cancel context.CancelFunc
+		dbCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+
 	query := `
 		SELECT r.id, r.name, r.description, r.created_at, r.updated_at
 		FROM role r
@@ -211,9 +289,20 @@ func (r *UserRepository) getUserRoles(ctx context.Context, userID uuid.UUID) ([]
 		WHERE ur.user_id = $1
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(dbCtx, query, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user roles: %w", err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			// If the context was canceled, retry with a fresh context
+			retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer retryCancel()
+
+			rows, err = r.db.QueryContext(retryCtx, query, userID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get user roles after retry: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to get user roles: %w", err)
+		}
 	}
 	defer rows.Close()
 

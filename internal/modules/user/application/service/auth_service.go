@@ -36,6 +36,7 @@ func NewAuthService(userService *UserService, jwtService *auth.JWTService) *Auth
 // Login authenticates a user and returns a JWT token
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResponse, error) {
 	// Authenticate the user
+	// Empty password indicates OAuth authentication
 	user, err := s.userService.Authenticate(ctx, email, password)
 	if err != nil {
 		return nil, err

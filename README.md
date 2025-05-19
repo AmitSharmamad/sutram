@@ -74,6 +74,10 @@ The application will be available at http://localhost:8080.
 - **GET /api/users/profile**: Get user profile (requires authentication)
   - Response: `{ "success": true, "data": {...} }`
 
+## OAuth Authentication
+
+The application supports OAuth authentication with Google. See [OAUTH.md](OAUTH.md) for setup instructions.
+
 ## Development
 
 ### Project Structure
