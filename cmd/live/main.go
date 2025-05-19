@@ -843,16 +843,15 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 
 	// Create instrument model
 	instrument := &model.Instrument{
-		ID:        uint64(securityID),
-		Symbol:    symbol,
-		Open:      float64(open),
-		High:      float64(high),
-		Low:       float64(low),
-		Close:     float64(close),
-		Volume:    volume,
-		Timestamp: timestampTime,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		ExchangeSecurityID: int32(securityID),
+		Open:               float64(open),
+		High:               float64(high),
+		Low:                float64(low),
+		Close:              float64(close),
+		Volume:             volume,
+		Timestamp:          timestampTime,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 
 	// Store in ClickHouse
@@ -864,6 +863,6 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 		return
 	}
 
-	log.Printf("Stored ticker data for %s (ID: %d) at %s",
+	log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
 		symbol, securityID, timestampTime.Format(time.RFC3339))
 }

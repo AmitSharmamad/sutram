@@ -33,16 +33,16 @@ func NewInstrumentService(
 	}
 }
 
-// GetInstrumentByID gets an instrument by ID
-func (s *InstrumentService) GetInstrumentByID(ctx context.Context, id uint64) (*model.Instrument, error) {
-	instrument, err := s.instrumentRepo.FindByID(ctx, id)
+// GetInstrumentsByExchangeSecurityID gets instruments by exchange security ID
+func (s *InstrumentService) GetInstrumentsByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) ([]*model.Instrument, error) {
+	instruments, err := s.instrumentRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding instrument: %w", err)
+		return nil, fmt.Errorf("error finding instruments: %w", err)
 	}
-	if instrument == nil {
+	if len(instruments) == 0 {
 		return nil, ErrInstrumentNotFound
 	}
-	return instrument, nil
+	return instruments, nil
 }
 
 // GetInstrumentMasterByID gets an instrument master by ID
@@ -57,17 +57,8 @@ func (s *InstrumentService) GetInstrumentMasterByID(ctx context.Context, id uint
 	return instrumentMaster, nil
 }
 
-// GetInstrumentsBySymbol gets instruments by symbol
-func (s *InstrumentService) GetInstrumentsBySymbol(ctx context.Context, symbol string) ([]*model.Instrument, error) {
-	instruments, err := s.instrumentRepo.FindBySymbol(ctx, symbol)
-	if err != nil {
-		return nil, fmt.Errorf("error finding instruments by symbol: %w", err)
-	}
-	return instruments, nil
-}
-
-// GetInstrumentsByTimeRange gets instruments by ID within a time range
-func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, id uint64, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
+// GetInstrumentsByTimeRange gets instruments by exchange security ID within a time range
+func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, exchangeSecurityID int32, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
 	// Validate time range
 	if start.After(end) {
 		return nil, ErrInvalidTimeRange
@@ -78,7 +69,7 @@ func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, id ui
 		timeFrame = "1m"
 	}
 
-	instruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, start, end, timeFrame)
+	instruments, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(ctx, exchangeSecurityID, start, end, timeFrame)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instruments by time range: %w", err)
 	}
@@ -141,10 +132,23 @@ func (s *InstrumentService) CreateInstrument(ctx context.Context, instrument *mo
 // UpdateInstrument updates an instrument
 func (s *InstrumentService) UpdateInstrument(ctx context.Context, instrument *model.Instrument) error {
 	// Check if instrument exists
-	existing, err := s.instrumentRepo.FindByID(ctx, instrument.ID)
+	existingInstruments, err := s.instrumentRepo.FindByExchangeSecurityID(ctx, instrument.ExchangeSecurityID)
 	if err != nil {
 		return fmt.Errorf("error finding instrument: %w", err)
 	}
+	if len(existingInstruments) == 0 {
+		return ErrInstrumentNotFound
+	}
+
+	// Find the specific instrument with matching timestamp
+	var existing *model.Instrument
+	for _, inst := range existingInstruments {
+		if inst.Timestamp.Equal(instrument.Timestamp) {
+			existing = inst
+			break
+		}
+	}
+
 	if existing == nil {
 		return ErrInstrumentNotFound
 	}
@@ -184,19 +188,19 @@ func (s *InstrumentService) UpdateInstrumentMaster(ctx context.Context, master *
 	return nil
 }
 
-// DeleteInstrument deletes an instrument
-func (s *InstrumentService) DeleteInstrument(ctx context.Context, id uint64) error {
-	// Check if instrument exists
-	existing, err := s.instrumentRepo.FindByID(ctx, id)
+// DeleteInstrument deletes instruments by exchange security ID
+func (s *InstrumentService) DeleteInstrument(ctx context.Context, exchangeSecurityID int32) error {
+	// Check if instruments exist
+	existing, err := s.instrumentRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
-		return fmt.Errorf("error finding instrument: %w", err)
+		return fmt.Errorf("error finding instruments: %w", err)
 	}
-	if existing == nil {
+	if len(existing) == 0 {
 		return ErrInstrumentNotFound
 	}
 
-	if err := s.instrumentRepo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("error deleting instrument: %w", err)
+	if err := s.instrumentRepo.Delete(ctx, exchangeSecurityID); err != nil {
+		return fmt.Errorf("error deleting instruments: %w", err)
 	}
 	return nil
 }
@@ -222,7 +226,7 @@ func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, id uint6
 // Combines both the requested date range data and lookback data into a single result
 func (s *InstrumentService) GetInstrumentDataWithLookback(
 	ctx context.Context,
-	id uint64,
+	exchangeSecurityID int32,
 	start, end time.Time,
 	timeFrame string,
 	lookBack int,
@@ -233,7 +237,7 @@ func (s *InstrumentService) GetInstrumentDataWithLookback(
 	}
 
 	// Get data for the requested date range
-	rangeInstruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, start, end, timeFrame)
+	rangeInstruments, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(ctx, exchangeSecurityID, start, end, timeFrame)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instruments for date range: %w", err)
 	}
@@ -249,7 +253,7 @@ func (s *InstrumentService) GetInstrumentDataWithLookback(
 	lookBackStart := start.AddDate(0, 0, -lookBack)
 
 	// Get lookback data
-	lookBackInstruments, err := s.instrumentRepo.FindByIDAndTimeRange(ctx, id, lookBackStart, start, timeFrame)
+	lookBackInstruments, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(ctx, exchangeSecurityID, lookBackStart, start, timeFrame)
 	if err != nil {
 		// If there's an error with lookback, just return the date range data
 		return &dateRangeData, nil

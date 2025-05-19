@@ -23,12 +23,11 @@ func NewInstrumentRepository(db *sqlx.DB) repository.InstrumentRepository {
 	}
 }
 
-// FindByID finds an instrument by ID
-func (r *InstrumentRepository) FindByID(ctx context.Context, id uint64) (*model.Instrument, error) {
+// FindByExchangeSecurityID finds instruments by exchange security ID
+func (r *InstrumentRepository) FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) ([]*model.Instrument, error) {
 	query := `
 		SELECT 
-			id, 
-			instrument, 
+			exchange_security_id, 
 			open, 
 			high, 
 			low, 
@@ -38,55 +37,25 @@ func (r *InstrumentRepository) FindByID(ctx context.Context, id uint64) (*model.
 			created_at, 
 			updated_at
 		FROM sutram.instrument
-		WHERE id = ?
-		LIMIT 1
-	`
-
-	instrument := &model.Instrument{}
-	err := r.db.GetContext(ctx, instrument, query, id)
-	if err != nil {
-		return nil, fmt.Errorf("error querying instrument by ID: %w", err)
-	}
-
-	return instrument, nil
-}
-
-// FindBySymbol finds instruments by symbol
-func (r *InstrumentRepository) FindBySymbol(ctx context.Context, symbol string) ([]*model.Instrument, error) {
-	query := `
-		SELECT 
-			id, 
-			instrument, 
-			open, 
-			high, 
-			low, 
-			close, 
-			volume, 
-			timestamp, 
-			created_at, 
-			updated_at
-		FROM sutram.instrument
-		WHERE instrument = ?
+		WHERE exchange_security_id = ?
 		ORDER BY timestamp DESC
-		LIMIT 1000
 	`
 
 	var instruments []*model.Instrument
-	err := r.db.SelectContext(ctx, &instruments, query, symbol)
+	err := r.db.SelectContext(ctx, &instruments, query, exchangeSecurityID)
 	if err != nil {
-		return nil, fmt.Errorf("error querying instruments by symbol: %w", err)
+		return nil, fmt.Errorf("error querying instruments by exchange security ID: %w", err)
 	}
 
 	return instruments, nil
 }
 
-// FindByIDAndTimeRange finds instruments by ID within a time range
+// FindByExchangeSecurityIDAndTimeRange finds instruments by exchange security ID within a time range
 // timeFrame parameter allows data aggregation by different time intervals ('1s', '1m', '3m', '5m', '15m', '30m', '1h', '3h', '1d', '1M')
-func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint64, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
+func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.Context, exchangeSecurityID int32, start, end time.Time, timeFrame string) ([]*model.Instrument, error) {
 	query := `
 		SELECT
-			id,
-			instrument,
+			exchange_security_id,
 			CASE
 				WHEN ? = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
 				WHEN ? = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
@@ -108,10 +77,10 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 			MAX(updated_at) AS updated_at
 		FROM sutram.instrument
 		WHERE 
-			id = ?
+			exchange_security_id = ? AND
+			timestamp BETWEEN ? AND ?
 		GROUP BY
-			id,
-			instrument,
+			exchange_security_id,
 			timestamp
 		ORDER BY
 			timestamp ASC
@@ -121,10 +90,10 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 	err := r.db.SelectContext(ctx, &instruments, query,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
-		id)
+		exchangeSecurityID, start, end)
 
 	if err != nil {
-		return nil, fmt.Errorf("error querying instruments by time range: %w", err)
+		return nil, fmt.Errorf("error querying instruments by exchange security ID and time range: %w", err)
 	}
 
 	return instruments, nil
@@ -134,8 +103,7 @@ func (r *InstrumentRepository) FindByIDAndTimeRange(ctx context.Context, id uint
 func (r *InstrumentRepository) Create(ctx context.Context, instrument *model.Instrument) error {
 	query := `
 		INSERT INTO sutram.instrument (
-			id,
-			instrument,
+			exchange_security_id,
 			open,
 			high,
 			low,
@@ -144,14 +112,13 @@ func (r *InstrumentRepository) Create(ctx context.Context, instrument *model.Ins
 			timestamp,
 			created_at,
 			updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
-		instrument.ID,
-		instrument.Symbol,
+		instrument.ExchangeSecurityID,
 		instrument.Open,
 		instrument.High,
 		instrument.Low,
@@ -181,7 +148,7 @@ func (r *InstrumentRepository) Update(ctx context.Context, instrument *model.Ins
 			close = ?,
 			volume = ?,
 			updated_at = ?
-		WHERE id = ?
+		WHERE exchange_security_id = ? AND timestamp = ?
 	`
 
 	_, err := r.db.ExecContext(
@@ -193,7 +160,8 @@ func (r *InstrumentRepository) Update(ctx context.Context, instrument *model.Ins
 		instrument.Close,
 		instrument.Volume,
 		instrument.UpdatedAt,
-		instrument.ID,
+		instrument.ExchangeSecurityID,
+		instrument.Timestamp,
 	)
 
 	if err != nil {
@@ -203,15 +171,15 @@ func (r *InstrumentRepository) Update(ctx context.Context, instrument *model.Ins
 	return nil
 }
 
-// Delete deletes an instrument
-func (r *InstrumentRepository) Delete(ctx context.Context, id uint64) error {
+// Delete deletes instruments by exchange security ID
+func (r *InstrumentRepository) Delete(ctx context.Context, exchangeSecurityID int32) error {
 	query := `
-		ALTER TABLE instrument DELETE WHERE id = ?
+		ALTER TABLE instrument DELETE WHERE exchange_security_id = ?
 	`
 
-	_, err := r.db.ExecContext(ctx, query, id)
+	_, err := r.db.ExecContext(ctx, query, exchangeSecurityID)
 	if err != nil {
-		return fmt.Errorf("error deleting instrument: %w", err)
+		return fmt.Errorf("error deleting instruments: %w", err)
 	}
 
 	return nil

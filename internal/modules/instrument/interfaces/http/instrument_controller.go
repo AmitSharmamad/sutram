@@ -3,7 +3,6 @@ package http
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"algo/internal/modules/instrument/application/dto"
 	"algo/internal/modules/instrument/application/service"
@@ -24,21 +23,21 @@ func NewInstrumentController(instrumentService *service.InstrumentService) *Inst
 	}
 }
 
-// GetInstrumentByID gets an instrument by ID
-func (c *InstrumentController) GetInstrumentByID(ctx *gin.Context) {
-	// Get instrument ID from URL parameter
+// GetInstrumentByExchangeSecurityID gets instruments by exchange security ID
+func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Context) {
+	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
 
-	// Get the instrument
-	instrument, err := c.instrumentService.GetInstrumentByID(ctx.Request.Context(), id)
+	// Get the instruments
+	instruments, err := c.instrumentService.GetInstrumentsByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -47,12 +46,15 @@ func (c *InstrumentController) GetInstrumentByID(ctx *gin.Context) {
 		return
 	}
 
-	// Convert instrument model to DTO
-	instrumentDTO := modelToDTO(instrument)
+	// Convert instrument models to DTOs
+	instrumentDTOs := make([]*dto.InstrumentDTO, len(instruments))
+	for i, instrument := range instruments {
+		instrumentDTOs[i] = modelToDTO(instrument)
+	}
 
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
-		Data:    instrumentDTO,
+		Data:    instrumentDTOs,
 	})
 }
 
@@ -88,34 +90,7 @@ func (c *InstrumentController) GetInstrumentMasterByID(ctx *gin.Context) {
 	})
 }
 
-// GetInstrumentsBySymbol gets instruments by symbol
-func (c *InstrumentController) GetInstrumentsBySymbol(ctx *gin.Context) {
-	// Get symbol from URL parameter
-	symbol := ctx.Param("symbol")
-
-	// Get instruments by symbol
-	instruments, err := c.instrumentService.GetInstrumentsBySymbol(ctx.Request.Context(), symbol)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
-			Success: false,
-			Error:   "Failed to get instruments: " + err.Error(),
-		})
-		return
-	}
-
-	// Convert instrument models to DTOs
-	instrumentDTOs := make([]*dto.InstrumentDTO, len(instruments))
-	for i, instrument := range instruments {
-		instrumentDTOs[i] = modelToDTO(instrument)
-	}
-
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Data:    instrumentDTOs,
-	})
-}
-
-// GetInstrumentsByTimeRange gets instruments by symbol within a time range
+// GetInstrumentsByTimeRange gets instruments by exchange security ID within a time range
 func (c *InstrumentController) GetInstrumentsByTimeRange(ctx *gin.Context) {
 	var req dto.GetInstrumentsByTimeRangeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -132,19 +107,9 @@ func (c *InstrumentController) GetInstrumentsByTimeRange(ctx *gin.Context) {
 		timeFrame = "1m" // Default to 1-minute timeframe if not specified
 	}
 
-	// Convert symbol string to uint64
-	symbolID, err := strconv.ParseUint(req.Symbol, 10, 64)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
-			Success: false,
-			Error:   "Invalid symbol format: " + err.Error(),
-		})
-		return
-	}
-
 	instruments, err := c.instrumentService.GetInstrumentsByTimeRange(
 		ctx.Request.Context(),
-		symbolID,
+		req.ExchangeSecurityID,
 		req.StartTime,
 		req.EndTime,
 		timeFrame,
@@ -169,27 +134,18 @@ func (c *InstrumentController) GetInstrumentsByTimeRange(ctx *gin.Context) {
 	})
 }
 
-// GetAllInstrumentMasters gets all instrument masters with filtering and pagination
+// GetAllInstrumentMasters gets all instrument masters with pagination and filtering
 func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
-	// Parse query parameters for filtering and pagination
 	var filter dto.InstrumentMasterFilterDTO
 	if err := ctx.ShouldBindQuery(&filter); err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid query parameters: " + err.Error(),
+			Error:   "Invalid filter parameters: " + err.Error(),
 		})
 		return
 	}
 
-	// Set default values if not provided
-	if filter.Page < 1 {
-		filter.Page = 1
-	}
-	if filter.PageSize < 1 {
-		filter.PageSize = 10
-	}
-
-	// Get instrument masters with filters
+	// Get instrument masters with filtering and pagination
 	instrumentMasters, totalCount, err := c.instrumentService.GetInstrumentMastersWithFilters(
 		ctx.Request.Context(),
 		filter.Exchange,
@@ -197,7 +153,6 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 		filter.Page,
 		filter.PageSize,
 	)
-
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
 			Success: false,
@@ -233,6 +188,40 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 	})
 }
 
+// GetInstrumentMastersByIDs gets instrument masters by their IDs
+func (c *InstrumentController) GetInstrumentMastersByIDs(ctx *gin.Context) {
+	var req struct {
+		IDs []uint64 `json:"ids" binding:"required"`
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	// Get instrument masters
+	instrumentMasters := make([]*model.InstrumentMaster, 0, len(req.IDs))
+	for _, id := range req.IDs {
+		instrumentMaster, err := c.instrumentService.GetInstrumentMasterByID(ctx.Request.Context(), id)
+		if err == nil && instrumentMaster != nil {
+			instrumentMasters = append(instrumentMasters, instrumentMaster)
+		}
+	}
+
+	// Convert instrument master models to DTOs
+	instrumentMasterDTOs := make([]*dto.InstrumentMasterDTO, len(instrumentMasters))
+	for i, instrumentMaster := range instrumentMasters {
+		instrumentMasterDTOs[i] = masterModelToDTO(instrumentMaster)
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    instrumentMasterDTOs,
+	})
+}
+
 // CreateInstrument creates a new instrument
 func (c *InstrumentController) CreateInstrument(ctx *gin.Context) {
 	var req dto.CreateInstrumentRequest
@@ -246,13 +235,13 @@ func (c *InstrumentController) CreateInstrument(ctx *gin.Context) {
 
 	// Create instrument from request
 	instrument := &model.Instrument{
-		Symbol:    req.Symbol,
-		Open:      req.Open,
-		High:      req.High,
-		Low:       req.Low,
-		Close:     req.Close,
-		Volume:    req.Volume,
-		Timestamp: req.Timestamp,
+		ExchangeSecurityID: req.ExchangeSecurityID,
+		Open:               req.Open,
+		High:               req.High,
+		Low:                req.Low,
+		Close:              req.Close,
+		Volume:             req.Volume,
+		Timestamp:          req.Timestamp,
 	}
 
 	// Create the instrument
@@ -277,13 +266,13 @@ func (c *InstrumentController) CreateInstrument(ctx *gin.Context) {
 
 // UpdateInstrument updates an instrument
 func (c *InstrumentController) UpdateInstrument(ctx *gin.Context) {
-	// Get instrument ID from URL parameter
+	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
@@ -297,12 +286,38 @@ func (c *InstrumentController) UpdateInstrument(ctx *gin.Context) {
 		return
 	}
 
-	// Get existing instrument
-	instrument, err := c.instrumentService.GetInstrumentByID(ctx.Request.Context(), id)
+	// We need the timestamp from the request to identify the specific instrument
+	if req.Timestamp.IsZero() {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Timestamp is required for updates",
+		})
+		return
+	}
+
+	// Get existing instruments for this exchange security ID
+	instruments, err := c.instrumentService.GetInstrumentsByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
 			Error:   err.Error(),
+		})
+		return
+	}
+
+	// Find the specific instrument with matching timestamp
+	var instrument *model.Instrument
+	for _, inst := range instruments {
+		if inst.Timestamp.Equal(req.Timestamp) {
+			instrument = inst
+			break
+		}
+	}
+
+	if instrument == nil {
+		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
+			Success: false,
+			Error:   "No instrument found with the specified timestamp",
 		})
 		return
 	}
@@ -313,7 +328,6 @@ func (c *InstrumentController) UpdateInstrument(ctx *gin.Context) {
 	instrument.Low = req.Low
 	instrument.Close = req.Close
 	instrument.Volume = req.Volume
-	instrument.Timestamp = req.Timestamp
 
 	// Update the instrument
 	err = c.instrumentService.UpdateInstrument(ctx.Request.Context(), instrument)
@@ -448,32 +462,32 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	})
 }
 
-// DeleteInstrument deletes an instrument
+// DeleteInstrument deletes instruments by exchange security ID
 func (c *InstrumentController) DeleteInstrument(ctx *gin.Context) {
-	// Get instrument ID from URL parameter
+	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
 
-	// Delete the instrument
-	err = c.instrumentService.DeleteInstrument(ctx.Request.Context(), id)
+	// Delete the instruments with the specified exchange security ID
+	err = c.instrumentService.DeleteInstrument(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
 			Success: false,
-			Error:   "Failed to delete instrument: " + err.Error(),
+			Error:   "Failed to delete instruments: " + err.Error(),
 		})
 		return
 	}
 
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
-		Message: "Instrument deleted successfully",
+		Message: "Instruments deleted successfully",
 	})
 }
 
@@ -506,56 +520,6 @@ func (c *InstrumentController) DeleteInstrumentMaster(ctx *gin.Context) {
 	})
 }
 
-// GetInstrumentMastersByIDs gets instrument masters by their IDs
-func (c *InstrumentController) GetInstrumentMastersByIDs(ctx *gin.Context) {
-	// Get ids from query parameter
-	idsParam := ctx.Query("ids")
-	if idsParam == "" {
-		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
-			Success: false,
-			Error:   "Missing required query parameter: ids",
-		})
-		return
-	}
-
-	// Parse and validate IDs
-	idStrings := strings.Split(idsParam, ",")
-	ids := make([]uint64, 0, len(idStrings))
-
-	for _, idStr := range idStrings {
-		id, err := strconv.ParseUint(strings.TrimSpace(idStr), 10, 64)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
-				Success: false,
-				Error:   "Invalid ID format: " + idStr,
-			})
-			return
-		}
-		ids = append(ids, id)
-	}
-
-	// Get the instrument masters
-	instrumentMasters, err := c.instrumentService.GetInstrumentMastersByIDs(ctx.Request.Context(), ids)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
-			Success: false,
-			Error:   "Failed to get instrument masters: " + err.Error(),
-		})
-		return
-	}
-
-	// Convert instrument master models to DTOs
-	instrumentMasterDTOs := make([]*dto.InstrumentMasterDTO, len(instrumentMasters))
-	for i, instrumentMaster := range instrumentMasters {
-		instrumentMasterDTOs[i] = masterModelToDTO(instrumentMaster)
-	}
-
-	ctx.JSON(http.StatusOK, dto.ApiResponse{
-		Success: true,
-		Data:    instrumentMasterDTOs,
-	})
-}
-
 // Helper function to convert instrument model to DTO
 func modelToDTO(instrument *model.Instrument) *dto.InstrumentDTO {
 	if instrument == nil {
@@ -563,14 +527,13 @@ func modelToDTO(instrument *model.Instrument) *dto.InstrumentDTO {
 	}
 
 	return &dto.InstrumentDTO{
-		ID:        instrument.ID,
-		Symbol:    instrument.Symbol,
-		Open:      instrument.Open,
-		High:      instrument.High,
-		Low:       instrument.Low,
-		Close:     instrument.Close,
-		Volume:    instrument.Volume,
-		Timestamp: instrument.Timestamp,
+		ExchangeSecurityID: instrument.ExchangeSecurityID,
+		Open:               instrument.Open,
+		High:               instrument.High,
+		Low:                instrument.Low,
+		Close:              instrument.Close,
+		Volume:             instrument.Volume,
+		Timestamp:          instrument.Timestamp,
 	}
 }
 
@@ -581,12 +544,13 @@ func masterModelToDTO(master *model.InstrumentMaster) *dto.InstrumentMasterDTO {
 	}
 
 	return &dto.InstrumentMasterDTO{
-		ID:        master.ID,
-		Exchange:  master.Exchange,
-		Segment:   master.Segment,
-		Symbol:    master.Symbol,
-		Name:      master.Name,
-		StartDate: master.StartDate,
-		Expiry:    master.Expiry,
+		ID:                 master.ID,
+		ExchangeSecurityID: master.ExchangeSecurityID,
+		Exchange:           master.Exchange,
+		Segment:            master.Segment,
+		Symbol:             master.Symbol,
+		Name:               master.Name,
+		StartDate:          master.StartDate,
+		Expiry:             master.Expiry,
 	}
 }
