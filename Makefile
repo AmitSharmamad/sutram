@@ -1,4 +1,4 @@
-.PHONY: build run clean test test-strategy coverage coverage-strategy docker-build docker-run db-start db-stop build-live run-live
+.PHONY: build run clean test coverage docker-build docker-run db-start db-stop build-live run-live
 
 # Build the web application
 build:
@@ -22,11 +22,6 @@ test:
 	@echo "Running tests..."
 	@go test -v ./...
 
-# Run only strategy module tests
-test-strategy:
-	@echo "Running strategy module tests..."
-	@go test -v ./tests/modules/strategy/...
-
 # Run tests with coverage analysis
 coverage:
 	@echo "Running tests with coverage analysis..."
@@ -34,14 +29,6 @@ coverage:
 	@go tool cover -func=coverage.out
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated in coverage.html"
-
-# Run only strategy module tests with coverage analysis
-coverage-strategy:
-	@echo "Running strategy module tests with coverage analysis..."
-	@go test -coverprofile=strategy-coverage.out -covermode=atomic ./tests/modules/strategy/...
-	@go tool cover -func=strategy-coverage.out
-	@go tool cover -html=strategy-coverage.out -o strategy-coverage.html
-	@echo "Coverage report generated in strategy-coverage.html"
 
 # Build Docker image
 docker-build:
