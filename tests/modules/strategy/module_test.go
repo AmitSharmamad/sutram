@@ -6,12 +6,8 @@ import (
 
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/strategy/application/service"
-	"algo/internal/modules/strategy/domain/repository"
-	"algo/internal/modules/strategy/interfaces/http"
-	userHttp "algo/internal/modules/user/interfaces/http"
 	"algo/tests/modules/strategy/mocks"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
