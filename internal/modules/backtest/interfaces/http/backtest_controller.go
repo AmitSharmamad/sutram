@@ -67,7 +67,7 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 	}
 
 	// Call the engine service to start the backtest
-	runGroup, err := c.engineService.Start(ctx, strategyID, userID)
+	response, err := c.engineService.Start(ctx, strategyID, userID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -78,6 +78,6 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 	// Return success response with the run group ID
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":      "Backtest started successfully",
-		"run_group_id": runGroup.ID,
+		"backtest_details": response,
 	})
 }

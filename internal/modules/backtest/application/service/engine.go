@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,10 +18,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// Response struct represents the response from a backtest run
+type Response struct {
+	InstrumentID string            `json:"instrument_id"`
+	Positions    []*model.Position `json:"positions"`
+	Metrics      *model.RunMetrics `json:"metrics"`
+}
+
 // EngineService defines the service for backtest engine operations
 type EngineService interface {
 	// Start a backtest run for the provided strategy
-	Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error)
+	Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]Response, error)
 }
 
 // BacktestEngine implements the engine for running backtests
@@ -58,7 +66,7 @@ func NewBacktestEngine(
 }
 
 // Start starts a backtest run for the provided strategy
-func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (*model.RunGroup, error) {
+func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]Response, error) {
 	// Get the strategy
 	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
 	if err != nil {
@@ -165,7 +173,24 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 		}
 	}
 
-	return runGroup, nil
+	// Create the response
+	var response []Response
+
+	// Create a response for each run
+	for _, run := range runs {
+		// Convert the instrument ID to a string for the response
+		instrumentIDStr := strconv.Itoa(run.InstrumentID)
+
+		resp := Response{
+			InstrumentID: instrumentIDStr,
+			Positions:    run.Positions,
+			Metrics:      run.RunMetrics,
+		}
+
+		response = append(response, resp)
+	}
+
+	return response, nil
 }
 
 // executeRunBacktest runs a backtest for a single instrument run
