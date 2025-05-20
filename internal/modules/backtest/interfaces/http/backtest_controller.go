@@ -78,6 +78,6 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 	// Return success response with the run group ID
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":      "Backtest started successfully",
-		"backtest_details": response,
+		"results": response,
 	})
 }
