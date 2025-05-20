@@ -74,6 +74,32 @@ func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol st
 	return instrumentMaster, nil
 }
 
+// FindByExchangeSecurityID finds an instrument master by exchange security ID
+func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) (*model.InstrumentMaster, error) {
+	query := `
+		SELECT
+			id,
+			exchange_security_id,
+			exchange,
+			segment,
+			symbol,
+			instrument,
+			start_date,
+			expiry
+		FROM sutram.instrument_master
+		WHERE exchange_security_id = ?
+		LIMIT 1
+	`
+
+	instrumentMaster := &model.InstrumentMaster{}
+	err := r.db.GetContext(ctx, instrumentMaster, query, exchangeSecurityID)
+	if err != nil {
+		return nil, fmt.Errorf("error querying instrument master by exchange security ID: %w", err)
+	}
+
+	return instrumentMaster, nil
+}
+
 // FindByExchange finds instrument masters by exchange
 func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchange string) ([]*model.InstrumentMaster, error) {
 	query := `
