@@ -166,10 +166,6 @@ algo/internal/modules/strategy/application/service/strategy_service.go:356.2,356
 algo/internal/modules/strategy/application/service/strategy_service.go:362.50,365.22 1 0
 algo/internal/modules/strategy/application/service/strategy_service.go:365.22,367.3 1 0
 algo/internal/modules/strategy/application/service/strategy_service.go:369.2,369.12 1 0
-algo/internal/modules/strategy/domain/model/strategy.go:107.13,130.2 1 0
-algo/internal/modules/strategy/domain/model/strategy.go:157.3,182.2 24 0
-algo/internal/modules/strategy/domain/model/strategy.go:185.31,188.2 2 0
-algo/internal/modules/strategy/domain/model/strategy.go:191.33,194.2 2 0
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:30.70,34.2 1 0
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:37.90,85.16 3 0
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:85.16,87.3 1 0
@@ -256,6 +252,10 @@ algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repo
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:636.2,636.34 1 0
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:636.34,638.3 1 0
 algo/internal/modules/strategy/infrastructure/persistence/postgres/strategy_repository.go:640.2,640.24 1 0
+algo/internal/modules/strategy/domain/model/strategy.go:107.13,130.2 1 0
+algo/internal/modules/strategy/domain/model/strategy.go:157.3,182.2 24 0
+algo/internal/modules/strategy/domain/model/strategy.go:185.31,188.2 2 0
+algo/internal/modules/strategy/domain/model/strategy.go:191.33,194.2 2 0
 algo/internal/modules/strategy/interfaces/http/strategy_handler.go:21.83,25.2 1 0
 algo/internal/modules/strategy/interfaces/http/strategy_handler.go:29.103,36.2 4 0
 algo/internal/modules/strategy/interfaces/http/strategy_handler.go:36.2,51.3 11 0
