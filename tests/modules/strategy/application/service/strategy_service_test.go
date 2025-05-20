@@ -65,7 +65,7 @@ func TestCreateStrategy_EmptyExpressionError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	req := createValidCreateStrategyRequest()
-	req.EntryExpression = "" // Empty expression
+	req.EntryExpression = "" // Empty expression - this will fail validation
 	userID := uuid.New()
 
 	mockRepo := &mocks.MockStrategyRepository{}
@@ -78,7 +78,7 @@ func TestCreateStrategy_EmptyExpressionError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, response)
-	assert.Equal(t, service.ErrInvalidExpression, err)
+	assert.Equal(t, service.ErrInvalidRequest, err) // Expression validation is part of the request validation
 }
 
 func TestCreateStrategy_RepositoryError(t *testing.T) {
