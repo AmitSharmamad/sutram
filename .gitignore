@@ -125,6 +125,8 @@ cython_debug/
 
 # Go ignore
 coverage.out
+*coverage.out
+*coverage.html
 main
 
 # sutram-go
