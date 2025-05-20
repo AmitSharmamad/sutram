@@ -1,4 +1,4 @@
-.PHONY: build run clean test docker-build docker-run db-start db-stop build-live run-live
+.PHONY: build run clean test coverage docker-build docker-run db-start db-stop build-live run-live
 
 # Build the web application
 build:
@@ -21,6 +21,14 @@ clean:
 test:
 	@echo "Running tests..."
 	@go test -v ./...
+
+# Run tests with coverage analysis
+coverage:
+	@echo "Running tests with coverage analysis..."
+	@go test -coverprofile=coverage.out -covermode=atomic ./...
+	@go tool cover -func=coverage.out
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated in coverage.html"
 
 # Build Docker image
 docker-build:
