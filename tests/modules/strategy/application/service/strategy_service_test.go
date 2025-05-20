@@ -530,8 +530,9 @@ func TestSearchStrategies_Success(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	userID := uuid.New()
+	isActive := true
 	filter := &dto.StrategyFilter{
-		IsActive: true,
+		IsActive: &isActive,
 	}
 	
 	strategies := []*model.Strategy{
@@ -569,6 +570,11 @@ func createValidCreateStrategyRequest() *dto.CreateStrategyRequest {
 	entryEndTime := time.Now()
 	startDate := time.Now().Add(-7 * 24 * time.Hour)
 	endDate := time.Now().Add(7 * 24 * time.Hour)
+	targetProfit := 5.0
+	targetProfitType := model.Percentage
+	stopLoss := 2.0
+	stopLossType := model.Percentage
+	capital := 10000.0
 
 	return &dto.CreateStrategyRequest{
 		Name:                 "Test Strategy",
@@ -577,18 +583,18 @@ func createValidCreateStrategyRequest() *dto.CreateStrategyRequest {
 		Instruments:          pq.Int32Array{1, 2, 3},
 		ChartType:            model.Candlestick,
 		ChartTimeframe:       model.OneHour,
-		TradeType:            model.Market,
+		TradeType:            "MIS",
 		Qty:                  10,
 		EntryExpression:      "close > open",
 		ExitExpression:       "close < open",
-		TargetProfit:         5.0,
-		TargetProfitType:     model.Percentage,
-		StopLoss:             2.0,
-		StopLossType:         model.Percentage,
+		TargetProfit:         &targetProfit,
+		TargetProfitType:     &targetProfitType,
+		StopLoss:             &stopLoss,
+		StopLossType:         &stopLossType,
 		TrailingStopLoss:     &trailingStopLoss,
 		TrailingStopLossType: &trailingStopLossType,
 		ExitType:             &exitType,
-		Capital:              10000.0,
+		Capital:              &capital,
 		MaxTrades:            &maxTrades,
 		EntryStartTime:       &entryStartTime,
 		EntryEndTime:         &entryEndTime,
@@ -606,6 +612,11 @@ func createValidUpdateStrategyRequest() *dto.UpdateStrategyRequest {
 	entryEndTime := time.Now()
 	startDate := time.Now().Add(-7 * 24 * time.Hour)
 	endDate := time.Now().Add(7 * 24 * time.Hour)
+	targetProfit := 10.0
+	targetProfitType := model.Absolute
+	stopLoss := 5.0
+	stopLossType := model.Absolute
+	capital := 20000.0
 
 	return &dto.UpdateStrategyRequest{
 		ID:                   uuid.New(),
@@ -615,18 +626,18 @@ func createValidUpdateStrategyRequest() *dto.UpdateStrategyRequest {
 		Instruments:          pq.Int32Array{4, 5, 6},
 		ChartType:            model.Heikinashi,
 		ChartTimeframe:       model.FiveMinutes,
-		TradeType:            model.Limit,
+		TradeType:            "CNC/NRML",
 		Qty:                  20,
 		EntryExpression:      "macd > signal",
 		ExitExpression:       "macd < signal",
-		TargetProfit:         10.0,
-		TargetProfitType:     model.Absolute,
-		StopLoss:             5.0,
-		StopLossType:         model.Absolute,
+		TargetProfit:         &targetProfit,
+		TargetProfitType:     &targetProfitType,
+		StopLoss:             &stopLoss,
+		StopLossType:         &stopLossType,
 		TrailingStopLoss:     &trailingStopLoss,
 		TrailingStopLossType: &trailingStopLossType,
 		ExitType:             &exitType,
-		Capital:              20000.0,
+		Capital:              &capital,
 		MaxTrades:            &maxTrades,
 		EntryStartTime:       &entryStartTime,
 		EntryEndTime:         &entryEndTime,
@@ -645,7 +656,7 @@ func createTestStrategy(userID uuid.UUID) *model.Strategy {
 		pq.Int32Array{1, 2, 3},
 		model.Candlestick,
 		model.OneHour,
-		model.Market,
+		"MIS",
 		10,
 		"close > open",
 		"close < open",
