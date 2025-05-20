@@ -165,14 +165,15 @@ func TestCreateStrategyRequestToDomain(t *testing.T) {
 	assert.Equal(t, req.Qty, strategy.Qty)
 	assert.Equal(t, req.EntryExpression, strategy.EntryExpression)
 	assert.Equal(t, req.ExitExpression, strategy.ExitExpression)
-	assert.Equal(t, req.TargetProfit, strategy.TargetProfit)
-	assert.Equal(t, req.TargetProfitType, strategy.TargetProfitType)
-	assert.Equal(t, req.StopLoss, strategy.StopLoss)
-	assert.Equal(t, req.StopLossType, strategy.StopLossType)
+	// ToDomain derferences the pointers
+	assert.Equal(t, *req.TargetProfit, strategy.TargetProfit)
+	assert.Equal(t, *req.TargetProfitType, strategy.TargetProfitType)
+	assert.Equal(t, *req.StopLoss, strategy.StopLoss)
+	assert.Equal(t, *req.StopLossType, strategy.StopLossType)
 	assert.Equal(t, req.TrailingStopLoss, strategy.TrailingStopLoss)
 	assert.Equal(t, req.TrailingStopLossType, strategy.TrailingStopLossType)
 	assert.Equal(t, req.ExitType, strategy.ExitType)
-	assert.Equal(t, req.Capital, strategy.Capital)
+	assert.Equal(t, *req.Capital, strategy.Capital)
 	assert.Equal(t, req.MaxTrades, strategy.MaxTrades)
 	assert.Equal(t, req.EntryStartTime, strategy.EntryStartTime)
 	assert.Equal(t, req.EntryEndTime, strategy.EntryEndTime)
@@ -202,14 +203,15 @@ func TestUpdateStrategyRequestToDomain(t *testing.T) {
 	assert.Equal(t, req.Qty, strategy.Qty)
 	assert.Equal(t, req.EntryExpression, strategy.EntryExpression)
 	assert.Equal(t, req.ExitExpression, strategy.ExitExpression)
-	assert.Equal(t, req.TargetProfit, strategy.TargetProfit)
-	assert.Equal(t, req.TargetProfitType, strategy.TargetProfitType)
-	assert.Equal(t, req.StopLoss, strategy.StopLoss)
-	assert.Equal(t, req.StopLossType, strategy.StopLossType)
+	// ToDomain derferences the pointers
+	assert.Equal(t, *req.TargetProfit, strategy.TargetProfit)
+	assert.Equal(t, *req.TargetProfitType, strategy.TargetProfitType)
+	assert.Equal(t, *req.StopLoss, strategy.StopLoss)
+	assert.Equal(t, *req.StopLossType, strategy.StopLossType)
 	assert.Equal(t, req.TrailingStopLoss, strategy.TrailingStopLoss)
 	assert.Equal(t, req.TrailingStopLossType, strategy.TrailingStopLossType)
 	assert.Equal(t, req.ExitType, strategy.ExitType)
-	assert.Equal(t, req.Capital, strategy.Capital)
+	assert.Equal(t, *req.Capital, strategy.Capital)
 	assert.Equal(t, req.MaxTrades, strategy.MaxTrades)
 	assert.Equal(t, req.EntryStartTime, strategy.EntryStartTime)
 	assert.Equal(t, req.EntryEndTime, strategy.EntryEndTime)
@@ -243,11 +245,21 @@ func TestFromDomain(t *testing.T) {
 	assert.Equal(t, strategy.TargetProfitType, response.TargetProfitType)
 	assert.Equal(t, strategy.StopLoss, response.StopLoss)
 	assert.Equal(t, strategy.StopLossType, response.StopLossType)
-	assert.Equal(t, strategy.TrailingStopLoss, response.TrailingStopLoss)
-	assert.Equal(t, strategy.TrailingStopLossType, response.TrailingStopLossType)
-	assert.Equal(t, strategy.ExitType, response.ExitType)
+	// FromDomain copies pointer value to direct value
+	if strategy.TrailingStopLoss != nil {
+		assert.Equal(t, *strategy.TrailingStopLoss, response.TrailingStopLoss)
+	}
+	if strategy.TrailingStopLossType != nil {
+		assert.Equal(t, *strategy.TrailingStopLossType, response.TrailingStopLossType)
+	}
+	if strategy.ExitType != nil {
+		assert.Equal(t, *strategy.ExitType, response.ExitType)
+	}
 	assert.Equal(t, strategy.Capital, response.Capital)
-	assert.Equal(t, strategy.MaxTrades, response.MaxTrades)
+	if strategy.MaxTrades != nil {
+		assert.Equal(t, *strategy.MaxTrades, response.MaxTrades)
+	}
+	// Date pointer fields are preserved without dereferencing
 	assert.Equal(t, strategy.EntryStartTime, response.EntryStartTime)
 	assert.Equal(t, strategy.EntryEndTime, response.EntryEndTime)
 	assert.Equal(t, strategy.StartDate, response.StartDate)

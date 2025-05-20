@@ -20,7 +20,7 @@ func TestNewStrategy(t *testing.T) {
 	instruments := pq.Int32Array{1, 2, 3}
 	chartType := model.Candlestick
 	chartTimeframe := model.OneHour
-	tradeType := TradeType("MIS")
+	tradeType := model.TradeType("MIS")
 	qty := 10
 	entryExpression := "close > open"
 	exitExpression := "close < open"
@@ -86,7 +86,7 @@ func TestUpdateStrategy(t *testing.T) {
 	newInstruments := pq.Int32Array{4, 5, 6}
 	newChartType := model.Heikinashi
 	newChartTimeframe := model.FiveMinutes
-	newTradeType := TradeType("CNC/NRML")
+	newTradeType := model.TradeType("CNC/NRML")
 	newQty := 20
 	newEntryExpression := "macd > signal"
 	newExitExpression := "macd < signal"
@@ -198,7 +198,7 @@ func createTestStrategy() *model.Strategy {
 		pq.Int32Array{1, 2, 3},
 		model.Candlestick,
 		model.OneHour,
-		TradeType("MIS"),
+		model.TradeType("MIS"),
 		10,
 		"close > open",
 		"close < open",
