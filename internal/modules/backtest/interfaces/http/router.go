@@ -24,6 +24,6 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 	backtestAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
 		// Add run backtest endpoint
-		backtestAuth.GET("/run", controller.RunBacktest)
+		backtestAuth.POST("/run", controller.RunBacktest)
 	}
 }
