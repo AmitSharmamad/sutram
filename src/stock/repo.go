@@ -153,9 +153,9 @@ func (repo *Repo) GetLookBack(
 func (repo *Repo) Insert(instruments []*shared.OHLCV) error {
 	_, err := repo.db.Insert(`
 		INSERT INTO sutram.instrument (
-			id, instrument, open, high, low, close, volume, timestamp, created_at, updated_at
+			exchange_security_id, open, high, low, close, volume, timestamp, created_at, updated_at
 		) VALUES (
-			:id, :instrument, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
+			:id, :open, :high, :low, :close, :volume, :timestamp, :created_at, :updated_at
 		)`,
 		instruments,
 	)
