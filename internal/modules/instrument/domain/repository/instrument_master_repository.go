@@ -14,9 +14,6 @@ type InstrumentMasterRepository interface {
 	// FindBySymbol finds an instrument master by symbol
 	FindBySymbol(ctx context.Context, symbol string) (*model.InstrumentMaster, error)
 
-	// FindByExchangeSecurityID finds an instrument master by exchange security ID
-	FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) (*model.InstrumentMaster, error)
-
 	// FindByExchange finds instrument masters by exchange
 	FindByExchange(ctx context.Context, exchange string) ([]*model.InstrumentMaster, error)
 

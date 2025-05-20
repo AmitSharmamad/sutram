@@ -107,7 +107,7 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 			endDate = time.Now()
 		}
 
-		instrumentIDInt := int(instrumentMaster.ID)
+		instrumentIDInt := int(instrumentMaster.ExchangeSecurityID)
 		qty := 1 // Default quantity
 		if strategyResp.Qty > 0 {
 			qty = strategyResp.Qty
@@ -264,7 +264,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	run.State = model.Started
 
 	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
-	minLookback := 1000
+	minLookback := 20
 
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
@@ -541,13 +541,17 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	metrics.TotalTrades = totalTrades
 
 	if totalTrades > 0 {
-		metrics.WinRate = float64(winningTrades) / float64(totalTrades) * 100
+		// Clamp win rate to avoid PostgreSQL numeric field overflow
+		winRate := float64(winningTrades) / float64(totalTrades) * 100
+		metrics.WinRate = e.clampFloat(winRate, -9999.9999, 9999.9999)
 	}
 
 	// Calculate profit factor
 	profitFactor := 0.0
 	if totalLossAmount != 0 {
 		profitFactor = totalWinAmount / math.Abs(totalLossAmount)
+		// Clamp profit factor to fit in database DECIMAL(10, 4)
+		profitFactor = e.clampFloat(profitFactor, -9999.9999, 9999.9999)
 	}
 	metrics.ProfitFactor = &profitFactor
 
@@ -555,22 +559,29 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	avgWinSize := 0.0
 	if winningTrades > 0 {
 		avgWinSize = totalWinAmount / float64(winningTrades)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgWinSize = e.clampFloat(avgWinSize, -9999999999.99999999, 9999999999.99999999)
 	}
 	metrics.AvgWinSize = &avgWinSize
 
 	avgLossSize := 0.0
 	if losingTrades > 0 {
 		avgLossSize = totalLossAmount / float64(losingTrades)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgLossSize = e.clampFloat(avgLossSize, -9999999999.99999999, 9999999999.99999999)
 	}
 	metrics.AvgLossSize = &avgLossSize
 
 	// Set transaction costs
-	metrics.TotalCommission = totalCommission
-	metrics.TotalSlippage = totalSlippage
+	metrics.TotalCommission = e.clampFloat(totalCommission, -9999999999.99999999, 9999999999.99999999)
+	metrics.TotalSlippage = e.clampFloat(totalSlippage, -9999999999.99999999, 9999999999.99999999)
 
 	if initialCapital > 0 {
-		metrics.TransactionCostsPct = (totalCommission + totalSlippage) / initialCapital * 100
-		metrics.TotalReturnPct = (finalCapital - initialCapital) / initialCapital * 100
+		transactionCostsPct := (totalCommission + totalSlippage) / initialCapital * 100
+		metrics.TransactionCostsPct = e.clampFloat(transactionCostsPct, -9999.9999, 9999.9999)
+
+		totalReturnPct := (finalCapital - initialCapital) / initialCapital * 100
+		metrics.TotalReturnPct = e.clampFloat(totalReturnPct, -9999.9999, 9999.9999)
 	}
 
 	// Calculate duration-based metrics
@@ -588,6 +599,8 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 
 	if count > 0 {
 		avgTradeDuration := totalDurationSeconds / float64(count) / 3600 // Convert to hours
+		// Clamp to fit in database DECIMAL(10, 4)
+		avgTradeDuration = e.clampFloat(avgTradeDuration, -9999.9999, 9999.9999)
 		metrics.AvgTradeDuration = &avgTradeDuration
 	}
 
@@ -612,6 +625,17 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	metrics.UpdatedAt = time.Now()
 
 	return metrics
+}
+
+// clampFloat restricts a float value to be within the specified range
+func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
