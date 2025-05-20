@@ -22,6 +22,11 @@ test:
 	@echo "Running tests..."
 	@go test -v ./...
 
+# Run only strategy module tests
+test-strategy:
+	@echo "Running strategy module tests..."
+	@go test -v ./tests/modules/strategy/...
+
 # Build Docker image
 docker-build:
 	@echo "Building Docker image..."
