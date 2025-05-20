@@ -34,7 +34,18 @@ func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE id = ?
 		LIMIT 1
@@ -53,13 +64,25 @@ func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*
 func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol string) (*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id, 
+			id,
+			exchange_security_id,
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE symbol = ?
 		LIMIT 1
@@ -85,7 +108,18 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Contex
 			symbol,
 			instrument,
 			start_date,
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE exchange_security_id = ?
 		LIMIT 1
@@ -104,13 +138,25 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Contex
 func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchange string) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id, 
+			id,
+			exchange_security_id, 
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE exchange = ?
 	`
@@ -128,13 +174,25 @@ func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchang
 func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment string) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id, 
+			id,
+			exchange_security_id,
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE segment = ?
 	`
@@ -152,13 +210,25 @@ func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment 
 func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id, 
+			id,
+			exchange_security_id, 
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 	`
 
@@ -176,25 +246,49 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 	query := `
 		INSERT INTO instrument_master (
 			id,
+			exchange_security_id,
 			exchange,
 			segment,
 			symbol,
 			instrument,
 			start_date,
-			expiry
-		) VALUES (?, ?, ?, ?, ?, ?, ?)
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
 		instrumentMaster.ID,
+		instrumentMaster.ExchangeSecurityID,
 		instrumentMaster.Exchange,
 		instrumentMaster.Segment,
 		instrumentMaster.Symbol,
 		instrumentMaster.Name,
 		instrumentMaster.StartDate,
 		instrumentMaster.Expiry,
+		instrumentMaster.ExmExchID,
+		instrumentMaster.SmstSecurityID,
+		instrumentMaster.InstrumentName,
+		instrumentMaster.TradingSymbol,
+		instrumentMaster.LotUnits,
+		instrumentMaster.StrikePrice,
+		instrumentMaster.OptionType,
+		instrumentMaster.TickSize,
+		instrumentMaster.ExpiryFlag,
+		instrumentMaster.ExchInstrumentType,
+		instrumentMaster.SymbolName,
 	)
 
 	if err != nil {
@@ -210,24 +304,48 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 	// This is a simplified version assuming you're using ALTER TABLE UPDATE syntax
 	query := `
 		ALTER TABLE instrument_master UPDATE
+			exchange_security_id = ?,
 			exchange = ?,
 			segment = ?,
 			symbol = ?,
 			instrument = ?,
 			start_date = ?,
-			expiry = ?
+			expiry = ?,
+			exm_exch_id = ?,
+			smst_security_id = ?,
+			instrument_name = ?,
+			trading_symbol = ?,
+			lot_units = ?,
+			strike_price = ?,
+			option_type = ?,
+			tick_size = ?,
+			expiry_flag = ?,
+			exch_instrument_type = ?,
+			symbol_name = ?
 		WHERE id = ?
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
+		instrumentMaster.ExchangeSecurityID,
 		instrumentMaster.Exchange,
 		instrumentMaster.Segment,
 		instrumentMaster.Symbol,
 		instrumentMaster.Name,
 		instrumentMaster.StartDate,
 		instrumentMaster.Expiry,
+		instrumentMaster.ExmExchID,
+		instrumentMaster.SmstSecurityID,
+		instrumentMaster.InstrumentName,
+		instrumentMaster.TradingSymbol,
+		instrumentMaster.LotUnits,
+		instrumentMaster.StrikePrice,
+		instrumentMaster.OptionType,
+		instrumentMaster.TickSize,
+		instrumentMaster.ExpiryFlag,
+		instrumentMaster.ExchInstrumentType,
+		instrumentMaster.SymbolName,
 		instrumentMaster.ID,
 	)
 
@@ -277,13 +395,25 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	// Query to get filtered and paginated data
 	query := fmt.Sprintf(`
 		SELECT 
-			id, 
+			id,
+			exchange_security_id, 
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
 			start_date, 
-			expiry
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		%s
 		LIMIT ? OFFSET ?
@@ -332,13 +462,25 @@ func (r *InstrumentMasterRepository) FindByIDs(ctx context.Context, ids []uint64
 
 	query := fmt.Sprintf(`
 		SELECT 
-			id, 
+			id,
+			exchange_security_id, 
 			exchange, 
 			segment, 
 			symbol, 
 			instrument, 
-			start_date, 
-			expiry
+			start_date,
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
 		FROM sutram.instrument_master
 		WHERE id IN (%s)
 	`, strings.Join(placeholders, ","))

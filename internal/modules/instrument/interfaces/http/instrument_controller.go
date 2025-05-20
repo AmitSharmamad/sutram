@@ -378,12 +378,23 @@ func (c *InstrumentController) CreateInstrumentMaster(ctx *gin.Context) {
 
 	// Create instrument master from request
 	instrumentMaster := &model.InstrumentMaster{
-		Exchange:  req.Exchange,
-		Segment:   req.Segment,
-		Symbol:    req.Symbol,
-		Name:      req.Name,
-		StartDate: req.StartDate,
-		Expiry:    req.Expiry,
+		Exchange:           req.Exchange,
+		Segment:            req.Segment,
+		Symbol:             req.Symbol,
+		Name:               req.Name,
+		StartDate:          req.StartDate,
+		Expiry:             req.Expiry,
+		ExmExchID:          req.ExmExchID,
+		SmstSecurityID:     req.SmstSecurityID,
+		InstrumentName:     req.InstrumentName,
+		TradingSymbol:      req.TradingSymbol,
+		LotUnits:           req.LotUnits,
+		StrikePrice:        req.StrikePrice,
+		OptionType:         req.OptionType,
+		TickSize:           req.TickSize,
+		ExpiryFlag:         req.ExpiryFlag,
+		ExchInstrumentType: req.ExchInstrumentType,
+		SymbolName:         req.SymbolName,
 	}
 
 	// Create the instrument master
@@ -456,6 +467,39 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	}
 	if !req.Expiry.IsZero() {
 		instrumentMaster.Expiry = req.Expiry
+	}
+	if req.ExmExchID != 0 {
+		instrumentMaster.ExmExchID = req.ExmExchID
+	}
+	if req.SmstSecurityID != 0 {
+		instrumentMaster.SmstSecurityID = req.SmstSecurityID
+	}
+	if req.InstrumentName != "" {
+		instrumentMaster.InstrumentName = req.InstrumentName
+	}
+	if req.TradingSymbol != "" {
+		instrumentMaster.TradingSymbol = req.TradingSymbol
+	}
+	if req.LotUnits != 0 {
+		instrumentMaster.LotUnits = req.LotUnits
+	}
+	if req.StrikePrice != 0 {
+		instrumentMaster.StrikePrice = req.StrikePrice
+	}
+	if req.OptionType != "" {
+		instrumentMaster.OptionType = req.OptionType
+	}
+	if req.TickSize != 0 {
+		instrumentMaster.TickSize = req.TickSize
+	}
+	if req.ExpiryFlag != "" {
+		instrumentMaster.ExpiryFlag = req.ExpiryFlag
+	}
+	if req.ExchInstrumentType != "" {
+		instrumentMaster.ExchInstrumentType = req.ExchInstrumentType
+	}
+	if req.SymbolName != "" {
+		instrumentMaster.SymbolName = req.SymbolName
 	}
 
 	// Update the instrument master
@@ -568,5 +612,16 @@ func masterModelToDTO(master *model.InstrumentMaster) *dto.InstrumentMasterDTO {
 		Name:               master.Name,
 		StartDate:          master.StartDate,
 		Expiry:             master.Expiry,
+		ExmExchID:          master.ExmExchID,
+		SmstSecurityID:     master.SmstSecurityID,
+		InstrumentName:     master.InstrumentName,
+		TradingSymbol:      master.TradingSymbol,
+		LotUnits:           master.LotUnits,
+		StrikePrice:        master.StrikePrice,
+		OptionType:         master.OptionType,
+		TickSize:           master.TickSize,
+		ExpiryFlag:         master.ExpiryFlag,
+		ExchInstrumentType: master.ExchInstrumentType,
+		SymbolName:         master.SymbolName,
 	}
 }
