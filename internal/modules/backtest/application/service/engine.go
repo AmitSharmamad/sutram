@@ -266,10 +266,69 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
 	minLookback := 20
 
+	// Keep track of the current trading day for MIS trades
+	var currentTradingDay time.Time
+	if len(stockData) > 0 {
+		currentTradingDay = stockData[0].Timestamp.Truncate(24 * time.Hour)
+	}
+
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
 		// Create data context using the data slice from the beginning up to the current position
 		data := e.toDataContext(stockData[:i+1])
+
+		// Check if we've moved to a new trading day
+		dateTruncated := stockData[i].Timestamp.Truncate(24 * time.Hour)
+		if !dateTruncated.Equal(currentTradingDay) {
+			// If we have an open position and this is an MIS (intraday) trade, close it at the end of the previous day
+			if openPosition != nil && openPosition.State == model.Entered && string(strategy.TradeType) == "MIS" {
+				// Find the last data point from the previous day
+				var lastDataFromPreviousDay *instrumentModel.Instrument
+				for j := i - 1; j >= 0; j-- {
+					if stockData[j].Timestamp.Truncate(24 * time.Hour).Equal(currentTradingDay) {
+						lastDataFromPreviousDay = stockData[j]
+						break
+					}
+				}
+
+				if lastDataFromPreviousDay != nil {
+					// Calculate fees
+					exitFees := calculateFees(lastDataFromPreviousDay.Close, openPosition.PositionSize)
+
+					// Calculate exit order price with slippage
+					exitOrderPrice := calculateExitOrderSlippage(
+						lastDataFromPreviousDay.Close,
+						openPosition.Direction,
+						lastDataFromPreviousDay,
+					)
+
+					// Close the position with "EOD MIS Square-off" as the reason
+					openPosition.Exit(
+						lastDataFromPreviousDay.Close,
+						lastDataFromPreviousDay.Timestamp,
+						exitOrderPrice,
+						lastDataFromPreviousDay.Timestamp,
+						"",                   // No exit expression for auto square-offs
+						"EOD MIS Square-off", // Special reason for MIS end-of-day square-off
+						exitFees,
+						nil,
+					)
+
+					// Collect position
+					positions = append(positions, openPosition)
+
+					// Add net profit/loss if available
+					if openPosition.NetProfitLoss != nil {
+						capital += *openPosition.NetProfitLoss
+					}
+
+					// Reset open position
+					openPosition = nil
+				}
+			}
+			// Update the current trading day
+			currentTradingDay = dateTruncated
+		}
 
 		// Check entry condition if no position is open
 		if openPosition == nil {
@@ -332,6 +391,48 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Skip to the next candle - this will be incremented by the for loop
 				continue
 			}
+		}
+	}
+
+	// Handle any remaining open position at the end of backtest period
+	// This is particularly important for MIS positions that might be open at the end of the last day
+	if openPosition != nil && openPosition.State == model.Entered && string(strategy.TradeType) == "MIS" {
+		// Use the last available data point for closing the position
+		if len(stockData) > 0 {
+			lastData := stockData[len(stockData)-1]
+
+			// Calculate fees
+			exitFees := calculateFees(lastData.Close, openPosition.PositionSize)
+
+			// Calculate exit order price with slippage
+			exitOrderPrice := calculateExitOrderSlippage(
+				lastData.Close,
+				openPosition.Direction,
+				lastData,
+			)
+
+			// Close the position with "EOD MIS Square-off" as the reason
+			openPosition.Exit(
+				lastData.Close,
+				lastData.Timestamp,
+				exitOrderPrice,
+				lastData.Timestamp,
+				"",                   // No exit expression for auto square-offs
+				"EOD MIS Square-off", // Special reason for MIS end-of-day square-off
+				exitFees,
+				nil,
+			)
+
+			// Collect position
+			positions = append(positions, openPosition)
+
+			// Add net profit/loss if available
+			if openPosition.NetProfitLoss != nil {
+				capital += *openPosition.NetProfitLoss
+			}
+
+			// Reset open position
+			openPosition = nil
 		}
 	}
 
