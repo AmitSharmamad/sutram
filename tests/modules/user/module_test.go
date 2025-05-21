@@ -4,10 +4,8 @@ import (
 	"database/sql"
 	"os"
 	"testing"
-	"time"
 
 	"algo/internal/modules/user"
-	httpInterface "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -89,12 +87,6 @@ func TestModule_RegisterRoutes(t *testing.T) {
 	module := &user.Module{}
 	
 	// Create a controller with mocked methods
-	controller := &httpInterface.UserController{}
-	
-	// Set the controller using reflection or a method for testing
-	// Since we can't directly access the private field, we'll test the public method
-	// and assume it properly passes through to the controller's RegisterRoutes method
-	
 	// Skip complete test as it requires fully mocking router which is complex
 	t.Skip("Skipping due to router complexity")
 	
