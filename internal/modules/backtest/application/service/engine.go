@@ -14,6 +14,7 @@ import (
 	parser "algo/internal/modules/parser/domain/model"
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyService "algo/internal/modules/strategy/application/service"
+	strategyModel "algo/internal/modules/strategy/domain/model"
 
 	"github.com/google/uuid"
 )
@@ -274,6 +275,11 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
+		// Safety check to avoid infinite loops
+		if i >= len(stockData) {
+			break
+		}
+
 		// Create data context using the data slice from the beginning up to the current position
 		data := e.toDataContext(stockData[:i+1])
 
@@ -281,10 +287,11 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		dateTruncated := stockData[i].Timestamp.Truncate(24 * time.Hour)
 		if !dateTruncated.Equal(currentTradingDay) {
 			// If we have an open position and this is an MIS (intraday) trade, close it at the end of the previous day
-			if openPosition != nil && openPosition.State == model.Entered && string(strategy.TradeType) == "MIS" {
-				// Find the last data point from the previous day
+			if openPosition != nil && openPosition.State == model.Entered && strategy.TradeType == strategyModel.TradeType("MIS") {
+				// Find the last data point from the previous day - limit the search to avoid too much iteration
 				var lastDataFromPreviousDay *instrumentModel.Instrument
-				for j := i - 1; j >= 0; j-- {
+				maxSearchDepth := min(100, i) // Limit search depth to avoid excessive looping
+				for j := i - 1; j >= i - maxSearchDepth && j >= 0; j-- {
 					if stockData[j].Timestamp.Truncate(24 * time.Hour).Equal(currentTradingDay) {
 						lastDataFromPreviousDay = stockData[j]
 						break
@@ -303,13 +310,19 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					)
 
 					// Close the position with "EOD MIS Square-off" as the reason
+					exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
+					
+					// Debug info we could log if needed
+					// fmt.Printf("Closing MIS position at EOD. Trade Type: %s, Entry Time: %v, Exit Time: %v\n", 
+					//   strategy.TradeType, openPosition.EntryTimeOrder, lastDataFromPreviousDay.Timestamp)
+					
 					openPosition.Exit(
 						lastDataFromPreviousDay.Close,
 						lastDataFromPreviousDay.Timestamp,
 						exitOrderPrice,
 						lastDataFromPreviousDay.Timestamp,
-						"",                   // No exit expression for auto square-offs
-						"EOD MIS Square-off", // Special reason for MIS end-of-day square-off
+						"",          // No exit expression for auto square-offs
+						exitReason,  // Use our defined exit reason
 						exitFees,
 						nil,
 					)
@@ -383,7 +396,19 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				// Find the next index to resume entry checks based on the timeframe
 				// This ensures we don't check for entry until the next candle in the chart timeframe
-				i = e.findNextCandleIndex(stockData, *openPosition.ExitTimeOrder, string(strategy.ChartTimeframe)) - 1
+				nextIndex := e.findNextCandleIndex(stockData, *openPosition.ExitTimeOrder, string(strategy.ChartTimeframe))
+				
+				// Safety check to ensure we don't go out of bounds or get stuck
+				if nextIndex <= i {
+					nextIndex = i + 1 // Simply advance by one if we couldn't find a good next index
+				}
+				
+				// Ensure we never go beyond the array bounds
+				if nextIndex >= len(stockData) {
+					nextIndex = len(stockData) - 1
+				}
+				
+				i = nextIndex - 1 // -1 because the loop will increment i
 
 				// Reset open position
 				openPosition = nil
@@ -395,15 +420,14 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Handle any remaining open position at the end of backtest period
-	// This is particularly important for MIS positions that might be open at the end of the last day
-	if openPosition != nil && openPosition.State == model.Entered && string(strategy.TradeType) == "MIS" {
-		// Use the last available data point for closing the position
-		if len(stockData) > 0 {
+	if openPosition != nil && openPosition.State == model.Entered {
+		// If this is a MIS position, close it at the end of the backtest
+		if strategy.TradeType == strategyModel.TradeType("MIS") && len(stockData) > 0 {
 			lastData := stockData[len(stockData)-1]
-
+			
 			// Calculate fees
 			exitFees := calculateFees(lastData.Close, openPosition.PositionSize)
-
+			
 			// Calculate exit order price with slippage
 			exitOrderPrice := calculateExitOrderSlippage(
 				lastData.Close,
@@ -412,13 +436,15 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			)
 
 			// Close the position with "EOD MIS Square-off" as the reason
+			exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
+			
 			openPosition.Exit(
 				lastData.Close,
 				lastData.Timestamp,
 				exitOrderPrice,
 				lastData.Timestamp,
-				"",                   // No exit expression for auto square-offs
-				"EOD MIS Square-off", // Special reason for MIS end-of-day square-off
+				"",          // No exit expression for auto square-offs
+				exitReason,  // Use our defined exit reason
 				exitFees,
 				nil,
 			)
@@ -430,10 +456,13 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			if openPosition.NetProfitLoss != nil {
 				capital += *openPosition.NetProfitLoss
 			}
-
-			// Reset open position
-			openPosition = nil
+		} else {
+			// For CNC/NRML positions, just add to the list without closing
+			positions = append(positions, openPosition)
 		}
+		
+		// Reset open position in all cases
+		openPosition = nil
 	}
 
 	// Mark run as ended
@@ -865,15 +894,32 @@ func (e *BacktestEngine) TryExit(
 		return true // Return true since it is already exited
 	}
 
-	// Cut the data right after the entry time till the end
-	var relevantData []*instrumentModel.Instrument
+	// No second-level data, can't evaluate exit
+	if len(secondLevelData) == 0 {
+		return false
+	}
+	
+	// Position must have entry time
 	if position.EntryTimeOrder == nil {
 		return false
 	}
 
+	// Cut the data right after the entry time till the end
+	var relevantData []*instrumentModel.Instrument
+	
+	// Limit the number of data points to check to avoid excessive processing
+	const maxDataPoints = 1000
+	pointsAdded := 0
+	
 	for _, data := range secondLevelData {
 		if data.Timestamp.After(*position.EntryTimeOrder) {
 			relevantData = append(relevantData, data)
+			pointsAdded++
+			
+			// Limit the amount of data to process to avoid excessive computation
+			if pointsAdded >= maxDataPoints {
+				break
+			}
 		}
 	}
 
@@ -966,6 +1012,11 @@ func calculateExitOrderSlippage(
 
 // findNextCandleIndex finds the index of the next candle matching the chart timeframe after the given timestamp
 func (e *BacktestEngine) findNextCandleIndex(stockData []*instrumentModel.Instrument, exitTime time.Time, chartTimeframe string) int {
+	// Safety check - empty data or nil
+	if len(stockData) == 0 {
+		return 0
+	}
+	
 	// Find the next candle in the chart timeframe after the exit time
 	for i, candle := range stockData {
 		if candle.Timestamp.After(exitTime) {
@@ -976,6 +1027,6 @@ func (e *BacktestEngine) findNextCandleIndex(stockData []*instrumentModel.Instru
 		}
 	}
 
-	// If no next candle is found, return the last index + 1 (end of data)
-	return len(stockData)
+	// If no next candle is found, return the last valid index (not beyond the array)
+	return len(stockData) - 1
 }
