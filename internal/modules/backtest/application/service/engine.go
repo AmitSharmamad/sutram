@@ -198,15 +198,26 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run, instrumentID int64, strategy *strategyDto.StrategyResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	startTime := time.Now()
+
 	instrumentMaster, err := e.instrumentService.GetInstrumentMasterByID(
 		ctx,
 		uint64(instrumentID),
 	)
 	if err != nil {
+		println("Error getting instrument master for ID:", instrumentID, "Error:", err.Error())
+		return
+	}
+
+	if instrumentMaster == nil {
+		println("Instrument master is nil for ID:", instrumentID)
 		return
 	}
 
 	// Get data for the main chart timeframe
+	timeFrameDataStartTime := time.Now()
+	println("\tFetching timeframe data for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
+
 	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
@@ -214,11 +225,21 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
 	)
+
+	timeFrameDataEndTime := time.Now()
+	timeFrameDataDuration := timeFrameDataEndTime.Sub(timeFrameDataStartTime)
+	println("\tTimeframe data fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
+		"- Records:", len(timeFrameData))
+
 	if err != nil {
+		println("Error getting timeframe data for instrument ID:", instrumentID, "Error:", err.Error())
 		return
 	}
 
 	// Get second-level data for more accurate exit condition checking
+	secondLevelDataStartTime := time.Now()
+	println("\tFetching second-level data for instrument", instrumentID, "- Start:", secondLevelDataStartTime.Format(time.RFC3339))
+
 	secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
@@ -226,9 +247,20 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		run.PeriodEndTime,
 		"1s", // 1-second data for granular exit condition checking
 	)
+
+	secondLevelDataEndTime := time.Now()
+	secondLevelDataDuration := secondLevelDataEndTime.Sub(secondLevelDataStartTime)
+	secondLevelDataCount := 0
+	if secondLevelData != nil {
+		secondLevelDataCount = len(secondLevelData)
+	}
+	println("\tSecond-level data fetched for instrument", instrumentID, "- Duration:", secondLevelDataDuration.String(),
+		"- Records:", secondLevelDataCount)
+
 	if err != nil {
 		// If we can't get second-level data, we'll just use the timeframe data
 		// Continue with the backtest using only timeframe data
+		println("\tWarning: Could not get second-level data for instrument ID:", instrumentID, "Error:", err.Error())
 		secondLevelData = nil
 	}
 
@@ -238,6 +270,21 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Store the positions and metrics in the run
 	run.Positions = positions
 	run.RunMetrics = metrics
+
+	endTime := time.Now()
+	executionDuration := endTime.Sub(startTime)
+
+	// Format: InstrumentID (Symbol): Start -> End (Duration)
+	instrumentIDStr := strconv.FormatInt(instrumentID, 10)
+	symbolStr := instrumentMaster.Symbol
+	if symbolStr == "" {
+		symbolStr = "Unknown"
+	}
+
+	println("Backtest execution completed for instrument", instrumentIDStr, "("+symbolStr+"):",
+		"\n\tStart:", startTime.Format(time.RFC3339),
+		"\n\tEnd:", endTime.Format(time.RFC3339),
+		"\n\tDuration:", executionDuration.String())
 }
 
 func (e *BacktestEngine) toDataContext(
@@ -253,6 +300,9 @@ func (e *BacktestEngine) toDataContext(
 
 // executeBacktestInMemory runs the backtest for a single instrument and returns the results without saving to database
 func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyResponse, stockData []*instrumentModel.Instrument, secondLevelData []*instrumentModel.Instrument, run *model.Run) ([]*model.Position, *model.RunMetrics) {
+	// Start tracking execution time for this function
+	functionStartTime := time.Now()
+
 	// Initialize variables to track positions and capital
 	var positions []*model.Position
 	var openPosition *model.Position
@@ -261,8 +311,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 	// Mark run as started
 	startTime := time.Now()
-	run.StartedTime = &startTime
-	run.State = model.Started
+	if run != nil {
+		run.StartedTime = &startTime
+		run.State = model.Started
+	}
 
 	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
 	minLookback := 20
@@ -291,7 +343,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Find the last data point from the previous day - limit the search to avoid too much iteration
 				var lastDataFromPreviousDay *instrumentModel.Instrument
 				maxSearchDepth := min(100, i) // Limit search depth to avoid excessive looping
-				for j := i - 1; j >= i - maxSearchDepth && j >= 0; j-- {
+				for j := i - 1; j >= i-maxSearchDepth && j >= 0; j-- {
 					if stockData[j].Timestamp.Truncate(24 * time.Hour).Equal(currentTradingDay) {
 						lastDataFromPreviousDay = stockData[j]
 						break
@@ -311,18 +363,14 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 					// Close the position with "EOD MIS Square-off" as the reason
 					exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
-					
-					// Debug info we could log if needed
-					// fmt.Printf("Closing MIS position at EOD. Trade Type: %s, Entry Time: %v, Exit Time: %v\n", 
-					//   strategy.TradeType, openPosition.EntryTimeOrder, lastDataFromPreviousDay.Timestamp)
-					
+
 					openPosition.Exit(
 						lastDataFromPreviousDay.Close,
 						lastDataFromPreviousDay.Timestamp,
 						exitOrderPrice,
 						lastDataFromPreviousDay.Timestamp,
-						"",          // No exit expression for auto square-offs
-						exitReason,  // Use our defined exit reason
+						"",         // No exit expression for auto square-offs
+						exitReason, // Use our defined exit reason
 						exitFees,
 						nil,
 					)
@@ -397,17 +445,17 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				// Find the next index to resume entry checks based on the timeframe
 				// This ensures we don't check for entry until the next candle in the chart timeframe
 				nextIndex := e.findNextCandleIndex(stockData, *openPosition.ExitTimeOrder, string(strategy.ChartTimeframe))
-				
+
 				// Safety check to ensure we don't go out of bounds or get stuck
 				if nextIndex <= i {
 					nextIndex = i + 1 // Simply advance by one if we couldn't find a good next index
 				}
-				
+
 				// Ensure we never go beyond the array bounds
 				if nextIndex >= len(stockData) {
 					nextIndex = len(stockData) - 1
 				}
-				
+
 				i = nextIndex - 1 // -1 because the loop will increment i
 
 				// Reset open position
@@ -424,10 +472,10 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		// If this is a MIS position, close it at the end of the backtest
 		if strategy.TradeType == strategyModel.TradeType("MIS") && len(stockData) > 0 {
 			lastData := stockData[len(stockData)-1]
-			
+
 			// Calculate fees
 			exitFees := calculateFees(lastData.Close, openPosition.PositionSize)
-			
+
 			// Calculate exit order price with slippage
 			exitOrderPrice := calculateExitOrderSlippage(
 				lastData.Close,
@@ -437,14 +485,14 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			// Close the position with "EOD MIS Square-off" as the reason
 			exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
-			
+
 			openPosition.Exit(
 				lastData.Close,
 				lastData.Timestamp,
 				exitOrderPrice,
 				lastData.Timestamp,
-				"",          // No exit expression for auto square-offs
-				exitReason,  // Use our defined exit reason
+				"",         // No exit expression for auto square-offs
+				exitReason, // Use our defined exit reason
 				exitFees,
 				nil,
 			)
@@ -460,18 +508,37 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			// For CNC/NRML positions, just add to the list without closing
 			positions = append(positions, openPosition)
 		}
-		
+
 		// Reset open position in all cases
 		openPosition = nil
 	}
 
 	// Mark run as ended
 	endTime := time.Now()
-	run.EndedTime = &endTime
-	run.State = model.Ended
+	if run != nil {
+		run.EndedTime = &endTime
+		run.State = model.Ended
+	}
 
 	// Calculate metrics
 	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
+
+	// Calculate and log function execution time
+	functionEndTime := time.Now()
+	executionDuration := functionEndTime.Sub(functionStartTime)
+
+	// Format a descriptive message about the backtest execution
+	totalPositions := len(positions)
+	instrumentInfo := ""
+	if run != nil && run.InstrumentID > 0 {
+		instrumentInfo = strconv.Itoa(run.InstrumentID)
+	}
+
+	println("\tBacktest in-memory calculation completed for instrument", instrumentInfo, ":",
+		totalPositions, "positions generated,",
+		"\n\t\tStart:", functionStartTime.Format(time.RFC3339),
+		"\n\t\tEnd:", functionEndTime.Format(time.RFC3339),
+		"\n\t\tDuration:", executionDuration.String())
 
 	return positions, metrics
 }
@@ -898,7 +965,7 @@ func (e *BacktestEngine) TryExit(
 	if len(secondLevelData) == 0 {
 		return false
 	}
-	
+
 	// Position must have entry time
 	if position.EntryTimeOrder == nil {
 		return false
@@ -906,16 +973,16 @@ func (e *BacktestEngine) TryExit(
 
 	// Cut the data right after the entry time till the end
 	var relevantData []*instrumentModel.Instrument
-	
+
 	// Limit the number of data points to check to avoid excessive processing
 	const maxDataPoints = 1000
 	pointsAdded := 0
-	
+
 	for _, data := range secondLevelData {
 		if data.Timestamp.After(*position.EntryTimeOrder) {
 			relevantData = append(relevantData, data)
 			pointsAdded++
-			
+
 			// Limit the amount of data to process to avoid excessive computation
 			if pointsAdded >= maxDataPoints {
 				break
@@ -1016,7 +1083,7 @@ func (e *BacktestEngine) findNextCandleIndex(stockData []*instrumentModel.Instru
 	if len(stockData) == 0 {
 		return 0
 	}
-	
+
 	// Find the next candle in the chart timeframe after the exit time
 	for i, candle := range stockData {
 		if candle.Timestamp.After(exitTime) {
