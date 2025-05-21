@@ -699,18 +699,18 @@ func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyRes
 		return float64(strategy.Qty)
 	}
 
-	// 3. If strategy.qty <= 0 and strategy.max_allocation > 0 then return strategy.max_allocation / price
+	// 3. If strategy.qty <= 0 and strategy.max_allocation > 0 then return strategy.max_allocation / price as integer
 	if strategy.Qty <= 0 && strategy.MaxAllocation > 0 {
-		return strategy.MaxAllocation / price
+		return math.Floor(strategy.MaxAllocation / price)
 	}
 
 	// 4. If strategy.qty > 0 and strategy.max_allocation > 0,
-	// then return the lowest between (strategy.qty, strategy.max_allocation / price)
+	// then return the lowest between (strategy.qty, strategy.max_allocation / price) as integer
 	qtyValue := float64(strategy.Qty) * price
 	if qtyValue < strategy.MaxAllocation {
 		return float64(strategy.Qty)
 	} else {
-		return strategy.MaxAllocation / price
+		return math.Floor(strategy.MaxAllocation / price)
 	}
 }
 
