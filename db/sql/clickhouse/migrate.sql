@@ -1,5 +1,10 @@
 USE sutram;
 
-clickhouse-client --query="INSERT INTO instrument_master FORMAT CSV" < instrument_master.csv
+INSERT INTO instrument
+SELECT *
+FROM file('instrument.csv', 'CSVWithNames');
 
-clickhouse-client --query="INSERT INTO instrument FORMAT CSV" < instrument.csv
+
+INSERT INTO instrument_master
+SELECT *
+FROM file('instrument_master.csv', 'CSVWithNames');
