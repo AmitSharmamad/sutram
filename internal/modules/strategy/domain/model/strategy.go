@@ -41,9 +41,8 @@ const (
 type TradeType string
 
 const (
-	Market   TradeType = "MARKET"
-	Limit    TradeType = "LIMIT"
-	StopLoss TradeType = "STOP_LOSS"
+	MIS      = "MIS"
+	CNC_NRML = "CNC/NRML"
 )
 
 // Value type enum
