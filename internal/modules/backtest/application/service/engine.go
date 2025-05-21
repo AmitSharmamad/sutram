@@ -214,6 +214,13 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		return
 	}
 
+	// Determine the fetch start time based on entry_start_time if available
+	fetchStartTime := run.PeriodStartTime
+
+	// If EntryStartTime is provided in the strategy, use it for fetching data
+	// We will fetch from the beginning of the backtest period to ensure we have
+	// enough data for indicators, but will respect the entry window during execution
+
 	// Get data for the main chart timeframe
 	timeFrameDataStartTime := time.Now()
 	println("\tFetching timeframe data for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
@@ -221,7 +228,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
-		run.PeriodStartTime,
+		fetchStartTime,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
 	)
@@ -243,7 +250,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
-		run.PeriodStartTime,
+		fetchStartTime,
 		run.PeriodEndTime,
 		"1s", // 1-second data for granular exit condition checking
 	)
@@ -393,38 +400,75 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// Check entry condition if no position is open
 		if openPosition == nil {
-			entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, data)
+			// Check if the current time is within the entry time window
+			// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
+			canCheckEntryCondition := true
 
-			if entrySignalTriggered {
-				// Calculate position size based on strategy
-				positionSize := e.calculatePositionSize(strategy, capital, stockData[i].Close)
+			if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
+				// Extract time of day from the current candle timestamp
+				currentTime := stockData[i].Timestamp
+				currentTimeOfDay := time.Date(0, 1, 1,
+					currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
 
-				// Determine position direction from strategy
-				var direction model.Direction
-				if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
-					direction = model.Long
-				} else {
-					direction = model.Short
+				// Check if we're within the entry time window
+				if strategy.EntryStartTime != nil {
+					// Extract time component from EntryStartTime
+					entryStartTimeOfDay := time.Date(0, 1, 1,
+						strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
+						strategy.EntryStartTime.Second(), 0, time.UTC)
+
+					if currentTimeOfDay.Before(entryStartTimeOfDay) {
+						canCheckEntryCondition = false
+					}
 				}
 
-				// Create new position
-				openPosition = model.NewPosition(
-					run.ID,
-					direction,
-					stockData[i].Close,
-					stockData[i].Timestamp,
-					strategy.EntryExpression,
-					positionSize,
-				)
+				if canCheckEntryCondition && strategy.EntryEndTime != nil {
+					// Extract time component from EntryEndTime
+					entryEndTimeOfDay := time.Date(0, 1, 1,
+						strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
+						strategy.EntryEndTime.Second(), 0, time.UTC)
 
-				// Simulate order execution
-				entryPrice := stockData[i].Close
-				entryFees := calculateFees(entryPrice, positionSize)
-				openPosition.Enter(entryPrice, stockData[i].Timestamp, entryFees, nil)
+					if currentTimeOfDay.After(entryEndTimeOfDay) {
+						canCheckEntryCondition = false
+					}
+				}
+			}
 
-				// Update capital for position entry
-				capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
+			// Only check entry conditions if we're within the allowed entry time window
+			if canCheckEntryCondition {
+				entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, data)
 
+				if entrySignalTriggered {
+					// Calculate position size based on strategy
+					positionSize := e.calculatePositionSize(strategy, capital, stockData[i].Close)
+
+					// Determine position direction from strategy
+					var direction model.Direction
+					if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
+						direction = model.Long
+					} else {
+						direction = model.Short
+					}
+
+					// Create new position
+					openPosition = model.NewPosition(
+						run.ID,
+						direction,
+						stockData[i].Close,
+						stockData[i].Timestamp,
+						strategy.EntryExpression,
+						positionSize,
+					)
+
+					// Simulate order execution
+					entryPrice := stockData[i].Close
+					entryFees := calculateFees(entryPrice, positionSize)
+					openPosition.Enter(entryPrice, stockData[i].Timestamp, entryFees, nil)
+
+					// Update capital for position entry
+					capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
+
+				}
 			}
 		}
 
