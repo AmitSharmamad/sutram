@@ -49,6 +49,9 @@ type StrategyService interface {
 	// SearchStrategies searches strategies with filter criteria
 	SearchStrategies(ctx context.Context, filter *dto.StrategyFilter, userID uuid.UUID) ([]*dto.StrategyResponse, error)
 
+	// GetRepository returns the strategy repository
+	GetRepository() repository.StrategyRepository
+
 	// DuplicateStrategy creates a copy of an existing strategy
 	DuplicateStrategy(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.StrategyResponse, error)
 }
@@ -367,4 +370,9 @@ func validateExpression(expression string) error {
 	}
 
 	return nil
+}
+
+// GetRepository returns the strategy repository
+func (s *strategyService) GetRepository() repository.StrategyRepository {
+	return s.strategyRepo
 }
