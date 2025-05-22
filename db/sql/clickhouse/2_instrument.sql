@@ -47,19 +47,3 @@ CREATE INDEX IF NOT EXISTS idx_instrument_exchange_security_id
 ON instrument (
     exchange_security_id
 ) TYPE bloom_filter GRANULARITY 4;
-
- INSERT INTO instrument_master (
-    id, exchange_security_id, exchange, segment, symbol, instrument, start_date, expiry, 
-    exm_exch_id, smst_security_id, instrument_name, trading_symbol, lot_units, strike_price, 
-    option_type, tick_size, expiry_flag, exch_instrument_type, symbol_name
-) VALUES
-    (1, 12018, 'NSE', 'EQUITY', 'SUZLON', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 12018, 'Suzlon Energy Ltd', 'SUZLON', 1, 0, '', 0.05, 'N', 'EQ', 'SUZLON'),
-    (2, 14366, 'NSE', 'EQUITY', 'IDEA', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 14366, 'Vodafone Idea Ltd', 'IDEA', 1, 0, '', 0.05, 'N', 'EQ', 'IDEA'),
-    (3, 11915, 'NSE', 'EQUITY', 'YESBANK', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 11915, 'Yes Bank Ltd', 'YESBANK', 1, 0, '', 0.05, 'N', 'EQ', 'YESBANK'),
-    (4, 2029, 'NSE', 'EQUITY', 'IRFC', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 2029, 'Indian Railway Finance Corporation Ltd', 'IRFC', 1, 0, '', 0.05, 'N', 'EQ', 'IRFC'),
-    (5, 1491, 'NSE', 'EQUITY', 'IFCI', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 1491, 'IFCI Ltd', 'IFCI', 1, 0, '', 0.05, 'N', 'EQ', 'IFCI'),
-    (6, 383, 'NSE', 'EQUITY', 'BEL', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 383, 'Bharat Electronics Ltd', 'BEL', 1, 0, '', 0.05, 'N', 'EQ', 'BEL'),
-    (7, 15259, 'NSE', 'EQUITY', 'RPOWER', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 15259, 'Reliance Power Ltd', 'RPOWER', 1, 0, '', 0.05, 'N', 'EQ', 'RPOWER'),
-    (8, 9552, 'NSE', 'EQUITY', 'RVNL', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 9552, 'Rail Vikas Nigam Ltd', 'RVNL', 1, 0, '', 0.05, 'N', 'EQ', 'RVNL'),
-    (9, 17400, 'NSE', 'EQUITY', 'NHPC', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 17400, 'NHPC Ltd', 'NHPC', 1, 0, '', 0.05, 'N', 'EQ', 'NHPC'),
-    (10, 10604, 'NSE', 'EQUITY', 'BHARTIARTL', 'STOCK', '2025-01-01 09:00:00.000000', '2025-12-31 17:00:00.000000', 1, 10604, 'Bharti Airtel Ltd', 'BHARTIARTL', 1, 0, '', 0.05, 'N', 'EQ', 'BHARTIARTL');
