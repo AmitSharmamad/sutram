@@ -440,7 +440,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				if entrySignalTriggered {
 					// Calculate position size based on strategy
-					positionSize := e.calculatePositionSize(strategy, capital, stockData[i].Close)
+					positionSize := e.calculatePositionSize(strategy, stockData[i].Close)
 
 					// Determine position direction from strategy
 					var direction model.Direction
@@ -687,19 +687,31 @@ func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strat
 }
 
 // calculatePositionSize calculates the position size based on strategy settings
-func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyResponse, capital float64, price float64) float64 {
-	// If strategy specifies fixed quantity, use that
-	if strategy.Qty > 0 {
+func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyResponse, price float64) float64 {
+	// 1. If strategy.qty <= 0 and strategy.max_allocation <= 0 throw an error
+	if strategy.Qty <= 0 && strategy.MaxAllocation <= 0 {
+		println("Error calculating position size: Both Qty and MaxAllocation are invalid (<=0)")
+		return 0
+	}
+
+	// 2. If strategy.qty > 0 and strategy.max_allocation <= 0 then return strategy.qty
+	if strategy.Qty > 0 && strategy.MaxAllocation <= 0 {
 		return float64(strategy.Qty)
 	}
 
-	// Otherwise, use a percentage of capital
-	// Default to 10% if not specified
-	capitalPercentage := 10.0
-	capitalToRisk := capital * (capitalPercentage / 100)
+	// 3. If strategy.qty <= 0 and strategy.max_allocation > 0 then return strategy.max_allocation / price as integer
+	if strategy.Qty <= 0 && strategy.MaxAllocation > 0 {
+		return math.Floor(strategy.MaxAllocation / price)
+	}
 
-	// Calculate position size based on available capital
-	return capitalToRisk / price
+	// 4. If strategy.qty > 0 and strategy.max_allocation > 0,
+	// then return the lowest between (strategy.qty, strategy.max_allocation / price) as integer
+	qtyValue := float64(strategy.Qty) * price
+	if qtyValue < strategy.MaxAllocation {
+		return float64(strategy.Qty)
+	} else {
+		return math.Floor(strategy.MaxAllocation / price)
+	}
 }
 
 // calculateFees calculates the trading fees

@@ -375,5 +375,6 @@ func createTestStrategy() *model.Strategy {
 		2.0,
 		model.Percentage,
 		10000.0,
+		8000.0,
 	)
 }

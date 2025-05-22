@@ -338,6 +338,7 @@ func (s *strategyService) DuplicateStrategy(ctx context.Context, id uuid.UUID, u
 		original.StopLoss,
 		original.StopLossType,
 		original.Capital,
+		original.MaxAllocation,
 	)
 
 	// Copy additional optional fields
