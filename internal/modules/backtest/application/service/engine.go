@@ -247,32 +247,32 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	secondLevelDataStartTime := time.Now()
 	println("\tFetching second-level data for instrument", instrumentID, "- Start:", secondLevelDataStartTime.Format(time.RFC3339))
 
-	secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
-		ctx,
-		instrumentMaster.ExchangeSecurityID,
-		fetchStartTime,
-		run.PeriodEndTime,
-		string(strategy.ChartTimeframe), // 1-second data for granular exit condition checking
-	)
+	// secondLevelData, err := e.instrumentService.GetInstrumentsByTimeRange(
+	// 	ctx,
+	// 	instrumentMaster.ExchangeSecurityID,
+	// 	fetchStartTime,
+	// 	run.PeriodEndTime,
+	// 	string(strategy.ChartTimeframe), // 1-second data for granular exit condition checking
+	// )
 
-	secondLevelDataEndTime := time.Now()
-	secondLevelDataDuration := secondLevelDataEndTime.Sub(secondLevelDataStartTime)
-	secondLevelDataCount := 0
-	if secondLevelData != nil {
-		secondLevelDataCount = len(secondLevelData)
-	}
-	println("\tSecond-level data fetched for instrument", instrumentID, "- Duration:", secondLevelDataDuration.String(),
-		"- Records:", secondLevelDataCount)
+	// secondLevelDataEndTime := time.Now()
+	// secondLevelDataDuration := secondLevelDataEndTime.Sub(secondLevelDataStartTime)
+	// secondLevelDataCount := 0
+	// if secondLevelData != nil {
+	// 	secondLevelDataCount = len(secondLevelData)
+	// }
+	// println("\tSecond-level data fetched for instrument", instrumentID, "- Duration:", secondLevelDataDuration.String(),
+	// 	"- Records:", secondLevelDataCount)
 
-	if err != nil {
-		// If we can't get second-level data, we'll just use the timeframe data
-		// Continue with the backtest using only timeframe data
-		println("\tWarning: Could not get second-level data for instrument ID:", instrumentID, "Error:", err.Error())
-		secondLevelData = nil
-	}
+	// if err != nil {
+	// 	// If we can't get second-level data, we'll just use the timeframe data
+	// 	// Continue with the backtest using only timeframe data
+	// 	println("\tWarning: Could not get second-level data for instrument ID:", instrumentID, "Error:", err.Error())
+	// 	secondLevelData = nil
+	// }
 
 	// Execute backtest for this instrument and gather positions and metrics
-	positions, metrics := e.executeBacktestInMemory(strategy, timeFrameData, secondLevelData, run)
+	positions, metrics := e.executeBacktestInMemory(strategy, timeFrameData, timeFrameData, run)
 
 	// Store the positions and metrics in the run
 	run.Positions = positions
