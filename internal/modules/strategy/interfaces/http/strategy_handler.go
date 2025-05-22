@@ -55,6 +55,19 @@ func (h *StrategyHandler) RegisterRoutes(r *gin.RouterGroup, userController *use
 }
 
 // CreateStrategy handles the creation of a new strategy
+// CreateStrategy handles the creation of a new strategy
+// @Summary Create a new trading strategy
+// @Description Create a new trading strategy with the provided parameters
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param strategy body dto.CreateStrategyRequest true "Strategy details"
+// @Success 201 {object} dto.StrategyResponse "Created strategy"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /strategy [post]
 func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 	// Extract userID from context (assuming it's set by auth middleware)
 	userID, exists := c.Get("userID")
@@ -108,6 +121,21 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 }
 
 // GetStrategyByID handles the retrieval of a strategy by ID
+// GetStrategyByID handles the retrieval of a strategy by ID
+// @Summary Get a strategy by ID
+// @Description Retrieve a strategy by its unique ID
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Strategy ID" format(uuid)
+// @Success 200 {object} dto.StrategyResponse "Strategy details"
+// @Failure 400 {object} map[string]interface{} "Invalid ID"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Strategy not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /strategy/{id} [get]
 func (h *StrategyHandler) GetStrategyByID(c *gin.Context) {
 	// Extract userID from context (assuming it's set by auth middleware)
 	userID, exists := c.Get("userID")
@@ -161,6 +189,17 @@ func (h *StrategyHandler) GetStrategyByID(c *gin.Context) {
 }
 
 // GetUserStrategies handles the retrieval of all strategies for a user
+// GetUserStrategies handles the retrieval of all strategies for the current user
+// @Summary Get user strategies
+// @Description Retrieve all strategies for the current authenticated user
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} dto.StrategyResponse "List of strategies"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /strategy [get]
 func (h *StrategyHandler) GetUserStrategies(c *gin.Context) {
 	// Extract userID from context (assuming it's set by auth middleware)
 	userID, exists := c.Get("userID")

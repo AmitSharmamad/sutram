@@ -1,0 +1,29 @@
+// Package http provides HTTP handlers for the deployment module
+// @title Deployment API
+// @version 1.0
+// @description Deployment API endpoints for the Sutram algorithmic trading platform
+// @BasePath /api/deployment
+package http
+
+import (
+	"fmt"
+	"net/http"
+
+	"algo/internal/modules/deployment/application/dto"
+	"algo/internal/modules/deployment/application/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+// DeploymentController handles deployment HTTP requests
+type DeploymentController struct {
+	deploymentService service.DeploymentService
+}
+
+// NewDeploymentController creates a new deployment controller
+func NewDeploymentController(deploymentService service.DeploymentService) *DeploymentController {
+	return &DeploymentController{
+		deploymentService: deploymentService,
+	}
+}

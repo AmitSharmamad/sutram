@@ -19,9 +19,13 @@ import (
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
 
+	_ "algo/internal/docs" // Import swagger docs
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -41,6 +45,9 @@ func main() {
 
 	// Setup middleware
 	setupMiddleware(router)
+
+	// Setup Swagger
+	setupSwagger(router)
 
 	// Setup API routes
 	apiRouter := router.Group("/api")
@@ -199,4 +206,16 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+// setupSwagger configures Swagger documentation
+func setupSwagger(router *gin.Engine) {
+	// Create a URL handler for Swagger UI
+	url := ginSwagger.URL("/swagger/doc.json") // The URL for the Swagger JSON documentation
+	
+	// Mount the Swagger UI at /swagger
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+	
+	// Log that Swagger is enabled
+	log.Println("Swagger documentation available at /swagger/index.html")
 }
