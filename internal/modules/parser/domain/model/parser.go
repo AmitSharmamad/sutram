@@ -1,13 +1,13 @@
 package parser
 
 import (
+	instrument "algo/internal/modules/instrument/domain/model"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"unicode"
-	instrument "algo/internal/modules/instrument/domain/model"
 )
 
 // TokenType represents different types of tokens in our grammar
@@ -664,24 +664,6 @@ func (p *Parser) parseArguments() ([]Node, error) {
 	p.nextToken() // consume ')'
 
 	return args, nil
-}
-
-// TradingFunctions defines the interface for trading-specific functions
-type TradingFunctions interface {
-	SMA(value float64, period int) (float64, error)
-	EMA(value float64, period int) (float64, error)
-	RSI(period int) (float64, error)
-	MACD(fastPeriod, slowPeriod, signalPeriod int) (float64, error)
-	BollingerBandUpper(period int, stdDev float64) (float64, error)
-	BollingerBandLower(period int, stdDev float64) (float64, error)
-	BollingerBandMiddle(period int, stdDev float64) (float64, error)
-	ATR(period int) (float64, error)
-	Stochastic(kPeriod, kSlowing, dPeriod int) (float64, error)
-	CrossAbove(value1, value2 float64) (float64, error)
-	CrossBelow(value1, value2 float64) (float64, error)
-	PercentChange(current float64, periods int) (float64, error)
-	Highest(value float64, period int) (float64, error)
-	Lowest(value float64, period int) (float64, error)
 }
 
 // EvaluationContext holds the context for expression evaluation
