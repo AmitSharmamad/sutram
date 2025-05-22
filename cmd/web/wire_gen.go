@@ -8,6 +8,7 @@ package main
 
 import (
 	"algo/internal/modules/backtest"
+	"algo/internal/modules/deployment"
 	"algo/internal/modules/instrument"
 	"algo/internal/modules/oauth"
 	"algo/internal/modules/strategy"
@@ -21,9 +22,10 @@ func InitializeApp() (*App, error) {
 	module := user.New()
 	instrumentModule := instrument.New()
 	strategyModule := strategy.New()
+	deploymentModule := deployment.New()
 	backtestModule := backtest.New()
 	oauthModule := oauth.New()
-	app := NewApp(module, instrumentModule, strategyModule, backtestModule, oauthModule)
+	app := NewApp(module, instrumentModule, strategyModule, deploymentModule, backtestModule, oauthModule)
 	return app, nil
 }
 
@@ -34,16 +36,18 @@ type App struct {
 	UserModule       *user.Module
 	InstrumentModule *instrument.Module
 	StrategyModule   *strategy.Module
+	DeploymentModule *deployment.Module
 	BacktestModule   *backtest.Module
 	OauthModule      *oauth.Module
 }
 
 // NewApp creates a new application instance
-func NewApp(userModule *user.Module, instrumentModule *instrument.Module, strategyModule *strategy.Module, backtestModule *backtest.Module, oauthModule *oauth.Module) *App {
+func NewApp(userModule *user.Module, instrumentModule *instrument.Module, strategyModule *strategy.Module, deploymentModule *deployment.Module, backtestModule *backtest.Module, oauthModule *oauth.Module) *App {
 	return &App{
 		UserModule:       userModule,
 		InstrumentModule: instrumentModule,
 		StrategyModule:   strategyModule,
+		DeploymentModule: deploymentModule,
 		BacktestModule:   backtestModule,
 		OauthModule:      oauthModule,
 	}

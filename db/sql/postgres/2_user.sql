@@ -1,5 +1,3 @@
-
-
 -- User Management Tables
 CREATE TABLE IF NOT EXISTS "user" (
     id UUID DEFAULT gen_random_uuid(),
