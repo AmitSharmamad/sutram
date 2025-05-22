@@ -56,6 +56,12 @@ type DeploymentService interface {
 
 	// StopAllDeployments deactivates all deployments for a user
 	StopAllDeployments(ctx context.Context, userID uuid.UUID) error
+
+	// StartAllDeployments activates all paused deployments for a user
+	StartAllDeployments(ctx context.Context, userID uuid.UUID) error
+
+	// DeployAllInstruments creates deployments for all instruments of a strategy
+	DeployAllInstruments(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
 }
 
 // deploymentService implements DeploymentService
@@ -373,4 +379,83 @@ func (s *deploymentService) StopAllDeployments(ctx context.Context, userID uuid.
 	}
 
 	return nil
+}
+
+// StartAllDeployments activates all paused deployments for a user
+func (s *deploymentService) StartAllDeployments(ctx context.Context, userID uuid.UUID) error {
+	// Get all inactive deployments for the user
+	deployments, err := s.deploymentRepo.GetInactiveDeploymentsByUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get inactive deployments: %w", err)
+	}
+
+	// If there are no inactive deployments, return early
+	if len(deployments) == 0 {
+		return nil
+	}
+
+	// Activate each deployment
+	for _, deployment := range deployments {
+		if err := s.deploymentRepo.ActivateDeployment(ctx, deployment.ID); err != nil {
+			return fmt.Errorf("failed to activate deployment %s: %w", deployment.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// DeployAllInstruments creates deployments for all instruments of a strategy
+func (s *deploymentService) DeployAllInstruments(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error) {
+	// Verify the strategy exists and belongs to the user
+	strategy, err := s.strategyRepo.GetByID(ctx, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrStrategyNotFound, err)
+	}
+
+	if strategy.UserID != userID {
+		return nil, ErrUnauthorized
+	}
+
+	// Get existing deployments for this strategy
+	existingDeployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing deployments: %w", err)
+	}
+
+	// Create a map of existing deployments by instrument ID for quick lookup
+	existingDeploymentsByInstrument := make(map[int]bool)
+	for _, deployment := range existingDeployments {
+		existingDeploymentsByInstrument[deployment.InstrumentID] = true
+	}
+
+	// Create deployments for each instrument that doesn't already have one
+	var newDeployments []*dto.DeploymentResponse
+	for _, instrumentID := range strategy.Instruments {
+		// Skip if deployment already exists for this instrument
+		if existingDeploymentsByInstrument[int(instrumentID)] {
+			continue
+		}
+
+		// Create deployment request
+		deploymentName := fmt.Sprintf("%s - Instrument %d", strategy.Name, instrumentID)
+		deploymentDesc := fmt.Sprintf("Auto-deployed for strategy: %s", strategy.Name)
+		req := &dto.CreateDeploymentRequest{
+			StrategyID:   strategyID,
+			InstrumentID: int(instrumentID),
+			Name:         deploymentName,
+			Description:  deploymentDesc,
+		}
+
+		// Create the deployment
+		deployment, err := s.CreateDeployment(ctx, req, userID)
+		if err != nil {
+			// Log the error but continue with other instruments
+			fmt.Printf("Error creating deployment for instrument %d: %v\n", instrumentID, err)
+			continue
+		}
+
+		newDeployments = append(newDeployments, deployment)
+	}
+
+	return newDeployments, nil
 }

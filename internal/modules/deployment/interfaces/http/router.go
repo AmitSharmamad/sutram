@@ -26,8 +26,10 @@ func RegisterRoutes(router *gin.RouterGroup, controller *DeploymentController, u
 		deploymentAuth.PUT("/:deployment_id/activate", controller.ActivateDeployment)
 		deploymentAuth.PUT("/:deployment_id/deactivate", controller.DeactivateDeployment)
 		deploymentAuth.POST("/stop-all", controller.StopAllDeployments)
+		deploymentAuth.POST("/start-all", controller.StartAllDeployments)
 
 		// Strategy-specific deployments
 		deploymentAuth.GET("/strategy/:strategy_id", controller.GetDeploymentsByStrategy)
+		deploymentAuth.POST("/all", controller.DeployAllInstruments)
 	}
 }

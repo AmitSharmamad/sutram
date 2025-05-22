@@ -439,6 +439,48 @@ func (r *DeploymentRepository) GetActiveDeploymentsByUserID(ctx context.Context,
 	return deployments, nil
 }
 
+// GetInactiveDeploymentsByUserID retrieves all inactive deployments for a specific user
+func (r *DeploymentRepository) GetInactiveDeploymentsByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Deployment, error) {
+	query := `
+		SELECT id, user_id, strategy_id, instrument_id, name, description, is_active, created_at, updated_at
+		FROM deployment
+		WHERE user_id = $1 AND is_active = false
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query inactive deployments: %w", err)
+	}
+	defer rows.Close()
+
+	var deployments []*model.Deployment
+	for rows.Next() {
+		var deployment model.Deployment
+		err := rows.Scan(
+			&deployment.ID,
+			&deployment.UserID,
+			&deployment.StrategyID,
+			&deployment.InstrumentID,
+			&deployment.Name,
+			&deployment.Description,
+			&deployment.IsActive,
+			&deployment.CreatedAt,
+			&deployment.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan deployment: %w", err)
+		}
+		deployments = append(deployments, &deployment)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deployment rows: %w", err)
+	}
+
+	return deployments, nil
+}
+
 // SearchDeployments searches deployments with filter criteria
 func (r *DeploymentRepository) SearchDeployments(ctx context.Context, filters map[string]interface{}) ([]*model.Deployment, error) {
 	// Start with base query
