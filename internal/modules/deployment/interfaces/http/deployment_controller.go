@@ -24,6 +24,19 @@ func NewDeploymentController(deploymentService service.DeploymentService) *Deplo
 }
 
 // CreateDeployment handles the request to create a new deployment
+// @Summary Create a deployment
+// @Description Create a new deployment for a strategy
+// @Tags Deployment
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param deployment body dto.CreateDeploymentRequest true "Deployment details"
+// @Success 201 {object} map[string]interface{} "Created deployment"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 404 {object} map[string]interface{} "Strategy not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /deployment [post]
 func (c *DeploymentController) CreateDeployment(ctx *gin.Context) {
 	var req dto.CreateDeploymentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -81,6 +94,20 @@ func (c *DeploymentController) CreateDeployment(ctx *gin.Context) {
 }
 
 // GetDeploymentByID handles the request to get a deployment by ID
+// @Summary Get a deployment by ID
+// @Description Retrieve a deployment by its ID
+// @Tags Deployment
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Deployment ID" format(uuid)
+// @Success 200 {object} map[string]interface{} "Deployment details"
+// @Failure 400 {object} map[string]interface{} "Invalid ID"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Deployment not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /deployment/{id} [get]
 func (c *DeploymentController) GetDeploymentByID(ctx *gin.Context) {
 	// Parse deployment ID from URL
 	idParam := ctx.Param("deployment_id")
@@ -133,6 +160,18 @@ func (c *DeploymentController) GetDeploymentByID(ctx *gin.Context) {
 }
 
 // GetUserDeployments handles the request to get all deployments for the current user
+// @Summary Get user deployments
+// @Description Retrieve all deployments for the current user
+// @Tags Deployment
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param active query boolean false "Filter by active status"
+// @Param strategy_id query string false "Filter by strategy ID" format(uuid)
+// @Success 200 {object} map[string]interface{} "List of deployments"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /deployment [get]
 func (c *DeploymentController) GetUserDeployments(ctx *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	userID, ok := getUserIDFromContext(ctx)
@@ -161,6 +200,21 @@ func (c *DeploymentController) GetUserDeployments(ctx *gin.Context) {
 }
 
 // GetDeploymentsByStrategy handles the request to get all deployments for a strategy
+// @Summary Get deployments by strategy
+// @Description Retrieve all deployments for a specific strategy
+// @Tags Deployment
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param strategy_id path string true "Strategy ID" format(uuid)
+// @Param active query boolean false "Filter by active status"
+// @Success 200 {object} map[string]interface{} "List of deployments"
+// @Failure 400 {object} map[string]interface{} "Invalid strategy ID"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 404 {object} map[string]interface{} "Strategy not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /deployment/strategy/{strategy_id} [get]
 func (c *DeploymentController) GetDeploymentsByStrategy(ctx *gin.Context) {
 	// Parse strategy ID from URL
 	idParam := ctx.Param("strategy_id")

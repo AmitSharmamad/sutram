@@ -23,6 +23,13 @@ func NewBacktestController(backtestService service.BacktestService, engineServic
 }
 
 // HealthCheck handles the health check endpoint
+// @Summary Check backtest service health
+// @Description Check if the backtest service is running
+// @Tags Backtest
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]string "Status message"
+// @Router /backtest/health [get]
 func (c *BacktestController) HealthCheck(ctx *gin.Context) {
 	ctx.JSON(200, gin.H{
 		"status": "Backtest module is running",
@@ -30,6 +37,18 @@ func (c *BacktestController) HealthCheck(ctx *gin.Context) {
 }
 
 // RunBacktest handles the run backtest endpoint
+// @Summary Run a backtest
+// @Description Run a backtest for a specific strategy
+// @Tags Backtest
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param strategy_id query string true "Strategy ID" format(uuid)
+// @Success 200 {object} map[string]interface{} "Backtest results"
+// @Failure 400 {object} map[string]interface{} "Invalid parameters"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /backtest/run [post]
 func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 	// Get strategy ID from query parameter
 	strategyIDStr := ctx.Query("strategy_id")

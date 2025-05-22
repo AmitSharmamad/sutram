@@ -43,6 +43,23 @@ func NewMarketplaceController(
 }
 
 // GetListings handles the request to get all marketplace listings
+// @Summary Get marketplace listings
+// @Description Retrieve all marketplace listings with optional filtering
+// @Tags Marketplace
+// @Accept json
+// @Produce json
+// @Param category query string false "Filter by category ID"
+// @Param sort query string false "Sort field (price, rating, popularity, newest)"
+// @Param order query string false "Sort order (asc, desc)"
+// @Param page query integer false "Page number (default: 1)"
+// @Param limit query integer false "Results per page (default: 10)"
+// @Param min_price query number false "Minimum price filter"
+// @Param max_price query number false "Maximum price filter"
+// @Param min_rating query number false "Minimum rating filter"
+// @Success 200 {object} dto.ApiResponse{data=[]dto.ListingResponse} "List of marketplace listings"
+// @Failure 400 {object} dto.ApiResponse "Invalid parameters"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /marketplace/listings [get]
 func (c *MarketplaceController) GetListings(ctx *gin.Context) {
 	var filters dto.ListingFilterRequest
 	if err := ctx.ShouldBindQuery(&filters); err != nil {
@@ -92,6 +109,17 @@ func (c *MarketplaceController) GetListings(ctx *gin.Context) {
 }
 
 // GetListingByID handles the request to get a specific marketplace listing
+// @Summary Get a marketplace listing by ID
+// @Description Retrieve a marketplace listing by its unique ID
+// @Tags Marketplace
+// @Accept json
+// @Produce json
+// @Param id path string true "Listing ID" format(uuid)
+// @Success 200 {object} dto.ApiResponse{data=dto.ListingResponse} "Marketplace listing details"
+// @Failure 400 {object} dto.ApiResponse "Invalid ID"
+// @Failure 404 {object} dto.ApiResponse "Listing not found"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /marketplace/listings/{id} [get]
 func (c *MarketplaceController) GetListingByID(ctx *gin.Context) {
 	idStr := ctx.Param("listing_id")
 	id, err := uuid.Parse(idStr)
@@ -133,6 +161,18 @@ func (c *MarketplaceController) GetListingByID(ctx *gin.Context) {
 }
 
 // CreateListing handles the request to create a new marketplace listing
+// @Summary Create a marketplace listing
+// @Description Create a new marketplace listing
+// @Tags Marketplace
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param listing body dto.CreateListingRequest true "Listing details"
+// @Success 201 {object} dto.ApiResponse{data=dto.ListingResponse} "Created listing"
+// @Failure 400 {object} dto.ApiResponse "Invalid request"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /marketplace/listings [post]
 func (c *MarketplaceController) CreateListing(ctx *gin.Context) {
 	var req dto.CreateListingRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
