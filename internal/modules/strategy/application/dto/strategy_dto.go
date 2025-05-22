@@ -108,7 +108,8 @@ type CreateStrategyRequest struct {
 	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
 	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
 	ExitType             *string              `json:"exit_type" db:"exit_type"`
-	Capital              *float64             `json:"capital" validate:"required,gt=0" db:"capital"`
+	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
+	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
 	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
@@ -136,7 +137,8 @@ type UpdateStrategyRequest struct {
 	TrailingStopLoss     *float64             `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
 	TrailingStopLossType *model.ValueType     `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
 	ExitType             *string              `json:"exit_type" db:"exit_type"`
-	Capital              *float64             `json:"capital" validate:"required,gt=0" db:"capital"`
+	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
+	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
 	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
@@ -166,6 +168,7 @@ type StrategyResponse struct {
 	TrailingStopLossType model.ValueType      `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
 	ExitType             string               `json:"exit_type,omitempty" db:"exit_type"`
 	Capital              float64              `json:"capital,omitempty" db:"capital"`
+	MaxAllocation        float64              `json:"max_allocation,omitempty" db:"max_allocation"`
 	MaxTrades            int                  `json:"max_trades,omitempty" db:"max_trades"`
 	EntryStartTime       *time.Time           `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *time.Time           `json:"entry_end_time,omitempty" db:"entry_end_time"`
@@ -209,6 +212,7 @@ func FromDomain(strategy *model.Strategy) *StrategyResponse {
 		StopLoss:         strategy.StopLoss,
 		StopLossType:     strategy.StopLossType,
 		Capital:          strategy.Capital,
+		MaxAllocation:    strategy.MaxAllocation,
 		CreatedAt:        strategy.CreatedAt,
 		UpdatedAt:        strategy.UpdatedAt,
 		IsActive:         strategy.IsActive,
@@ -267,6 +271,11 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		capital = *req.Capital
 	}
 
+	maxAllocation := 0.0
+	if req.MaxAllocation != nil {
+		maxAllocation = *req.MaxAllocation
+	}
+
 	// Create strategy with required parameters
 	strategy := model.NewStrategy(
 		userID,
@@ -285,6 +294,7 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		stopLoss,
 		stopLossType,
 		capital,
+		maxAllocation,
 	)
 
 	// Set optional fields
@@ -293,6 +303,10 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		if req.TrailingStopLossType != nil {
 			strategy.TrailingStopLossType = req.TrailingStopLossType
 		}
+	}
+
+	if req.MaxAllocation != nil {
+		strategy.MaxAllocation = *req.MaxAllocation
 	}
 
 	if req.ExitType != nil {
@@ -350,6 +364,11 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		capital = *req.Capital
 	}
 
+	maxAllocation := 0.0
+	if req.MaxAllocation != nil {
+		maxAllocation = *req.MaxAllocation
+	}
+
 	// Create the strategy object with base fields
 	strategy := &model.Strategy{
 		ID:               req.ID,
@@ -368,6 +387,7 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		StopLoss:         stopLoss,
 		StopLossType:     stopLossType,
 		Capital:          capital,
+		MaxAllocation:    maxAllocation,
 	}
 
 	// Set optional fields
@@ -381,6 +401,10 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 
 	if req.ExitType != nil {
 		strategy.ExitType = req.ExitType
+	}
+
+	if req.MaxAllocation != nil {
+		strategy.MaxAllocation = *req.MaxAllocation
 	}
 
 	if req.MaxTrades != nil {

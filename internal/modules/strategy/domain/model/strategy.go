@@ -75,6 +75,7 @@ type Strategy struct {
 	TrailingStopLossType *ValueType     `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
 	ExitType             *string        `json:"exit_type,omitempty" db:"exit_type"`
 	Capital              float64        `json:"capital" db:"capital"`
+	MaxAllocation        float64        `json:"max_allocation" db:"max_allocation"`
 	MaxTrades            *int           `json:"max_trades,omitempty" db:"max_trades"`
 	EntryStartTime       *time.Time     `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *time.Time     `json:"entry_end_time,omitempty" db:"entry_end_time"`
@@ -103,6 +104,7 @@ func NewStrategy(
 	stopLoss float64,
 	stopLossType ValueType,
 	capital float64,
+	maxAllocation float64,
 ) *Strategy {
 	return &Strategy{
 		ID:               uuid.New(),
@@ -122,6 +124,7 @@ func NewStrategy(
 		StopLoss:         stopLoss,
 		StopLossType:     stopLossType,
 		Capital:          capital,
+		MaxAllocation:    maxAllocation,
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 		IsActive:         true,
@@ -148,6 +151,7 @@ func (s *Strategy) Update(
 	trailingStopLossType *ValueType,
 	exitType *string,
 	capital float64,
+	maxAllocation float64,
 	maxTrades *int,
 	entryStartTime *time.Time,
 	entryEndTime *time.Time,
@@ -172,6 +176,7 @@ func (s *Strategy) Update(
 	s.TrailingStopLossType = trailingStopLossType
 	s.ExitType = exitType
 	s.Capital = capital
+	s.MaxAllocation = maxAllocation
 	s.MaxTrades = maxTrades
 	s.EntryStartTime = entryStartTime
 	s.EntryEndTime = entryEndTime

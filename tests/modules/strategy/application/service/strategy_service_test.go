@@ -233,10 +233,10 @@ func TestUpdateStrategy_Success(t *testing.T) {
 	ctx := context.Background()
 	strategyID := uuid.New()
 	userID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(userID)
 	existingStrategy.ID = strategyID
-	
+
 	req := createValidUpdateStrategyRequest()
 	req.ID = strategyID
 
@@ -269,7 +269,7 @@ func TestUpdateStrategy_ValidationError(t *testing.T) {
 	// Arrange
 	ctx := context.Background()
 	userID := uuid.New()
-	
+
 	req := createValidUpdateStrategyRequest()
 	req.Name = "" // Invalid name
 
@@ -291,7 +291,7 @@ func TestUpdateStrategy_NotFound(t *testing.T) {
 	ctx := context.Background()
 	strategyID := uuid.New()
 	userID := uuid.New()
-	
+
 	req := createValidUpdateStrategyRequest()
 	req.ID = strategyID
 
@@ -318,10 +318,10 @@ func TestUpdateStrategy_Unauthorized(t *testing.T) {
 	strategyID := uuid.New()
 	userID := uuid.New()
 	otherUserID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(otherUserID)
 	existingStrategy.ID = strategyID
-	
+
 	req := createValidUpdateStrategyRequest()
 	req.ID = strategyID
 
@@ -347,7 +347,7 @@ func TestDeleteStrategy_Success(t *testing.T) {
 	ctx := context.Background()
 	strategyID := uuid.New()
 	userID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(userID)
 	existingStrategy.ID = strategyID
 
@@ -399,7 +399,7 @@ func TestDeleteStrategy_Unauthorized(t *testing.T) {
 	strategyID := uuid.New()
 	userID := uuid.New()
 	otherUserID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(otherUserID)
 	existingStrategy.ID = strategyID
 
@@ -424,7 +424,7 @@ func TestActivateStrategy_Success(t *testing.T) {
 	ctx := context.Background()
 	strategyID := uuid.New()
 	userID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(userID)
 	existingStrategy.ID = strategyID
 	existingStrategy.IsActive = false
@@ -477,7 +477,7 @@ func TestActivateStrategy_Unauthorized(t *testing.T) {
 	strategyID := uuid.New()
 	userID := uuid.New()
 	otherUserID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(otherUserID)
 	existingStrategy.ID = strategyID
 
@@ -502,7 +502,7 @@ func TestDeactivateStrategy_Success(t *testing.T) {
 	ctx := context.Background()
 	strategyID := uuid.New()
 	userID := uuid.New()
-	
+
 	existingStrategy := createTestStrategy(userID)
 	existingStrategy.ID = strategyID
 
@@ -534,7 +534,7 @@ func TestSearchStrategies_Success(t *testing.T) {
 	filter := &dto.StrategyFilter{
 		IsActive: &isActive,
 	}
-	
+
 	strategies := []*model.Strategy{
 		createTestStrategy(userID),
 		createTestStrategy(userID),
@@ -656,7 +656,7 @@ func createTestStrategy(userID uuid.UUID) *model.Strategy {
 		pq.Int32Array{1, 2, 3},
 		model.Candlestick,
 		model.OneHour,
-		"MIS",
+		model.TradeType("MIS"),
 		10,
 		"close > open",
 		"close < open",
@@ -665,6 +665,7 @@ func createTestStrategy(userID uuid.UUID) *model.Strategy {
 		2.0,
 		model.Percentage,
 		10000.0,
+		8000.0,
 	)
 
 	trailingStopLoss := 3.0
