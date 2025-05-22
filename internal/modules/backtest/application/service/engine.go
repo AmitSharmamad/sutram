@@ -252,7 +252,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 		instrumentMaster.ExchangeSecurityID,
 		fetchStartTime,
 		run.PeriodEndTime,
-		"1s", // 1-second data for granular exit condition checking
+		string(strategy.ChartTimeframe), // 1-second data for granular exit condition checking
 	)
 
 	secondLevelDataEndTime := time.Now()
