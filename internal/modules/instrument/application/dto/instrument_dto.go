@@ -119,6 +119,7 @@ type GetInstrumentsByTimeRangeRequest struct {
 type InstrumentMasterFilterDTO struct {
 	Exchange string `form:"exchange"`
 	Segment  string `form:"segment"`
+	Query    string `form:"query"`
 	Page     int    `form:"page,default=1"`
 	PageSize int    `form:"pageSize,default=10"`
 }

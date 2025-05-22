@@ -506,6 +506,108 @@ func (c *DeploymentController) StopAllDeployments(ctx *gin.Context) {
 	})
 }
 
+// DeployAllInstruments handles the request to deploy all instruments for a specific strategy
+func (c *DeploymentController) DeployAllInstruments(ctx *gin.Context) {
+	var strategyID uuid.UUID
+	var err error
+
+	// Check if strategy_id is provided as a query parameter
+	strategyIDParam := ctx.Query("strategy_id")
+	if strategyIDParam != "" {
+		strategyID, err = uuid.Parse(strategyIDParam)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "Invalid strategy ID in query parameter",
+				"error":   err.Error(),
+			})
+			return
+		}
+	} else {
+		// If not in query, try to get from JSON body
+		var req struct {
+			StrategyID uuid.UUID `json:"strategy_id" binding:"required"`
+		}
+
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "Strategy ID required in request body or as query parameter",
+				"error":   err.Error(),
+			})
+			return
+		}
+		strategyID = req.StrategyID
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, ok := getUserIDFromContext(ctx)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Invalid user ID",
+		})
+		return
+	}
+
+	deployments, err := c.deploymentService.DeployAllInstruments(ctx.Request.Context(), strategyID, userID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		message := "Failed to deploy instruments"
+
+		switch err {
+		case service.ErrStrategyNotFound:
+			status = http.StatusNotFound
+			message = "Strategy not found"
+		case service.ErrUnauthorized:
+			status = http.StatusForbidden
+			message = "You don't have permission to deploy this strategy"
+		}
+
+		ctx.JSON(status, gin.H{
+			"success": false,
+			"message": message,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Instruments deployed successfully",
+		"data":    deployments,
+	})
+}
+
+// StartAllDeployments handles the request to start all paused deployments for the current user
+func (c *DeploymentController) StartAllDeployments(ctx *gin.Context) {
+	// Get user ID from context (set by auth middleware)
+	userID, ok := getUserIDFromContext(ctx)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Invalid user ID",
+		})
+		return
+	}
+
+	// Start all paused deployments for the user
+	err := c.deploymentService.StartAllDeployments(ctx, userID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Failed to start deployments",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "All paused deployments started successfully",
+	})
+}
+
 // Helper function to get user ID from context
 func getUserIDFromContext(ctx *gin.Context) (uuid.UUID, bool) {
 	// Get the user ID from the context (set by middleware)

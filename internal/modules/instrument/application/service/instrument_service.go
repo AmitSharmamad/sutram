@@ -98,7 +98,7 @@ func (s *InstrumentService) GetAllInstrumentMasters(ctx context.Context) ([]*mod
 }
 
 // GetInstrumentMastersWithFilters gets instrument masters with filtering and pagination
-func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange, segment string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
+func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange, segment, query string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -109,7 +109,7 @@ func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context,
 	offset := (page - 1) * pageSize
 	limit := pageSize
 
-	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segment, offset, limit)
+	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segment, query, offset, limit)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error finding instrument masters with filters: %w", err)
 	}
