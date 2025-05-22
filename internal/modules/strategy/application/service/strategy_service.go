@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"algo/internal/modules/strategy/application/dto"
@@ -33,6 +34,9 @@ type StrategyService interface {
 
 	// GetUserStrategies retrieves all strategies for a user
 	GetUserStrategies(ctx context.Context, userID uuid.UUID) ([]*dto.StrategyResponse, error)
+
+	// GetDefaultStrategies retrieves all strategies for the system user
+	GetDefaultStrategies(ctx context.Context) ([]*dto.StrategyResponse, error)
 
 	// UpdateStrategy updates an existing strategy
 	UpdateStrategy(ctx context.Context, req *dto.UpdateStrategyRequest, userID uuid.UUID) (*dto.StrategyResponse, error)
@@ -119,6 +123,29 @@ func (s *strategyService) GetStrategyByID(ctx context.Context, id uuid.UUID, use
 // GetUserStrategies retrieves all strategies for a user
 func (s *strategyService) GetUserStrategies(ctx context.Context, userID uuid.UUID) ([]*dto.StrategyResponse, error) {
 	strategies, err := s.strategyRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert domain models to response DTOs
+	var strategyResponses []*dto.StrategyResponse
+	for _, strategy := range strategies {
+		strategyResponses = append(strategyResponses, dto.FromDomain(strategy))
+	}
+
+	return strategyResponses, nil
+}
+
+// GetDefaultStrategies retrieves all strategies for the system user
+func (s *strategyService) GetDefaultStrategies(ctx context.Context) ([]*dto.StrategyResponse, error) {
+	// System user ID from default.sql
+	systemUserID, err := uuid.Parse("e65c67f1-2b43-4581-b33b-ec26295e741b")
+	if err != nil {
+		return nil, fmt.Errorf("invalid system user ID: %w", err)
+	}
+
+	// Get strategies for system user
+	strategies, err := s.strategyRepo.GetByUserID(ctx, systemUserID)
 	if err != nil {
 		return nil, err
 	}

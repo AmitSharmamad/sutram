@@ -39,6 +39,8 @@ func (h *StrategyHandler) RegisterRoutes(r *gin.RouterGroup, userController *use
 		strategies.POST("/", h.CreateStrategy)
 		strategies.GET("", h.GetUserStrategies)
 		strategies.GET("/", h.GetUserStrategies)
+		strategies.GET("/default", h.GetDefaultStrategies)
+		strategies.GET("/default/", h.GetDefaultStrategies)
 
 		// Other routes remain the same
 		strategies.GET("/:id", h.GetStrategyByID)
@@ -505,6 +507,30 @@ func (h *StrategyHandler) SearchStrategies(c *gin.Context) {
 
 	// Search strategies
 	strategies, err := h.strategyService.SearchStrategies(c.Request.Context(), &filter, userID.(uuid.UUID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Internal server error: " + err.Error(),
+		})
+		return
+	}
+
+	// Ensure we return an empty array instead of null if strategies is nil
+	if strategies == nil {
+		strategies = []*dto.StrategyResponse{}
+	}
+
+	// Return strategies
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    strategies,
+	})
+}
+
+// GetDefaultStrategies handles the retrieval of all default strategies (system user strategies)
+func (h *StrategyHandler) GetDefaultStrategies(c *gin.Context) {
+	// Get default strategies
+	strategies, err := h.strategyService.GetDefaultStrategies(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
