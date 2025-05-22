@@ -12,6 +12,7 @@ import (
 
 	"algo/internal/modules/backtest"
 	"algo/internal/modules/community"
+	"algo/internal/modules/deployment"
 	"algo/internal/modules/instrument"
 	"algo/internal/modules/marketplace"
 	"algo/internal/modules/oauth"
@@ -162,6 +163,11 @@ func initializeModules(router *gin.RouterGroup) {
 	// This ensures that all strategy endpoints are protected by authentication
 	strategyModule.SetUserController(userController)
 	strategyModule.RegisterRoutes(router)
+
+	// Initialize deployment module
+	deploymentModule := deployment.New()
+	deploymentModule.Initialize(userController, strategyModule)
+	deploymentModule.RegisterRoutes(router)
 
 	// Initialize backtest module
 	backtestModule := backtest.New()

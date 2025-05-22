@@ -39,6 +39,9 @@ func (h *StrategyHandler) RegisterRoutes(r *gin.RouterGroup, userController *use
 		strategies.POST("/", h.CreateStrategy)
 		strategies.GET("", h.GetUserStrategies)
 		strategies.GET("/", h.GetUserStrategies)
+		strategies.GET("/default", h.GetDefaultStrategies)
+		strategies.GET("/default/", h.GetDefaultStrategies)
+		strategies.POST("/default/:id/clone", h.CloneDefaultStrategy)
 
 		// Other routes remain the same
 		strategies.GET("/:id", h.GetStrategyByID)
@@ -481,6 +484,55 @@ func (h *StrategyHandler) DuplicateStrategy(c *gin.Context) {
 	})
 }
 
+// CloneDefaultStrategy handles the cloning of a default strategy for the current user
+func (h *StrategyHandler) CloneDefaultStrategy(c *gin.Context) {
+	// Extract userID from context (set by auth middleware)
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	// Parse default strategy ID from URL
+	defaultIDStr := c.Param("id")
+	defaultID, err := uuid.Parse(defaultIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid default strategy ID",
+		})
+		return
+	}
+
+	// Clone the default strategy for the user
+	clonedStrategy, err := h.strategyService.CloneDefaultStrategy(c.Request.Context(), defaultID, userID.(uuid.UUID))
+	if err != nil {
+		switch err {
+		case service.ErrStrategyNotFound:
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Default strategy not found",
+			})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to clone default strategy: " + err.Error(),
+			})
+		}
+		return
+	}
+
+	// Return the cloned strategy
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": "Default strategy cloned successfully",
+		"data":    clonedStrategy,
+	})
+}
+
 // SearchStrategies handles the search of strategies with filter criteria
 func (h *StrategyHandler) SearchStrategies(c *gin.Context) {
 	// Extract userID from context (assuming it's set by auth middleware)
@@ -505,6 +557,30 @@ func (h *StrategyHandler) SearchStrategies(c *gin.Context) {
 
 	// Search strategies
 	strategies, err := h.strategyService.SearchStrategies(c.Request.Context(), &filter, userID.(uuid.UUID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Internal server error: " + err.Error(),
+		})
+		return
+	}
+
+	// Ensure we return an empty array instead of null if strategies is nil
+	if strategies == nil {
+		strategies = []*dto.StrategyResponse{}
+	}
+
+	// Return strategies
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    strategies,
+	})
+}
+
+// GetDefaultStrategies handles the retrieval of all default strategies (system user strategies)
+func (h *StrategyHandler) GetDefaultStrategies(c *gin.Context) {
+	// Get default strategies
+	strategies, err := h.strategyService.GetDefaultStrategies(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
