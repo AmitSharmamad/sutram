@@ -58,6 +58,9 @@ type StrategyService interface {
 
 	// DuplicateStrategy creates a copy of an existing strategy
 	DuplicateStrategy(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.StrategyResponse, error)
+
+	// CloneDefaultStrategy clones a default strategy for a user
+	CloneDefaultStrategy(ctx context.Context, defaultStrategyID uuid.UUID, userID uuid.UUID) (*dto.StrategyResponse, error)
 }
 
 // strategyService implements the StrategyService interface
@@ -385,6 +388,65 @@ func (s *strategyService) DuplicateStrategy(ctx context.Context, id uuid.UUID, u
 	}
 
 	return dto.FromDomain(duplicate), nil
+}
+
+// CloneDefaultStrategy clones a default strategy for a user
+func (s *strategyService) CloneDefaultStrategy(ctx context.Context, defaultStrategyID uuid.UUID, userID uuid.UUID) (*dto.StrategyResponse, error) {
+	// System user ID from default.sql
+	systemUserID, err := uuid.Parse("e65c67f1-2b43-4581-b33b-ec26295e741b")
+	if err != nil {
+		return nil, fmt.Errorf("invalid system user ID: %w", err)
+	}
+
+	// Retrieve the default strategy
+	defaultStrategy, err := s.strategyRepo.GetByID(ctx, defaultStrategyID)
+	if err != nil {
+		return nil, ErrStrategyNotFound
+	}
+
+	// Verify this is actually a default strategy (owned by system user)
+	if defaultStrategy.UserID != systemUserID {
+		return nil, errors.New("strategy is not a default strategy")
+	}
+
+	// Create a new strategy with the same properties but owned by the current user
+	clonedStrategy := model.NewStrategy(
+		userID,
+		defaultStrategy.Name,
+		defaultStrategy.Description,
+		defaultStrategy.PositionType,
+		defaultStrategy.Instruments,
+		defaultStrategy.ChartType,
+		defaultStrategy.ChartTimeframe,
+		defaultStrategy.TradeType,
+		defaultStrategy.Qty,
+		defaultStrategy.EntryExpression,
+		defaultStrategy.ExitExpression,
+		defaultStrategy.TargetProfit,
+		defaultStrategy.TargetProfitType,
+		defaultStrategy.StopLoss,
+		defaultStrategy.StopLossType,
+		defaultStrategy.Capital,
+		defaultStrategy.MaxAllocation,
+	)
+
+	// Copy additional optional fields
+	clonedStrategy.TrailingStopLoss = defaultStrategy.TrailingStopLoss
+	clonedStrategy.TrailingStopLossType = defaultStrategy.TrailingStopLossType
+	clonedStrategy.ExitType = defaultStrategy.ExitType
+	clonedStrategy.MaxTrades = defaultStrategy.MaxTrades
+	clonedStrategy.EntryStartTime = defaultStrategy.EntryStartTime
+	clonedStrategy.EntryEndTime = defaultStrategy.EntryEndTime
+	clonedStrategy.StartDate = defaultStrategy.StartDate
+	clonedStrategy.EndDate = defaultStrategy.EndDate
+
+	// Save the cloned strategy
+	err = s.strategyRepo.Create(ctx, clonedStrategy)
+	if err != nil {
+		return nil, ErrStrategyCreateFailed
+	}
+
+	return dto.FromDomain(clonedStrategy), nil
 }
 
 // validateExpression validates the trading expression syntax
