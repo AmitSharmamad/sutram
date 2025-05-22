@@ -27,6 +27,16 @@ func NewUserController(authService *service.AuthService, userService *service.Us
 }
 
 // Register handles user registration
+// @Summary Register a new user
+// @Description Register a new user with the provided information
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param user body dto.RegisterRequest true "User registration details"
+// @Success 201 {object} dto.ApiResponse{data=dto.AuthResponse} "Registration successful"
+// @Failure 400 {object} dto.ApiResponse "Invalid request or registration failed"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/register [post]
 func (c *UserController) Register(ctx *gin.Context) {
 	var req dto.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -69,6 +79,18 @@ func (c *UserController) Register(ctx *gin.Context) {
 }
 
 // Login handles user login
+// Login handles user login
+// @Summary Login a user
+// @Description Authenticate a user with credentials
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param credentials body dto.LoginRequest true "User login credentials"
+// @Success 200 {object} dto.ApiResponse{data=dto.AuthResponse} "Login successful"
+// @Failure 400 {object} dto.ApiResponse "Invalid credentials"
+// @Failure 401 {object} dto.ApiResponse "Authentication failed"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/login [post]
 func (c *UserController) Login(ctx *gin.Context) {
 	var req dto.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -106,6 +128,18 @@ func (c *UserController) Login(ctx *gin.Context) {
 }
 
 // RefreshToken refreshes a user's token
+// RefreshToken refreshes the user's JWT token
+// @Summary Refresh authentication token
+// @Description Get a new JWT token using a valid refresh token
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.ApiResponse{data=dto.AuthResponse} "New tokens"
+// @Failure 400 {object} dto.ApiResponse "Invalid token"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized or expired token"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/refresh-token [post]
 func (c *UserController) RefreshToken(ctx *gin.Context) {
 	// Get the token from header
 	tokenString := extractToken(ctx)
@@ -141,6 +175,19 @@ func (c *UserController) RefreshToken(ctx *gin.Context) {
 }
 
 // GetProfile gets the current user's profile
+// GetProfile retrieves the current user's profile
+// @Summary Get user profile
+// @Description Get the authenticated user's profile information
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.ApiResponse{data=dto.UserResponse} "User profile"
+// @Failure 400 {object} dto.ApiResponse "Invalid token"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized"
+// @Failure 404 {object} dto.ApiResponse "User not found"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/profile [get]
 func (c *UserController) GetProfile(ctx *gin.Context) {
 	// Get the token from header
 	tokenString := extractToken(ctx)
@@ -172,6 +219,20 @@ func (c *UserController) GetProfile(ctx *gin.Context) {
 }
 
 // UpdateProfile updates the current user's profile
+// UpdateProfile updates the current user's profile
+// @Summary Update user profile
+// @Description Update the authenticated user's profile information
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param profile body dto.UpdateUserRequest true "Updated profile information"
+// @Success 200 {object} dto.ApiResponse{data=dto.UserResponse} "Updated user profile"
+// @Failure 400 {object} dto.ApiResponse "Invalid request"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized"
+// @Failure 404 {object} dto.ApiResponse "User not found"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/profile [put]
 func (c *UserController) UpdateProfile(ctx *gin.Context) {
 	var req dto.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -230,6 +291,20 @@ func (c *UserController) UpdateProfile(ctx *gin.Context) {
 }
 
 // ChangePassword changes the current user's password
+// ChangePassword updates the user's password
+// @Summary Change password
+// @Description Change the authenticated user's password
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param passwords body dto.ChangePasswordRequest true "Old and new password"
+// @Success 200 {object} dto.ApiResponse "Password changed successfully"
+// @Failure 400 {object} dto.ApiResponse "Invalid request"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized or incorrect old password"
+// @Failure 404 {object} dto.ApiResponse "User not found"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /user/change-password [post]
 func (c *UserController) ChangePassword(ctx *gin.Context) {
 	var req dto.ChangePasswordRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
