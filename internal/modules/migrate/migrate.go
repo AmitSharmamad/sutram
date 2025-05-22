@@ -130,7 +130,7 @@ func (m *DataMigrator) processSecurity(security SecurityData) error {
 
 		// If we crossed a year boundary, write the accumulated data and reset
 		if processDate.Year() > currentYear {
-			err := m.writeCSV(security.SecurityID, yearData)
+			err := m.writeCSV(security.SecurityID, currentYear, yearData)
 			if err != nil {
 				return fmt.Errorf("error writing CSV for year %d: %w", currentYear, err)
 			}
@@ -172,7 +172,7 @@ func (m *DataMigrator) processSecurity(security SecurityData) error {
 
 	// Write any remaining data for the current year
 	if len(yearData) > 1 { // If we have more than just headers
-		err := m.writeCSV(security.SecurityID, yearData)
+		err := m.writeCSV(security.SecurityID, currentYear, yearData)
 		if err != nil {
 			return fmt.Errorf("error writing final CSV for year %d: %w", currentYear, err)
 		}
@@ -278,14 +278,14 @@ func (m *DataMigrator) processResponseData(exchangeSegment string, resp *ChartRe
 }
 
 // writeCSV writes the accumulated data to a CSV file
-func (m *DataMigrator) writeCSV(securityID string, data [][]string) error {
+func (m *DataMigrator) writeCSV(securityID string, year int, data [][]string) error {
 	// Create directory if it doesn't exist
 	outputDir := "data"
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("error creating output directory: %w", err)
 	}
 
-	filename := filepath.Join(outputDir, fmt.Sprintf("instrument_data_%s.csv", securityID))
+	filename := filepath.Join(outputDir, fmt.Sprintf("instrument_data_%s_%d.csv", securityID, year))
 	fmt.Printf("Writing data to file: %s\n", filename)
 
 	file, err := os.Create(filename)
