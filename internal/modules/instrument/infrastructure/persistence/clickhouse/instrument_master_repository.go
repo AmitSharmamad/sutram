@@ -47,7 +47,7 @@ func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*
 			exch_instrument_type,
 			symbol_name
 		FROM sutram.instrument_master
-		WHERE id = ?
+		WHERE exchange_security_id = ?
 		LIMIT 1
 	`
 

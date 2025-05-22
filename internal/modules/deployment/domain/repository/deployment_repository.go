@@ -49,6 +49,9 @@ type DeploymentRepository interface {
 	// GetActiveDeploymentsByUserID retrieves all active deployments for a specific user
 	GetActiveDeploymentsByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Deployment, error)
 
+	// GetInactiveDeploymentsByUserID retrieves all inactive deployments for a specific user
+	GetInactiveDeploymentsByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Deployment, error)
+
 	// SearchDeployments searches deployments with filter criteria
 	SearchDeployments(ctx context.Context, filters map[string]interface{}) ([]*model.Deployment, error)
 }
