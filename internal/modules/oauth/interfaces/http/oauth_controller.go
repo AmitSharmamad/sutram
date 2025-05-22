@@ -25,6 +25,17 @@ func NewOAuthController(oauthService *service.OAuthService) *OAuthController {
 }
 
 // InitiateLogin initiates the OAuth login flow
+// @Summary Initiate OAuth login
+// @Description Start the OAuth login flow for a specific provider
+// @Tags OAuth
+// @Accept json
+// @Produce json
+// @Param provider path string true "OAuth provider (google, github, etc.)"
+// @Success 200 {object} dto.ApiResponse{data=map[string]string} "Login URL"
+// @Success 302 {string} string "Redirect to provider login page"
+// @Failure 400 {object} dto.ApiResponse "Invalid provider"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /oauth/{provider}/login [get]
 func (c *OAuthController) InitiateLogin(ctx *gin.Context) {
 	provider := ctx.Param("provider")
 	if provider == "" {
@@ -59,6 +70,21 @@ func (c *OAuthController) InitiateLogin(ctx *gin.Context) {
 }
 
 // HandleCallback handles the OAuth callback
+// HandleCallback handles the OAuth callback
+// @Summary Handle OAuth callback
+// @Description Process the OAuth callback from the provider
+// @Tags OAuth
+// @Accept json
+// @Produce json
+// @Param provider path string true "OAuth provider (google, github, etc.)"
+// @Param code query string true "Authorization code"
+// @Param state query string true "State parameter for CSRF protection"
+// @Param error query string false "Error message from provider"
+// @Success 200 {object} dto.ApiResponse{data=map[string]interface{}} "User and token"
+// @Success 302 {string} string "Redirect to home page with cookie"
+// @Failure 400 {object} dto.ApiResponse "Invalid parameters"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /oauth/{provider}/callback [get]
 func (c *OAuthController) HandleCallback(ctx *gin.Context) {
 	provider := ctx.Param("provider")
 	if provider == "" {
@@ -120,6 +146,15 @@ func (c *OAuthController) HandleCallback(ctx *gin.Context) {
 }
 
 // GetAvailableProviders gets all available OAuth providers
+// GetAvailableProviders gets all available OAuth providers
+// @Summary Get available OAuth providers
+// @Description Retrieve a list of all available OAuth providers
+// @Tags OAuth
+// @Accept json
+// @Produce json
+// @Success 200 {object} dto.ApiResponse{data=[]string} "List of available providers"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /oauth/providers [get]
 func (c *OAuthController) GetAvailableProviders(ctx *gin.Context) {
 	providers, err := c.oauthService.GetAvailableProviders(ctx.Request.Context())
 	if err != nil {
@@ -145,6 +180,17 @@ func (c *OAuthController) GetAvailableProviders(ctx *gin.Context) {
 }
 
 // GetUserConnections gets all OAuth connections for a user
+// GetUserConnections gets all OAuth connections for a user
+// @Summary Get user OAuth connections
+// @Description Retrieve all OAuth connections for the authenticated user
+// @Tags OAuth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.ApiResponse{data=[]dto.OAuthConnectionResponse} "List of user's OAuth connections"
+// @Failure 401 {object} dto.ApiResponse "Unauthorized"
+// @Failure 500 {object} dto.ApiResponse "Internal server error"
+// @Router /oauth/connections [get]
 func (c *OAuthController) GetUserConnections(ctx *gin.Context) {
 	userID, exists := ctx.Get("userID")
 	if !exists {
