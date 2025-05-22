@@ -1,4 +1,4 @@
-.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live
+.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate
 
 # Build the web application
 build:
@@ -75,5 +75,13 @@ build-live:
 live: build-live
 	@echo "Running the live WebSocket server..."
 	@./s-live
-	@echo "Stopping all services..."
-	@docker-compose down
+
+# Build the data migration tool
+build-migrate:
+	@echo "Building the data migration tool..."
+	@go build -o s-migrate cmd/migrate/main.go
+
+# Run the data migration tool
+migrate: build-migrate
+	@echo "Running the data migration tool..."
+	@./s-migrate
