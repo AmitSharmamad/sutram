@@ -24,7 +24,7 @@ type InstrumentMasterRepository interface {
 	FindAll(ctx context.Context) ([]*model.InstrumentMaster, error)
 
 	// FindWithFilters returns instrument masters with filtering and pagination
-	FindWithFilters(ctx context.Context, exchange, segment string, offset, limit int) ([]*model.InstrumentMaster, int, error)
+	FindWithFilters(ctx context.Context, exchange, segment, query string, offset, limit int) ([]*model.InstrumentMaster, int, error)
 
 	// Create creates a new instrument master
 	Create(ctx context.Context, instrumentMaster *model.InstrumentMaster) error

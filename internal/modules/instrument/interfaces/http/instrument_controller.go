@@ -151,6 +151,7 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 		ctx.Request.Context(),
 		filter.Exchange,
 		filter.Segment,
+		filter.Query,
 		filter.Page,
 		filter.PageSize,
 	)

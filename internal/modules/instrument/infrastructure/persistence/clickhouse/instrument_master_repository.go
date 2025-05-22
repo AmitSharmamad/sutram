@@ -371,7 +371,7 @@ func (r *InstrumentMasterRepository) Delete(ctx context.Context, id uint64) erro
 }
 
 // FindWithFilters returns instrument masters with filtering and pagination
-func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchange, segment string, offset, limit int) ([]*model.InstrumentMaster, int, error) {
+func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchange, segment, searchQuery string, offset, limit int) ([]*model.InstrumentMaster, int, error) {
 	// Build the WHERE clause based on filters
 	var whereConditions []string
 	var args []interface{}
@@ -386,6 +386,13 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 		args = append(args, segment)
 	}
 
+	if searchQuery != "" {
+		// Search in both name and symbol fields
+		whereConditions = append(whereConditions, "(lowerUTF8(symbol) LIKE ? OR lowerUTF8(instrument) LIKE ? OR lowerUTF8(instrument_name) LIKE ? OR lowerUTF8(trading_symbol) LIKE ? OR lowerUTF8(symbol_name) LIKE ?)")
+		searchPattern := "%" + strings.ToLower(searchQuery) + "%"
+		args = append(args, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
+	}
+
 	// Build the full WHERE clause
 	whereClause := ""
 	if len(whereConditions) > 0 {
@@ -393,7 +400,7 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	}
 
 	// Query to get filtered and paginated data
-	query := fmt.Sprintf(`
+	sqlQuery := fmt.Sprintf(`
 		SELECT 
 			id,
 			exchange_security_id, 
@@ -424,7 +431,7 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 
 	// Execute the query
 	var instrumentMasters []*model.InstrumentMaster
-	err := r.db.SelectContext(ctx, &instrumentMasters, query, args...)
+	err := r.db.SelectContext(ctx, &instrumentMasters, sqlQuery, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error querying instrument masters with filters: %w", err)
 	}

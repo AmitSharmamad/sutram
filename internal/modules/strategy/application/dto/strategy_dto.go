@@ -94,7 +94,7 @@ type CreateStrategyRequest struct {
 	Name                 string               `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string               `json:"description" validate:"max=500" db:"description"`
 	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
-	Instruments          pq.Int32Array        `json:"instruments" validate:"required,min=1,dive,gt=0" db:"instruments"`
+	Instruments          pq.Int32Array        `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
 	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 15m 1h 1d" db:"chart_timeframe"`
 	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MIS CNC/NRML" db:"trade_type"`
