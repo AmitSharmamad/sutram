@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS strategy (
     trailing_stop_loss_type value_type,
     exit_type VARCHAR,
     capital DECIMAL(18, 8) NOT NULL,
+    max_allocation DECIMAL(18, 8) NOT NULL,
     max_trades INT,
     entry_start_time TIMESTAMP,
     entry_end_time TIMESTAMP,

@@ -29,6 +29,7 @@ func TestNewStrategy(t *testing.T) {
 	stopLoss := 2.0
 	stopLossType := model.Percentage
 	capital := 10000.0
+	maxAllocation := 8000.0
 
 	// Act
 	strategy := model.NewStrategy(
@@ -48,6 +49,7 @@ func TestNewStrategy(t *testing.T) {
 		stopLoss,
 		stopLossType,
 		capital,
+		maxAllocation,
 	)
 
 	// Assert
@@ -68,6 +70,7 @@ func TestNewStrategy(t *testing.T) {
 	assert.Equal(t, stopLoss, strategy.StopLoss)
 	assert.Equal(t, stopLossType, strategy.StopLossType)
 	assert.Equal(t, capital, strategy.Capital)
+	assert.Equal(t, maxAllocation, strategy.MaxAllocation)
 	assert.True(t, strategy.IsActive)
 	assert.NotEmpty(t, strategy.ID)
 	assert.False(t, strategy.CreatedAt.IsZero())
@@ -78,7 +81,7 @@ func TestUpdateStrategy(t *testing.T) {
 	// Arrange
 	strategy := createTestStrategy()
 	originalCreatedAt := strategy.CreatedAt
-	
+
 	// New values for update
 	newName := "Updated Strategy"
 	newDescription := "Updated description"
@@ -98,6 +101,7 @@ func TestUpdateStrategy(t *testing.T) {
 	trailingStopLossType := model.Percentage
 	exitType := "EOD"
 	newCapital := 20000.0
+	newMaxAllocation := 15000.0
 	maxTrades := 5
 	entryStartTime := time.Now().Add(-1 * time.Hour)
 	entryEndTime := time.Now()
@@ -124,6 +128,7 @@ func TestUpdateStrategy(t *testing.T) {
 		&trailingStopLossType,
 		&exitType,
 		newCapital,
+		newMaxAllocation,
 		&maxTrades,
 		&entryStartTime,
 		&entryEndTime,
@@ -150,6 +155,7 @@ func TestUpdateStrategy(t *testing.T) {
 	assert.Equal(t, &trailingStopLossType, strategy.TrailingStopLossType)
 	assert.Equal(t, &exitType, strategy.ExitType)
 	assert.Equal(t, newCapital, strategy.Capital)
+	assert.Equal(t, newMaxAllocation, strategy.MaxAllocation)
 	assert.Equal(t, &maxTrades, strategy.MaxTrades)
 	assert.Equal(t, &entryStartTime, strategy.EntryStartTime)
 	assert.Equal(t, &entryEndTime, strategy.EntryEndTime)
@@ -207,5 +213,6 @@ func createTestStrategy() *model.Strategy {
 		2.0,
 		model.Percentage,
 		10000.0,
+		8000.0,
 	)
 }

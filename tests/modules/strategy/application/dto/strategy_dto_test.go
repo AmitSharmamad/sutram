@@ -256,6 +256,7 @@ func TestFromDomain(t *testing.T) {
 		assert.Equal(t, *strategy.ExitType, response.ExitType)
 	}
 	assert.Equal(t, strategy.Capital, response.Capital)
+	assert.Equal(t, strategy.MaxAllocation, response.MaxAllocation)
 	if strategy.MaxTrades != nil {
 		assert.Equal(t, *strategy.MaxTrades, response.MaxTrades)
 	}
@@ -276,6 +277,7 @@ func createValidCreateStrategyRequest() *dto.CreateStrategyRequest {
 	trailingStopLossType := model.Percentage
 	exitType := "EOD"
 	maxTrades := 5
+	maxAllocation := 8000.0
 	entryStartTime := time.Now().Add(-1 * time.Hour)
 	entryEndTime := time.Now()
 	startDate := time.Now().Add(-7 * 24 * time.Hour)
@@ -305,6 +307,7 @@ func createValidCreateStrategyRequest() *dto.CreateStrategyRequest {
 		TrailingStopLossType: &trailingStopLossType,
 		ExitType:             &exitType,
 		Capital:              &capital,
+		MaxAllocation:        &maxAllocation,
 		MaxTrades:            &maxTrades,
 		EntryStartTime:       &entryStartTime,
 		EntryEndTime:         &entryEndTime,
@@ -318,6 +321,7 @@ func createValidUpdateStrategyRequest() *dto.UpdateStrategyRequest {
 	trailingStopLossType := model.Percentage
 	exitType := "EOD"
 	maxTrades := 5
+	maxAllocation := 15000.0
 	entryStartTime := time.Now().Add(-1 * time.Hour)
 	entryEndTime := time.Now()
 	startDate := time.Now().Add(-7 * 24 * time.Hour)
@@ -348,6 +352,7 @@ func createValidUpdateStrategyRequest() *dto.UpdateStrategyRequest {
 		TrailingStopLossType: &trailingStopLossType,
 		ExitType:             &exitType,
 		Capital:              &capital,
+		MaxAllocation:        &maxAllocation,
 		MaxTrades:            &maxTrades,
 		EntryStartTime:       &entryStartTime,
 		EntryEndTime:         &entryEndTime,
@@ -366,7 +371,7 @@ func createTestStrategy() *model.Strategy {
 		pq.Int32Array{1, 2, 3},
 		model.Candlestick,
 		model.OneHour,
-		model.Market,
+		model.TradeType("MIS"),
 		10,
 		"close > open",
 		"close < open",
@@ -375,11 +380,13 @@ func createTestStrategy() *model.Strategy {
 		2.0,
 		model.Percentage,
 		10000.0,
+		0.0, // Default maxAllocation
 	)
 
 	trailingStopLoss := 3.0
 	trailingStopLossType := model.Percentage
 	exitType := "EOD"
+	maxAllocation := 8000.0
 	maxTrades := 5
 	entryStartTime := time.Now().Add(-1 * time.Hour)
 	entryEndTime := time.Now()
@@ -389,6 +396,7 @@ func createTestStrategy() *model.Strategy {
 	strategy.TrailingStopLoss = &trailingStopLoss
 	strategy.TrailingStopLossType = &trailingStopLossType
 	strategy.ExitType = &exitType
+	strategy.MaxAllocation = maxAllocation
 	strategy.MaxTrades = &maxTrades
 	strategy.EntryStartTime = &entryStartTime
 	strategy.EntryEndTime = &entryEndTime
