@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	// Import time for parsing timestamps in other functions
+
 	"algo/internal/modules/instrument/application/dto"
 	"algo/internal/modules/instrument/application/service"
 	"algo/internal/modules/instrument/domain/model"
@@ -93,12 +95,47 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 		TotalPages: totalPages,
 	}
 
-	// Create response using the new pagination structure
-	response := struct {
-		Data       []*dto.InstrumentDTO `json:"data"`
-		Pagination dto.PaginationDTO    `json:"pagination"`
+	// Prepare data in the required format - separate arrays for each property
+	openValues := make([]float64, len(instruments))
+	highValues := make([]float64, len(instruments))
+	lowValues := make([]float64, len(instruments))
+	closeValues := make([]float64, len(instruments))
+	volumeValues := make([]float64, len(instruments))
+	// Using Unix timestamps (seconds since epoch) for better compatibility with frontend
+	timestampValues := make([]int64, len(instruments))
+
+	for i, instrument := range instruments {
+		openValues[i] = instrument.Open
+		highValues[i] = instrument.High
+		lowValues[i] = instrument.Low
+		closeValues[i] = instrument.Close
+		volumeValues[i] = instrument.Volume
+		timestampValues[i] = instrument.Timestamp.Unix()
+	}
+
+	// Create response using the new required format
+	instrumentData := struct {
+		Open      []float64 `json:"open"`
+		High      []float64 `json:"high"`
+		Low       []float64 `json:"low"`
+		Close     []float64 `json:"close"`
+		Volume    []float64 `json:"volume"`
+		Timestamp []int64   `json:"timestamp"`
 	}{
-		Data:       instrumentDTOs,
+		Open:      openValues,
+		High:      highValues,
+		Low:       lowValues,
+		Close:     closeValues,
+		Volume:    volumeValues,
+		Timestamp: timestampValues,
+	}
+
+	// Wrap the data in the outer structure
+	response := struct {
+		Data       interface{}       `json:"data"`
+		Pagination dto.PaginationDTO `json:"pagination"`
+	}{
+		Data:       instrumentData,
 		Pagination: paginationInfo,
 	}
 
