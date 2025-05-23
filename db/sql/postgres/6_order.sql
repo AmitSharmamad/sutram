@@ -13,6 +13,9 @@ CREATE TABLE "order" (
     state order_state NOT NULL,
     product_type product_type NOT NULL,
     order_type order_type NOT NULL,
+    broker_order_id VARCHAR(100),
+    broker_order_response JSONB,
+    algo_id VARCHAR(100),
 
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()

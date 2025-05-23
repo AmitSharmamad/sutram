@@ -4,10 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	backtestEngine "algo/internal/modules/backtest/application/service"
+	backtestModel "algo/internal/modules/backtest/domain/model"
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/domain/model"
 	"algo/internal/modules/deployment/domain/repository"
+	instrumentModel "algo/internal/modules/instrument/domain/model"
+	instrumentRepository "algo/internal/modules/instrument/domain/repository"
+	strategyDto "algo/internal/modules/strategy/application/dto"
+	strategyModel "algo/internal/modules/strategy/domain/model"
 	strategyRepository "algo/internal/modules/strategy/domain/repository"
 
 	"github.com/google/uuid"
@@ -27,57 +34,77 @@ var (
 
 // DeploymentService defines the service for deployment operations
 type DeploymentService interface {
-	// CreateDeployment creates a new deployment
+	// Deployment core operations
 	CreateDeployment(ctx context.Context, req *dto.CreateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// GetDeploymentByID retrieves a deployment by its ID
 	GetDeploymentByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// GetUserDeployments retrieves all deployments for a user
 	GetUserDeployments(ctx context.Context, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// GetDeploymentsByStrategyID retrieves all deployments for a strategy
 	GetDeploymentsByStrategyID(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// UpdateDeployment updates an existing deployment
 	UpdateDeployment(ctx context.Context, req *dto.UpdateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// DeleteDeployment deletes a deployment
 	DeleteDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// ActivateDeployment activates a deployment
 	ActivateDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// DeactivateDeployment deactivates a deployment
 	DeactivateDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// SearchDeployments searches deployments with filter criteria
 	SearchDeployments(ctx context.Context, filter *dto.DeploymentFilter, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// StopAllDeployments deactivates all deployments for a user
 	StopAllDeployments(ctx context.Context, userID uuid.UUID) error
-
-	// StartAllDeployments activates all paused deployments for a user
 	StartAllDeployments(ctx context.Context, userID uuid.UUID) error
-
-	// DeployAllInstruments creates deployments for all instruments of a strategy
 	DeployAllInstruments(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
+
+	// Deployment log operations
+	CreateDeploymentLog(ctx context.Context, req *dto.DeploymentLogRequest, userID uuid.UUID) (*dto.DeploymentLogResponse, error)
+	GetDeploymentLogs(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentLogResponse, error)
+	GetLatestDeploymentLog(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) (*dto.DeploymentLogResponse, error)
+
+	// Deployment position operations
+	CreatePosition(ctx context.Context, req *dto.CreatePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
+	GetPositionByID(ctx context.Context, id int64, userID uuid.UUID) (*dto.PositionResponse, error)
+	GetPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
+	GetOpenPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
+	ClosePosition(ctx context.Context, id int64, req *dto.ClosePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
+	CancelPosition(ctx context.Context, id int64, userID uuid.UUID) error
+
+	// Deployment metrics operations
+	CreateOrUpdateMetrics(ctx context.Context, req *dto.CreateMetricsRequest, userID uuid.UUID) (*dto.MetricsResponse, error)
+	GetMetricsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.MetricsResponse, error)
+	GetMetricsByDeploymentAndDate(ctx context.Context, deploymentID uuid.UUID, date time.Time, userID uuid.UUID) (*dto.MetricsResponse, error)
+	GetMetricsTimeRange(ctx context.Context, filter *dto.MetricsFilter, userID uuid.UUID) ([]*dto.MetricsResponse, error)
+	GetLatestMetrics(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) (*dto.MetricsResponse, error)
+
+	// Live trading operations
+	Initialize(ctx context.Context) error
+	Run(ctx context.Context, deployment *model.Deployment, instrumentData *instrumentModel.Instrument) error
+	ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error
 }
 
 // deploymentService implements DeploymentService
 type deploymentService struct {
-	deploymentRepo repository.DeploymentRepository
-	strategyRepo   strategyRepository.StrategyRepository
+	deploymentRepo        repository.DeploymentRepository
+	strategyRepo          strategyRepository.StrategyRepository
+	logRepo               repository.DeploymentLogRepository
+	positionRepo          repository.DeploymentPositionRepository
+	metricsRepo           repository.DeploymentMetricsRepository
+	instrumentRepo        instrumentRepository.InstrumentRepository
+	engine                *backtestEngine.BacktestEngine
+	instrumentDeployments map[int][]*model.Deployment
 }
 
 // NewDeploymentService creates a new deployment service
 func NewDeploymentService(
 	deploymentRepo repository.DeploymentRepository,
 	strategyRepo strategyRepository.StrategyRepository,
+	logRepo repository.DeploymentLogRepository,
+	positionRepo repository.DeploymentPositionRepository,
+	metricsRepo repository.DeploymentMetricsRepository,
+	instrumentRepo instrumentRepository.InstrumentRepository,
+	engine *backtestEngine.BacktestEngine,
 ) DeploymentService {
 	return &deploymentService{
-		deploymentRepo: deploymentRepo,
-		strategyRepo:   strategyRepo,
+		deploymentRepo:        deploymentRepo,
+		strategyRepo:          strategyRepo,
+		logRepo:               logRepo,
+		positionRepo:          positionRepo,
+		metricsRepo:           metricsRepo,
+		instrumentRepo:        instrumentRepo,
+		engine:                engine,
+		instrumentDeployments: make(map[int][]*model.Deployment),
 	}
 }
 
@@ -111,6 +138,26 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 	// Save to repository
 	if err := s.deploymentRepo.Create(ctx, deployment); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrDeploymentCreateFailed, err)
+	}
+
+	// Create initial deployment metrics
+	initialMetrics, err := model.NewDeploymentMetrics(
+		deployment.ID,
+		time.Now(),
+		map[string]interface{}{
+			"initial_setup": true,
+			"status":        "created",
+		},
+	)
+	if err != nil {
+		// Log the error but don't fail the deployment creation
+		fmt.Printf("Error creating initial deployment metrics: %v\n", err)
+	} else {
+		// Save the initial metrics
+		if err := s.metricsRepo.Create(ctx, initialMetrics); err != nil {
+			// Log the error but don't fail the deployment creation
+			fmt.Printf("Error saving initial deployment metrics: %v\n", err)
+		}
 	}
 
 	// Return response
@@ -458,4 +505,198 @@ func (s *deploymentService) DeployAllInstruments(ctx context.Context, strategyID
 	}
 
 	return newDeployments, nil
+}
+
+// Initialize initializes the deployment service for live trading
+func (s *deploymentService) Initialize(ctx context.Context) error {
+	// Get all active deployments for all users
+	deployments, err := s.deploymentRepo.GetActiveDeployments(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active deployments: %w", err)
+	}
+
+	// Group deployments by instrument ID for efficient lookup
+	instrumentDeployments := make(map[int][]*model.Deployment)
+	for _, deployment := range deployments {
+		instrumentDeployments[deployment.InstrumentID] = append(instrumentDeployments[deployment.InstrumentID], deployment)
+	}
+
+	// Store the deployments map for later use when handling events
+	// This approach allows us to efficiently find deployments when we receive market data
+	s.instrumentDeployments = instrumentDeployments
+
+	return nil
+}
+
+// Run executes a deployment's strategy against live market data
+func (s *deploymentService) Run(ctx context.Context, deployment *model.Deployment, instrumentData *instrumentModel.Instrument) error {
+	// Retrieve the strategy for this deployment
+	strategy, err := s.strategyRepo.GetByID(ctx, deployment.StrategyID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrStrategyNotFound, err)
+	}
+
+	// Log the execution
+	logEntry, err := model.NewDeploymentLog(
+		deployment.ID,
+		model.StatusStarted,
+		map[string]any{
+			"instrument_data_time": instrumentData.Timestamp,
+			"instrument_id":        instrumentData.ExchangeSecurityID,
+		},
+	)
+	if err != nil {
+		// Log but continue processing
+		fmt.Printf("Error creating deployment log: %v\n", err)
+	} else {
+		if err := s.logRepo.Create(ctx, logEntry); err != nil {
+			// Log but continue processing
+			fmt.Printf("Error saving deployment log: %v\n", err)
+		}
+	}
+
+	// Prepare strategy data
+	// This will be used in the future when we implement proper strategy execution
+	_ = &strategyDto.StrategyResponse{
+		ID:              strategy.ID,
+		UserID:          strategy.UserID,
+		Name:            strategy.Name,
+		Description:     strategy.Description,
+		EntryExpression: strategy.EntryExpression,
+		ExitExpression:  strategy.ExitExpression,
+		ChartTimeframe:  strategyModel.ChartTimeframe(strategy.ChartTimeframe),
+		PositionType:    strategy.PositionType,
+		TradeType:       strategyModel.TradeType(strategy.TradeType),
+		Capital:         strategy.Capital,
+		Instruments:     strategy.Instruments,
+	}
+
+	// Create a dummy run for future use
+	// Currently not utilized but will be needed for strategy execution
+	_ = &backtestModel.Run{
+		ID:           uuid.New(),
+		StrategyID:   strategy.ID,
+		InstrumentID: deployment.InstrumentID,
+		State:        backtestModel.Started,
+	}
+
+	// Create a single-element slice with the current instrument data
+	// This will be used in the future for strategy execution
+	_ = []*instrumentModel.Instrument{instrumentData}
+
+	// Execute the strategy with a simulated backtest run
+	// TODO: Implement proper strategy execution method for live trading
+	// For now, use a simple placeholder
+	var positions []*backtestModel.Position
+	var metrics *backtestModel.RunMetrics
+
+	// Placeholder for actual strategy execution logic
+	fmt.Printf("Running strategy for instrument %d at %s\n",
+		instrumentData.ExchangeSecurityID, instrumentData.Timestamp)
+
+	// Process any positions that were generated
+	if len(positions) > 0 {
+		// Create a deployment position for each position
+		for _, position := range positions {
+			// Only create a position if it's in "Entered" state
+			if position.State == backtestModel.Entered {
+				deploymentPosition, err := model.NewDeploymentPosition(
+					deployment.ID,
+					deployment.InstrumentID,
+					position.PositionSize,
+					position.EntryPriceSignal,
+					position.EntryTimeSignal,
+					map[string]interface{}{
+						"strategy_id": strategy.ID.String(),
+						"created_by":  "live_trading",
+						"timestamp":   time.Now().Format(time.RFC3339),
+					},
+				)
+
+				if err != nil {
+					fmt.Printf("Error creating deployment position: %v\n", err)
+					continue
+				}
+
+				if err := s.positionRepo.Create(ctx, deploymentPosition); err != nil {
+					fmt.Printf("Error creating deployment position: %v\n", err)
+					continue
+				}
+
+				// Log the position creation
+				logEntry, err := model.NewDeploymentLog(
+					deployment.ID,
+					model.StatusCreated,
+					map[string]interface{}{
+						"position_id":   deploymentPosition.ID,
+						"entry_price":   deploymentPosition.EntryPrice,
+						"entry_time":    deploymentPosition.EntryTime,
+						"quantity":      deploymentPosition.Quantity,
+						"instrument_id": deployment.InstrumentID,
+					},
+				)
+				if err != nil {
+					fmt.Printf("Error creating deployment log for position: %v\n", err)
+				} else if err := s.logRepo.Create(ctx, logEntry); err != nil {
+					fmt.Printf("Error saving deployment log for position: %v\n", err)
+				}
+			}
+		}
+	}
+
+	// Update deployment metrics if metrics were generated
+	if metrics != nil {
+		// Create deployment metrics for this execution
+		deploymentMetrics, err := model.NewDeploymentMetrics(
+			deployment.ID,
+			time.Now(),
+			map[string]interface{}{
+				"total_trades":         metrics.TotalTrades,
+				"win_rate":             metrics.WinRate,
+				"max_drawdown":         metrics.MaxDrawdown,
+				"total_pnl":            metrics.TotalReturnPct,
+				"sharpe_ratio":         metrics.SharpeRatio,
+				"sortino_ratio":        metrics.SortinoRatio,
+				"execution_time":       time.Now().Format(time.RFC3339),
+				"instrument_data_time": instrumentData.Timestamp.Format(time.RFC3339),
+			},
+		)
+		if err != nil {
+			fmt.Printf("Error creating deployment metrics: %v\n", err)
+		} else {
+			if err := s.metricsRepo.Create(ctx, deploymentMetrics); err != nil {
+				fmt.Printf("Error saving deployment metrics: %v\n", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ProcessInstrumentData processes incoming instrument data and runs the appropriate deployments
+func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error {
+	// Store the data in the database
+	if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
+		return fmt.Errorf("failed to store instrument data: %w", err)
+	}
+
+	// Find deployments for this instrument
+	instrumentID := int(instrumentData.ExchangeSecurityID)
+	deployments, exists := s.instrumentDeployments[instrumentID]
+	if !exists || len(deployments) == 0 {
+		// No deployments for this instrument, nothing to do
+		return nil
+	}
+
+	// Run each deployment for this instrument
+	for _, deployment := range deployments {
+		if err := s.Run(ctx, deployment, instrumentData); err != nil {
+			// Log the error but continue with other deployments
+			fmt.Printf("Error running deployment %s for instrument %d: %v\n",
+				deployment.ID, instrumentID, err)
+			continue
+		}
+	}
+
+	return nil
 }
