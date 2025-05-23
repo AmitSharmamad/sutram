@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/application/service"
@@ -108,7 +109,7 @@ func (c *DeploymentPositionController) GetPositionByID(ctx *gin.Context) {
 
 // GetPositionsByDeployment handles the request to get all positions for a deployment
 func (c *DeploymentPositionController) GetPositionsByDeployment(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -146,7 +147,7 @@ func (c *DeploymentPositionController) GetPositionsByDeployment(ctx *gin.Context
 
 // GetOpenPositionsByDeployment handles the request to get all open positions for a deployment
 func (c *DeploymentPositionController) GetOpenPositionsByDeployment(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -194,15 +195,6 @@ func (c *DeploymentPositionController) ClosePosition(ctx *gin.Context) {
 		return
 	}
 
-	var req dto.ClosePositionRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request: " + err.Error(),
-		})
-		return
-	}
-
 	// Get user ID from context (set by auth middleware)
 	userID, ok := getUserIDFromContext(ctx)
 	if !ok {
@@ -211,6 +203,78 @@ func (c *DeploymentPositionController) ClosePosition(ctx *gin.Context) {
 			"message": "Invalid user ID",
 		})
 		return
+	}
+
+	// If deployment_id is provided in the URL, validate it
+	deploymentIDStr := ctx.Param("deployment_id")
+	if deploymentIDStr == "" {
+		// Try the deploymentID parameter format for backward compatibility
+		deploymentIDStr = ctx.Param("deploymentID")
+	}
+
+	if deploymentIDStr != "" {
+		// This is a sanity check to ensure the position belongs to the deployment
+		deploymentID, err := uuid.Parse(deploymentIDStr)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Invalid deployment ID: " + err.Error(),
+			})
+			return
+		}
+
+		// Get the position first to check its deployment ID
+		position, err := c.deploymentService.GetPositionByID(ctx, positionID, userID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to get position: " + err.Error(),
+			})
+			return
+		}
+
+		if position == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Position not found",
+			})
+			return
+		}
+
+		// Ensure the position belongs to the specified deployment
+		if position.DeploymentID != deploymentID {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Position does not belong to the specified deployment",
+			})
+			return
+		}
+	}
+
+	// Parse request body if available
+	var req dto.ClosePositionRequest
+	if ctx.Request.ContentLength > 0 {
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Invalid request: " + err.Error(),
+			})
+			return
+		}
+	} else {
+		// If no request body, use current time and last price
+		req.ExitTime = time.Now()
+		// Use the entry price as the exit price if we don't have another value
+		// This is a fallback and might need to be adjusted based on business logic
+		position, err := c.deploymentService.GetPositionByID(ctx, positionID, userID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to get position: " + err.Error(),
+			})
+			return
+		}
+		req.ExitPrice = position.EntryPrice
 	}
 
 	// Close the position
@@ -249,6 +313,52 @@ func (c *DeploymentPositionController) CancelPosition(ctx *gin.Context) {
 			"message": "Invalid user ID",
 		})
 		return
+	}
+
+	// If deployment_id is provided in the URL, validate it
+	deploymentIDStr := ctx.Param("deployment_id")
+	if deploymentIDStr == "" {
+		// Try the deploymentID parameter format for backward compatibility
+		deploymentIDStr = ctx.Param("deploymentID")
+	}
+
+	if deploymentIDStr != "" {
+		// This is a sanity check to ensure the position belongs to the deployment
+		deploymentID, err := uuid.Parse(deploymentIDStr)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Invalid deployment ID: " + err.Error(),
+			})
+			return
+		}
+
+		// Get the position first to check its deployment ID
+		position, err := c.deploymentService.GetPositionByID(ctx, positionID, userID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to get position: " + err.Error(),
+			})
+			return
+		}
+
+		if position == nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Position not found",
+			})
+			return
+		}
+
+		// Ensure the position belongs to the specified deployment
+		if position.DeploymentID != deploymentID {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Position does not belong to the specified deployment",
+			})
+			return
+		}
 	}
 
 	// Cancel the position
