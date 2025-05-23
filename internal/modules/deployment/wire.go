@@ -34,6 +34,11 @@ func ProvideDeploymentMetricsRepository(db *sqlx.DB) repository.DeploymentMetric
 	return postgres.NewPgDeploymentMetricsRepository(db)
 }
 
+// ProvideDeploymentPositionLogRepository provides a deployment position log repository
+func ProvideDeploymentPositionLogRepository(db *sqlx.DB) repository.DeploymentPositionLogRepository {
+	return postgres.NewPgDeploymentPositionLogRepository(db)
+}
+
 // ProvideDeploymentService provides a deployment service
 func ProvideDeploymentService(
 	deploymentRepo repository.DeploymentRepository,
@@ -55,6 +60,13 @@ func ProvideDeploymentService(
 	)
 }
 
+// ProvideDeploymentPositionLogService provides a deployment position log service
+func ProvideDeploymentPositionLogService(
+	repo repository.DeploymentPositionLogRepository,
+) *service.DeploymentPositionLogService {
+	return service.NewDeploymentPositionLogService(repo)
+}
+
 // ProvideDeploymentController provides a deployment controller
 func ProvideDeploymentController(svc service.DeploymentService) *http.DeploymentController {
 	return http.NewDeploymentController(svc)
@@ -73,4 +85,9 @@ func ProvideDeploymentPositionController(svc service.DeploymentService) *http.De
 // ProvideDeploymentMetricsController provides a deployment metrics controller
 func ProvideDeploymentMetricsController(svc service.DeploymentService) *http.DeploymentMetricsController {
 	return http.NewDeploymentMetricsController(svc)
+}
+
+// ProvideDeploymentPositionLogController provides a deployment position log controller
+func ProvideDeploymentPositionLogController(svc *service.DeploymentPositionLogService) *http.DeploymentPositionLogController {
+	return http.NewDeploymentPositionLogController(svc)
 }

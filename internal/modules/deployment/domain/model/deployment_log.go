@@ -20,7 +20,7 @@ const (
 
 // DeploymentLog represents a log entry for a deployment
 type DeploymentLog struct {
-	ID           int64            `json:"id" db:"id"`
+	ID           uuid.UUID            `json:"id" db:"id"`
 	DeploymentID uuid.UUID        `json:"deployment_id" db:"deployment_id"`
 	Status       DeploymentStatus `json:"status" db:"status"`
 	Metadata     json.RawMessage  `json:"metadata" db:"metadata"`

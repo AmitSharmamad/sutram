@@ -20,13 +20,14 @@ import (
 
 // Module represents the deployment module
 type Module struct {
-	db                 *sql.DB
-	controller         *http.DeploymentController
-	logController      *http.DeploymentLogController
-	positionController *http.DeploymentPositionController
-	metricsController  *http.DeploymentMetricsController
-	userController     *userHttp.UserController
-	strategyModule     *strategyModule.Module
+	db                    *sql.DB
+	controller            *http.DeploymentController
+	logController         *http.DeploymentLogController
+	positionController    *http.DeploymentPositionController
+	positionLogController *http.DeploymentPositionLogController
+	metricsController     *http.DeploymentMetricsController
+	userController        *userHttp.UserController
+	strategyModule        *strategyModule.Module
 }
 
 // ProvideModule provides a wire provider set for the deployment module
@@ -73,6 +74,7 @@ func (m *Module) initializeComponents() {
 	logRepo := postgres.NewPgDeploymentLogRepository(dbx)
 	positionRepo := postgres.NewPgDeploymentPositionRepository(dbx)
 	metricsRepo := postgres.NewPgDeploymentMetricsRepository(dbx)
+	positionLogRepo := postgres.NewPgDeploymentPositionLogRepository(dbx)
 
 	// Get strategy repository from strategy module
 	strategyService := m.strategyModule.GetStrategyService()
@@ -108,16 +110,21 @@ func (m *Module) initializeComponents() {
 	positionController := http.NewDeploymentPositionController(deploymentService)
 	metricsController := http.NewDeploymentMetricsController(deploymentService)
 
+	// Create position log service and controller
+	positionLogService := service.NewDeploymentPositionLogService(positionLogRepo)
+	positionLogController := http.NewDeploymentPositionLogController(positionLogService)
+
 	// Store controllers in the module
 	m.logController = logController
 	m.positionController = positionController
 	m.metricsController = metricsController
+	m.positionLogController = positionLogController
 }
 
 // RegisterRoutes registers the deployment module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 	// Register main deployment routes using the router.go implementation
-	http.RegisterRoutes(router, m.controller, m.userController)
+	http.RegisterRoutes(router, m.controller, m.positionLogController, m.userController)
 
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(m.userController.GetAuthService())
@@ -169,6 +176,11 @@ func (m *Module) GetController() *http.DeploymentController {
 // GetLogController returns the deployment log controller
 func (m *Module) GetLogController() *http.DeploymentLogController {
 	return m.logController
+}
+
+// GetPositionLogController returns the deployment position log controller
+func (m *Module) GetPositionLogController() *http.DeploymentPositionLogController {
+	return m.positionLogController
 }
 
 // GetPositionController returns the deployment position controller

@@ -8,7 +8,12 @@ import (
 )
 
 // RegisterRoutes registers the deployment module routes
-func RegisterRoutes(router *gin.RouterGroup, controller *DeploymentController, userController *userHttp.UserController) {
+func RegisterRoutes(
+	router *gin.RouterGroup,
+	controller *DeploymentController,
+	deploymentPositionLogController *DeploymentPositionLogController,
+	userController *userHttp.UserController,
+) {
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
 
@@ -31,5 +36,11 @@ func RegisterRoutes(router *gin.RouterGroup, controller *DeploymentController, u
 		// Strategy-specific deployments
 		deploymentAuth.GET("/strategy/:strategy_id", controller.GetDeploymentsByStrategy)
 		deploymentAuth.POST("/all", controller.DeployAllInstruments)
+
+		// Deployment position logs
+		deploymentAuth.POST("/position/log", deploymentPositionLogController.CreateLog)
+		deploymentAuth.GET("/position/log/:id", deploymentPositionLogController.GetLogByID)
+		deploymentAuth.GET("/position/:positionId/logs", deploymentPositionLogController.GetLogsByPositionID)
+		deploymentAuth.GET("/position/:positionId/logs/time-range", deploymentPositionLogController.GetLogsByPositionIDAndTimeRange)
 	}
 }
