@@ -53,7 +53,7 @@ func (r *PgDeploymentMetricsRepository) Create(ctx context.Context, metrics *mod
 		RETURNING id
 	`
 
-	var id int64
+	var id uuid.UUID
 	err := r.db.QueryRowContext(
 		ctx,
 		query,
