@@ -12,7 +12,7 @@ import (
 // DeploymentPositionLogDTO represents a data transfer object for deployment position logs
 type DeploymentPositionLogDTO struct {
 	ID                   uuid.UUID       `json:"id"`
-	DeploymentPositionID int64           `json:"deployment_position_id"`
+	DeploymentPositionID uuid.UUID           `json:"deployment_position_id"`
 	Results              json.RawMessage `json:"results"`
 	Timestamp            time.Time       `json:"timestamp"`
 	CreatedAt            time.Time       `json:"created_at"`

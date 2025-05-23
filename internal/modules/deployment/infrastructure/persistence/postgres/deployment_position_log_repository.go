@@ -114,3 +114,22 @@ func (r *PgDeploymentPositionLogRepository) GetByPositionIDAndTimeRange(ctx cont
 
 	return logs, nil
 }
+
+// GetByDeploymentID retrieves all logs for all positions in a deployment
+func (r *PgDeploymentPositionLogRepository) GetByDeploymentID(ctx context.Context, deploymentID uuid.UUID) ([]*model.DeploymentPositionLog, error) {
+	query := `
+		SELECT l.id, l.deployment_position_id, l.results, l.timestamp, l.created_at
+		FROM deployment_position_log l
+		JOIN deployment_position p ON l.deployment_position_id = p.id
+		WHERE p.deployment_id = $1
+		ORDER BY l.timestamp DESC
+	`
+
+	logs := []*model.DeploymentPositionLog{}
+	err := r.db.SelectContext(ctx, &logs, query, deploymentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}

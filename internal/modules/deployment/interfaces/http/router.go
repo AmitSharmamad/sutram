@@ -40,7 +40,8 @@ func RegisterRoutes(
 		// Deployment position logs
 		deploymentAuth.POST("/position/log", deploymentPositionLogController.CreateLog)
 		deploymentAuth.GET("/position/log/:id", deploymentPositionLogController.GetLogByID)
-		deploymentAuth.GET("/position/:positionId/logs", deploymentPositionLogController.GetLogsByPositionID)
-		deploymentAuth.GET("/position/:positionId/logs/time-range", deploymentPositionLogController.GetLogsByPositionIDAndTimeRange)
+		deploymentAuth.GET("/position/:positionID/logs", deploymentPositionLogController.GetLogsByPositionID)
+		deploymentAuth.GET("/position/:positionID/logs/time-range", deploymentPositionLogController.GetLogsByPositionIDAndTimeRange)
+		deploymentAuth.GET("/:deployment_id/position/log", deploymentPositionLogController.GetLogsByDeploymentID)
 	}
 }

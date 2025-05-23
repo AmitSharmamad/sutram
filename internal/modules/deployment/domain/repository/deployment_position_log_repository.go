@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"algo/internal/modules/deployment/domain/model"
+
+	"github.com/google/uuid"
 )
 
 // DeploymentPositionLogRepository defines the interface for deployment position log data access
@@ -20,4 +22,7 @@ type DeploymentPositionLogRepository interface {
 
 	// GetByPositionIDAndTimeRange retrieves logs for a position within a specific time range
 	GetByPositionIDAndTimeRange(ctx context.Context, positionID int64, startTime, endTime time.Time) ([]*model.DeploymentPositionLog, error)
+
+	// GetByDeploymentID retrieves all logs for all positions in a deployment
+	GetByDeploymentID(ctx context.Context, deploymentID uuid.UUID) ([]*model.DeploymentPositionLog, error)
 }
