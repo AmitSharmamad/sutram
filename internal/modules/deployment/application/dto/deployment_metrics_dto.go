@@ -44,7 +44,7 @@ type MetricsFilter struct {
 
 // MetricsResponse is the response for deployment metrics
 type MetricsResponse struct {
-	ID           int64           `json:"id"`
+	ID           uuid.UUID           `json:"id"`
 	DeploymentID uuid.UUID       `json:"deployment_id"`
 	MetricDate   time.Time       `json:"metric_date"`
 	TotalTrades  int             `json:"total_trades"`

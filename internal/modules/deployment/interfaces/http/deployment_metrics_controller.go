@@ -62,7 +62,7 @@ func (c *DeploymentMetricsController) CreateOrUpdateMetrics(ctx *gin.Context) {
 
 // GetMetricsByDeployment handles the request to get all metrics for a deployment
 func (c *DeploymentMetricsController) GetMetricsByDeployment(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -100,7 +100,7 @@ func (c *DeploymentMetricsController) GetMetricsByDeployment(ctx *gin.Context) {
 
 // GetMetricsByDate handles the request to get metrics for a deployment and date
 func (c *DeploymentMetricsController) GetMetricsByDate(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -156,7 +156,7 @@ func (c *DeploymentMetricsController) GetMetricsByDate(ctx *gin.Context) {
 
 // GetMetricsTimeRange handles the request to get metrics for a time range
 func (c *DeploymentMetricsController) GetMetricsTimeRange(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -226,7 +226,7 @@ func (c *DeploymentMetricsController) GetMetricsTimeRange(ctx *gin.Context) {
 
 // GetLatestMetrics handles the request to get the latest metrics for a deployment
 func (c *DeploymentMetricsController) GetLatestMetrics(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{

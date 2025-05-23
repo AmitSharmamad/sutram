@@ -409,11 +409,11 @@ curl -X POST "http://localhost:8080/api/deployment/all" \
 
 Creates a new log entry for a deployment.
 
-**Endpoint**: `POST /deployments/:deploymentID/logs`
+**Endpoint**: `POST /deployment/:deployment_id/logs`
 
 **Request**:
 ```bash
-curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs" \
+curl -X POST "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs" \
   -H "Content-Type: application/json" \
 
   -d '{
@@ -445,11 +445,11 @@ curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4
 
 Retrieves all logs for a specific deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/logs`
+**Endpoint**: `GET /deployment/:deployment_id/logs`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -487,11 +487,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves the most recent log entry for a deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/logs/latest`
+**Endpoint**: `GET /deployment/:deployment_id/logs/latest`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs/latest" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/logs/latest" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -515,11 +515,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Creates a new trading position for a deployment.
 
-**Endpoint**: `POST /deployments/:deploymentID/positions`
+**Endpoint**: `POST /deployment/:deployment_id/positions`
 
 **Request**:
 ```bash
-curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions" \
+curl -X POST "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions" \
   -H "Content-Type: application/json" \
 
   -d '{
@@ -558,11 +558,11 @@ curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4
 
 Retrieves all positions for a specific deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/positions`
+**Endpoint**: `GET /deployment/:deployment_id/positions`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -606,11 +606,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves all open positions for a specific deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/positions/open`
+**Endpoint**: `GET /deployment/:deployment_id/positions/open`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions/open" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions/open" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -639,11 +639,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves a specific position by its ID.
 
-**Endpoint**: `GET /deployments/positions/:positionID`
+**Endpoint**: `GET /deployment/positions/:positionID`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/positions/456" \
+curl -X GET "http://localhost:8080/api/deployment/positions/456" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -670,13 +670,27 @@ curl -X GET "http://localhost:8080/api/deployments/positions/456" \
 
 Closes an open position.
 
-**Endpoint**: `PUT /deployments/positions/:positionID/close`
+**Endpoint**: `PUT /deployment/positions/:positionID/close`
+
+**Alternative Endpoint**: `PUT /deployment/:deployment_id/positions/:positionID/close`
 
 **Request**:
 ```bash
-curl -X PUT "http://localhost:8080/api/deployments/positions/456/close" \
+curl -X PUT "http://localhost:8080/api/deployment/positions/456/close" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "exit_price": 45500.75,
+    "exit_time": "2025-05-23T18:45:30Z"
+  }'
+```
 
+Or using the alternative endpoint:
+
+```bash
+curl -X PUT "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/positions/456/close" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "exit_price": 45500.75,
     "exit_time": "2025-05-23T18:45:30Z"
@@ -709,11 +723,11 @@ curl -X PUT "http://localhost:8080/api/deployments/positions/456/close" \
 
 Cancels an open position without executing it.
 
-**Endpoint**: `PUT /deployments/positions/:positionID/cancel`
+**Endpoint**: `PUT /deployment/positions/:positionID/cancel`
 
 **Request**:
 ```bash
-curl -X PUT "http://localhost:8080/api/deployments/positions/457/cancel" \
+curl -X PUT "http://localhost:8080/api/deployment/positions/457/cancel" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -731,11 +745,11 @@ curl -X PUT "http://localhost:8080/api/deployments/positions/457/cancel" \
 
 Creates or updates metrics for a deployment on a specific date.
 
-**Endpoint**: `POST /deployments/:deploymentID/metrics`
+**Endpoint**: `POST /deployment/:deployment_id/metrics`
 
 **Request**:
 ```bash
-curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics" \
+curl -X POST "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics" \
   -H "Content-Type: application/json" \
 
   -d '{
@@ -784,11 +798,11 @@ curl -X POST "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4
 
 Retrieves all metrics for a specific deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/metrics`
+**Endpoint**: `GET /deployment/:deployment_id/metrics`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -859,11 +873,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves the most recent metrics for a deployment.
 
-**Endpoint**: `GET /deployments/:deploymentID/metrics/latest`
+**Endpoint**: `GET /deployment/:deployment_id/metrics/latest`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/latest" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/latest" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -896,11 +910,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves metrics for a deployment on a specific date.
 
-**Endpoint**: `GET /deployments/:deploymentID/metrics/:date`
+**Endpoint**: `GET /deployment/:deployment_id/metrics/:date`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/2025-05-22" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/2025-05-22" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -933,11 +947,11 @@ curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c
 
 Retrieves metrics for a deployment within a specific time range.
 
-**Endpoint**: `GET /deployments/:deploymentID/metrics/range`
+**Endpoint**: `GET /deployment/:deployment_id/metrics/range`
 
 **Request**:
 ```bash
-curl -X GET "http://localhost:8080/api/deployments/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/range?startDate=2025-05-21&endDate=2025-05-23" \
+curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c13f7c09/metrics/range?startDate=2025-05-21&endDate=2025-05-23" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

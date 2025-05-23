@@ -18,7 +18,7 @@ const (
 
 // DeploymentPosition represents a position for a deployment
 type DeploymentPosition struct {
-	ID           int64           `json:"id" db:"id"`
+	ID           uuid.UUID           `json:"id" db:"id"`
 	DeploymentID uuid.UUID       `json:"deployment_id" db:"deployment_id"`
 	InstrumentID int             `json:"instrument_id" db:"instrument_id"`
 	Quantity     float64         `json:"quantity" db:"quantity"`
