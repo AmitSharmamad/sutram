@@ -115,7 +115,7 @@ func (m *DataMigrator) processSecurity(security SecurityData) error {
 
 	// Create header row
 	headers := []string{
-		"exchange_segment_id", "open", "high", "low", "close",
+		"exchange_security_id", "open", "high", "low", "close",
 		"volume", "timestamp", "created_at", "updated_at",
 	}
 	yearData = append(yearData, headers)
