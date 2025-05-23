@@ -6,6 +6,8 @@ import (
 
 	"algo/internal/modules/deployment/domain/model"
 	"algo/internal/modules/deployment/domain/repository"
+
+	"github.com/google/uuid"
 )
 
 // DeploymentPositionLogService handles business logic for deployment position logs
@@ -38,4 +40,9 @@ func (s *DeploymentPositionLogService) GetLogsByPositionID(ctx context.Context, 
 // GetLogsByPositionIDAndTimeRange retrieves logs for a position within a specific time range
 func (s *DeploymentPositionLogService) GetLogsByPositionIDAndTimeRange(ctx context.Context, positionID int64, startTime, endTime time.Time) ([]*model.DeploymentPositionLog, error) {
 	return s.repository.GetByPositionIDAndTimeRange(ctx, positionID, startTime, endTime)
+}
+
+// GetLogsByDeploymentID retrieves all logs for all positions in a deployment
+func (s *DeploymentPositionLogService) GetLogsByDeploymentID(ctx context.Context, deploymentID uuid.UUID) ([]*model.DeploymentPositionLog, error) {
+	return s.repository.GetByDeploymentID(ctx, deploymentID)
 }

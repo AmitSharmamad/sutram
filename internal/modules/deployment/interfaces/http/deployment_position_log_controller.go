@@ -9,6 +9,8 @@ import (
 	"algo/internal/modules/deployment/application/service"
 	"algo/internal/modules/deployment/domain/model"
 
+	"github.com/google/uuid"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +29,7 @@ func NewDeploymentPositionLogController(service *service.DeploymentPositionLogSe
 // CreateLog creates a new position log
 func (c *DeploymentPositionLogController) CreateLog(ctx *gin.Context) {
 	var input struct {
-		DeploymentPositionID int64          `json:"deployment_position_id" binding:"required"`
+		DeploymentPositionID uuid.UUID          `json:"deployment_position_id" binding:"required"`
 		Results              map[string]any `json:"results" binding:"required"`
 		Timestamp            time.Time      `json:"timestamp" binding:"required"`
 	}
@@ -78,7 +80,7 @@ func (c *DeploymentPositionLogController) GetLogByID(ctx *gin.Context) {
 
 // GetLogsByPositionID retrieves all logs for a specific position
 func (c *DeploymentPositionLogController) GetLogsByPositionID(ctx *gin.Context) {
-	positionIDStr := ctx.Param("positionId")
+	positionIDStr := ctx.Param("positionID")
 	positionID, err := strconv.ParseInt(positionIDStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid position ID"})
@@ -96,7 +98,7 @@ func (c *DeploymentPositionLogController) GetLogsByPositionID(ctx *gin.Context) 
 
 // GetLogsByPositionIDAndTimeRange retrieves logs for a position within a specific time range
 func (c *DeploymentPositionLogController) GetLogsByPositionIDAndTimeRange(ctx *gin.Context) {
-	positionIDStr := ctx.Param("positionId")
+	positionIDStr := ctx.Param("positionID")
 	positionID, err := strconv.ParseInt(positionIDStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid position ID"})
@@ -136,4 +138,31 @@ func (c *DeploymentPositionLogController) GetLogsByPositionIDAndTimeRange(ctx *g
 	}
 
 	ctx.JSON(http.StatusOK, logs)
+}
+
+// GetLogsByDeploymentID retrieves all logs for all positions in a deployment
+func (c *DeploymentPositionLogController) GetLogsByDeploymentID(ctx *gin.Context) {
+	deploymentIDStr := ctx.Param("deployment_id")
+	deploymentID, err := uuid.Parse(deploymentIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid deployment ID: " + err.Error(),
+		})
+		return
+	}
+
+	logs, err := c.service.GetLogsByDeploymentID(ctx, deploymentID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to get position logs: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    logs,
+	})
 }
