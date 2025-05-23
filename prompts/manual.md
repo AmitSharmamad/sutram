@@ -1,0 +1,1 @@
+create an api `deployment/:deploymentId/positions/:positionId/close` to close the open position

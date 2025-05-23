@@ -5,10 +5,12 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	backtestEngine "algo/internal/modules/backtest/application/service"
 	"algo/internal/modules/deployment/application/service"
 	"algo/internal/modules/deployment/domain/repository"
 	"algo/internal/modules/deployment/infrastructure/persistence/postgres"
 	"algo/internal/modules/deployment/interfaces/http"
+	instrumentRepository "algo/internal/modules/instrument/domain/repository"
 	strategyRepository "algo/internal/modules/strategy/domain/repository"
 )
 
@@ -39,8 +41,18 @@ func ProvideDeploymentService(
 	logRepo repository.DeploymentLogRepository,
 	positionRepo repository.DeploymentPositionRepository,
 	metricsRepo repository.DeploymentMetricsRepository,
+	instrumentRepo instrumentRepository.InstrumentRepository,
+	engine *backtestEngine.BacktestEngine,
 ) service.DeploymentService {
-	return service.NewDeploymentService(deploymentRepo, strategyRepo, logRepo, positionRepo, metricsRepo)
+	return service.NewDeploymentService(
+		deploymentRepo,
+		strategyRepo,
+		logRepo,
+		positionRepo,
+		metricsRepo,
+		instrumentRepo,
+		engine,
+	)
 }
 
 // ProvideDeploymentController provides a deployment controller

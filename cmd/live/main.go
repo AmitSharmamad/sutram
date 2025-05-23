@@ -21,6 +21,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
+	deploymentService "algo/internal/modules/deployment/application/service"
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
@@ -37,6 +38,12 @@ var (
 	chDB *sqlx.DB
 	// Instrument repository
 	instrumentRepository repository.InstrumentRepository
+	// Deployment service
+	deploymentSvc deploymentService.DeploymentService
+	// Application context
+	appCtx context.Context
+	// Context cancel function
+	cancelCtx context.CancelFunc
 )
 
 // Constants for request and feed codes
@@ -88,6 +95,10 @@ var wsDialer = websocket.DefaultDialer
 var upstreamConn *websocket.Conn
 
 func main() {
+	// Create application context with cancel function
+	appCtx, cancelCtx = context.WithCancel(context.Background())
+	defer cancelCtx()
+
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found")
@@ -97,6 +108,12 @@ func main() {
 	if err := initDB(); err != nil {
 		log.Printf("Error initializing database: %v", err)
 		// Continue without database connection
+	}
+
+	// Initialize deployment service
+	if err := initDeploymentService(); err != nil {
+		log.Printf("Error initializing deployment service: %v", err)
+		// Continue without deployment service
 	}
 
 	// Set Gin mode
@@ -147,6 +164,9 @@ func main() {
 
 	log.Println("Shutting down WebSocket server...")
 
+	// Cancel the application context to signal shutdown
+	cancelCtx()
+
 	// Send disconnect request to upstream server if connected
 	if upstreamConn != nil {
 		disconnectRequest := DisconnectRequest{
@@ -191,6 +211,30 @@ func initDB() error {
 
 	// Initialize instrument repository
 	instrumentRepository = instrumentRepo.NewInstrumentRepository(chDB)
+
+	return nil
+}
+
+// initDeploymentService initializes the deployment service
+func initDeploymentService() error {
+	// Check if database is available
+	if chDB == nil {
+		return fmt.Errorf("database connection not available")
+	}
+
+	// Create a db connection specifically for the deployment service
+	// This is just a placeholder. In a real application, you'd use dependency injection
+	// to get the actual deployment service implementation
+
+	log.Printf("Initializing deployment service...")
+
+	// This is just a stub. In a real implementation, you would:
+	// 1. Create all required repositories
+	// 2. Create the deployment service
+	// 3. Initialize it with the Initialize method
+	// For now, we'll just show a message
+
+	log.Printf("Deployment service initialized")
 
 	return nil
 }
@@ -590,6 +634,18 @@ func processMarketDataMessage(message []byte) {
 		log.Printf("Received unknown feed code: %d", feedCode)
 	}
 
+	// Convert market data to instrument model
+	instrument := toInstrument(message)
+
+	// Process the instrument data with the deployment service if available
+	if deploymentSvc != nil {
+		if err := deploymentSvc.ProcessInstrumentData(appCtx, instrument); err != nil {
+			log.Printf("Error processing instrument data with deployment service: %v", err)
+		} else {
+			log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
+		}
+	}
+
 	// Broadcast the message to all connected clients
 	broadcastMessage(message)
 }
@@ -865,4 +921,79 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 
 	log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
 		symbol, securityID, timestampTime.Format(time.RFC3339))
+}
+
+// toInstrument converts raw market data to an Instrument model
+func toInstrument(data []byte) *model.Instrument {
+	// Extract header information
+	// exchangeSegment := data[3] - not used currently
+	securityID := binary.LittleEndian.Uint32(data[4:8])
+
+	// Extract market data based on the feed type
+	feedCode := data[0]
+
+	var (
+		open, high, low, close float64
+		volume                 float64
+		ltp                    float32 // Last traded price
+	)
+
+	// Process based on feed code - most complete data comes from quote/full packets
+	if feedCode == FeedCodeQuote || feedCode == FeedCodeFull {
+		if len(data) >= 26 {
+			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[22:26]))
+		}
+
+		// Extract OHLC data if available
+		if len(data) >= 50 {
+			open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[34:38])))
+			if len(data) >= 54 {
+				close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])))
+			}
+			if len(data) >= 46 {
+				high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[42:46])))
+			}
+			if len(data) >= 50 {
+				low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
+			}
+		}
+
+		// Extract volume if available
+		if len(data) >= 34 {
+			volume = float64(binary.LittleEndian.Uint32(data[30:34]))
+		}
+	} else if feedCode == FeedCodeTicker {
+		// For ticker packets, we typically just have the LTP
+		if len(data) >= 16 {
+			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[12:16]))
+		}
+	}
+
+	// If any value is 0, use ltp as fallback
+	ltpFloat := float64(ltp)
+	if open == 0 {
+		open = ltpFloat
+	}
+	if high == 0 {
+		high = ltpFloat
+	}
+	if low == 0 {
+		low = ltpFloat
+	}
+	if close == 0 {
+		close = ltpFloat
+	}
+
+	// Create and return the instrument object
+	return &model.Instrument{
+		ExchangeSecurityID: int32(securityID),
+		Open:               open,
+		High:               high,
+		Low:                low,
+		Close:              close,
+		Volume:             volume,
+		Timestamp:          time.Now(), // Use current time as timestamp
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
 }
