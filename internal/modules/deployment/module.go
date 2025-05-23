@@ -126,32 +126,38 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 	authMiddleware := middleware.AuthMiddleware(authServiceAdapter)
 
 	// Register log routes
-	logRoutes := router.Group("/deployments")
+	logRoutes := router.Group("/deployment")
 	{
-		logRoutes.POST("/:deploymentID/logs", authMiddleware, m.logController.CreateDeploymentLog)
-		logRoutes.GET("/:deploymentID/logs", authMiddleware, m.logController.GetDeploymentLogs)
-		logRoutes.GET("/:deploymentID/logs/latest", authMiddleware, m.logController.GetLatestDeploymentLog)
+		logRoutes.POST("/:deployment_id/logs", authMiddleware, m.logController.CreateDeploymentLog)
+		logRoutes.GET("/:deployment_id/logs", authMiddleware, m.logController.GetDeploymentLogs)
+		logRoutes.GET("/:deployment_id/logs/latest", authMiddleware, m.logController.GetLatestDeploymentLog)
 	}
-
 	// Register position routes
-	positionRoutes := router.Group("/deployments")
+	positionRoutes := router.Group("/deployment")
 	{
-		positionRoutes.POST("/:deploymentID/positions", authMiddleware, m.positionController.CreatePosition)
-		positionRoutes.GET("/:deploymentID/positions", authMiddleware, m.positionController.GetPositionsByDeployment)
-		positionRoutes.GET("/:deploymentID/positions/open", authMiddleware, m.positionController.GetOpenPositionsByDeployment)
+		positionRoutes.POST("/:deployment_id/positions", authMiddleware, m.positionController.CreatePosition)
+		positionRoutes.GET("/:deployment_id/positions", authMiddleware, m.positionController.GetPositionsByDeployment)
+		positionRoutes.GET("/:deployment_id/positions/open", authMiddleware, m.positionController.GetOpenPositionsByDeployment)
 		positionRoutes.GET("/positions/:positionID", authMiddleware, m.positionController.GetPositionByID)
 		positionRoutes.PUT("/positions/:positionID/close", authMiddleware, m.positionController.ClosePosition)
 		positionRoutes.PUT("/positions/:positionID/cancel", authMiddleware, m.positionController.CancelPosition)
+
+		// Add new route format as specified in the manual
+		positionRoutes.PUT("/:deployment_id/positions/:positionID/close", authMiddleware, m.positionController.ClosePosition)
+		positionRoutes.PUT("/:deployment_id/positions/:positionID/cancel", authMiddleware, m.positionController.CancelPosition)
 	}
 
+	// Register position routes with new format (deployment/:deployment_id/positions/:positionID/...)
+	// These routes have been implemented above
+
 	// Register metrics routes
-	metricsRoutes := router.Group("/deployments")
+	metricsRoutes := router.Group("/deployment")
 	{
-		metricsRoutes.POST("/:deploymentID/metrics", authMiddleware, m.metricsController.CreateOrUpdateMetrics)
-		metricsRoutes.GET("/:deploymentID/metrics", authMiddleware, m.metricsController.GetMetricsByDeployment)
-		metricsRoutes.GET("/:deploymentID/metrics/latest", authMiddleware, m.metricsController.GetLatestMetrics)
-		metricsRoutes.GET("/:deploymentID/metrics/:date", authMiddleware, m.metricsController.GetMetricsByDate)
-		metricsRoutes.GET("/:deploymentID/metrics/range", authMiddleware, m.metricsController.GetMetricsTimeRange)
+		metricsRoutes.POST("/:deployment_id/metrics", authMiddleware, m.metricsController.CreateOrUpdateMetrics)
+		metricsRoutes.GET("/:deployment_id/metrics", authMiddleware, m.metricsController.GetMetricsByDeployment)
+		metricsRoutes.GET("/:deployment_id/metrics/latest", authMiddleware, m.metricsController.GetLatestMetrics)
+		metricsRoutes.GET("/:deployment_id/metrics/:date", authMiddleware, m.metricsController.GetMetricsByDate)
+		metricsRoutes.GET("/:deployment_id/metrics/range", authMiddleware, m.metricsController.GetMetricsTimeRange)
 	}
 }
 

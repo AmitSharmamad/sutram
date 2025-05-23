@@ -1,0 +1,1 @@
+create an api with sse for live deployment updates

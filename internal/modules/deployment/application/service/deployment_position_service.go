@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/domain/model"
@@ -175,8 +176,22 @@ func (s *deploymentService) ClosePosition(ctx context.Context, id int64, req *dt
 		return nil, ErrUnauthorized
 	}
 
+	// Handle nil request
+	var exitPrice float64
+	var exitTime time.Time
+
+	if req != nil {
+		exitPrice = req.ExitPrice
+		exitTime = req.ExitTime
+	} else {
+		// Default values if request is nil
+		exitTime = time.Now()
+		// Use entry price as exit price (fallback)
+		exitPrice = position.EntryPrice
+	}
+
 	// Close the position
-	if err := s.positionRepo.ClosePosition(ctx, id, req.ExitPrice, req.ExitTime); err != nil {
+	if err := s.positionRepo.ClosePosition(ctx, id, exitPrice, exitTime); err != nil {
 		return nil, fmt.Errorf("failed to close position: %w", err)
 	}
 
@@ -192,7 +207,7 @@ func (s *deploymentService) ClosePosition(ctx context.Context, id int64, req *dt
 		"instrument_id": updatedPosition.InstrumentID,
 		"quantity":      updatedPosition.Quantity,
 		"entry_price":   updatedPosition.EntryPrice,
-		"exit_price":    req.ExitPrice,
+		"exit_price":    exitPrice,
 		"pnl":           updatedPosition.PNL,
 		"action":        "POSITION_CLOSED",
 	}
