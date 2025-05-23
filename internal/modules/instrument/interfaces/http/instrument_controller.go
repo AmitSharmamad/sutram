@@ -24,7 +24,7 @@ func NewInstrumentController(instrumentService *service.InstrumentService) *Inst
 	}
 }
 
-// GetInstrumentByExchangeSecurityID gets instruments by exchange security ID
+// GetInstrumentByExchangeSecurityID gets instruments by exchange security ID with pagination
 func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Context) {
 	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("id")
@@ -37,8 +37,34 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 		return
 	}
 
-	// Get the instruments
-	instruments, err := c.instrumentService.GetInstrumentsByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
+	// Get pagination parameters
+	var pagination dto.GetInstrumentsByExchangeSecurityIDRequest
+	if err := ctx.ShouldBindQuery(&pagination); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid pagination parameters",
+		})
+		return
+	}
+
+	// Default values for pagination
+	if pagination.Page <= 0 {
+		pagination.Page = 1
+	}
+	if pagination.PageSize <= 0 {
+		pagination.PageSize = 50
+	}
+	if pagination.PageSize > 1000 {
+		pagination.PageSize = 1000
+	}
+
+	// Get the paginated instruments
+	instruments, totalCount, err := c.instrumentService.GetInstrumentsByExchangeSecurityIDPaginated(
+		ctx.Request.Context(),
+		int32(exchangeSecurityID),
+		pagination.Page,
+		pagination.PageSize,
+	)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -53,9 +79,32 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 		instrumentDTOs[i] = modelToDTO(instrument)
 	}
 
+	// Calculate total pages
+	totalPages := int(totalCount) / pagination.PageSize
+	if int(totalCount)%pagination.PageSize > 0 {
+		totalPages++
+	}
+
+	// Create pagination response
+	paginationInfo := dto.PaginationDTO{
+		Page:       pagination.Page,
+		PageSize:   pagination.PageSize,
+		TotalItems: totalCount,
+		TotalPages: totalPages,
+	}
+
+	// Create response using the new pagination structure
+	response := struct {
+		Data       []*dto.InstrumentDTO `json:"data"`
+		Pagination dto.PaginationDTO    `json:"pagination"`
+	}{
+		Data:       instrumentDTOs,
+		Pagination: paginationInfo,
+	}
+
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
-		Data:    instrumentDTOs,
+		Data:    response,
 	})
 }
 
