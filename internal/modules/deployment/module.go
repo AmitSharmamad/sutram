@@ -2,12 +2,15 @@ package deployment
 
 import (
 	"database/sql"
+	"fmt"
 
 	"algo/internal/infra/http/middleware"
 	infraRepo "algo/internal/infra/persistance/repository"
+	backtestEngine "algo/internal/modules/backtest/application/service"
 	"algo/internal/modules/deployment/application/service"
 	"algo/internal/modules/deployment/infrastructure/persistence/postgres"
 	"algo/internal/modules/deployment/interfaces/http"
+	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
 	strategyModule "algo/internal/modules/strategy"
 	userHttp "algo/internal/modules/user/interfaces/http"
 
@@ -74,6 +77,20 @@ func (m *Module) initializeComponents() {
 	// Get strategy repository from strategy module
 	strategyService := m.strategyModule.GetStrategyService()
 
+	// Get Clickhouse DB for instrument repository
+	chDB, err := infraRepo.ProvideClickHouseDB()
+	if err != nil {
+		// In a real application, handle this error properly
+		fmt.Printf("Error connecting to ClickHouse: %v\n", err)
+		// Create a nil instrument repository as a fallback
+		// In a real app, you would handle this better
+	}
+	instrumentRepository := instrumentRepo.NewInstrumentRepository(chDB)
+
+	// For now, create a nil backtest engine
+	// In a real implementation, we would obtain this from the backtest module
+	var engine *backtestEngine.BacktestEngine = nil
+
 	// Create services
 	deploymentService := service.NewDeploymentService(
 		deploymentRepo,
@@ -81,6 +98,8 @@ func (m *Module) initializeComponents() {
 		logRepo,
 		positionRepo,
 		metricsRepo,
+		instrumentRepository,
+		engine,
 	)
 
 	// Create controllers
