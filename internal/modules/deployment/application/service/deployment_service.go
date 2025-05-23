@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/domain/model"
@@ -27,57 +28,64 @@ var (
 
 // DeploymentService defines the service for deployment operations
 type DeploymentService interface {
-	// CreateDeployment creates a new deployment
+	// Deployment core operations
 	CreateDeployment(ctx context.Context, req *dto.CreateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// GetDeploymentByID retrieves a deployment by its ID
 	GetDeploymentByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// GetUserDeployments retrieves all deployments for a user
 	GetUserDeployments(ctx context.Context, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// GetDeploymentsByStrategyID retrieves all deployments for a strategy
 	GetDeploymentsByStrategyID(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// UpdateDeployment updates an existing deployment
 	UpdateDeployment(ctx context.Context, req *dto.UpdateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
-
-	// DeleteDeployment deletes a deployment
 	DeleteDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// ActivateDeployment activates a deployment
 	ActivateDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// DeactivateDeployment deactivates a deployment
 	DeactivateDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
-
-	// SearchDeployments searches deployments with filter criteria
 	SearchDeployments(ctx context.Context, filter *dto.DeploymentFilter, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
-
-	// StopAllDeployments deactivates all deployments for a user
 	StopAllDeployments(ctx context.Context, userID uuid.UUID) error
-
-	// StartAllDeployments activates all paused deployments for a user
 	StartAllDeployments(ctx context.Context, userID uuid.UUID) error
-
-	// DeployAllInstruments creates deployments for all instruments of a strategy
 	DeployAllInstruments(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
+
+	// Deployment log operations
+	CreateDeploymentLog(ctx context.Context, req *dto.DeploymentLogRequest, userID uuid.UUID) (*dto.DeploymentLogResponse, error)
+	GetDeploymentLogs(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentLogResponse, error)
+	GetLatestDeploymentLog(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) (*dto.DeploymentLogResponse, error)
+
+	// Deployment position operations
+	CreatePosition(ctx context.Context, req *dto.CreatePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
+	GetPositionByID(ctx context.Context, id int64, userID uuid.UUID) (*dto.PositionResponse, error)
+	GetPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
+	GetOpenPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
+	ClosePosition(ctx context.Context, id int64, req *dto.ClosePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
+	CancelPosition(ctx context.Context, id int64, userID uuid.UUID) error
+
+	// Deployment metrics operations
+	CreateOrUpdateMetrics(ctx context.Context, req *dto.CreateMetricsRequest, userID uuid.UUID) (*dto.MetricsResponse, error)
+	GetMetricsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.MetricsResponse, error)
+	GetMetricsByDeploymentAndDate(ctx context.Context, deploymentID uuid.UUID, date time.Time, userID uuid.UUID) (*dto.MetricsResponse, error)
+	GetMetricsTimeRange(ctx context.Context, filter *dto.MetricsFilter, userID uuid.UUID) ([]*dto.MetricsResponse, error)
+	GetLatestMetrics(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) (*dto.MetricsResponse, error)
 }
 
 // deploymentService implements DeploymentService
 type deploymentService struct {
 	deploymentRepo repository.DeploymentRepository
 	strategyRepo   strategyRepository.StrategyRepository
+	logRepo        repository.DeploymentLogRepository
+	positionRepo   repository.DeploymentPositionRepository
+	metricsRepo    repository.DeploymentMetricsRepository
 }
 
 // NewDeploymentService creates a new deployment service
 func NewDeploymentService(
 	deploymentRepo repository.DeploymentRepository,
 	strategyRepo strategyRepository.StrategyRepository,
+	logRepo repository.DeploymentLogRepository,
+	positionRepo repository.DeploymentPositionRepository,
+	metricsRepo repository.DeploymentMetricsRepository,
 ) DeploymentService {
 	return &deploymentService{
 		deploymentRepo: deploymentRepo,
 		strategyRepo:   strategyRepo,
+		logRepo:        logRepo,
+		positionRepo:   positionRepo,
+		metricsRepo:    metricsRepo,
 	}
 }
 
