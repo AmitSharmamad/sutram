@@ -47,6 +47,7 @@ type Position struct {
 	ExitFees             *float64      `json:"exit_fees,omitempty" db:"exit_fees"`
 	NetProfitLoss        *float64      `json:"net_profit_loss,omitempty" db:"net_profit_loss"`
 	PositionSize         float64       `json:"position_size" db:"position_size"`
+	StopLossPrice		 *float64
 	EntryOrderID         *uuid.UUID    `json:"entry_order_id,omitempty" db:"entry_order_id"`
 	ExitOrderID          *uuid.UUID    `json:"exit_order_id,omitempty" db:"exit_order_id"`
 	CreatedAt            time.Time     `json:"created_at" db:"created_at"`

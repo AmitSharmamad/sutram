@@ -359,7 +359,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				if lastDataFromPreviousDay != nil {
 					// Calculate fees
-					exitFees := calculateFees(lastDataFromPreviousDay.Close, openPosition.PositionSize)
+					exitFees := 0.0
 
 					// Calculate exit order price with slippage
 					exitOrderPrice := calculateExitOrderSlippage(
@@ -462,8 +462,15 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 					// Simulate order execution
 					entryPrice := stockData[i].Close
-					entryFees := calculateFees(entryPrice, positionSize)
+					entryFees := 0.0
 					openPosition.Enter(entryPrice, stockData[i].Timestamp, entryFees, nil)
+
+					openPosition.StopLossPrice = e.calculateStopLoss(
+						*openPosition.EntryPriceOrder,
+						strategy.StopLoss,
+						strategy.StopLossType,
+						strategy.PositionType,
+					)
 
 					// Update capital for position entry
 					capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
@@ -518,7 +525,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			lastData := stockData[len(stockData)-1]
 
 			// Calculate fees
-			exitFees := calculateFees(lastData.Close, openPosition.PositionSize)
+			exitFees := 0.0
 
 			// Calculate exit order price with slippage
 			exitOrderPrice := calculateExitOrderSlippage(
@@ -613,13 +620,6 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	}
 }
 
-// createDataContext creates a data context for expression evaluation
-func (e *BacktestEngine) createDataContext(instruments []*instrumentModel.Instrument, currentIndex int) map[string]interface{} {
-	context := make(map[string]any)
-	context["data"] = instruments
-	return context
-}
-
 func (e *BacktestEngine) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
 	return parser.Execute(expression, parser.NewEvaluationContext(data))
 }
@@ -628,35 +628,110 @@ func (e *BacktestEngine) evaluateExitCondition(expression string, data *instrume
 	return parser.Execute(expression, parser.NewEvaluationContext(data))
 }
 
-// checkStopLossOrTarget checks if a position should be closed due to stop loss or target price
-func (e *BacktestEngine) checkStopLossOrTarget(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
-	return e.isStopLossTriggered(position, strategy, instrument) ||
-		e.isTargetProfitTriggered(position, strategy, instrument)
+func (e *BacktestEngine) calculateStopLoss(
+	entryPrice float64,
+	stopLoss float64,
+	stopLossType strategyModel.ValueType,
+	direction strategyModel.Direction,
+) *float64 {
+
+	var stopPrice float64
+	if direction == strategyModel.Long {
+		if stopLossType == "PERCENTAGE" {
+			stopPrice = entryPrice * (1 - stopLoss/100)
+		} else {
+			stopPrice = entryPrice - stopLoss
+		}
+	} else { // Short position
+		if stopLossType == "PERCENTAGE" {
+			stopPrice = entryPrice * (1 + stopLoss/100)
+		} else {
+			stopPrice = entryPrice + stopLoss
+		}
+	}
+
+	return &stopPrice
+}
+
+func (e *BacktestEngine) updateStopLossBasedOnTrailing(
+	position *model.Position,
+	strategy *strategyDto.StrategyResponse,
+	instrument *instrumentModel.Instrument,
+) {
+	// Skip if trailing stop loss isn't enabled or position doesn't have a stop loss
+	if strategy.TrailingStopLoss <= 0 || position.StopLossPrice == nil || position.EntryPriceOrder == nil {
+		return
+	}
+
+	currentPrice := instrument.Close
+	entryPrice := *position.EntryPriceOrder
+	currentStopLoss := *position.StopLossPrice
+
+	initialStopDistance := *e.calculateStopLoss(entryPrice, strategy.StopLoss, strategy.StopLossType, strategy.PositionType)
+
+	// Calculate the trailing amount based on type (percentage or absolute)
+	trailingAmount := 0.0
+	if strategy.TrailingStopLossType == "PERCENTAGE" {
+		// For percentage, calculate the equivalent price distance
+		if position.Direction == model.Long {
+			trailingAmount = entryPrice * (strategy.TrailingStopLoss / 100.0)
+		} else {
+			trailingAmount = entryPrice * (strategy.TrailingStopLoss / 100.0)
+		}
+	} else {
+		// For absolute, use the value directly
+		trailingAmount = strategy.TrailingStopLoss
+	}
+
+	// Handle long position trailing stop
+	if position.Direction == model.Long {
+		// Calculate how much price has moved above entry
+		priceMovement := currentPrice - entryPrice
+
+		// Only trail if price has moved up enough (entry + trailingAmount)
+		if priceMovement >= trailingAmount {
+			// Calculate new stop loss: current price - initial stop distance
+			unitsJump := math.Floor(priceMovement / trailingAmount)
+			newStopLoss := initialStopDistance + (unitsJump * trailingAmount)
+
+			// Only update stop loss if it's higher (better) than current stop loss
+			// This ensures the stop loss only moves up, never down
+			if newStopLoss > currentStopLoss {
+				*position.StopLossPrice = newStopLoss
+			}
+		}
+	} else { // Handle short position trailing stop
+		// Calculate how much price has moved below entry
+		priceMovement := entryPrice - currentPrice
+
+		// Only trail if price has moved down enough (entry - trailingAmount)
+		if priceMovement >= trailingAmount {
+			// Calculate new stop loss: current price + initial stop distance
+			unitsJump := math.Floor(priceMovement / trailingAmount)
+			newStopLoss := initialStopDistance - (unitsJump * trailingAmount)
+
+			// Only update stop loss if it's lower (better) than current stop loss
+			// This ensures the stop loss only moves down, never up
+			if newStopLoss < currentStopLoss {
+				*position.StopLossPrice = newStopLoss
+			}
+		}
+	}
 }
 
 // isStopLossTriggered checks if stop loss is triggered
-func (e *BacktestEngine) isStopLossTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
-	if strategy.StopLoss <= 0 || position.EntryPriceOrder == nil {
+func (e *BacktestEngine) isStopLossTriggered(
+	position *model.Position,
+	instrument *instrumentModel.Instrument,
+) bool {
+	if position.EntryPriceOrder == nil {
 		return false
 	}
 
-	entryPrice := *position.EntryPriceOrder
-	stopPrice := 0.0
-
 	if position.Direction == model.Long {
-		if strategy.StopLossType == "PERCENTAGE" {
-			stopPrice = entryPrice * (1 - strategy.StopLoss/100)
-		} else {
-			stopPrice = entryPrice - strategy.StopLoss
-		}
-		return instrument.Low <= stopPrice
+		return instrument.Low <= *position.StopLossPrice
 	} else { // Short position
-		if strategy.StopLossType == "PERCENTAGE" {
-			stopPrice = entryPrice * (1 + strategy.StopLoss/100)
-		} else {
-			stopPrice = entryPrice + strategy.StopLoss
-		}
-		return instrument.High >= stopPrice
+		return instrument.High >= *position.StopLossPrice
 	}
 }
 
@@ -712,13 +787,6 @@ func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyRes
 	} else {
 		return math.Floor(strategy.MaxAllocation / price)
 	}
-}
-
-// calculateFees calculates the trading fees
-func calculateFees(price float64, quantity float64) float64 {
-	// Implement your fee structure
-	// For example, 0.1% of transaction value
-	return price * quantity * 0.001
 }
 
 // updateCapitalOnPositionChange updates the capital based on the position direction and event type (entry or exit)
@@ -918,7 +986,7 @@ func (e *BacktestEngine) processSecondLevelData(position *model.Position, strate
 		}
 
 		// Check stop loss or target profit hit
-		stopLossHit := e.isStopLossTriggered(position, strategy, data)
+		stopLossHit := e.isStopLossTriggered(position, data)
 		targetProfitHit := e.isTargetProfitTriggered(position, strategy, data)
 
 		if exitSignalTriggered || stopLossHit || targetProfitHit {
@@ -931,7 +999,7 @@ func (e *BacktestEngine) processSecondLevelData(position *model.Position, strate
 			}
 
 			// Calculate fees
-			exitFees := calculateFees(data.Close, position.PositionSize)
+			exitFees := 0.0
 
 			// Close the position
 			position.Exit(
@@ -1061,8 +1129,15 @@ func (e *BacktestEngine) TryExit(
 			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
 		}
 
+		// Update the Stop Loss based on trailing stop loss
+		e.updateStopLossBasedOnTrailing(
+			position,
+			strategy,
+			data,
+		)
+
 		// Check stop loss or target profit hit
-		stopLossHit := e.isStopLossTriggered(position, strategy, data)
+		stopLossHit := e.isStopLossTriggered(position, data)
 		targetProfitHit := e.isTargetProfitTriggered(position, strategy, data)
 
 		if exitSignalTriggered || stopLossHit || targetProfitHit {
@@ -1075,7 +1150,7 @@ func (e *BacktestEngine) TryExit(
 			}
 
 			// Calculate fees
-			exitFees := calculateFees(data.Close, position.PositionSize)
+			exitFees := 0.0
 
 			// Calculate exit order price with slippage
 			exitOrderPrice := calculateExitOrderSlippage(
