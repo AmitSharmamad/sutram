@@ -12,13 +12,3 @@ CREATE TABLE IF NOT EXISTS "user" (
     is_active BOOLEAN DEFAULT true,
     PRIMARY KEY (id)
 );
-
--- Portfolio Management Tables
-CREATE TABLE IF NOT EXISTS portfolio (
-    id UUID DEFAULT gen_random_uuid(),
-    user_id UUID UNIQUE,
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now(),
-    PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
-);
