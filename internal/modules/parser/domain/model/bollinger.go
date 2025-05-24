@@ -23,6 +23,8 @@ func (indicator *BollingerBands) SliceData(prices Prices) Prices {
 	return prices[start:end]
 }
 
+// BOLLINGER_BANDS(SOURCE (OPEN, HIGH, LOW, CLOSE), PERIOD, STANDARD_DEVIATION, OFFSET)
+// BOLLINGER_BANDS(CLOSE, 20, 2, 0)
 func (indicator *BollingerBands) Calculate(
 	config []any,
 	ctx *EvaluationContext,
