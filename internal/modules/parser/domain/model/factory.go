@@ -25,6 +25,7 @@ func NewFactory() *IndicatorFactory {
 	factory.indicators["MACD"] = &MACD{}
 	factory.indicators["VORTEX"] = &Vortex{}
 	factory.indicators["BOLLINGER"] = &BollingerBands{}
+	factory.indicators["LBB"] = &LowerBollingerBands{}
 	factory.indicators["DMI"] = &DMI{}
 	factory.indicators["KELTNER"] = &KeltnerChannels{}
 	factory.indicators["PSAR"] = &ParabolicSAR{}
