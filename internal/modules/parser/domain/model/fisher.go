@@ -40,7 +40,8 @@ func (indicator *FisherTransform) Calculate(
 	ctx *EvaluationContext,
 ) float64 {
 	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	line := config[1].(string)
+	offset := int(config[2].(float64))
 
 	indicator.period = period
 	indicator.offset = offset
@@ -115,7 +116,18 @@ func (indicator *FisherTransform) Calculate(
 		fisher[i] = 0.5 * math.Log((1.0+value[i])/(1.0-value[i]))
 	}
 
-	// Return the last calculated Fisher Transform value
+	// Calculate the trigger line (a 1-period lag of the Fisher line)
+	var trigger = make([]float64, len(fisher))
+	trigger[0] = 0.0
+	for i := 1; i < len(fisher); i++ {
+		trigger[i] = fisher[i-1]
+	}
+
+	// Return the last calculated value based on the selected line
+	if line == "TRIGGER" {
+		return util.Round(trigger[len(trigger)-1])
+	}
+	// Default is "EF" (Fisher line)
 	return util.Round(fisher[len(fisher)-1])
 }
 
@@ -125,6 +137,8 @@ func (indicator *FisherTransform) GetDataRange(config map[string]any) int32 {
 	} else {
 		indicator.period = 10 // default period
 	}
+
+	// We don't need to handle the "line" parameter here as it doesn't affect data range
 
 	if o, ok := config["offset"].(float64); ok {
 		indicator.offset = int(o)

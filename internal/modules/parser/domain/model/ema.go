@@ -27,14 +27,14 @@ func (indicator *EMA) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	point := config[0].(string)
+	field := config[0].(string)
 	period := int(config[1].(float64))
 	offset := int(config[2].(float64))
 
 	indicator.period = period
 	indicator.offset = offset
 
-	prices := GetPrices(*ctx.Data, point)
+	prices := GetPrices(*ctx.Data, field)
 
 	// Check if we have enough data points
 	if len(prices) < period+offset {
@@ -77,7 +77,7 @@ func (indicator *EMA) GetDataRange(config map[string]any) int32 {
 	if p, ok := config["period"].(float64); ok {
 		indicator.period = int(p)
 	} else {
-		indicator.period = 14 // default period
+		indicator.period = 20 // default period from indicators.json
 	}
 
 	if p, ok := config["offset"].(float64); ok {
