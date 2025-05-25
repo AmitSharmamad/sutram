@@ -140,3 +140,9 @@ type ApiResponse struct {
 	Error   string      `json:"error,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
 }
+
+// GetInstrumentsByExchangeSecurityIDRequest represents request to get paginated instruments
+type GetInstrumentsByExchangeSecurityIDRequest struct {
+	Page     int `form:"page" json:"page"`
+	PageSize int `form:"page_size" json:"page_size"`
+}

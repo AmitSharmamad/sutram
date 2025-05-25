@@ -18,7 +18,7 @@ type DeploymentLogRequest struct {
 
 // DeploymentLogResponse is the response for a deployment log
 type DeploymentLogResponse struct {
-	ID           int64                  `json:"id"`
+	ID           uuid.UUID                  `json:"id"`
 	DeploymentID uuid.UUID              `json:"deployment_id"`
 	Status       model.DeploymentStatus `json:"status"`
 	Metadata     json.RawMessage        `json:"metadata,omitempty"`

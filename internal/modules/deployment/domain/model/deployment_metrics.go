@@ -9,7 +9,7 @@ import (
 
 // DeploymentMetrics represents metrics for a deployment
 type DeploymentMetrics struct {
-	ID           int64           `json:"id" db:"id"`
+	ID           uuid.UUID           `json:"id" db:"id"`
 	DeploymentID uuid.UUID       `json:"deployment_id" db:"deployment_id"`
 	MetricDate   time.Time       `json:"metric_date" db:"metric_date"`
 	TotalTrades  int             `json:"total_trades" db:"total_trades"`

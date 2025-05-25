@@ -184,3 +184,57 @@ func (r *InstrumentRepository) Delete(ctx context.Context, exchangeSecurityID in
 
 	return nil
 }
+
+// FindByExchangeSecurityIDPaginated finds instruments by exchange security ID with pagination
+func (r *InstrumentRepository) FindByExchangeSecurityIDPaginated(ctx context.Context, exchangeSecurityID int32, page, pageSize int) ([]*model.Instrument, int64, error) {
+	// Calculate offset
+	offset := (page - 1) * pageSize
+
+	// Ensure pageSize doesn't exceed maximum
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+
+	// First, get the total count
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM sutram.instrument
+		WHERE exchange_security_id = ?
+	`
+	var totalCount int64
+	err := r.db.GetContext(ctx, &totalCount, countQuery, exchangeSecurityID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error counting instruments: %w", err)
+	}
+
+	// If no records, return early
+	if totalCount == 0 {
+		return []*model.Instrument{}, 0, nil
+	}
+
+	// Get paginated data
+	query := `
+		SELECT 
+			exchange_security_id, 
+			open, 
+			high, 
+			low, 
+			close, 
+			volume, 
+			timestamp, 
+			created_at, 
+			updated_at
+		FROM sutram.instrument
+		WHERE exchange_security_id = ?
+		ORDER BY timestamp DESC
+		LIMIT ? OFFSET ?
+	`
+
+	var instruments []*model.Instrument
+	err = r.db.SelectContext(ctx, &instruments, query, exchangeSecurityID, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error querying paginated instruments: %w", err)
+	}
+
+	return instruments, totalCount, nil
+}

@@ -61,7 +61,7 @@ func (c *DeploymentLogController) CreateDeploymentLog(ctx *gin.Context) {
 
 // GetDeploymentLogs handles the request to get all logs for a deployment
 func (c *DeploymentLogController) GetDeploymentLogs(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -99,7 +99,7 @@ func (c *DeploymentLogController) GetDeploymentLogs(ctx *gin.Context) {
 
 // GetLatestDeploymentLog handles the request to get the latest log for a deployment
 func (c *DeploymentLogController) GetLatestDeploymentLog(ctx *gin.Context) {
-	deploymentIDStr := ctx.Param("deploymentID")
+	deploymentIDStr := ctx.Param("deployment_id")
 	deploymentID, err := uuid.Parse(deploymentIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
