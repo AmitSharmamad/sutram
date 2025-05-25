@@ -584,6 +584,40 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	return positions, metrics
 }
 
+func (e *BacktestEngine) IsMISEndOfDayHit(
+	data *instrumentModel.Instrument,
+) bool {
+	// NOTE: MIS close is 15 minutes prior to market close
+	exchange := "NSE"
+	endHour := 15
+	endMinute := 15
+	
+	if exchange == "MCX" {
+		// MCX has different timings, so we need to adjust accordingly
+		// MCX trading ends at 11:30 PM IST
+		endHour = 23
+		endMinute = 30
+	}
+	
+	// Extract the time from the data timestamp
+	currentTime := data.Timestamp
+
+	// Create a time representing 3:15 PM on the same date
+	eodTime := time.Date(
+		currentTime.Year(),
+		currentTime.Month(),
+		currentTime.Day(),
+		endHour, // 3 PM (24-hour format)
+		endMinute, // 15 minutes
+		0,  // 0 seconds
+		0,  // 0 nanoseconds
+		currentTime.Location(),
+	)
+
+	// Return true if current time is at or after 3:15 PM
+	return currentTime.Equal(eodTime) || currentTime.After(eodTime)
+}
+
 // executeBacktest runs the backtest for a single instrument and saves results to the database
 // This legacy method is kept for backward compatibility
 func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategyDto.StrategyResponse, instruments []*instrumentModel.Instrument, run *model.Run) {
@@ -640,7 +674,7 @@ func (e *BacktestEngine) calculateStopLoss(
 		}
 	}
 
-	stopPrice = math.Round(stopPrice * 100) / 100 // Round to 2 decimal places
+	stopPrice = math.Round(stopPrice*100) / 100 // Round to 2 decimal places
 
 	return &stopPrice
 }
