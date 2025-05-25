@@ -361,12 +361,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					// Calculate fees
 					exitFees := 0.0
 
-					// Calculate exit order price with slippage
-					exitOrderPrice := calculateExitOrderSlippage(
-						lastDataFromPreviousDay.Close,
-						openPosition.Direction,
-						lastDataFromPreviousDay,
-					)
+					exitOrderPrice := lastDataFromPreviousDay.Close // For backtest, we can use the close price directly
 
 					// Close the position with "EOD MIS Square-off" as the reason
 					exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
@@ -527,12 +522,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			// Calculate fees
 			exitFees := 0.0
 
-			// Calculate exit order price with slippage
-			exitOrderPrice := calculateExitOrderSlippage(
-				lastData.Close,
-				openPosition.Direction,
-				lastData,
-			)
+			exitOrderPrice := lastData.Close // For backtest, we can use the close price directly
 
 			// Close the position with "EOD MIS Square-off" as the reason
 			exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
@@ -649,6 +639,8 @@ func (e *BacktestEngine) calculateStopLoss(
 			stopPrice = entryPrice + stopLoss
 		}
 	}
+
+	stopPrice = math.Round(stopPrice * 100) / 100 // Round to 2 decimal places
 
 	return &stopPrice
 }
@@ -1152,12 +1144,7 @@ func (e *BacktestEngine) TryExit(
 			// Calculate fees
 			exitFees := 0.0
 
-			// Calculate exit order price with slippage
-			exitOrderPrice := calculateExitOrderSlippage(
-				data.Close,
-				position.Direction,
-				data,
-			)
+			exitOrderPrice := data.Close // For backtest, we can use the close price directly
 
 			// Close the position
 			position.Exit(
@@ -1177,35 +1164,6 @@ func (e *BacktestEngine) TryExit(
 
 	// If no exit condition was met, return false
 	return false
-}
-
-// calculateExitOrderSlippage simulates slippage between exit signal and exit order execution
-func calculateExitOrderSlippage(
-	signalPrice float64,
-	direction model.Direction,
-	instrument *instrumentModel.Instrument,
-) float64 {
-	// Default slippage percentage (0.1% of price)
-	slippagePct := 0.1
-
-	// Calculate base slippage amount
-	baseSlippage := signalPrice * (slippagePct / 100.0)
-
-	// Adjust slippage based on volatility (using high-low range as a simple volatility proxy)
-	volatilityFactor := (instrument.High - instrument.Low) / instrument.Low
-	// Scale volatility factor to not be too extreme (cap at 2x default slippage)
-	adjustedVolatilityFactor := math.Min(volatilityFactor*10, 2.0)
-
-	// Calculate final slippage amount accounting for volatility
-	slippageAmount := baseSlippage * adjustedVolatilityFactor
-
-	// For long positions, exit price is typically worse (lower) due to slippage
-	// For short positions, exit price is typically worse (higher) due to slippage
-	if direction == model.Long {
-		return signalPrice - slippageAmount
-	} else {
-		return signalPrice + slippageAmount
-	}
 }
 
 // findNextCandleIndex finds the index of the next candle matching the chart timeframe after the given timestamp
