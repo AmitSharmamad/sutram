@@ -20,13 +20,14 @@ import (
 
 // Module represents the deployment module
 type Module struct {
-	db                 *sql.DB
-	controller         *http.DeploymentController
-	logController      *http.DeploymentLogController
-	positionController *http.DeploymentPositionController
-	metricsController  *http.DeploymentMetricsController
-	userController     *userHttp.UserController
-	strategyModule     *strategyModule.Module
+	db                    *sql.DB
+	controller            *http.DeploymentController
+	logController         *http.DeploymentLogController
+	positionController    *http.DeploymentPositionController
+	positionLogController *http.DeploymentPositionLogController
+	metricsController     *http.DeploymentMetricsController
+	userController        *userHttp.UserController
+	strategyModule        *strategyModule.Module
 }
 
 // ProvideModule provides a wire provider set for the deployment module
@@ -73,6 +74,7 @@ func (m *Module) initializeComponents() {
 	logRepo := postgres.NewPgDeploymentLogRepository(dbx)
 	positionRepo := postgres.NewPgDeploymentPositionRepository(dbx)
 	metricsRepo := postgres.NewPgDeploymentMetricsRepository(dbx)
+	positionLogRepo := postgres.NewPgDeploymentPositionLogRepository(dbx)
 
 	// Get strategy repository from strategy module
 	strategyService := m.strategyModule.GetStrategyService()
@@ -108,16 +110,21 @@ func (m *Module) initializeComponents() {
 	positionController := http.NewDeploymentPositionController(deploymentService)
 	metricsController := http.NewDeploymentMetricsController(deploymentService)
 
+	// Create position log service and controller
+	positionLogService := service.NewDeploymentPositionLogService(positionLogRepo)
+	positionLogController := http.NewDeploymentPositionLogController(positionLogService)
+
 	// Store controllers in the module
 	m.logController = logController
 	m.positionController = positionController
 	m.metricsController = metricsController
+	m.positionLogController = positionLogController
 }
 
 // RegisterRoutes registers the deployment module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 	// Register main deployment routes using the router.go implementation
-	http.RegisterRoutes(router, m.controller, m.userController)
+	http.RegisterRoutes(router, m.controller, m.positionLogController, m.userController)
 
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(m.userController.GetAuthService())
@@ -126,32 +133,38 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 	authMiddleware := middleware.AuthMiddleware(authServiceAdapter)
 
 	// Register log routes
-	logRoutes := router.Group("/deployments")
+	logRoutes := router.Group("/deployment")
 	{
-		logRoutes.POST("/:deploymentID/logs", authMiddleware, m.logController.CreateDeploymentLog)
-		logRoutes.GET("/:deploymentID/logs", authMiddleware, m.logController.GetDeploymentLogs)
-		logRoutes.GET("/:deploymentID/logs/latest", authMiddleware, m.logController.GetLatestDeploymentLog)
+		logRoutes.POST("/:deployment_id/logs", authMiddleware, m.logController.CreateDeploymentLog)
+		logRoutes.GET("/:deployment_id/logs", authMiddleware, m.logController.GetDeploymentLogs)
+		logRoutes.GET("/:deployment_id/logs/latest", authMiddleware, m.logController.GetLatestDeploymentLog)
 	}
-
 	// Register position routes
-	positionRoutes := router.Group("/deployments")
+	positionRoutes := router.Group("/deployment")
 	{
-		positionRoutes.POST("/:deploymentID/positions", authMiddleware, m.positionController.CreatePosition)
-		positionRoutes.GET("/:deploymentID/positions", authMiddleware, m.positionController.GetPositionsByDeployment)
-		positionRoutes.GET("/:deploymentID/positions/open", authMiddleware, m.positionController.GetOpenPositionsByDeployment)
+		positionRoutes.POST("/:deployment_id/positions", authMiddleware, m.positionController.CreatePosition)
+		positionRoutes.GET("/:deployment_id/positions", authMiddleware, m.positionController.GetPositionsByDeployment)
+		positionRoutes.GET("/:deployment_id/positions/open", authMiddleware, m.positionController.GetOpenPositionsByDeployment)
 		positionRoutes.GET("/positions/:positionID", authMiddleware, m.positionController.GetPositionByID)
 		positionRoutes.PUT("/positions/:positionID/close", authMiddleware, m.positionController.ClosePosition)
 		positionRoutes.PUT("/positions/:positionID/cancel", authMiddleware, m.positionController.CancelPosition)
+
+		// Add new route format as specified in the manual
+		positionRoutes.PUT("/:deployment_id/positions/:positionID/close", authMiddleware, m.positionController.ClosePosition)
+		positionRoutes.PUT("/:deployment_id/positions/:positionID/cancel", authMiddleware, m.positionController.CancelPosition)
 	}
 
+	// Register position routes with new format (deployment/:deployment_id/positions/:positionID/...)
+	// These routes have been implemented above
+
 	// Register metrics routes
-	metricsRoutes := router.Group("/deployments")
+	metricsRoutes := router.Group("/deployment")
 	{
-		metricsRoutes.POST("/:deploymentID/metrics", authMiddleware, m.metricsController.CreateOrUpdateMetrics)
-		metricsRoutes.GET("/:deploymentID/metrics", authMiddleware, m.metricsController.GetMetricsByDeployment)
-		metricsRoutes.GET("/:deploymentID/metrics/latest", authMiddleware, m.metricsController.GetLatestMetrics)
-		metricsRoutes.GET("/:deploymentID/metrics/:date", authMiddleware, m.metricsController.GetMetricsByDate)
-		metricsRoutes.GET("/:deploymentID/metrics/range", authMiddleware, m.metricsController.GetMetricsTimeRange)
+		metricsRoutes.POST("/:deployment_id/metrics", authMiddleware, m.metricsController.CreateOrUpdateMetrics)
+		metricsRoutes.GET("/:deployment_id/metrics", authMiddleware, m.metricsController.GetMetricsByDeployment)
+		metricsRoutes.GET("/:deployment_id/metrics/latest", authMiddleware, m.metricsController.GetLatestMetrics)
+		metricsRoutes.GET("/:deployment_id/metrics/:date", authMiddleware, m.metricsController.GetMetricsByDate)
+		metricsRoutes.GET("/:deployment_id/metrics/range", authMiddleware, m.metricsController.GetMetricsTimeRange)
 	}
 }
 
@@ -163,6 +176,11 @@ func (m *Module) GetController() *http.DeploymentController {
 // GetLogController returns the deployment log controller
 func (m *Module) GetLogController() *http.DeploymentLogController {
 	return m.logController
+}
+
+// GetPositionLogController returns the deployment position log controller
+func (m *Module) GetPositionLogController() *http.DeploymentPositionLogController {
+	return m.positionLogController
 }
 
 // GetPositionController returns the deployment position controller

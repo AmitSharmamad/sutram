@@ -45,6 +45,31 @@ func (s *InstrumentService) GetInstrumentsByExchangeSecurityID(ctx context.Conte
 	return instruments, nil
 }
 
+// GetInstrumentsByExchangeSecurityIDPaginated gets paginated instruments by exchange security ID
+func (s *InstrumentService) GetInstrumentsByExchangeSecurityIDPaginated(ctx context.Context, exchangeSecurityID int32, page, pageSize int) ([]*model.Instrument, int64, error) {
+	// Validate and normalize pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	if pageSize > 1000 {
+		pageSize = 1000
+	}
+
+	instruments, totalCount, err := s.instrumentRepo.FindByExchangeSecurityIDPaginated(ctx, exchangeSecurityID, page, pageSize)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error finding paginated instruments: %w", err)
+	}
+
+	if len(instruments) == 0 && page == 1 {
+		return nil, 0, ErrInstrumentNotFound
+	}
+
+	return instruments, totalCount, nil
+}
+
 // GetInstrumentMasterByID gets an instrument master by ID
 func (s *InstrumentService) GetInstrumentMasterByID(ctx context.Context, id uint64) (*model.InstrumentMaster, error) {
 	instrumentMaster, err := s.instrumentMasterRepo.FindByID(ctx, id)

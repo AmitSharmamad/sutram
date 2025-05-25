@@ -33,7 +33,7 @@ func (r *PgDeploymentLogRepository) Create(ctx context.Context, log *model.Deplo
 		RETURNING id
 	`
 
-	var id int64
+	var id uuid.UUID
 	err := r.db.QueryRowContext(
 		ctx,
 		query,

@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_deployment_instrument_id ON deployment(instrument
 
 -- Deployment Log Table - Tracks progression of a deployment (immutable)
 CREATE TABLE IF NOT EXISTS deployment_log (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     deployment_id UUID NOT NULL REFERENCES deployment(id) ON DELETE CASCADE,
     status VARCHAR NOT NULL,
     metadata JSONB,
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_deployment_log_status ON deployment_log(status);
 
 -- Deployment Position Table - Stores deployment positions
 CREATE TABLE IF NOT EXISTS deployment_position (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     deployment_id UUID NOT NULL REFERENCES deployment(id) ON DELETE CASCADE,
     instrument_id INT NOT NULL,
     quantity DECIMAL NOT NULL,
@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_deployment_position_status ON deployment_position
 
 -- Deployment Metrics Table - Stores deployment metrics
 CREATE TABLE IF NOT EXISTS deployment_metrics (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid()  PRIMARY KEY,
     deployment_id UUID NOT NULL REFERENCES deployment(id) ON DELETE CASCADE,
     metric_date DATE NOT NULL,
     total_trades INT DEFAULT 0,

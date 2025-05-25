@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	// Import time for parsing timestamps in other functions
+
 	"algo/internal/modules/instrument/application/dto"
 	"algo/internal/modules/instrument/application/service"
 	"algo/internal/modules/instrument/domain/model"
@@ -24,7 +26,7 @@ func NewInstrumentController(instrumentService *service.InstrumentService) *Inst
 	}
 }
 
-// GetInstrumentByExchangeSecurityID gets instruments by exchange security ID
+// GetInstrumentByExchangeSecurityID gets instruments by exchange security ID with pagination
 func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Context) {
 	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("id")
@@ -37,8 +39,34 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 		return
 	}
 
-	// Get the instruments
-	instruments, err := c.instrumentService.GetInstrumentsByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
+	// Get pagination parameters
+	var pagination dto.GetInstrumentsByExchangeSecurityIDRequest
+	if err := ctx.ShouldBindQuery(&pagination); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid pagination parameters",
+		})
+		return
+	}
+
+	// Default values for pagination
+	if pagination.Page <= 0 {
+		pagination.Page = 1
+	}
+	if pagination.PageSize <= 0 {
+		pagination.PageSize = 50
+	}
+	if pagination.PageSize > 1000 {
+		pagination.PageSize = 1000
+	}
+
+	// Get the paginated instruments
+	instruments, totalCount, err := c.instrumentService.GetInstrumentsByExchangeSecurityIDPaginated(
+		ctx.Request.Context(),
+		int32(exchangeSecurityID),
+		pagination.Page,
+		pagination.PageSize,
+	)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -53,9 +81,67 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 		instrumentDTOs[i] = modelToDTO(instrument)
 	}
 
+	// Calculate total pages
+	totalPages := int(totalCount) / pagination.PageSize
+	if int(totalCount)%pagination.PageSize > 0 {
+		totalPages++
+	}
+
+	// Create pagination response
+	paginationInfo := dto.PaginationDTO{
+		Page:       pagination.Page,
+		PageSize:   pagination.PageSize,
+		TotalItems: totalCount,
+		TotalPages: totalPages,
+	}
+
+	// Prepare data in the required format - separate arrays for each property
+	openValues := make([]float64, len(instruments))
+	highValues := make([]float64, len(instruments))
+	lowValues := make([]float64, len(instruments))
+	closeValues := make([]float64, len(instruments))
+	volumeValues := make([]float64, len(instruments))
+	// Using Unix timestamps (seconds since epoch) for better compatibility with frontend
+	timestampValues := make([]int64, len(instruments))
+
+	for i, instrument := range instruments {
+		openValues[i] = instrument.Open
+		highValues[i] = instrument.High
+		lowValues[i] = instrument.Low
+		closeValues[i] = instrument.Close
+		volumeValues[i] = instrument.Volume
+		timestampValues[i] = instrument.Timestamp.Unix()
+	}
+
+	// Create response using the new required format
+	instrumentData := struct {
+		Open      []float64 `json:"open"`
+		High      []float64 `json:"high"`
+		Low       []float64 `json:"low"`
+		Close     []float64 `json:"close"`
+		Volume    []float64 `json:"volume"`
+		Timestamp []int64   `json:"timestamp"`
+	}{
+		Open:      openValues,
+		High:      highValues,
+		Low:       lowValues,
+		Close:     closeValues,
+		Volume:    volumeValues,
+		Timestamp: timestampValues,
+	}
+
+	// Wrap the data in the outer structure
+	response := struct {
+		Data       interface{}       `json:"data"`
+		Pagination dto.PaginationDTO `json:"pagination"`
+	}{
+		Data:       instrumentData,
+		Pagination: paginationInfo,
+	}
+
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
-		Data:    instrumentDTOs,
+		Data:    response,
 	})
 }
 

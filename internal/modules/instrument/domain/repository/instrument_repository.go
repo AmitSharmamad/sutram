@@ -12,6 +12,9 @@ type InstrumentRepository interface {
 	// FindByExchangeSecurityID finds instruments by exchange security ID
 	FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) ([]*model.Instrument, error)
 
+	// FindByExchangeSecurityIDPaginated finds instruments by exchange security ID with pagination
+	FindByExchangeSecurityIDPaginated(ctx context.Context, exchangeSecurityID int32, page, pageSize int) ([]*model.Instrument, int64, error)
+
 	// FindByExchangeSecurityIDAndTimeRange finds instruments by exchange security ID within a time range and aggregated by timeFrame
 	// timeFrame parameter allows data aggregation by different time intervals ('1s', '1m', '3m', '5m', '15m', '30m', '1h', '3h', '1d', '1M')
 	FindByExchangeSecurityIDAndTimeRange(ctx context.Context, exchangeSecurityID int32, start, end time.Time, timeFrame string) ([]*model.Instrument, error)

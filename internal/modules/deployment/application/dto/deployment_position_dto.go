@@ -27,7 +27,7 @@ type ClosePositionRequest struct {
 
 // PositionResponse is the response for a deployment position
 type PositionResponse struct {
-	ID           int64                `json:"id"`
+	ID           uuid.UUID                `json:"id"`
 	DeploymentID uuid.UUID            `json:"deployment_id"`
 	InstrumentID int                  `json:"instrument_id"`
 	Quantity     float64              `json:"quantity"`
