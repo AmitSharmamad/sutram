@@ -5,8 +5,10 @@ import (
 )
 
 type MFI struct {
-	period int
-	offset int
+	period   int
+	maType   string
+	maPeriod int
+	offset   int
 }
 
 func (indicator *MFI) SliceData(prices Prices) Prices {
@@ -39,9 +41,13 @@ func (indicator *MFI) Calculate(
 	ctx *EvaluationContext,
 ) float64 {
 	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	maType := config[1].(string)
+	maPeriod := int(config[2].(float64))
+	offset := int(config[3].(float64))
 
 	indicator.period = period
+	indicator.maType = maType
+	indicator.maPeriod = maPeriod
 	indicator.offset = offset
 
 	highs := GetPrices(*ctx.Data, "high")
@@ -113,7 +119,21 @@ func (indicator *MFI) Calculate(
 		}
 	}
 
-	// Return the last calculated MFI value
+	// Apply moving average smoothing if maPeriod > 0
+	if indicator.maPeriod > 0 {
+		// Extract valid MFI values (skip initial zeros)
+		validMfi := mfi[period:]
+
+		// Apply the specified moving average type
+		smoothedMfi := util.CalculateMovingAverage(validMfi, indicator.maType, indicator.maPeriod)
+
+		// Return the last value from the smoothed MFI
+		if len(smoothedMfi) > 0 {
+			return util.Round(smoothedMfi[len(smoothedMfi)-1])
+		}
+	}
+
+	// Return the last calculated MFI value if no smoothing applied
 	return util.Round(mfi[len(mfi)-1])
 }
 
@@ -121,7 +141,19 @@ func (indicator *MFI) GetDataRange(config map[string]any) int32 {
 	if p, ok := config["period"].(float64); ok {
 		indicator.period = int(p)
 	} else {
-		indicator.period = 14 // default period
+		indicator.period = 20 // default period
+	}
+
+	if t, ok := config["type"].(string); ok {
+		indicator.maType = t
+	} else {
+		indicator.maType = "SIMPLE" // default type
+	}
+
+	if mp, ok := config["maPeriod"].(float64); ok {
+		indicator.maPeriod = int(mp)
+	} else {
+		indicator.maPeriod = 20 // default MA period
 	}
 
 	if o, ok := config["offset"].(float64); ok {

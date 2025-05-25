@@ -15,21 +15,19 @@ func (indicator *SMA) SliceData(prices Prices) Prices {
 	return prices[start:end]
 }
 
-// SMA(OHLCV, period, offset)
+// SMA(field, period, offset)
 func (indicator *SMA) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	point := config[0].(string)
+	field := config[0].(string)
 	period := int(config[1].(float64))
 	offset := int(config[2].(float64))
 
 	indicator.period = period
 	indicator.offset = offset
 
-	prices := GetPrices(*ctx.Data, point)
-
-	println(point, period, offset)
+	prices := GetPrices(*ctx.Data, field)
 
 	if len(prices) < period+offset {
 		return 0.0
@@ -50,17 +48,17 @@ func (indicator *SMA) Calculate(
 func (indicator *SMA) GetDataRange(config map[string]any) int32 {
 	period := indicator.period
 	if period == 0 {
-		if p, ok := config["period"].(int); ok {
-			period = p
+		if p, ok := config["period"].(float64); ok {
+			period = int(p)
 		} else {
-			period = 14 // default period
+			period = 20 // default period from indicators.json
 		}
 	}
 
 	offset := indicator.offset
 	if offset == 0 {
-		if p, ok := config["period"].(int); ok {
-			offset = p
+		if o, ok := config["offset"].(float64); ok {
+			offset = int(o)
 		} else {
 			offset = 0
 		}
