@@ -17,7 +17,6 @@ type InstrumentDTO struct {
 
 // InstrumentMasterDTO represents instrument master data for API responses
 type InstrumentMasterDTO struct {
-	ID                 uint64    `json:"id"`
 	ExchangeSecurityID int32     `json:"exchange_security_id"`
 	Exchange           string    `json:"exchange"`
 	Segment            string    `json:"segment"`
