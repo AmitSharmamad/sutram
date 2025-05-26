@@ -20,10 +20,10 @@ func RegisterRoutes(router *gin.RouterGroup, controller *InstrumentController) {
 	masters := router.Group("/instrument-master")
 	{
 		masters.GET("", controller.GetAllInstrumentMasters)
-		masters.GET("/by-ids", controller.GetInstrumentMastersByIDs)
-		masters.GET("/:id", controller.GetInstrumentMasterByID)
-		masters.PUT("/:id", controller.UpdateInstrumentMaster)
-		masters.DELETE("/:id", controller.DeleteInstrumentMaster)
+		masters.GET("/by-exchange-security-ids", controller.GetInstrumentMastersByExchangeSecurityIDs)
+		masters.GET("/by-exchange-security-id/:exchange_security_id", controller.GetInstrumentMasterByExchangeSecurityID)
+		masters.PUT("/:exchange_security_id", controller.UpdateInstrumentMaster)
+		masters.DELETE("/:exchange_security_id", controller.DeleteInstrumentMaster)
 		masters.POST("", controller.CreateInstrumentMaster)
 	}
 }
