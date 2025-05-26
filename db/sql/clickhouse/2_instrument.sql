@@ -1,7 +1,6 @@
 USE sutram;
 
 CREATE TABLE IF NOT EXISTS instrument_master (
-    id UInt64,
     exchange_security_id Int32,
     exchange LowCardinality(String),
     segment LowCardinality(String),

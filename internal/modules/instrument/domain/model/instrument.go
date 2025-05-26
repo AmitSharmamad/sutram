@@ -21,7 +21,6 @@ type StockData []Instrument
 
 // InstrumentMaster represents the master instrument record with metadata
 type InstrumentMaster struct {
-	ID                 uint64    `json:"id" db:"id"`
 	ExchangeSecurityID int32     `json:"exchange_security_id" db:"exchange_security_id"`
 	Exchange           string    `json:"exchange" db:"exchange"`
 	Segment            string    `json:"segment" db:"segment"`

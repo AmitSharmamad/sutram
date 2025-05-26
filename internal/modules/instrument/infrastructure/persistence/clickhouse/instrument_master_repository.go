@@ -23,85 +23,10 @@ func NewInstrumentMasterRepository(db *sqlx.DB) repository.InstrumentMasterRepos
 	}
 }
 
-// FindByID finds an instrument master by ID
-func (r *InstrumentMasterRepository) FindByID(ctx context.Context, id uint64) (*model.InstrumentMaster, error) {
-	query := `
-		SELECT 
-			id,
-			exchange_security_id,
-			exchange, 
-			segment, 
-			symbol, 
-			instrument, 
-			start_date, 
-			expiry,
-			exm_exch_id,
-			smst_security_id,
-			instrument_name,
-			trading_symbol,
-			lot_units,
-			strike_price,
-			option_type,
-			tick_size,
-			expiry_flag,
-			exch_instrument_type,
-			symbol_name
-		FROM sutram.instrument_master
-		WHERE exchange_security_id = ?
-		LIMIT 1
-	`
-
-	instrumentMaster := &model.InstrumentMaster{}
-	err := r.db.GetContext(ctx, instrumentMaster, query, id)
-	if err != nil {
-		return nil, fmt.Errorf("error querying instrument master by ID: %w", err)
-	}
-
-	return instrumentMaster, nil
-}
-
-// FindBySymbol finds an instrument master by symbol
-func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol string) (*model.InstrumentMaster, error) {
-	query := `
-		SELECT 
-			id,
-			exchange_security_id,
-			exchange, 
-			segment, 
-			symbol, 
-			instrument, 
-			start_date, 
-			expiry,
-			exm_exch_id,
-			smst_security_id,
-			instrument_name,
-			trading_symbol,
-			lot_units,
-			strike_price,
-			option_type,
-			tick_size,
-			expiry_flag,
-			exch_instrument_type,
-			symbol_name
-		FROM sutram.instrument_master
-		WHERE symbol = ?
-		LIMIT 1
-	`
-
-	instrumentMaster := &model.InstrumentMaster{}
-	err := r.db.GetContext(ctx, instrumentMaster, query, symbol)
-	if err != nil {
-		return nil, fmt.Errorf("error querying instrument master by symbol: %w", err)
-	}
-
-	return instrumentMaster, nil
-}
-
-// FindByExchangeSecurityID finds an instrument master by exchange security ID
-func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) (*model.InstrumentMaster, error) {
+// FindByExchangeSecurityID finds an instrument master by exchange security ID (this is now our primary lookup)
+func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Context, exchangeSecurityID int64) (*model.InstrumentMaster, error) {
 	query := `
 		SELECT
-			id,
 			exchange_security_id,
 			exchange,
 			segment,
@@ -134,11 +59,46 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Contex
 	return instrumentMaster, nil
 }
 
+// FindBySymbol finds an instrument master by symbol
+func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol string) (*model.InstrumentMaster, error) {
+	query := `
+		SELECT 
+			exchange_security_id,
+			exchange, 
+			segment, 
+			symbol, 
+			instrument, 
+			start_date, 
+			expiry,
+			exm_exch_id,
+			smst_security_id,
+			instrument_name,
+			trading_symbol,
+			lot_units,
+			strike_price,
+			option_type,
+			tick_size,
+			expiry_flag,
+			exch_instrument_type,
+			symbol_name
+		FROM sutram.instrument_master
+		WHERE symbol = ?
+		LIMIT 1
+	`
+
+	instrumentMaster := &model.InstrumentMaster{}
+	err := r.db.GetContext(ctx, instrumentMaster, query, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("error querying instrument master by symbol: %w", err)
+	}
+
+	return instrumentMaster, nil
+}
+
 // FindByExchange finds instrument masters by exchange
 func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchange string) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id,
 			exchange_security_id, 
 			exchange, 
 			segment, 
@@ -174,7 +134,6 @@ func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchang
 func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment string) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id,
 			exchange_security_id,
 			exchange, 
 			segment, 
@@ -210,7 +169,6 @@ func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment 
 func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.InstrumentMaster, error) {
 	query := `
 		SELECT 
-			id,
 			exchange_security_id, 
 			exchange, 
 			segment, 
@@ -245,7 +203,6 @@ func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.Inst
 func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaster *model.InstrumentMaster) error {
 	query := `
 		INSERT INTO instrument_master (
-			id,
 			exchange_security_id,
 			exchange,
 			segment,
@@ -264,13 +221,12 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 			expiry_flag,
 			exch_instrument_type,
 			symbol_name
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
-		instrumentMaster.ID,
 		instrumentMaster.ExchangeSecurityID,
 		instrumentMaster.Exchange,
 		instrumentMaster.Segment,
@@ -298,13 +254,12 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 	return nil
 }
 
-// Update updates an instrument master
+// Update updates an instrument master by exchange security ID
 func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaster *model.InstrumentMaster) error {
 	// Note: ClickHouse typically doesn't support direct updates as in traditional RDBMS
 	// This is a simplified version assuming you're using ALTER TABLE UPDATE syntax
 	query := `
 		ALTER TABLE instrument_master UPDATE
-			exchange_security_id = ?,
 			exchange = ?,
 			segment = ?,
 			symbol = ?,
@@ -322,13 +277,12 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 			expiry_flag = ?,
 			exch_instrument_type = ?,
 			symbol_name = ?
-		WHERE id = ?
+		WHERE exchange_security_id = ?
 	`
 
 	_, err := r.db.ExecContext(
 		ctx,
 		query,
-		instrumentMaster.ExchangeSecurityID,
 		instrumentMaster.Exchange,
 		instrumentMaster.Segment,
 		instrumentMaster.Symbol,
@@ -346,7 +300,7 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 		instrumentMaster.ExpiryFlag,
 		instrumentMaster.ExchInstrumentType,
 		instrumentMaster.SymbolName,
-		instrumentMaster.ID,
+		instrumentMaster.ExchangeSecurityID,
 	)
 
 	if err != nil {
@@ -356,13 +310,13 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 	return nil
 }
 
-// Delete deletes an instrument master
-func (r *InstrumentMasterRepository) Delete(ctx context.Context, id uint64) error {
+// Delete deletes an instrument master by exchange security ID
+func (r *InstrumentMasterRepository) Delete(ctx context.Context, exchangeSecurityID int64) error {
 	query := `
-		ALTER TABLE instrument_master DELETE WHERE id = ?
+		ALTER TABLE instrument_master DELETE WHERE exchange_security_id = ?
 	`
 
-	_, err := r.db.ExecContext(ctx, query, id)
+	_, err := r.db.ExecContext(ctx, query, exchangeSecurityID)
 	if err != nil {
 		return fmt.Errorf("error deleting instrument master: %w", err)
 	}
@@ -402,7 +356,6 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	// Query to get filtered and paginated data
 	sqlQuery := fmt.Sprintf(`
 		SELECT 
-			id,
 			exchange_security_id, 
 			exchange, 
 			segment, 
@@ -453,23 +406,22 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 	return instrumentMasters, totalCount, nil
 }
 
-// FindByIDs finds multiple instrument masters by their IDs
-func (r *InstrumentMasterRepository) FindByIDs(ctx context.Context, ids []uint64) ([]*model.InstrumentMaster, error) {
-	if len(ids) == 0 {
+// FindByExchangeSecurityIDs finds multiple instrument masters by their exchange security IDs
+func (r *InstrumentMasterRepository) FindByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int64) ([]*model.InstrumentMaster, error) {
+	if len(exchangeSecurityIDs) == 0 {
 		return []*model.InstrumentMaster{}, nil
 	}
 
 	// Convert the slice of IDs to a comma-separated string for the IN clause
-	placeholders := make([]string, len(ids))
-	args := make([]interface{}, len(ids))
-	for i, id := range ids {
+	placeholders := make([]string, len(exchangeSecurityIDs))
+	args := make([]interface{}, len(exchangeSecurityIDs))
+	for i, id := range exchangeSecurityIDs {
 		placeholders[i] = "?"
 		args[i] = id
 	}
 
 	query := fmt.Sprintf(`
 		SELECT 
-			id,
 			exchange_security_id, 
 			exchange, 
 			segment, 
@@ -489,13 +441,13 @@ func (r *InstrumentMasterRepository) FindByIDs(ctx context.Context, ids []uint64
 			exch_instrument_type,
 			symbol_name
 		FROM sutram.instrument_master
-		WHERE id IN (%s)
+		WHERE exchange_security_id IN (%s)
 	`, strings.Join(placeholders, ","))
 
 	instrumentMasters := []*model.InstrumentMaster{}
 	err := r.db.SelectContext(ctx, &instrumentMasters, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("error querying instrument masters by IDs: %w", err)
+		return nil, fmt.Errorf("error querying instrument masters by exchange security IDs: %w", err)
 	}
 
 	return instrumentMasters, nil

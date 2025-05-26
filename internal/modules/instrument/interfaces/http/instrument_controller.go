@@ -145,21 +145,21 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 	})
 }
 
-// GetInstrumentMasterByID gets an instrument master by ID
-func (c *InstrumentController) GetInstrumentMasterByID(ctx *gin.Context) {
-	// Get instrument master ID from URL parameter
-	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+// GetInstrumentMasterByExchangeSecurityID gets an instrument master by exchange security ID
+func (c *InstrumentController) GetInstrumentMasterByExchangeSecurityID(ctx *gin.Context) {
+	// Get exchange security ID from URL parameter
+	idParam := ctx.Param("exchange_security_id")
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument master ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
 
 	// Get the instrument master
-	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByID(ctx.Request.Context(), id)
+	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), exchangeSecurityID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -276,41 +276,42 @@ func (c *InstrumentController) GetAllInstrumentMasters(ctx *gin.Context) {
 	})
 }
 
-// GetInstrumentMastersByIDs gets instrument masters by their IDs
-func (c *InstrumentController) GetInstrumentMastersByIDs(ctx *gin.Context) {
-	// Get IDs from query parameter - expected format: ?ids=1,2,3,4
-	idsParam := ctx.Query("ids")
+// GetInstrumentMastersByExchangeSecurityIDs gets instrument masters by their exchange security IDs
+func (c *InstrumentController) GetInstrumentMastersByExchangeSecurityIDs(ctx *gin.Context) {
+	// Get exchange security IDs from query parameter - expected format: ?exchange_security_ids=1,2,3,4
+	idsParam := ctx.Query("exchange_security_ids")
 	if idsParam == "" {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Missing required query parameter: ids",
+			Error:   "Missing required query parameter: exchange_security_ids",
 		})
 		return
 	}
 
-	// Split the comma-separated IDs and parse them to uint64
+	// Split the comma-separated IDs and parse them to int64
 	idStrings := strings.Split(idsParam, ",")
-	ids := make([]uint64, 0, len(idStrings))
+	exchangeSecurityIDs := make([]int64, 0, len(idStrings))
 
 	for _, idStr := range idStrings {
-		id, err := strconv.ParseUint(strings.TrimSpace(idStr), 10, 64)
+		exchangeSecurityID, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 64)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 				Success: false,
-				Error:   "Invalid ID format: " + idStr,
+				Error:   "Invalid exchange security ID format: " + idStr,
 			})
 			return
 		}
-		ids = append(ids, id)
+		exchangeSecurityIDs = append(exchangeSecurityIDs, exchangeSecurityID)
 	}
 
 	// Get instrument masters
-	instrumentMasters := make([]*model.InstrumentMaster, 0, len(ids))
-	for _, id := range ids {
-		instrumentMaster, err := c.instrumentService.GetInstrumentMasterByID(ctx.Request.Context(), id)
-		if err == nil && instrumentMaster != nil {
-			instrumentMasters = append(instrumentMasters, instrumentMaster)
-		}
+	instrumentMasters, err := c.instrumentService.GetInstrumentMastersByExchangeSecurityIDs(ctx.Request.Context(), exchangeSecurityIDs)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get instrument masters: " + err.Error(),
+		})
+		return
 	}
 
 	// Convert instrument master models to DTOs
@@ -506,13 +507,13 @@ func (c *InstrumentController) CreateInstrumentMaster(ctx *gin.Context) {
 
 // UpdateInstrumentMaster updates an instrument master
 func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
-	// Get instrument master ID from URL parameter
-	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	// Get exchange security ID from URL parameter
+	idParam := ctx.Param("exchange_security_id")
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument master ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
@@ -527,7 +528,7 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	}
 
 	// Get existing instrument master
-	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByID(ctx.Request.Context(), id)
+	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), exchangeSecurityID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -640,19 +641,19 @@ func (c *InstrumentController) DeleteInstrument(ctx *gin.Context) {
 
 // DeleteInstrumentMaster deletes an instrument master
 func (c *InstrumentController) DeleteInstrumentMaster(ctx *gin.Context) {
-	// Get instrument master ID from URL parameter
-	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	// Get exchange security ID from URL parameter
+	idParam := ctx.Param("exchange_security_id")
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
-			Error:   "Invalid instrument master ID",
+			Error:   "Invalid exchange security ID",
 		})
 		return
 	}
 
 	// Delete the instrument master
-	err = c.instrumentService.DeleteInstrumentMaster(ctx.Request.Context(), id)
+	err = c.instrumentService.DeleteInstrumentMaster(ctx.Request.Context(), exchangeSecurityID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
 			Success: false,
@@ -691,7 +692,6 @@ func masterModelToDTO(master *model.InstrumentMaster) *dto.InstrumentMasterDTO {
 	}
 
 	return &dto.InstrumentMasterDTO{
-		ID:                 master.ID,
 		ExchangeSecurityID: master.ExchangeSecurityID,
 		Exchange:           master.Exchange,
 		Segment:            master.Segment,

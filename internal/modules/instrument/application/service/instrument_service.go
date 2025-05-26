@@ -70,11 +70,11 @@ func (s *InstrumentService) GetInstrumentsByExchangeSecurityIDPaginated(ctx cont
 	return instruments, totalCount, nil
 }
 
-// GetInstrumentMasterByID gets an instrument master by ID
-func (s *InstrumentService) GetInstrumentMasterByID(ctx context.Context, id uint64) (*model.InstrumentMaster, error) {
-	instrumentMaster, err := s.instrumentMasterRepo.FindByID(ctx, id)
+// GetInstrumentMasterByExchangeSecurityID gets an instrument master by exchange security ID
+func (s *InstrumentService) GetInstrumentMasterByExchangeSecurityID(ctx context.Context, exchangeSecurityID int64) (*model.InstrumentMaster, error) {
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding instrument master: %w", err)
+		return nil, fmt.Errorf("error finding instrument master by exchange security ID: %w", err)
 	}
 	if instrumentMaster == nil {
 		return nil, ErrInstrumentNotFound
@@ -198,8 +198,8 @@ func (s *InstrumentService) CreateInstrumentMaster(ctx context.Context, master *
 
 // UpdateInstrumentMaster updates an instrument master
 func (s *InstrumentService) UpdateInstrumentMaster(ctx context.Context, master *model.InstrumentMaster) error {
-	// Check if instrument master exists
-	existing, err := s.instrumentMasterRepo.FindByID(ctx, master.ID)
+	// Check if instrument master exists by exchange security ID
+	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(master.ExchangeSecurityID))
 	if err != nil {
 		return fmt.Errorf("error finding instrument master: %w", err)
 	}
@@ -230,10 +230,10 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, exchangeSecuri
 	return nil
 }
 
-// DeleteInstrumentMaster deletes an instrument master
-func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, id uint64) error {
+// DeleteInstrumentMaster deletes an instrument master by exchange security ID
+func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, exchangeSecurityID int64) error {
 	// Check if instrument master exists
-	existing, err := s.instrumentMasterRepo.FindByID(ctx, id)
+	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
 		return fmt.Errorf("error finding instrument master: %w", err)
 	}
@@ -241,7 +241,7 @@ func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, id uint6
 		return ErrInstrumentNotFound
 	}
 
-	if err := s.instrumentMasterRepo.Delete(ctx, id); err != nil {
+	if err := s.instrumentMasterRepo.Delete(ctx, exchangeSecurityID); err != nil {
 		return fmt.Errorf("error deleting instrument master: %w", err)
 	}
 	return nil
@@ -302,11 +302,11 @@ func (s *InstrumentService) GetInstrumentDataWithLookback(
 	return &result, nil
 }
 
-// GetInstrumentMastersByIDs gets multiple instrument masters by their IDs
-func (s *InstrumentService) GetInstrumentMastersByIDs(ctx context.Context, ids []uint64) ([]*model.InstrumentMaster, error) {
-	instrumentMasters, err := s.instrumentMasterRepo.FindByIDs(ctx, ids)
+// GetInstrumentMastersByExchangeSecurityIDs gets multiple instrument masters by their exchange security IDs
+func (s *InstrumentService) GetInstrumentMastersByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int64) ([]*model.InstrumentMaster, error) {
+	instrumentMasters, err := s.instrumentMasterRepo.FindByExchangeSecurityIDs(ctx, exchangeSecurityIDs)
 	if err != nil {
-		return nil, fmt.Errorf("error finding instrument masters by IDs: %w", err)
+		return nil, fmt.Errorf("error finding instrument masters by exchange security IDs: %w", err)
 	}
 	return instrumentMasters, nil
 }
