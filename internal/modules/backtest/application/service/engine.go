@@ -82,11 +82,11 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 	var wg sync.WaitGroup
 
 	for _, instrumentID := range strategyResp.Instruments {
-		// Fetch instrument data using ID directly
+		// Fetch instrument data using exchange security ID directly
 		// TODO: Move this outside of the loop
-		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByID(
+		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
 			ctx,
-			uint64(instrumentID),
+			int64(instrumentID),
 		)
 		if err != nil {
 			// Log error and continue with other instruments
@@ -200,17 +200,17 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 
 	startTime := time.Now()
 
-	instrumentMaster, err := e.instrumentService.GetInstrumentMasterByID(
+	instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
 		ctx,
-		uint64(instrumentID),
+		int64(instrumentID),
 	)
 	if err != nil {
-		println("Error getting instrument master for ID:", instrumentID, "Error:", err.Error())
+		println("Error getting instrument master for exchange security ID:", instrumentID, "Error:", err.Error())
 		return
 	}
 
 	if instrumentMaster == nil {
-		println("Instrument master is nil for ID:", instrumentID)
+		println("Instrument master is nil for exchange security ID:", instrumentID)
 		return
 	}
 
