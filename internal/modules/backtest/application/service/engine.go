@@ -690,8 +690,7 @@ func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strat
 func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyResponse, price float64) float64 {
 	// 1. If strategy.qty <= 0 and strategy.max_allocation <= 0 throw an error
 	if strategy.Qty <= 0 && strategy.MaxAllocation <= 0 {
-		println("Error calculating position size: Both Qty and MaxAllocation are invalid (<=0)")
-		return 0
+		panic("Invalid position size parameters")
 	}
 
 	// 2. If strategy.qty > 0 and strategy.max_allocation <= 0 then return strategy.qty
@@ -700,8 +699,13 @@ func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyRes
 	}
 
 	// 3. If strategy.qty <= 0 and strategy.max_allocation > 0 then return strategy.max_allocation / price as integer
+	// Ensure at least 1 share is purchased if the calculation results in less than 0
 	if strategy.Qty <= 0 && strategy.MaxAllocation > 0 {
-		return math.Floor(strategy.MaxAllocation / price)
+		quantity := math.Floor(strategy.MaxAllocation / price)
+		if quantity <= 0 {
+			return 1
+		}
+		return quantity
 	}
 
 	// 4. If strategy.qty > 0 and strategy.max_allocation > 0,
@@ -710,7 +714,11 @@ func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyRes
 	if qtyValue < strategy.MaxAllocation {
 		return float64(strategy.Qty)
 	} else {
-		return math.Floor(strategy.MaxAllocation / price)
+		quantity := math.Floor(strategy.MaxAllocation / price)
+		if quantity <= 0 {
+			return 1
+		}
+		return quantity
 	}
 }
 
