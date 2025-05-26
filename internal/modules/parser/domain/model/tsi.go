@@ -10,6 +10,7 @@ type TSI struct {
 	shortPeriod  int
 	signalPeriod int
 	offset       int
+	lineType     string
 }
 
 func (indicator *TSI) SliceData(prices Prices) Prices {
@@ -30,18 +31,20 @@ func (indicator *TSI) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	point := config[0].(string)
-	longPeriod := int(config[1].(float64))
-	shortPeriod := int(config[2].(float64))
-	signalPeriod := int(config[3].(float64))
-	offset := int(config[4].(float64))
+	field := config[0].(string)
+	lineType := config[1].(string)
+	longPeriod := int(config[2].(float64))
+	shortPeriod := int(config[3].(float64))
+	signalPeriod := int(config[4].(float64))
+	offset := int(config[5].(float64))
 
 	indicator.longPeriod = longPeriod
 	indicator.shortPeriod = shortPeriod
 	indicator.signalPeriod = signalPeriod
 	indicator.offset = offset
+	indicator.lineType = lineType
 
-	prices := GetPrices(*ctx.Data, point)
+	prices := GetPrices(*ctx.Data, field)
 
 	// Check if we have enough data points
 	totalPeriod := longPeriod + shortPeriod + signalPeriod
@@ -153,8 +156,13 @@ func (indicator *TSI) Calculate(
 		signal[i] = (tsi[i]-signal[i-1])*multiplierSignal + signal[i-1]
 	}
 
-	// Return the last calculated TSI value
-	return util.Round(tsi[len(tsi)-1])
+	// Return the appropriate value based on lineType
+	if indicator.lineType == "SIGNAL" {
+		return util.Round(signal[len(signal)-1])
+	} else {
+		// Default is "TSI"
+		return util.Round(tsi[len(tsi)-1])
+	}
 }
 
 func (indicator *TSI) GetDataRange(config map[string]any) int32 {
@@ -173,7 +181,7 @@ func (indicator *TSI) GetDataRange(config map[string]any) int32 {
 	if p, ok := config["signalPeriod"].(float64); ok {
 		indicator.signalPeriod = int(p)
 	} else {
-		indicator.signalPeriod = 7 // default signal period
+		indicator.signalPeriod = 13 // default signal period
 	}
 
 	if o, ok := config["offset"].(float64); ok {

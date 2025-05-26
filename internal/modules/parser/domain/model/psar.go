@@ -40,12 +40,12 @@ func (indicator *ParabolicSAR) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	acceleration := float64(config[0].(float64))
-	maxAcceleration := float64(config[1].(float64))
+	minimumAF := float64(config[0].(float64))
+	maximumAF := float64(config[1].(float64))
 	offset := int(config[2].(float64))
 
-	indicator.acceleration = acceleration
-	indicator.maxAcceleration = maxAcceleration
+	indicator.acceleration = minimumAF
+	indicator.maxAcceleration = maximumAF
 	indicator.offset = offset
 
 	highs := GetPrices(*ctx.Data, "high")
@@ -163,13 +163,13 @@ func (indicator *ParabolicSAR) Calculate(
 }
 
 func (indicator *ParabolicSAR) GetDataRange(config map[string]any) int32 {
-	if a, ok := config["acceleration"].(float64); ok {
+	if a, ok := config["minimumAF"].(float64); ok {
 		indicator.acceleration = a
 	} else {
 		indicator.acceleration = 0.02 // default initial acceleration
 	}
 
-	if m, ok := config["maxAcceleration"].(float64); ok {
+	if m, ok := config["maximumAF"].(float64); ok {
 		indicator.maxAcceleration = m
 	} else {
 		indicator.maxAcceleration = 0.2 // default maximum acceleration

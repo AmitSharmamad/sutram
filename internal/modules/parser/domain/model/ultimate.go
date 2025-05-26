@@ -5,18 +5,15 @@ import (
 )
 
 type UltimateOscillator struct {
-	shortPeriod int
-	midPeriod   int
-	longPeriod  int
-	weightShort float64
-	weightMid   float64
-	weightLong  float64
-	offset      int
+	length1 int
+	length2 int
+	length3 int
+	offset  int
 }
 
 func (indicator *UltimateOscillator) SliceData(prices Prices) Prices {
 	// We need enough data to calculate Ultimate Oscillator properly
-	start := max(0, len(prices)-(indicator.offset+2*indicator.longPeriod))
+	start := max(0, len(prices)-(indicator.offset+2*indicator.length3))
 	end := len(prices) - indicator.offset
 
 	if start < 0 || end <= start || end > len(prices) {
@@ -29,7 +26,7 @@ func (indicator *UltimateOscillator) SliceData(prices Prices) Prices {
 // Helper method to slice all required data
 func (indicator *UltimateOscillator) sliceAllData(highs, lows, closes Prices) (Prices, Prices, Prices) {
 	// We need enough data to calculate Ultimate Oscillator properly
-	start := max(0, len(closes)-(indicator.offset+2*indicator.longPeriod))
+	start := max(0, len(closes)-(indicator.offset+2*indicator.length3))
 	end := len(closes) - indicator.offset
 
 	if start < 0 || end <= start || end > len(closes) {
@@ -43,35 +40,35 @@ func (indicator *UltimateOscillator) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	shortPeriod := int(config[0].(float64))
-	midPeriod := int(config[1].(float64))
-	longPeriod := int(config[2].(float64))
-	weightShort := float64(config[3].(float64))
-	weightMid := float64(config[4].(float64))
-	weightLong := float64(config[5].(float64))
-	offset := int(config[6].(float64))
+	length1 := int(config[0].(float64))
+	length2 := int(config[1].(float64))
+	length3 := int(config[2].(float64))
+	offset := int(config[3].(float64))
 
-	indicator.shortPeriod = shortPeriod
-	indicator.midPeriod = midPeriod
-	indicator.longPeriod = longPeriod
-	indicator.weightShort = weightShort
-	indicator.weightMid = weightMid
-	indicator.weightLong = weightLong
+	indicator.length1 = length1
+	indicator.length2 = length2
+	indicator.length3 = length3
 	indicator.offset = offset
+
+	// Standard weights for Ultimate Oscillator calculation
+	// Using 4:2:1 ratio as per traditional implementation
+	weightShort := 4.0
+	weightMid := 2.0
+	weightLong := 1.0
 
 	highs := GetPrices(*ctx.Data, "high")
 	lows := GetPrices(*ctx.Data, "low")
 	closes := GetPrices(*ctx.Data, "close")
 
 	// Check if we have enough data points
-	if len(highs) < longPeriod+offset+1 || len(lows) < longPeriod+offset+1 || len(closes) < longPeriod+offset+1 {
+	if len(highs) < length3+offset+1 || len(lows) < length3+offset+1 || len(closes) < length3+offset+1 {
 		return 0.0
 	}
 
 	highs, lows, closes = indicator.sliceAllData(highs, lows, closes)
 
-	// Need at least longPeriod+1 data points to calculate
-	if len(highs) < longPeriod+1 || len(lows) < longPeriod+1 || len(closes) < longPeriod+1 {
+	// Need at least length3+1 data points to calculate
+	if len(highs) < length3+1 || len(lows) < length3+1 || len(closes) < length3+1 {
 		return 0.0
 	}
 
@@ -87,62 +84,60 @@ func (indicator *UltimateOscillator) Calculate(
 		tr[i] = max(highs[i], closes[i-1]) - min(lows[i], closes[i-1])
 	}
 
-	// Calculate Average7, Average14, and Average28
-	var sumBPShort, sumTRShort float64
-	var sumBPMid, sumTRMid float64
-	var sumBPLong, sumTRLong float64
+	// Calculate averages for each period
+	var sumBP1, sumTR1 float64
+	var sumBP2, sumTR2 float64
+	var sumBP3, sumTR3 float64
 
 	// Calculate UO
 	var uo = make([]float64, len(closes))
 
-	for i := indicator.longPeriod; i < len(closes); i++ {
+	for i := indicator.length3; i < len(closes); i++ {
 		// Reset sums for each period
-		sumBPShort = 0
-		sumTRShort = 0
-		sumBPMid = 0
-		sumTRMid = 0
-		sumBPLong = 0
-		sumTRLong = 0
+		sumBP1 = 0
+		sumTR1 = 0
+		sumBP2 = 0
+		sumTR2 = 0
+		sumBP3 = 0
+		sumTR3 = 0
 
 		// Calculate short period sums
-		for j := i - indicator.shortPeriod + 1; j <= i; j++ {
-			sumBPShort += bp[j]
-			sumTRShort += tr[j]
+		for j := i - indicator.length1 + 1; j <= i; j++ {
+			sumBP1 += bp[j]
+			sumTR1 += tr[j]
 		}
 
 		// Calculate mid period sums
-		for j := i - indicator.midPeriod + 1; j <= i; j++ {
-			sumBPMid += bp[j]
-			sumTRMid += tr[j]
+		for j := i - indicator.length2 + 1; j <= i; j++ {
+			sumBP2 += bp[j]
+			sumTR2 += tr[j]
 		}
 
 		// Calculate long period sums
-		for j := i - indicator.longPeriod + 1; j <= i; j++ {
-			sumBPLong += bp[j]
-			sumTRLong += tr[j]
+		for j := i - indicator.length3 + 1; j <= i; j++ {
+			sumBP3 += bp[j]
+			sumTR3 += tr[j]
 		}
 
 		// Calculate averages
-		var average7, average14, average28 float64
+		var avg1, avg2, avg3 float64
 
 		// Avoid division by zero
-		if sumTRShort > 0 {
-			average7 = sumBPShort / sumTRShort
+		if sumTR1 > 0 {
+			avg1 = sumBP1 / sumTR1
 		}
 
-		if sumTRMid > 0 {
-			average14 = sumBPMid / sumTRMid
+		if sumTR2 > 0 {
+			avg2 = sumBP2 / sumTR2
 		}
 
-		if sumTRLong > 0 {
-			average28 = sumBPLong / sumTRLong
+		if sumTR3 > 0 {
+			avg3 = sumBP3 / sumTR3
 		}
 
 		// Calculate Ultimate Oscillator
-		totalWeight := indicator.weightShort + indicator.weightMid + indicator.weightLong
-		uo[i] = 100 * ((indicator.weightShort*average7 +
-			indicator.weightMid*average14 +
-			indicator.weightLong*average28) / totalWeight)
+		totalWeight := weightShort + weightMid + weightLong
+		uo[i] = 100 * ((weightShort*avg1 + weightMid*avg2 + weightLong*avg3) / totalWeight)
 	}
 
 	// Return the last calculated Ultimate Oscillator value
@@ -150,40 +145,22 @@ func (indicator *UltimateOscillator) Calculate(
 }
 
 func (indicator *UltimateOscillator) GetDataRange(config map[string]any) int32 {
-	if p, ok := config["shortPeriod"].(float64); ok {
-		indicator.shortPeriod = int(p)
+	if p, ok := config["length1"].(float64); ok {
+		indicator.length1 = int(p)
 	} else {
-		indicator.shortPeriod = 7 // default short period
+		indicator.length1 = 7 // default short period
 	}
 
-	if p, ok := config["midPeriod"].(float64); ok {
-		indicator.midPeriod = int(p)
+	if p, ok := config["length2"].(float64); ok {
+		indicator.length2 = int(p)
 	} else {
-		indicator.midPeriod = 14 // default mid period
+		indicator.length2 = 14 // default mid period
 	}
 
-	if p, ok := config["longPeriod"].(float64); ok {
-		indicator.longPeriod = int(p)
+	if p, ok := config["length3"].(float64); ok {
+		indicator.length3 = int(p)
 	} else {
-		indicator.longPeriod = 28 // default long period
-	}
-
-	if w, ok := config["weightShort"].(float64); ok {
-		indicator.weightShort = w
-	} else {
-		indicator.weightShort = 4.0 // default weight for short period
-	}
-
-	if w, ok := config["weightMid"].(float64); ok {
-		indicator.weightMid = w
-	} else {
-		indicator.weightMid = 2.0 // default weight for mid period
-	}
-
-	if w, ok := config["weightLong"].(float64); ok {
-		indicator.weightLong = w
-	} else {
-		indicator.weightLong = 1.0 // default weight for long period
+		indicator.length3 = 28 // default long period
 	}
 
 	if o, ok := config["offset"].(float64); ok {
@@ -192,6 +169,6 @@ func (indicator *UltimateOscillator) GetDataRange(config map[string]any) int32 {
 		indicator.offset = 0
 	}
 
-	// We need longPeriod+1 data points (due to the use of previous values) + offset
-	return int32(indicator.longPeriod + 1 + indicator.offset)
+	// We need length3+1 data points (due to the use of previous values) + offset
+	return int32(indicator.length3 + 1 + indicator.offset)
 }
