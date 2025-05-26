@@ -43,13 +43,20 @@ func (indicator *KeltnerChannels) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	emaPeriod := int(config[0].(float64))
-	atrPeriod := int(config[1].(float64))
-	multiplier := float64(config[2].(float64))
-	offset := int(config[3].(float64))
+	// Parse config parameters according to indicators.json
+	emaPeriod := int(config[0].(float64))      // default: 50
+	bandType := config[1].(string)             // default: "MEDIAN"
+	maType := config[2].(string)               // default: "EXPONENTIAL"
+	multiplier := float64(config[3].(float64)) // default: 5
+	offset := 0
+
+	// Handle optional parameter if present
+	if len(config) > 4 {
+		offset = int(config[4].(float64))
+	}
 
 	indicator.emaPeriod = emaPeriod
-	indicator.atrPeriod = atrPeriod
+	indicator.atrPeriod = emaPeriod // Using same period for ATR calculation
 	indicator.multiplier = multiplier
 	indicator.offset = offset
 
@@ -58,7 +65,7 @@ func (indicator *KeltnerChannels) Calculate(
 	closes := GetPrices(*ctx.Data, "close")
 
 	// Check if we have enough data points
-	maxPeriod := max(emaPeriod, atrPeriod)
+	maxPeriod := emaPeriod
 	if len(highs) < maxPeriod+offset+1 || len(lows) < maxPeriod+offset+1 || len(closes) < maxPeriod+offset+1 {
 		return 0.0
 	}
@@ -70,27 +77,15 @@ func (indicator *KeltnerChannels) Calculate(
 		return 0.0
 	}
 
-	// Calculate EMA of typical price (middle line)
-	var typicalPrices = make([]float64, len(closes))
+	// Calculate price series (always using median price for Keltner)
+	var prices = make([]float64, len(closes))
 	for i := 0; i < len(closes); i++ {
-		typicalPrices[i] = (highs[i] + lows[i] + closes[i]) / 3.0
+		// For Keltner Channels, we typically use median price (high+low)/2
+		prices[i] = (highs[i] + lows[i]) / 2.0
 	}
 
-	// Calculate EMA
-	multiplierEMA := 2.0 / float64(indicator.emaPeriod+1)
-	var emaSum float64
-	for i := 0; i < indicator.emaPeriod; i++ {
-		emaSum += typicalPrices[i]
-	}
-	ema := emaSum / float64(indicator.emaPeriod)
-
-	var emas = make([]float64, len(closes))
-	emas[indicator.emaPeriod-1] = ema
-
-	for i := indicator.emaPeriod; i < len(closes); i++ {
-		ema = (typicalPrices[i]-ema)*multiplierEMA + ema
-		emas[i] = ema
-	}
+	// Calculate moving average using utility function
+	emas := util.CalculateMovingAverage(prices, maType, indicator.emaPeriod)
 
 	// Calculate ATR (Average True Range)
 	var tr = make([]float64, len(closes))
@@ -106,47 +101,92 @@ func (indicator *KeltnerChannels) Calculate(
 		)
 	}
 
-	// Calculate initial ATR as simple average of TR
-	var atrSum float64
-	for i := 1; i <= indicator.atrPeriod; i++ {
-		atrSum += tr[i]
-	}
-	atr := atrSum / float64(indicator.atrPeriod)
+	// Calculate ATR using moving average on TR
+	trData := tr[1:] // Skip the first zero value
+	atrs := util.CalculateMovingAverage(trData, maType, indicator.atrPeriod)
 
-	var atrs = make([]float64, len(closes))
-	atrs[indicator.atrPeriod] = atr
-
-	// Calculate subsequent ATR values
-	for i := indicator.atrPeriod + 1; i < len(closes); i++ {
-		atr = ((atr * float64(indicator.atrPeriod-1)) + tr[i]) / float64(indicator.atrPeriod)
-		atrs[i] = atr
+	// Adjust ATR length to match the original data
+	fullAtrs := make([]float64, len(closes))
+	// Fill in missing values at the beginning
+	for i := 0; i < indicator.atrPeriod+1; i++ {
+		fullAtrs[i] = 0.0
 	}
+	// Copy calculated values
+	copy(fullAtrs[indicator.atrPeriod+1:], atrs)
 
 	// Calculate upper and lower bands
 	var upperBand = make([]float64, len(closes))
 	var lowerBand = make([]float64, len(closes))
 
-	maxIndex := max(indicator.emaPeriod, indicator.atrPeriod+1)
-	for i := maxIndex; i < len(closes); i++ {
-		upperBand[i] = emas[i] + indicator.multiplier*atrs[i]
-		lowerBand[i] = emas[i] - indicator.multiplier*atrs[i]
+	// Determine the start index for valid calculations
+	startIndex := indicator.emaPeriod
+	if len(emas) < len(closes) {
+		startIndex += len(closes) - len(emas)
 	}
 
-	// Return the middle line (EMA)
-	return util.Round(emas[len(emas)-1])
+	for i := startIndex; i < len(closes); i++ {
+		if i < len(emas) {
+			// Calculate bands using MA and ATR
+			ema := 0.0
+			if i < len(emas) {
+				ema = emas[i-startIndex]
+			}
+
+			atr := 0.0
+			if i < len(fullAtrs) {
+				atr = fullAtrs[i]
+			}
+
+			upperBand[i] = ema + indicator.multiplier*atr
+			lowerBand[i] = ema - indicator.multiplier*atr
+		}
+	}
+
+	// Determine which band to return based on bandType
+	if len(emas) > 0 {
+		var result float64
+		lastEmaIndex := len(emas) - 1
+		lastAtrIndex := min(len(atrs)-1, len(fullAtrs)-1-indicator.atrPeriod-1)
+
+		switch bandType {
+		case "TOP":
+			if lastAtrIndex >= 0 {
+				result = emas[lastEmaIndex] + indicator.multiplier*atrs[lastAtrIndex]
+			} else {
+				result = emas[lastEmaIndex]
+			}
+		case "BOTTOM":
+			if lastAtrIndex >= 0 {
+				result = emas[lastEmaIndex] - indicator.multiplier*atrs[lastAtrIndex]
+			} else {
+				result = emas[lastEmaIndex]
+			}
+		default: // "MEDIAN" or any other value
+			result = emas[lastEmaIndex]
+		}
+		return util.Round(result)
+	}
+	return 0.0
 }
 
 func (indicator *KeltnerChannels) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
 ) (float64, float64, float64) {
-	emaPeriod := int(config[0].(float64))
-	atrPeriod := int(config[1].(float64))
-	multiplier := float64(config[2].(float64))
-	offset := int(config[3].(float64))
+	// Parse config parameters according to indicators.json
+	emaPeriod := int(config[0].(float64))      // default: 50
+	_ = config[1].(string)                     // bandType is not used in CalculateAll
+	maType := config[2].(string)               // default: "EXPONENTIAL"
+	multiplier := float64(config[3].(float64)) // default: 5
+	offset := 0
+
+	// Handle optional parameter if present
+	if len(config) > 4 {
+		offset = int(config[4].(float64))
+	}
 
 	indicator.emaPeriod = emaPeriod
-	indicator.atrPeriod = atrPeriod
+	indicator.atrPeriod = emaPeriod // Using same period for ATR calculation
 	indicator.multiplier = multiplier
 	indicator.offset = offset
 
@@ -155,7 +195,7 @@ func (indicator *KeltnerChannels) CalculateAll(
 	closes := GetPrices(*ctx.Data, "close")
 
 	// Check if we have enough data points
-	maxPeriod := max(emaPeriod, atrPeriod)
+	maxPeriod := emaPeriod
 	if len(highs) < maxPeriod+offset+1 || len(lows) < maxPeriod+offset+1 || len(closes) < maxPeriod+offset+1 {
 		return 0.0, 0.0, 0.0
 	}
@@ -167,27 +207,15 @@ func (indicator *KeltnerChannels) CalculateAll(
 		return 0.0, 0.0, 0.0
 	}
 
-	// Calculate EMA of typical price (middle line)
-	var typicalPrices = make([]float64, len(closes))
+	// Calculate price series (always using median price for Keltner)
+	var prices = make([]float64, len(closes))
 	for i := 0; i < len(closes); i++ {
-		typicalPrices[i] = (highs[i] + lows[i] + closes[i]) / 3.0
+		// For Keltner Channels, we typically use median price (high+low)/2
+		prices[i] = (highs[i] + lows[i]) / 2.0
 	}
 
-	// Calculate EMA
-	multiplierEMA := 2.0 / float64(indicator.emaPeriod+1)
-	var emaSum float64
-	for i := 0; i < indicator.emaPeriod; i++ {
-		emaSum += typicalPrices[i]
-	}
-	ema := emaSum / float64(indicator.emaPeriod)
-
-	var emas = make([]float64, len(closes))
-	emas[indicator.emaPeriod-1] = ema
-
-	for i := indicator.emaPeriod; i < len(closes); i++ {
-		ema = (typicalPrices[i]-ema)*multiplierEMA + ema
-		emas[i] = ema
-	}
+	// Calculate moving average using utility function
+	emas := util.CalculateMovingAverage(prices, maType, indicator.emaPeriod)
 
 	// Calculate ATR (Average True Range)
 	var tr = make([]float64, len(closes))
@@ -203,50 +231,43 @@ func (indicator *KeltnerChannels) CalculateAll(
 		)
 	}
 
-	// Calculate initial ATR as simple average of TR
-	var atrSum float64
-	for i := 1; i <= indicator.atrPeriod; i++ {
-		atrSum += tr[i]
-	}
-	atr := atrSum / float64(indicator.atrPeriod)
+	// Calculate ATR using moving average on TR
+	trData := tr[1:] // Skip the first zero value
+	atrs := util.CalculateMovingAverage(trData, maType, indicator.atrPeriod)
 
-	var atrs = make([]float64, len(closes))
-	atrs[indicator.atrPeriod] = atr
-
-	// Calculate subsequent ATR values
-	for i := indicator.atrPeriod + 1; i < len(closes); i++ {
-		atr = ((atr * float64(indicator.atrPeriod-1)) + tr[i]) / float64(indicator.atrPeriod)
-		atrs[i] = atr
+	// Get the last values for MA and ATR
+	var middleLine float64
+	if len(emas) > 0 {
+		middleLine = emas[len(emas)-1]
 	}
 
-	// Calculate upper and lower bands
-	var upperBand, lowerBand float64
+	var atr float64
+	if len(atrs) > 0 {
+		atr = atrs[len(atrs)-1]
+	}
 
-	lastIndex := len(closes) - 1
+	// Calculate bands using last values
+	upperBand := middleLine + indicator.multiplier*atr
+	lowerBand := middleLine - indicator.multiplier*atr
 
-	upperBand = emas[lastIndex] + indicator.multiplier*atrs[lastIndex]
-	lowerBand = emas[lastIndex] - indicator.multiplier*atrs[lastIndex]
-
-	return util.Round(upperBand), util.Round(emas[lastIndex]), util.Round(lowerBand)
+	return util.Round(upperBand), util.Round(middleLine), util.Round(lowerBand)
 }
 
 func (indicator *KeltnerChannels) GetDataRange(config map[string]any) int32 {
-	if p, ok := config["emaPeriod"].(float64); ok {
+	// Based on indicators.json field names
+	if p, ok := config["period"].(float64); ok {
 		indicator.emaPeriod = int(p)
 	} else {
-		indicator.emaPeriod = 20 // default EMA period
+		indicator.emaPeriod = 50 // default period value
 	}
 
-	if p, ok := config["atrPeriod"].(float64); ok {
-		indicator.atrPeriod = int(p)
-	} else {
-		indicator.atrPeriod = 10 // default ATR period
-	}
+	// Using the same period for ATR as for the EMA
+	indicator.atrPeriod = indicator.emaPeriod
 
-	if m, ok := config["multiplier"].(float64); ok {
+	if m, ok := config["shift"].(float64); ok {
 		indicator.multiplier = m
 	} else {
-		indicator.multiplier = 2.0 // default multiplier
+		indicator.multiplier = 5.0 // default shift value
 	}
 
 	if o, ok := config["offset"].(float64); ok {

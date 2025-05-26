@@ -1,0 +1,559 @@
+{
+  "SMA": {
+    "name": "SMA",
+    "label": "Simple Moving Average",
+    "description": "A simple moving average (SMA) is a basic technical indicator that calculates the average price of an asset over a specified number of periods. It is used to smooth out price data and identify trends over time.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "EMA": {
+    "name": "EMA",
+    "label": "Exponential Moving Average",
+    "description": "An exponential moving average (EMA) gives more weight to recent prices, making it more responsive to new information. It is used to identify trends and potential reversals.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "SUPERTREND": {
+    "name": "SUPERTREND",
+    "label": "Supertrend",
+    "description": "The Supertrend indicator identifies trend direction by combining price and volatility. It acts as dynamic support or resistance, signaling buy or sell opportunities.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "period",
+        "type": "number",
+        "default": 7
+      },
+      {
+        "name": "multiplier",
+        "type": "number",
+        "default": 3
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "MACD": {
+    "name": "MACD",
+    "label": "Moving Average Convergence Divergence",
+    "description": "MACD measures the relationship between two EMAs to identify momentum and trend changes. It includes a signal line and histogram for trade signals.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "fastPeriod",
+        "type": "number",
+        "default": 12
+      },
+      {
+        "name": "slowPeriod",
+        "type": "number",
+        "default": 26
+      },
+      {
+        "name": "signalPeriod",
+        "type": "number",
+        "default": 9
+      },
+      {
+        "name": "macdType",
+        "type": "string",
+        "enum": ["STANDARD", "HISTOGRAM", "SIGNAL"],
+        "default": "STANDARD"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "VTX": {
+    "name": "VORTEX",
+    "label": "Vortex Indicator",
+    "description": "The Vortex indicator identifies trend direction and strength by comparing price highs and lows over a period, using +VI and -VI lines.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "period",
+        "type": "number",
+        "default": 14
+      },
+      {
+        "name": "signal",
+        "type": "string",
+        "enum": ["+VI", "-VI"],
+        "default": "+VI"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "LBB": {
+    "name": "LBB",
+    "label": "Lower Bollinger Band",
+    "description": "The Lower Bollinger Band is part of the Bollinger Bands, set below the moving average by a multiple of standard deviations, indicating potential oversold conditions.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "deviations",
+        "type": "number",
+        "default": 2
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"],
+        "default": "SIMPLE"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "UBB": {
+    "name": "UBB",
+    "label": "Upper Bollinger Band",
+    "description": "The Upper Bollinger Band is set above the moving average by a multiple of standard deviations, signaling potential overbought conditions.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "deviations",
+        "type": "number",
+        "default": 2
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"],
+        "default": "SIMPLE"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "MBB": {
+    "name": "MBB",
+    "label": "Middle Bollinger Band",
+    "description": "The Middle Bollinger Band is a moving average, typically simple or exponential, serving as the centerline for Bollinger Bands.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "deviations",
+        "type": "number",
+        "default": 2
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"],
+        "default": "SIMPLE"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "DMI": {
+    "name": "DMI",
+    "label": "Directional Movement Index",
+    "description": "The DMI measures trend strength and direction using +DI and -DI lines, often paired with ADX to confirm trends.",
+    "type": "volatility",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "period",
+        "type": "number",
+        "default": 14
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "KELTNER": {
+    "name": "KELTNER",
+    "label": "Keltner Channels",
+    "description": "Keltner Channels use an EMA and ATR to create bands around price, identifying volatility and potential breakouts.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "period",
+        "type": "number",
+        "default": 50
+      },
+      {
+        "name": "band",
+        "type": "string",
+        "enum": ["TOP", "MEDIAN", "BOTTOM"],
+        "default": "MEDIAN"
+      },
+      {
+        "name": "maType",
+        "type": "string",
+        "enum":["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"], 
+        "default": "EXPONENTIAL"
+      },
+      {
+        "name": "shift",
+        "type": "number",
+        "default": 5
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "PSAR": {
+    "name": "PSAR",
+    "label": "Parabolic SAR",
+    "description": "Parabolic SAR places dots above or below price to indicate trend direction and potential reversal points.",
+    "type": "trend",
+    "config": [
+      {
+        "name": "minimumAF",
+        "type": "number",
+        "default": 0.02
+      },
+      {
+        "name": "maximumAF",
+        "type": "number",
+        "default": 0.2
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "FISHER": {
+    "name": "FISHER",
+    "label": "Fisher Transform",
+    "description": "The Fisher Transform converts price data into a Gaussian distribution to identify extreme price movements and reversals.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "period",
+        "type": "number",
+        "default": 10
+      },
+      {
+        "name": "line",
+        "type": "string",
+        "enum": ["EF", "TRIGGER"],
+        "default": "EF"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "MFI": {
+    "name": "MFI",
+    "label": "Money Flow Index",
+    "description": "The Money Flow Index measures buying and selling pressure using price and volume, indicating overbought or oversold conditions.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "period",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"],
+        "default": "SIMPLE"
+      },
+      {
+        "name": "maPeriod",
+        "type": "number",
+        "default": 20
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "VWAP": {
+    "name": "VWAP",
+    "label": "Volume Weighted Average Price",
+    "description": "VWAP calculates the average price weighted by volume, serving as a benchmark for intraday trading decisions.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "TSI": {
+    "name": "TSI",
+    "label": "True Strength Index",
+    "description": "The True Strength Index measures price momentum with double-smoothed EMAs, signaling trend strength and reversals.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "field",
+        "type": "string",
+        "enum": ["CLOSE", "OPEN", "HIGH", "LOW"],
+        "default": "CLOSE"
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "enum": ["TSI", "SIGNAL"],
+        "default": "TSI"
+      },
+      {
+        "name": "longPeriod",
+        "type": "number",
+        "default": 25
+      },
+      {
+        "name": "shortPeriod",
+        "type": "number",
+        "default": 13
+      },
+      {
+        "name": "signalPeriod",
+        "type": "number",
+        "default": 13
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "VO": {
+    "name": "VO",
+    "label": "Volume Oscillator",
+    "description": "The Volume Oscillator measures the difference between two volume moving averages, indicating changes in trading activity.",
+    "type": "volume",
+    "config": [
+      {
+        "name": "shortPeriod",
+        "type": "number",
+        "default": 12
+      },
+      {
+        "name": "longPeriod",
+        "type": "number",
+        "default": 26
+      },
+      {
+        "name": "pop",
+        "type": "string",
+        "enum": ["PCT", "POINT"],
+        "default": "PCT"
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "UO": {
+    "name": "UO",
+    "label": "Ultimate Oscillator",
+    "description": "The Ultimate Oscillator combines three timeframes to measure buying pressure, identifying overbought or oversold conditions.",
+    "type": "momentum",
+    "config": [
+      {
+        "name": "length1",
+        "type": "number",
+        "default": 7
+      },
+      {
+        "name": "length2",
+        "type": "number",
+        "default": 14
+      },
+      {
+        "name": "length3",
+        "type": "number",
+        "default": 28
+      },
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "OPEN": {
+    "name": "OPEN",
+    "label": "Open Price",
+    "description": "The opening price of an asset for a given period, used as a reference for price analysis.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "HIGH": {
+    "name": "HIGH",
+    "label": "High Price",
+    "description": "The highest price of an asset during a given period, indicating peak market activity.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "LOW": {
+    "name": "LOW",
+    "label": "Low Price",
+    "description": "The lowest price of an asset during a given period, indicating troughs in market activity.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "CLOSE": {
+    "name": "CLOSE",
+    "label": "Close Price",
+    "description": "The closing price of an asset for a given period, commonly used for trend and momentum analysis.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "VOLUME": {
+    "name": "VOLUME",
+    "label": "Trading Volume",
+    "description": "The total number of shares or contracts traded for an asset in a period, indicating market activity.",
+    "type": "price",
+    "config": [
+      {
+        "name": "offset",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  },
+  "NUMBER": {
+    "name": "NUMBER",
+    "label": "Number",
+    "description": "A generic number indicator, which can be used for custom calculations or as a placeholder.",
+    "type": "price",
+    "config": [
+      {
+        "name": "value",
+        "type": "number",
+        "default": 0
+      }
+    ]
+  }
+}

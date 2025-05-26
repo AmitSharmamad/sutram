@@ -39,8 +39,9 @@ func (indicator *Vortex) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	period := int(config[0].(float64)) // default: 14
+	signal := config[1].(string)       // default: "+VI"
+	offset := int(config[2].(float64)) // default: 0
 
 	indicator.period = period
 	indicator.offset = offset
@@ -111,8 +112,13 @@ func (indicator *Vortex) Calculate(
 		viMinus[i] = sumVMMinus / sumTR
 	}
 
-	// Return the last calculated VI+ value
-	return util.Round(viPlus[len(viPlus)-1])
+	// Return the appropriate value based on signal parameter
+	lastIndex := len(viPlus) - 1
+	if signal == "-VI" {
+		return util.Round(viMinus[lastIndex])
+	} else { // Default to "+VI" for any other value
+		return util.Round(viPlus[lastIndex])
+	}
 }
 
 func (indicator *Vortex) GetDataRange(config map[string]any) int32 {

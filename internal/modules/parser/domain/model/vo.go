@@ -7,6 +7,7 @@ import (
 type VolumeOscillator struct {
 	shortPeriod int
 	longPeriod  int
+	pop         string // "PCT" or "POINT"
 	offset      int
 }
 
@@ -28,10 +29,12 @@ func (indicator *VolumeOscillator) Calculate(
 ) float64 {
 	shortPeriod := int(config[0].(float64))
 	longPeriod := int(config[1].(float64))
-	offset := int(config[2].(float64))
+	pop := config[2].(string)
+	offset := int(config[3].(float64))
 
 	indicator.shortPeriod = shortPeriod
 	indicator.longPeriod = longPeriod
+	indicator.pop = pop
 	indicator.offset = offset
 
 	volumes := GetPrices(*ctx.Data, "volume")
@@ -75,11 +78,17 @@ func (indicator *VolumeOscillator) Calculate(
 	// Calculate Volume Oscillator
 	var vo = make([]float64, len(volumes))
 	for i := indicator.longPeriod - 1; i < len(volumes); i++ {
-		// Avoid division by zero
-		if longSMA[i] != 0 {
-			vo[i] = 100 * ((shortSMA[i] - longSMA[i]) / longSMA[i])
+		if indicator.pop == "PCT" {
+			// Percentage-based Volume Oscillator
+			// Avoid division by zero
+			if longSMA[i] != 0 {
+				vo[i] = 100 * ((shortSMA[i] - longSMA[i]) / longSMA[i])
+			} else {
+				vo[i] = 0
+			}
 		} else {
-			vo[i] = 0
+			// POINT-based Volume Oscillator is simply the difference
+			vo[i] = shortSMA[i] - longSMA[i]
 		}
 	}
 
@@ -91,13 +100,19 @@ func (indicator *VolumeOscillator) GetDataRange(config map[string]any) int32 {
 	if p, ok := config["shortPeriod"].(float64); ok {
 		indicator.shortPeriod = int(p)
 	} else {
-		indicator.shortPeriod = 5 // default short period
+		indicator.shortPeriod = 12 // default short period per indicators.json
 	}
 
 	if p, ok := config["longPeriod"].(float64); ok {
 		indicator.longPeriod = int(p)
 	} else {
-		indicator.longPeriod = 10 // default long period
+		indicator.longPeriod = 26 // default long period per indicators.json
+	}
+
+	if p, ok := config["pop"].(string); ok {
+		indicator.pop = p
+	} else {
+		indicator.pop = "PCT" // default pop type per indicators.json
 	}
 
 	if o, ok := config["offset"].(float64); ok {

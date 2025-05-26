@@ -58,13 +58,34 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.
 			exchange_security_id,
 			CASE
 				WHEN ? = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
-				WHEN ? = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
-				WHEN ? = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
-				WHEN ? = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
-				WHEN ? = '15m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 15 MINUTE)
-				WHEN ? = '30m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 30 MINUTE)
-				WHEN ? = '1h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 HOUR)
-				WHEN ? = '3h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 HOUR)
+				WHEN ? = '1m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 1 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '3m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 3 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '5m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 5 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '15m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 15 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '30m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 30 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '1h' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 1 HOUR
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '3h' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 3 HOUR
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
 				WHEN ? = '1d' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 DAY)
 				WHEN ? = '1M' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MONTH)
 			END AS timestamp,

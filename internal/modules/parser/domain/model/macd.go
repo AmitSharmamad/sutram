@@ -29,18 +29,18 @@ func (indicator *MACD) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	point := config[0].(string)
-	fastPeriod := int(config[1].(float64))
-	slowPeriod := int(config[2].(float64))
-	signalPeriod := int(config[3].(float64))
-	offset := int(config[4].(float64))
+	fastPeriod := int(config[0].(float64))   // default: 12
+	slowPeriod := int(config[1].(float64))   // default: 26
+	signalPeriod := int(config[2].(float64)) // default: 9
+	macdType := config[3].(string)           // default: "STANDARD"
+	offset := int(config[4].(float64))       // default: 0
 
 	indicator.fastPeriod = fastPeriod
 	indicator.slowPeriod = slowPeriod
 	indicator.signalPeriod = signalPeriod
 	indicator.offset = offset
 
-	prices := GetPrices(*ctx.Data, point)
+	prices := GetPrices(*ctx.Data, "close") // MACD typically uses close prices
 
 	// Check if we have enough data points
 	minDataPoints := indicator.slowPeriod + indicator.signalPeriod + indicator.offset
@@ -123,8 +123,23 @@ func (indicator *MACD) Calculate(
 		histogram[i] = macdLine[i] - signalLine[i]
 	}
 
-	// Return the last calculated MACD line value
-	return util.Round(macdLine[len(macdLine)-1])
+	// Return the appropriate value based on macdType
+	lastIndex := len(macdLine) - 1
+	switch macdType {
+	case "HISTOGRAM":
+		if lastIndex >= startIndex {
+			return util.Round(histogram[lastIndex])
+		}
+	case "SIGNAL":
+		if lastIndex >= startIndex {
+			return util.Round(signalLine[lastIndex])
+		}
+	default: // "STANDARD" or any other value
+		return util.Round(macdLine[lastIndex])
+	}
+
+	// Fallback return in case of any issues
+	return 0.0
 }
 
 func (indicator *MACD) GetDataRange(config map[string]any) int32 {
@@ -145,6 +160,8 @@ func (indicator *MACD) GetDataRange(config map[string]any) int32 {
 	} else {
 		indicator.signalPeriod = 9 // default signal period
 	}
+
+	// No need to store macdType in struct as it's only used for return value selection
 
 	if o, ok := config["offset"].(float64); ok {
 		indicator.offset = int(o)

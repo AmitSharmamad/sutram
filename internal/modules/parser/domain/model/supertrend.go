@@ -158,7 +158,7 @@ func (indicator *Supertrend) GetDataRange(config map[string]any) int32 {
 	if p, ok := config["period"].(float64); ok {
 		indicator.period = int(p)
 	} else {
-		indicator.period = 14 // default period
+		indicator.period = 7 // default period from indicators.json
 	}
 
 	if m, ok := config["multiplier"].(float64); ok {

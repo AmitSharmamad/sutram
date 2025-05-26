@@ -38,10 +38,10 @@ func (indicator *VWAP) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	offset := int(config[0].(float64))
 
-	indicator.period = period
+	// Default period to 20 for VWAP calculation
+	indicator.period = 20
 	indicator.offset = offset
 
 	highs := GetPrices(*ctx.Data, "high")
@@ -50,16 +50,16 @@ func (indicator *VWAP) Calculate(
 	volumes := GetPrices(*ctx.Data, "volume")
 
 	// Check if we have enough data points
-	if len(highs) < period+offset || len(lows) < period+offset ||
-		len(closes) < period+offset || len(volumes) < period+offset {
+	if len(highs) < indicator.period+offset || len(lows) < indicator.period+offset ||
+		len(closes) < indicator.period+offset || len(volumes) < indicator.period+offset {
 		return 0.0
 	}
 
 	highs, lows, closes, volumes = indicator.sliceAllData(highs, lows, closes, volumes)
 
 	// Need at least period data points to calculate
-	if len(highs) < period || len(lows) < period ||
-		len(closes) < period || len(volumes) < period {
+	if len(highs) < indicator.period || len(lows) < indicator.period ||
+		len(closes) < indicator.period || len(volumes) < indicator.period {
 		return 0.0
 	}
 
@@ -75,7 +75,7 @@ func (indicator *VWAP) Calculate(
 	var vwap = make([]float64, len(closes))
 
 	// Calculate for the lookback period
-	for i := len(closes) - period; i < len(closes); i++ {
+	for i := len(closes) - indicator.period; i < len(closes); i++ {
 		cumulativeTPV += typicalPrices[i] * volumes[i]
 		cumulativeVolume += volumes[i]
 
@@ -92,11 +92,8 @@ func (indicator *VWAP) Calculate(
 }
 
 func (indicator *VWAP) GetDataRange(config map[string]any) int32 {
-	if p, ok := config["period"].(float64); ok {
-		indicator.period = int(p)
-	} else {
-		indicator.period = 14 // default period
-	}
+	// Default period for VWAP calculation (not in config, but needed for calculation)
+	indicator.period = 20
 
 	if o, ok := config["offset"].(float64); ok {
 		indicator.offset = int(o)
