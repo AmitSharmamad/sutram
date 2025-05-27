@@ -95,3 +95,10 @@ build-migrate:
 migrate: build-migrate
 	@echo "Running the data migration tool..."
 	@./s-migrate
+
+sync:
+	git checkout main
+	git pull --rebase
+	git checkout -
+	git merge origin main
+	git push
