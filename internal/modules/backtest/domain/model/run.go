@@ -1,6 +1,7 @@
 package model
 
 import (
+	"algo/internal/modules/instrument/domain/model"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,6 +52,8 @@ type Run struct {
 	UpdatedAt       time.Time   `json:"updated_at" db:"updated_at"`
 	Positions       []*Position `json:"positions,omitempty" db:"-"`
 	RunMetrics      *RunMetrics `json:"run_metrics,omitempty" db:"-"`
+
+	InstrumentMaster *model.InstrumentMaster
 }
 
 // NewRunGroup creates a new run group
@@ -74,6 +77,7 @@ func NewRun(
 	qty int,
 	periodStartTime time.Time,
 	periodEndTime time.Time,
+	instrumentMaster *model.InstrumentMaster,
 ) *Run {
 	now := time.Now()
 	return &Run{
@@ -89,5 +93,6 @@ func NewRun(
 		PeriodEndTime:   periodEndTime,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		InstrumentMaster:      instrumentMaster,
 	}
 }

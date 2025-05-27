@@ -2,7 +2,7 @@ services:
 
   sutram-clickhouse:
     image: clickhouse/clickhouse-server
-    container_name: sutramdb
+    container_name: ch
     environment:
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
@@ -35,7 +35,7 @@ services:
 
   sutram-postgres:
     image: postgres:latest
-    container_name: sutrampgdb
+    container_name: pg
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=admin
