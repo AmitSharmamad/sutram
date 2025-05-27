@@ -1,17 +1,5 @@
 .PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live
 
-# Build the web application
-build:
-	@echo "Building the web application..."
-	@mkdir -p bin
-	@wire ./cmd/web
-	@go build -o bin/web-server cmd/web/main.go cmd/web/wire_gen.go
-
-# Run the web application
-run: build
-	@echo "Running the web server..."
-	@./bin/web-server
-
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
@@ -36,16 +24,6 @@ coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated in coverage.html"
 
-# Build Docker image
-docker-build:
-	@echo "Building Docker image..."
-	@docker build -t sutram-web -f Dockerfile.web .
-
-# Run Docker container
-docker-run: docker-build
-	@echo "Running Docker container..."
-	@docker run -p 8080:8080 --env-file .env sutram-web
-
 # Start the database
 db-start:
 	@echo "Starting the database..."
@@ -66,35 +44,39 @@ all-down:
 	@echo "Stopping all services..."
 	@docker-compose down
 
-# Build the live WebSocket server
-build-live:
+# ---------------------------------------------------------- #
+
+web:
+	@echo "Building the web application..."
+	@go build -gcflags="all=-N -l" -o bin/web cmd/web/main.go
+	@echo "Running the web application..."
+	@./bin/web
+
+# ---------------------------------------------------------- #
+
+live:
 	@echo "Building the live WebSocket server..."
-	@go build -gcflags="all=-N -l" -o s-live cmd/live/main.go
-
-# Run the live WebSocket server
-live: build-live
+	@go build -gcflags="all=-N -l" -o bin/live cmd/live/main.go
 	@echo "Running the live WebSocket server..."
-	@./s-live
+	@./bin/live
 
-# Build the market data simulator client
-build-client:
+# ---------------------------------------------------------- #
+
+client:
 	@echo "Building the market data simulator client..."
-	@go build -o s-client cmd/client/main.go
-
-# Run the market data simulator client (as server)
-client: build-client
+	@go build -o bin/client cmd/client/main.go
 	@echo "Running the market data simulator server..."
-	@./s-client
+	@./bin/client
 
-# Build the data migration tool
-build-migrate:
+# ---------------------------------------------------------- #
+
+migrate:
 	@echo "Building the data migration tool..."
-	@go build -o s-migrate cmd/migrate/main.go
-
-# Run the data migration tool
-migrate: build-migrate
+	@go build -o bin/migrate cmd/migrate/main.go
 	@echo "Running the data migration tool..."
-	@./s-migrate
+	@./bin/migrate
+
+# ---------------------------------------------------------- #
 
 sync:
 	git checkout main
@@ -102,3 +84,5 @@ sync:
 	git checkout -
 	git merge origin main
 	git push
+
+# ---------------------------------------------------------- #
