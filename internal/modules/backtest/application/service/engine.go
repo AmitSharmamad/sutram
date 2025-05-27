@@ -21,6 +21,7 @@ import (
 
 // Response struct represents the response from a backtest run
 type Response struct {
+	InstrumentMaster *instrumentModel.InstrumentMaster `json:"instrument_master"`
 	InstrumentID string            `json:"instrument_id"`
 	Positions    []*model.Position `json:"positions"`
 	Metrics      *model.RunMetrics `json:"metrics"`
@@ -124,6 +125,7 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 			qty,
 			startDate,
 			endDate,
+			instrumentMaster,
 		)
 
 		runs = append(runs, run)
@@ -183,7 +185,8 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 		instrumentIDStr := strconv.Itoa(run.InstrumentID)
 
 		resp := Response{
-			InstrumentID: instrumentIDStr,
+			InstrumentMaster: run.InstrumentMaster,
+			InstrumentID:   instrumentIDStr,
 			Positions:    run.Positions,
 			Metrics:      run.RunMetrics,
 		}
