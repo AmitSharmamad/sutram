@@ -23,6 +23,9 @@ type DeploymentPositionRepository interface {
 	// GetOpenPositionsByDeploymentID retrieves all open positions for a specific deployment
 	GetOpenPositionsByDeploymentID(ctx context.Context, deploymentID uuid.UUID) ([]*model.DeploymentPosition, error)
 
+	// GetOpenPositionsByDeploymentIDs retrieves all open positions for multiple deployments
+	GetOpenPositionsByDeploymentIDs(ctx context.Context, deploymentIDs []uuid.UUID) (map[uuid.UUID]*model.DeploymentPosition, error)
+
 	// GetByDeploymentAndInstrument retrieves all positions for a specific deployment and instrument
 	GetByDeploymentAndInstrument(ctx context.Context, deploymentID uuid.UUID, instrumentID int) ([]*model.DeploymentPosition, error)
 
