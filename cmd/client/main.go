@@ -205,7 +205,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 	log.Printf("Client subscribed to %d instruments", request.InstrumentCount)
 
 	// Send confirmation back to client
-	response := map[string]interface{}{
+	response := map[string]any{
 		"status":      "subscribed",
 		"count":       request.InstrumentCount,
 		"instruments": request.InstrumentList,
@@ -217,7 +217,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 
 // startMarketDataSimulation starts the market data simulation in background
 func startMarketDataSimulation(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	feedTypes := []byte{FeedCodeTicker, FeedCodeQuote, FeedCodeFull}
