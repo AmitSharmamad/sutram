@@ -160,6 +160,7 @@ func (s *backtestService) CreateRun(ctx context.Context, req *dto.CreateRunReque
 		req.Qty,
 		req.PeriodStartTime,
 		req.PeriodEndTime,
+		nil,
 	)
 
 	// Save to database
