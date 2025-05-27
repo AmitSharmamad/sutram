@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	backtestEngine "algo/internal/modules/backtest/application/service"
@@ -13,6 +14,7 @@ import (
 	"algo/internal/modules/deployment/domain/repository"
 	instrumentModel "algo/internal/modules/instrument/domain/model"
 	instrumentRepository "algo/internal/modules/instrument/domain/repository"
+	parser "algo/internal/modules/parser/domain/model"
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyModel "algo/internal/modules/strategy/domain/model"
 	strategyRepository "algo/internal/modules/strategy/domain/repository"
@@ -20,10 +22,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// DeploymentWithStrategy holds a deployment along with its associated strategy
+// DeploymentWithStrategy holds a deployment along with its associated strategy and current position
 type DeploymentWithStrategy struct {
-	Deployment *model.Deployment
-	Strategy   *strategyModel.Strategy
+	Deployment      *model.Deployment
+	Strategy        *strategyModel.Strategy
+	CurrentPosition *model.DeploymentPosition // Pre-fetched open position for efficient trading
 }
 
 // Common errors
@@ -522,10 +525,19 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to get active deployments: %w", err)
 	}
 
+	if len(deployments) == 0 {
+		fmt.Printf("No active deployments found\n")
+		s.instrumentDeployments = make(map[int][]*DeploymentWithStrategy)
+		return nil
+	}
+
 	// Collect unique strategy IDs from all deployments
 	uniqueStrategyIDs := make(map[uuid.UUID]bool)
-	for _, deployment := range deployments {
+	deploymentIDs := make([]uuid.UUID, len(deployments))
+
+	for i, deployment := range deployments {
 		uniqueStrategyIDs[deployment.StrategyID] = true
+		deploymentIDs[i] = deployment.ID
 	}
 
 	// Convert map keys to slice for the batch call
@@ -546,7 +558,15 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 		strategyMap[strategy.ID] = strategy
 	}
 
-	// Group deployments by instrument ID and attach their strategies
+	// Fetch all open positions for all deployments using bulk query
+	fmt.Printf("Fetching open positions for %d deployments\n", len(deploymentIDs))
+	positionMap, err := s.positionRepo.GetOpenPositionsByDeploymentIDs(ctx, deploymentIDs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch open positions: %w", err)
+	}
+	fmt.Printf("Found %d open positions across all deployments\n", len(positionMap))
+
+	// Group deployments by instrument ID and attach their strategies and positions
 	instrumentDeployments := make(map[int][]*DeploymentWithStrategy)
 	for _, deployment := range deployments {
 		// Get the strategy from the pre-fetched map
@@ -558,10 +578,18 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 			continue
 		}
 
-		// Create DeploymentWithStrategy object
+		// Get the current open position for this deployment (if any)
+		currentPosition := positionMap[deployment.ID]
+		if currentPosition != nil {
+			fmt.Printf("Found open position %s for deployment %s\n",
+				currentPosition.ID, deployment.ID)
+		}
+
+		// Create DeploymentWithStrategy object with pre-fetched position
 		deploymentWithStrategy := &DeploymentWithStrategy{
-			Deployment: deployment,
-			Strategy:   strategy,
+			Deployment:      deployment,
+			Strategy:        strategy,
+			CurrentPosition: currentPosition,
 		}
 
 		instrumentDeployments[deployment.InstrumentID] = append(
@@ -574,6 +602,7 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 	// This approach allows us to efficiently find deployments when we receive market data
 	s.instrumentDeployments = instrumentDeployments
 
+	fmt.Printf("Initialized %d instruments with deployments\n", len(instrumentDeployments))
 	return nil
 }
 
@@ -601,97 +630,188 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		}
 	}
 
+	// Use pre-fetched position from DeploymentWithStrategy
+	currentPosition := deploymentWithStrategy.CurrentPosition
+
 	// Prepare strategy data
-	// This will be used in the future when we implement proper strategy execution
-	_ = &strategyDto.StrategyResponse{
-		ID:              strategy.ID,
-		UserID:          strategy.UserID,
-		Name:            strategy.Name,
-		Description:     strategy.Description,
-		EntryExpression: strategy.EntryExpression,
-		ExitExpression:  strategy.ExitExpression,
-		ChartTimeframe:  strategyModel.ChartTimeframe(strategy.ChartTimeframe),
-		PositionType:    strategy.PositionType,
-		TradeType:       strategyModel.TradeType(strategy.TradeType),
-		Capital:         strategy.Capital,
-		Instruments:     strategy.Instruments,
+	strategyResponse := &strategyDto.StrategyResponse{
+		ID:               strategy.ID,
+		UserID:           strategy.UserID,
+		Name:             strategy.Name,
+		Description:      strategy.Description,
+		EntryExpression:  strategy.EntryExpression,
+		ExitExpression:   strategy.ExitExpression,
+		ChartTimeframe:   strategyModel.ChartTimeframe(strategy.ChartTimeframe),
+		PositionType:     strategy.PositionType,
+		TradeType:        strategyModel.TradeType(strategy.TradeType),
+		Capital:          strategy.Capital,
+		Instruments:      strategy.Instruments,
+		Qty:              strategy.Qty,
+		MaxAllocation:    strategy.MaxAllocation,
+		StopLoss:         strategy.StopLoss,
+		StopLossType:     strategy.StopLossType,
+		TargetProfit:     strategy.TargetProfit,
+		TargetProfitType: strategy.TargetProfitType,
+		EntryStartTime:   strategy.EntryStartTime,
+		EntryEndTime:     strategy.EntryEndTime,
 	}
 
-	// Create a dummy run for future use
-	// Currently not utilized but will be needed for strategy execution
-	_ = &backtestModel.Run{
-		ID:           uuid.New(),
-		StrategyID:   strategy.ID,
-		InstrumentID: deployment.InstrumentID,
-		State:        backtestModel.Started,
+	// Fetch historical data needed for strategy execution
+	historicalData, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(
+		ctx,
+		instrumentData.ExchangeSecurityID,
+		instrumentData.Timestamp.Add(-24*time.Hour), // Look back 24 hours for indicators
+		instrumentData.Timestamp,
+		string(strategy.ChartTimeframe),
+	)
+	if err != nil {
+		fmt.Printf("Error getting historical data for instrument %d: %v\n",
+			instrumentData.ExchangeSecurityID, err)
+		// Use current data point only as fallback
+		historicalData = []*instrumentModel.Instrument{instrumentData}
 	}
 
-	// Create a single-element slice with the current instrument data
-	// This will be used in the future for strategy execution
-	_ = []*instrumentModel.Instrument{instrumentData}
+	// Add current instrument data to the end of historical data
+	historicalData = append(historicalData, instrumentData)
 
-	// Execute the strategy with a simulated backtest run
-	// TODO: Implement proper strategy execution method for live trading
-	// For now, use a simple placeholder
-	positions := []*backtestModel.Position{} // Initialize as empty slice instead of nil
-	// metrics will be nil initially, only create if we have actual metrics to report
+	// Handle existing position first - check exit conditions
+	if currentPosition != nil {
+		fmt.Printf("Found existing open position %s for deployment %s\n",
+			currentPosition.ID, deployment.ID)
 
-	// Placeholder for actual strategy execution logic
-	fmt.Printf("Running strategy for instrument %d at %s\n",
-		instrumentData.ExchangeSecurityID, instrumentData.Timestamp)
+		// Evaluate exit condition using current market data
+		exitSignal, err := s.evaluateExitCondition(strategyResponse, historicalData, currentPosition)
+		if err != nil {
+			fmt.Printf("Error evaluating exit condition: %v\n", err)
+		} else if exitSignal {
+			// Close the position
+			exitPrice := instrumentData.Close
+			exitTime := instrumentData.Timestamp
 
-	// Process any positions that were generated
-	if len(positions) > 0 {
-		// Create a deployment position for each position
-		for _, position := range positions {
-			// Only create a position if it's in "Entered" state
-			if position.State == backtestModel.Entered {
-				deploymentPosition, err := model.NewDeploymentPosition(
-					deployment.ID,
-					deployment.InstrumentID,
-					position.PositionSize,
-					position.EntryPriceSignal,
-					position.EntryTimeSignal,
-					map[string]interface{}{
-						"strategy_id": strategy.ID.String(),
-						"created_by":  "live_trading",
-						"timestamp":   time.Now().Format(time.RFC3339),
-					},
-				)
+			// Update position with exit details
+			currentPosition.ClosePosition(exitPrice, exitTime)
 
-				if err != nil {
-					fmt.Printf("Error creating deployment position: %v\n", err)
-					continue
-				}
+			// Persist the position update
+			if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
+				fmt.Printf("Error updating closed position: %v\n", err)
+			} else {
+				fmt.Printf("Closed position %s at price %.2f\n",
+					currentPosition.ID, exitPrice)
 
-				if err := s.positionRepo.Create(ctx, deploymentPosition); err != nil {
-					fmt.Printf("Error creating deployment position: %v\n", err)
-					continue
-				}
-
-				// Log the position creation
+				// Log the position closure
 				logEntry, err := model.NewDeploymentLog(
 					deployment.ID,
-					model.StatusCreated,
-					map[string]interface{}{
-						"position_id":   deploymentPosition.ID,
-						"entry_price":   deploymentPosition.EntryPrice,
-						"entry_time":    deploymentPosition.EntryTime,
-						"quantity":      deploymentPosition.Quantity,
-						"instrument_id": deployment.InstrumentID,
+					model.StatusCompleted,
+					map[string]any{
+						"position_id": currentPosition.ID,
+						"exit_price":  exitPrice,
+						"exit_time":   exitTime,
+						"pnl":         currentPosition.PNL,
 					},
 				)
-				if err != nil {
-					fmt.Printf("Error creating deployment log for position: %v\n", err)
-				} else if err := s.logRepo.Create(ctx, logEntry); err != nil {
-					fmt.Printf("Error saving deployment log for position: %v\n", err)
+				if err == nil {
+					s.logRepo.Create(ctx, logEntry)
+				}
+			}
+
+			// Clear current position since it's now closed
+			currentPosition = nil
+			// Update the DeploymentWithStrategy's position state
+			deploymentWithStrategy.CurrentPosition = nil
+		}
+	}
+
+	// If no current position exists, check entry conditions
+	if currentPosition == nil {
+		fmt.Printf("No open position for deployment %s, checking entry conditions\n", deployment.ID)
+
+		// Evaluate entry condition
+		dataContext := s.toDataContext(historicalData)
+		entrySignal := s.evaluateEntryCondition(strategyResponse.EntryExpression, dataContext)
+		if entrySignal {
+			// Create new position
+			entryPrice := instrumentData.Close
+			entryTime := instrumentData.Timestamp
+			quantity := s.calculatePositionSize(strategyResponse, entryPrice)
+
+			newPosition, err := model.NewDeploymentPosition(
+				deployment.ID,
+				deployment.InstrumentID,
+				quantity,
+				entryPrice,
+				entryTime,
+				map[string]any{
+					"strategy_id": strategy.ID.String(),
+					"created_by":  "live_trading",
+					"timestamp":   time.Now().Format(time.RFC3339),
+				},
+			)
+
+			if err != nil {
+				fmt.Printf("Error creating new deployment position: %v\n", err)
+			} else {
+				// Persist the new position
+				if err := s.positionRepo.Create(ctx, newPosition); err != nil {
+					fmt.Printf("Error saving new position: %v\n", err)
+				} else {
+					fmt.Printf("Created new position %s at price %.2f with quantity %.2f\n",
+						newPosition.ID, entryPrice, quantity)
+
+					// Log the position creation
+					logEntry, err := model.NewDeploymentLog(
+						deployment.ID,
+						model.StatusCreated,
+						map[string]any{
+							"position_id":   newPosition.ID,
+							"entry_price":   entryPrice,
+							"entry_time":    entryTime,
+							"quantity":      quantity,
+							"instrument_id": deployment.InstrumentID,
+						},
+					)
+					if err == nil {
+						s.logRepo.Create(ctx, logEntry)
+					}
+
+					// Set as current position for metrics calculation
+					currentPosition = newPosition
+					// Update the DeploymentWithStrategy's position state
+					deploymentWithStrategy.CurrentPosition = newPosition
 				}
 			}
 		}
 	}
 
-	// TODO: Update deployment metrics when actual strategy execution is implemented
-	// For now, we skip metrics creation since this is placeholder code
+	// Calculate and update deployment metrics
+	metrics := s.calculateDeploymentMetrics(ctx, deployment.ID, currentPosition)
+	if metrics != nil {
+		deploymentMetrics, err := model.NewDeploymentMetrics(
+			deployment.ID,
+			time.Now(),
+			map[string]any{
+				"total_return_pct": metrics.TotalReturnPct,
+				"total_trades":     metrics.TotalTrades,
+				"win_rate":         metrics.WinRate,
+				"sharpe_ratio":     metrics.SharpeRatio,
+				"max_drawdown":     metrics.MaxDrawdown,
+				"total_commission": metrics.TotalCommission,
+				"profit_factor":    metrics.ProfitFactor,
+				"avg_win_size":     metrics.AvgWinSize,
+				"avg_loss_size":    metrics.AvgLossSize,
+			},
+		)
+
+		if err != nil {
+			fmt.Printf("Error creating deployment metrics: %v\n", err)
+		} else {
+			if err := s.metricsRepo.Create(ctx, deploymentMetrics); err != nil {
+				fmt.Printf("Error saving deployment metrics: %v\n", err)
+			}
+		}
+	}
+
+	fmt.Printf("Strategy execution completed for deployment %s on instrument %d\n",
+		deployment.ID, instrumentData.ExchangeSecurityID)
 
 	return nil
 }
@@ -731,4 +851,118 @@ func (s *deploymentService) GetActiveInstrumentIDs() []int {
 		instrumentIDs = append(instrumentIDs, instrumentID)
 	}
 	return instrumentIDs
+}
+
+// toDataContext converts instruments to data context for expression evaluation
+func (s *deploymentService) toDataContext(instruments []*instrumentModel.Instrument) *instrumentModel.StockData {
+	stockData := make(instrumentModel.StockData, len(instruments))
+	for i, instrument := range instruments {
+		stockData[i] = *instrument
+	}
+	return &stockData
+}
+
+// evaluateEntryCondition evaluates entry expression using parser
+func (s *deploymentService) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
+	return parser.Execute(expression, parser.NewEvaluationContext(data))
+}
+
+// calculatePositionSize calculates position size based on strategy settings
+func (s *deploymentService) calculatePositionSize(strategy *strategyDto.StrategyResponse, price float64) float64 {
+	if strategy.Qty > 0 {
+		return float64(strategy.Qty)
+	}
+
+	// Default to 1 unit if no quantity specified
+	return 1.0
+}
+
+// evaluateExitCondition evaluates exit expression using parser for current position
+func (s *deploymentService) evaluateExitCondition(strategy *strategyDto.StrategyResponse, historicalData []*instrumentModel.Instrument, currentPosition *model.DeploymentPosition) (bool, error) {
+	if strategy.ExitExpression == "" {
+		return false, nil
+	}
+
+	// Convert instruments to data context for expression evaluation
+	dataContext := s.toDataContext(historicalData)
+
+	// Execute the exit expression
+	return parser.Execute(strategy.ExitExpression, parser.NewEvaluationContext(dataContext)), nil
+}
+
+// calculateDeploymentMetrics calculates metrics for a deployment based on its positions
+func (s *deploymentService) calculateDeploymentMetrics(ctx context.Context, deploymentID uuid.UUID, currentPosition *model.DeploymentPosition) *backtestModel.RunMetrics {
+	// Get all positions for this deployment to calculate metrics
+	positions, err := s.positionRepo.GetByDeploymentID(ctx, deploymentID)
+	if err != nil {
+		fmt.Printf("Error fetching positions for metrics calculation: %v\n", err)
+		return nil
+	}
+
+	totalPnL := 0.0
+	winningTrades := 0
+	losingTrades := 0
+	totalTrades := 0
+	totalWinAmount := 0.0
+	totalLossAmount := 0.0
+
+	for _, pos := range positions {
+		if pos.Status == model.PositionClosed && pos.PNL != nil {
+			totalTrades++
+			pnl := *pos.PNL
+			totalPnL += pnl
+
+			if pnl > 0 {
+				winningTrades++
+				totalWinAmount += pnl
+			} else if pnl < 0 {
+				losingTrades++
+				totalLossAmount += pnl
+			}
+		}
+	}
+
+	// Create basic metrics
+	metrics := &backtestModel.RunMetrics{
+		TotalTrades: totalTrades,
+	}
+
+	if totalTrades > 0 {
+		winRate := float64(winningTrades) / float64(totalTrades) * 100
+		metrics.WinRate = winRate
+
+		// Calculate total return percentage (simplified)
+		baseCapital := 100000.0 // Default base capital for percentage calculation
+		if totalPnL != 0 {
+			totalReturnPct := (totalPnL / baseCapital) * 100
+			metrics.TotalReturnPct = totalReturnPct
+		}
+
+		// Calculate profit factor
+		profitFactor := 1.0
+		if totalLossAmount != 0 {
+			profitFactor = totalWinAmount / math.Abs(totalLossAmount)
+		}
+		metrics.ProfitFactor = &profitFactor
+
+		// Calculate average win and loss sizes
+		avgWinSize := 0.0
+		if winningTrades > 0 {
+			avgWinSize = totalWinAmount / float64(winningTrades)
+		}
+		metrics.AvgWinSize = &avgWinSize
+
+		avgLossSize := 0.0
+		if losingTrades > 0 {
+			avgLossSize = totalLossAmount / float64(losingTrades)
+		}
+		metrics.AvgLossSize = &avgLossSize
+
+		// Basic metrics (simplified)
+		metrics.MaxDrawdown = 0.0
+		metrics.SharpeRatio = 0.0
+		metrics.TotalCommission = 0.0
+	}
+
+	return metrics
 }
