@@ -20,6 +20,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// DeploymentWithStrategy holds a deployment along with its associated strategy
+type DeploymentWithStrategy struct {
+	Deployment *model.Deployment
+	Strategy   *strategyModel.Strategy
+}
+
 // Common errors
 var (
 	ErrDeploymentNotFound      = errors.New("deployment not found")
@@ -70,8 +76,9 @@ type DeploymentService interface {
 
 	// Live trading operations
 	Initialize(ctx context.Context) error
-	Run(ctx context.Context, deployment *model.Deployment, instrumentData *instrumentModel.Instrument) error
+	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error
 	ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error
+	GetActiveInstrumentIDs() []int
 }
 
 // deploymentService implements DeploymentService
@@ -83,7 +90,7 @@ type deploymentService struct {
 	metricsRepo           repository.DeploymentMetricsRepository
 	instrumentRepo        instrumentRepository.InstrumentRepository
 	engine                *backtestEngine.BacktestEngine
-	instrumentDeployments map[int][]*model.Deployment
+	instrumentDeployments map[int][]*DeploymentWithStrategy
 }
 
 // NewDeploymentService creates a new deployment service
@@ -104,7 +111,7 @@ func NewDeploymentService(
 		metricsRepo:           metricsRepo,
 		instrumentRepo:        instrumentRepo,
 		engine:                engine,
-		instrumentDeployments: make(map[int][]*model.Deployment),
+		instrumentDeployments: make(map[int][]*DeploymentWithStrategy),
 	}
 }
 
@@ -515,10 +522,52 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 		return fmt.Errorf("failed to get active deployments: %w", err)
 	}
 
-	// Group deployments by instrument ID for efficient lookup
-	instrumentDeployments := make(map[int][]*model.Deployment)
+	// Collect unique strategy IDs from all deployments
+	uniqueStrategyIDs := make(map[uuid.UUID]bool)
 	for _, deployment := range deployments {
-		instrumentDeployments[deployment.InstrumentID] = append(instrumentDeployments[deployment.InstrumentID], deployment)
+		uniqueStrategyIDs[deployment.StrategyID] = true
+	}
+
+	// Convert map keys to slice for the batch call
+	strategyIDs := make([]uuid.UUID, 0, len(uniqueStrategyIDs))
+	for strategyID := range uniqueStrategyIDs {
+		strategyIDs = append(strategyIDs, strategyID)
+	}
+
+	// Fetch all strategies at once using batch call
+	strategies, err := s.strategyRepo.GetByIDs(ctx, strategyIDs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch strategies: %w", err)
+	}
+
+	// Create a map of strategy ID to strategy for quick lookup
+	strategyMap := make(map[uuid.UUID]*strategyModel.Strategy)
+	for _, strategy := range strategies {
+		strategyMap[strategy.ID] = strategy
+	}
+
+	// Group deployments by instrument ID and attach their strategies
+	instrumentDeployments := make(map[int][]*DeploymentWithStrategy)
+	for _, deployment := range deployments {
+		// Get the strategy from the pre-fetched map
+		strategy, exists := strategyMap[deployment.StrategyID]
+		if !exists {
+			// Log error but continue with other deployments
+			fmt.Printf("Strategy %s not found for deployment %s\n",
+				deployment.StrategyID, deployment.ID)
+			continue
+		}
+
+		// Create DeploymentWithStrategy object
+		deploymentWithStrategy := &DeploymentWithStrategy{
+			Deployment: deployment,
+			Strategy:   strategy,
+		}
+
+		instrumentDeployments[deployment.InstrumentID] = append(
+			instrumentDeployments[deployment.InstrumentID],
+			deploymentWithStrategy,
+		)
 	}
 
 	// Store the deployments map for later use when handling events
@@ -529,12 +578,9 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 }
 
 // Run executes a deployment's strategy against live market data
-func (s *deploymentService) Run(ctx context.Context, deployment *model.Deployment, instrumentData *instrumentModel.Instrument) error {
-	// Retrieve the strategy for this deployment
-	strategy, err := s.strategyRepo.GetByID(ctx, deployment.StrategyID)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStrategyNotFound, err)
-	}
+func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error {
+	deployment := deploymentWithStrategy.Deployment
+	strategy := deploymentWithStrategy.Strategy
 
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
@@ -587,8 +633,8 @@ func (s *deploymentService) Run(ctx context.Context, deployment *model.Deploymen
 	// Execute the strategy with a simulated backtest run
 	// TODO: Implement proper strategy execution method for live trading
 	// For now, use a simple placeholder
-	var positions []*backtestModel.Position
-	var metrics *backtestModel.RunMetrics
+	positions := []*backtestModel.Position{} // Initialize as empty slice instead of nil
+	// metrics will be nil initially, only create if we have actual metrics to report
 
 	// Placeholder for actual strategy execution logic
 	fmt.Printf("Running strategy for instrument %d at %s\n",
@@ -644,31 +690,8 @@ func (s *deploymentService) Run(ctx context.Context, deployment *model.Deploymen
 		}
 	}
 
-	// Update deployment metrics if metrics were generated
-	if metrics != nil {
-		// Create deployment metrics for this execution
-		deploymentMetrics, err := model.NewDeploymentMetrics(
-			deployment.ID,
-			time.Now(),
-			map[string]interface{}{
-				"total_trades":         metrics.TotalTrades,
-				"win_rate":             metrics.WinRate,
-				"max_drawdown":         metrics.MaxDrawdown,
-				"total_pnl":            metrics.TotalReturnPct,
-				"sharpe_ratio":         metrics.SharpeRatio,
-				"sortino_ratio":        metrics.SortinoRatio,
-				"execution_time":       time.Now().Format(time.RFC3339),
-				"instrument_data_time": instrumentData.Timestamp.Format(time.RFC3339),
-			},
-		)
-		if err != nil {
-			fmt.Printf("Error creating deployment metrics: %v\n", err)
-		} else {
-			if err := s.metricsRepo.Create(ctx, deploymentMetrics); err != nil {
-				fmt.Printf("Error saving deployment metrics: %v\n", err)
-			}
-		}
-	}
+	// TODO: Update deployment metrics when actual strategy execution is implemented
+	// For now, we skip metrics creation since this is placeholder code
 
 	return nil
 }
@@ -689,14 +712,23 @@ func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumen
 	}
 
 	// Run each deployment for this instrument
-	for _, deployment := range deployments {
-		if err := s.Run(ctx, deployment, instrumentData); err != nil {
+	for _, deploymentWithStrategy := range deployments {
+		if err := s.Run(ctx, deploymentWithStrategy, instrumentData); err != nil {
 			// Log the error but continue with other deployments
 			fmt.Printf("Error running deployment %s for instrument %d: %v\n",
-				deployment.ID, instrumentID, err)
+				deploymentWithStrategy.Deployment.ID, instrumentID, err)
 			continue
 		}
 	}
 
 	return nil
+}
+
+// GetActiveInstrumentIDs returns the unique instrument IDs from all active deployments
+func (s *deploymentService) GetActiveInstrumentIDs() []int {
+	instrumentIDs := make([]int, 0, len(s.instrumentDeployments))
+	for instrumentID := range s.instrumentDeployments {
+		instrumentIDs = append(instrumentIDs, instrumentID)
+	}
+	return instrumentIDs
 }

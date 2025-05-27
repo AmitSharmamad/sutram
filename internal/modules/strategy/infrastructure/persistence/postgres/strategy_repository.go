@@ -151,6 +151,92 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 	return &strategy, nil
 }
 
+// GetByIDs retrieves multiple strategies by their IDs
+func (r *StrategyRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.Strategy, error) {
+	if len(ids) == 0 {
+		return []*model.Strategy{}, nil
+	}
+
+	// Build placeholder string for the query
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			id, user_id, name, description, position_type, instruments, 
+			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
+			exit_expression, target_profit, target_profit_type, stop_loss, 
+			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
+			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			start_date, end_date, created_at, updated_at, is_active, max_allocation
+		FROM strategy
+		WHERE id IN (%s)
+		ORDER BY created_at DESC
+	`, strings.Join(placeholders, ", "))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+	defer rows.Close()
+
+	var strategies []*model.Strategy
+
+	for rows.Next() {
+		var strategy model.Strategy
+		var instruments pq.Int32Array
+
+		err := rows.Scan(
+			&strategy.ID,
+			&strategy.UserID,
+			&strategy.Name,
+			&strategy.Description,
+			&strategy.PositionType,
+			pq.Array(&instruments),
+			&strategy.ChartType,
+			&strategy.ChartTimeframe,
+			&strategy.TradeType,
+			&strategy.Qty,
+			&strategy.EntryExpression,
+			&strategy.ExitExpression,
+			&strategy.TargetProfit,
+			&strategy.TargetProfitType,
+			&strategy.StopLoss,
+			&strategy.StopLossType,
+			&strategy.TrailingStopLoss,
+			&strategy.TrailingStopLossType,
+			&strategy.ExitType,
+			&strategy.Capital,
+			&strategy.MaxTrades,
+			&strategy.EntryStartTime,
+			&strategy.EntryEndTime,
+			&strategy.StartDate,
+			&strategy.EndDate,
+			&strategy.CreatedAt,
+			&strategy.UpdatedAt,
+			&strategy.IsActive,
+			&strategy.MaxAllocation,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrDatabaseError, err)
+		}
+
+		strategy.Instruments = instruments
+		strategies = append(strategies, &strategy)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+
+	return strategies, nil
+}
+
 // GetByUserID retrieves all strategies for a specific user
 func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Strategy, error) {
 	query := `
