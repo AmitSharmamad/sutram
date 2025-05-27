@@ -1,4 +1,4 @@
-.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate
+.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live
 
 # Build the web application
 build:
@@ -75,6 +75,16 @@ build-live:
 live: build-live
 	@echo "Running the live WebSocket server..."
 	@./s-live
+
+# Build the market data simulator client
+build-client:
+	@echo "Building the market data simulator client..."
+	@go build -o s-client cmd/client/main.go
+
+# Run the market data simulator client (as server)
+client: build-client
+	@echo "Running the market data simulator server..."
+	@./s-client
 
 # Build the data migration tool
 build-migrate:
