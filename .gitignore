@@ -129,6 +129,7 @@ main
 s-web
 s-migrate
 s-live
+s-client
 main
 
 # data

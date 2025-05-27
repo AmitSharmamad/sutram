@@ -16,6 +16,9 @@ type StrategyRepository interface {
 	// GetByID retrieves a strategy by its ID
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Strategy, error)
 
+	// GetByIDs retrieves multiple strategies by their IDs
+	GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*model.Strategy, error)
+
 	// GetByUserID retrieves all strategies for a specific user
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*model.Strategy, error)
 

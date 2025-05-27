@@ -28,6 +28,7 @@ type Module struct {
 	metricsController     *http.DeploymentMetricsController
 	userController        *userHttp.UserController
 	strategyModule        *strategyModule.Module
+	deploymentService     service.DeploymentService // Add this field
 }
 
 // ProvideModule provides a wire provider set for the deployment module
@@ -104,6 +105,9 @@ func (m *Module) initializeComponents() {
 		engine,
 	)
 
+	// Store the deployment service in the module
+	m.deploymentService = deploymentService
+
 	// Create controllers
 	m.controller = http.NewDeploymentController(deploymentService)
 	logController := http.NewDeploymentLogController(deploymentService)
@@ -119,6 +123,9 @@ func (m *Module) initializeComponents() {
 	m.positionController = positionController
 	m.metricsController = metricsController
 	m.positionLogController = positionLogController
+
+	// Store the deployment service in the module
+	m.deploymentService = deploymentService
 }
 
 // RegisterRoutes registers the deployment module routes with the given router
@@ -191,4 +198,9 @@ func (m *Module) GetPositionController() *http.DeploymentPositionController {
 // GetMetricsController returns the deployment metrics controller
 func (m *Module) GetMetricsController() *http.DeploymentMetricsController {
 	return m.metricsController
+}
+
+// GetDeploymentService returns the deployment service
+func (m *Module) GetDeploymentService() service.DeploymentService {
+	return m.deploymentService
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"algo/internal/modules/deployment/domain/model"
@@ -125,6 +126,51 @@ func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentID(ctx cont
 	}
 
 	return positions, nil
+}
+
+// GetOpenPositionsByDeploymentIDs retrieves all open positions for multiple deployments
+// Returns a map of deployment ID to the first open position (assuming one open position per deployment)
+func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentIDs(ctx context.Context, deploymentIDs []uuid.UUID) (map[uuid.UUID]*model.DeploymentPosition, error) {
+	if len(deploymentIDs) == 0 {
+		return make(map[uuid.UUID]*model.DeploymentPosition), nil
+	}
+
+	// Create placeholders for the IN clause
+	placeholders := make([]interface{}, len(deploymentIDs)+1)
+	placeholderStrings := make([]string, len(deploymentIDs))
+
+	for i, id := range deploymentIDs {
+		placeholders[i] = id
+		placeholderStrings[i] = fmt.Sprintf("$%d", i+1)
+	}
+	placeholders[len(deploymentIDs)] = model.PositionOpen
+
+	query := fmt.Sprintf(`
+		SELECT 
+			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
+			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+		FROM deployment_position
+		WHERE deployment_id IN (%s) AND status = $%d
+		ORDER BY deployment_id, entry_time DESC
+	`,
+		strings.Join(placeholderStrings, ","),
+		len(deploymentIDs)+1)
+
+	var positions []*model.DeploymentPosition
+	err := r.db.SelectContext(ctx, &positions, query, placeholders...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get open deployment positions by deployment IDs: %w", err)
+	}
+
+	// Create map with first position per deployment (assuming one open position per deployment)
+	positionMap := make(map[uuid.UUID]*model.DeploymentPosition)
+	for _, position := range positions {
+		if _, exists := positionMap[position.DeploymentID]; !exists {
+			positionMap[position.DeploymentID] = position
+		}
+	}
+
+	return positionMap, nil
 }
 
 // GetByDeploymentAndInstrument retrieves all positions for a specific deployment and instrument

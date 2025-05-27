@@ -21,10 +21,13 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
+	deploymentModule "algo/internal/modules/deployment"
 	deploymentService "algo/internal/modules/deployment/application/service"
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
+	strategyModule "algo/internal/modules/strategy"
+	userModule "algo/internal/modules/user"
 )
 
 var (
@@ -215,28 +218,102 @@ func initDB() error {
 	return nil
 }
 
-// initDeploymentService initializes the deployment service
+// initDeploymentService initializes the deployment service and all its dependencies
 func initDeploymentService() error {
 	// Check if database is available
 	if chDB == nil {
 		return fmt.Errorf("database connection not available")
 	}
 
-	// Create a db connection specifically for the deployment service
-	// This is just a placeholder. In a real application, you'd use dependency injection
-	// to get the actual deployment service implementation
-
 	log.Printf("Initializing deployment service...")
 
-	// This is just a stub. In a real implementation, you would:
-	// 1. Create all required repositories
-	// 2. Create the deployment service
-	// 3. Initialize it with the Initialize method
-	// For now, we'll just show a message
+	// Initialize strategy module first (required dependency for deployment)
+	strategyMod := strategyModule.New()
 
-	log.Printf("Deployment service initialized")
+	// Initialize user module (required for auth, but not used in live trading)
+	userMod := userModule.New()
+	userController := userMod.GetController()
+
+	// Initialize deployment module
+	deploymentMod := deploymentModule.New()
+	deploymentMod.Initialize(userController, strategyMod)
+
+	// Get the deployment service from the module
+	deploymentSvc = deploymentMod.GetDeploymentService()
+
+	// Initialize the deployment service for live trading
+	if err := deploymentSvc.Initialize(appCtx); err != nil {
+		return fmt.Errorf("failed to initialize deployment service: %w", err)
+	}
+
+	// Get active deployments and subscribe to their instruments
+	if err := subscribeToActiveDeploymentInstruments(); err != nil {
+		log.Printf("Warning: Failed to subscribe to deployment instruments: %v", err)
+		// Don't fail the initialization, just log the warning
+	}
+
+	log.Printf("Deployment service initialized successfully")
 
 	return nil
+}
+
+// subscribeToActiveDeploymentInstruments gets all active deployments and subscribes to their instruments
+func subscribeToActiveDeploymentInstruments() error {
+	if deploymentSvc == nil {
+		return fmt.Errorf("deployment service not initialized")
+	}
+
+	log.Printf("Getting active deployments to subscribe to instruments...")
+
+	// Get unique instrument IDs from the deployment service
+	// We need to add a helper method to extract this information
+	instrumentIDs := getInstrumentIDsFromDeployments()
+
+	if len(instrumentIDs) == 0 {
+		log.Printf("No active deployments found, no instruments to subscribe to")
+		return nil
+	}
+
+	// Convert instrument IDs to InstrumentInfo objects for subscription
+	instruments := make([]InstrumentInfo, 0, len(instrumentIDs))
+	for _, instrumentID := range instrumentIDs {
+		// For now, we'll assume these are NSE instruments
+		// In a real implementation, you might want to store exchange information in deployments
+		instruments = append(instruments, InstrumentInfo{
+			ExchangeSegment: "NSE", // Default to NSE, can be made configurable
+			SecurityId:      fmt.Sprintf("%d", instrumentID),
+		})
+	}
+
+	log.Printf("Subscribing to %d instruments from active deployments", len(instruments))
+
+	// Subscribe to instruments in a goroutine to avoid blocking initialization
+	go func() {
+		// Wait for upstream connection to be established
+		for upstreamConn == nil {
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		// Subscribe to instruments
+		if success := subscribeToInstruments(instruments); success {
+			log.Printf("Successfully subscribed to %d deployment instruments", len(instruments))
+		} else {
+			log.Printf("Failed to subscribe to deployment instruments")
+		}
+	}()
+
+	return nil
+}
+
+// getInstrumentIDsFromDeployments extracts unique instrument IDs from active deployments
+// This function accesses the deployment service's internal state after Initialize() has been called
+func getInstrumentIDsFromDeployments() []int {
+	if deploymentSvc == nil {
+		return []int{}
+	}
+
+	// Get instrument IDs from the deployment service
+	return deploymentSvc.GetActiveInstrumentIDs()
 }
 
 // setupCORS configures CORS middleware
