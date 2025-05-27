@@ -22,9 +22,9 @@ import (
 // Response struct represents the response from a backtest run
 type Response struct {
 	InstrumentMaster *instrumentModel.InstrumentMaster `json:"instrument_master"`
-	InstrumentID string            `json:"instrument_id"`
-	Positions    []*model.Position `json:"positions"`
-	Metrics      *model.RunMetrics `json:"metrics"`
+	InstrumentID     string                            `json:"instrument_id"`
+	Positions        []*model.Position                 `json:"positions"`
+	Metrics          *model.RunMetrics                 `json:"metrics"`
 }
 
 // EngineService defines the service for backtest engine operations
@@ -186,15 +186,44 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 
 		resp := Response{
 			InstrumentMaster: run.InstrumentMaster,
-			InstrumentID:   instrumentIDStr,
-			Positions:    run.Positions,
-			Metrics:      run.RunMetrics,
+			InstrumentID:     instrumentIDStr,
+			Positions:        run.Positions,
+			Metrics:          run.RunMetrics,
 		}
 
 		response = append(response, resp)
 	}
 
 	return response, nil
+}
+
+// calculateLookbackDuration calculates the duration to look back based on timeframe and number of candles
+func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int) time.Duration {
+	var baseDuration time.Duration
+
+	switch timeframe {
+	case "1m":
+		baseDuration = time.Minute
+	case "3m":
+		baseDuration = 3 * time.Minute
+	case "5m":
+		baseDuration = 5 * time.Minute
+	case "15m":
+		baseDuration = 15 * time.Minute
+	case "30m":
+		baseDuration = 30 * time.Minute
+	case "1h":
+		baseDuration = time.Hour
+	case "3h":
+		baseDuration = 3 * time.Hour
+	case "1d":
+		baseDuration = 24 * time.Hour
+	default:
+		// Default to 1 minute if unknown timeframe
+		baseDuration = time.Minute
+	}
+
+	return time.Duration(candles) * baseDuration
 }
 
 // executeRunBacktest runs a backtest for a single instrument run
@@ -220,31 +249,39 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Determine the fetch start time based on entry_start_time if available
 	fetchStartTime := run.PeriodStartTime
 
-	// If EntryStartTime is provided in the strategy, use it for fetching data
-	// We will fetch from the beginning of the backtest period to ensure we have
-	// enough data for indicators, but will respect the entry window during execution
+	// Calculate lookback duration for 100 candles
+	lookbackCandles := 100
+	lookbackDuration := e.calculateLookbackDuration(string(strategy.ChartTimeframe), lookbackCandles)
 
-	// Get data for the main chart timeframe
+	// Adjust fetch start time to include lookback period
+	lookbackStartTime := fetchStartTime.Add(-lookbackDuration)
+
+	// Get data for the main chart timeframe with lookback
 	timeFrameDataStartTime := time.Now()
-	println("\tFetching timeframe data for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
+	println("\tFetching timeframe data with lookback for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
+	println("\t\tLookback period:", lookbackCandles, "candles,", lookbackDuration.String())
+	println("\t\tFetch range:", lookbackStartTime.Format(time.RFC3339), "to", run.PeriodEndTime.Format(time.RFC3339))
 
-	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
+	timeFrameDataWithLookback, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
-		fetchStartTime,
+		lookbackStartTime,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
 	)
 
 	timeFrameDataEndTime := time.Now()
 	timeFrameDataDuration := timeFrameDataEndTime.Sub(timeFrameDataStartTime)
-	println("\tTimeframe data fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
-		"- Records:", len(timeFrameData))
+	println("\tTimeframe data with lookback fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
+		"- Records:", len(timeFrameDataWithLookback))
 
 	if err != nil {
 		println("Error getting timeframe data for instrument ID:", instrumentID, "Error:", err.Error())
 		return
 	}
+
+	// Use the data with lookback as our timeFrameData
+	timeFrameData := timeFrameDataWithLookback
 
 	// Get second-level data for more accurate exit condition checking
 	secondLevelDataStartTime := time.Now()
@@ -326,8 +363,23 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Started
 	}
 
-	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
+	// Find the index where the actual backtest period starts
+	// (after the lookback period)
+	backtestStartIndex := 0
+	if run != nil {
+		for i, candle := range stockData {
+			if candle.Timestamp.Equal(run.PeriodStartTime) || candle.Timestamp.After(run.PeriodStartTime) {
+				backtestStartIndex = i
+				break
+			}
+		}
+	}
+
+	// Minimum lookback period for indicators (use max of 20 or backtestStartIndex to ensure enough data)
 	minLookback := 20
+	if backtestStartIndex > minLookback {
+		minLookback = backtestStartIndex
+	}
 
 	// Keep track of the current trading day for MIS trades
 	var currentTradingDay time.Time
@@ -594,14 +646,14 @@ func (e *BacktestEngine) IsMISEndOfDayHit(
 	exchange := "NSE"
 	endHour := 15
 	endMinute := 15
-	
+
 	if exchange == "MCX" {
 		// MCX has different timings, so we need to adjust accordingly
 		// MCX trading ends at 11:30 PM IST
 		endHour = 23
 		endMinute = 30
 	}
-	
+
 	// Extract the time from the data timestamp
 	currentTime := data.Timestamp
 
@@ -610,10 +662,10 @@ func (e *BacktestEngine) IsMISEndOfDayHit(
 		currentTime.Year(),
 		currentTime.Month(),
 		currentTime.Day(),
-		endHour, // 3 PM (24-hour format)
+		endHour,   // 3 PM (24-hour format)
 		endMinute, // 15 minutes
-		0,  // 0 seconds
-		0,  // 0 nanoseconds
+		0,         // 0 seconds
+		0,         // 0 nanoseconds
 		currentTime.Location(),
 	)
 
