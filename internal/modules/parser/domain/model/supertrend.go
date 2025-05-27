@@ -59,8 +59,8 @@ func (indicator *Supertrend) Calculate(
 
 	highs, lows, closes = indicator.sliceAllData(highs, lows, closes)
 
-	// Need at least period data points to calculate
-	if len(highs) < period || len(lows) < period || len(closes) < period {
+	// Need at least period+1 data points to calculate Supertrend properly
+	if len(highs) <= period || len(lows) <= period || len(closes) <= period {
 		return 0.0
 	}
 
@@ -81,10 +81,12 @@ func (indicator *Supertrend) Calculate(
 
 	// Calculate initial ATR (simple average of TR for the first 'period' days)
 	var sumTR float64
-	for i := 1; i <= period; i++ {
+	for i := 1; i < period+1 && i < len(closes); i++ {
 		sumTR += tr[i]
 	}
-	atr[period] = sumTR / float64(period)
+	if period < len(closes) {
+		atr[period] = sumTR / float64(period)
+	}
 
 	// Calculate ATR using the smoothing technique
 	for i := period + 1; i < len(closes); i++ {
@@ -99,6 +101,11 @@ func (indicator *Supertrend) Calculate(
 
 	// Calculate initial bands
 	for i := period; i < len(closes); i++ {
+		// Ensure we have valid ATR data
+		if i >= len(atr) || atr[i] == 0 {
+			continue
+		}
+
 		basicUpperBand := (highs[i]+lows[i])/2 + indicator.multiplier*atr[i]
 		basicLowerBand := (highs[i]+lows[i])/2 - indicator.multiplier*atr[i]
 
@@ -151,6 +158,9 @@ func (indicator *Supertrend) Calculate(
 	}
 
 	// Return the last calculated supertrend value
+	if len(supertrend) == 0 {
+		return 0.0
+	}
 	return util.Round(supertrend[len(supertrend)-1])
 }
 
