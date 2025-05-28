@@ -757,3 +757,78 @@ func Execute(expr string, ctx *EvaluationContext) bool {
 
 	return result > 0
 }
+
+// IndicatorInfo represents information about an indicator function call
+type IndicatorInfo struct {
+	Name      string `json:"name"`
+	Arguments []any  `json:"arguments"`
+}
+
+// ExtractIndicators parses an expression string and returns all indicator function calls
+func ExtractIndicators(expr string) ([]IndicatorInfo, error) {
+	// Parse the expression into an AST
+	node, err := Parse(expr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse expression: %w", err)
+	}
+
+	// Extract all function calls from the AST
+	var indicators []IndicatorInfo
+	extractFunctionCalls(node, &indicators)
+
+	return indicators, nil
+}
+
+// extractFunctionCalls recursively traverses the AST and collects all function calls
+func extractFunctionCalls(node Node, indicators *[]IndicatorInfo) {
+	if node == nil {
+		return
+	}
+
+	switch n := node.(type) {
+	case *FunctionCallNode:
+		// Extract arguments from the function call
+		args := make([]any, len(n.Arguments))
+		for i, arg := range n.Arguments {
+			if varNode, isVariable := arg.(*VariableNode); isVariable {
+				args[i] = varNode.Name
+				continue
+			}
+
+			switch argNode := arg.(type) {
+			case *NumberNode:
+				args[i] = argNode.Value
+			case *FunctionCallNode:
+				// For nested function calls, we'll represent them as strings
+				args[i] = argNode.String()
+			default:
+				// For other node types, convert to string representation
+				args[i] = argNode.String()
+			}
+		}
+
+		// Add the indicator to our list
+		*indicators = append(*indicators, IndicatorInfo{
+			Name:      n.Name,
+			Arguments: args,
+		})
+
+		// Recursively process nested function calls in arguments
+		for _, arg := range n.Arguments {
+			extractFunctionCalls(arg, indicators)
+		}
+
+	case *BinaryOpNode:
+		// Process both left and right operands
+		extractFunctionCalls(n.Left, indicators)
+		extractFunctionCalls(n.Right, indicators)
+
+	case *UnaryOpNode:
+		// Process the operand
+		extractFunctionCalls(n.Operand, indicators)
+
+	case *NumberNode, *VariableNode:
+		// These nodes don't contain function calls, so we don't need to process them
+		return
+	}
+}
