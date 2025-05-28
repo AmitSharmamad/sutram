@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"math"
+	"time"
 )
 
 type DMI struct {
@@ -187,4 +188,55 @@ func (indicator *DMI) GetLookBack(config []any) int64 {
 	// - Plus any offset
 	// Using the same calculation as GetDataRange: 2*period + 1 + offset
 	return int64(2*period + 1 + offset)
+}
+
+// CalculateAll calculates DMI/ADX values for all data points
+func (indicator *DMI) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	period := int(config[0].(float64))
+	offset := int(config[1].(float64))
+
+	indicator.period = period
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := 2*period + 1 + offset
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate DMI/ADX value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

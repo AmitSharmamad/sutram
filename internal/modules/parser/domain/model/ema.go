@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
+	"time"
 )
 
 type EMA struct {
@@ -137,4 +138,79 @@ func (indicator *EMA) GetLookBack(config []any) int64 {
 	// Using 2*period to ensure we have enough data for proper EMA calculation
 	// as used in SliceData method, plus the offset
 	return int64(5*period + offset)
+}
+
+// CalculateAll calculates EMA values for all data points
+func (indicator *EMA) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	field := config[0].(string)
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.period = period
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Get prices for the entire dataset
+	prices := GetPrices(stockData, field)
+
+	// We need at least enough data to calculate initial EMA
+	// For EMA, we typically need at least 2*period data points for proper calculation
+	minDataPoints := 2*period + offset
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate multiplier (alpha)
+	multiplier := 2.0 / float64(period+1)
+
+	// Calculate initial SMA for the first EMA value
+	startIndex := period + offset
+	var sma float64
+	smaStart := startIndex - period - offset
+	smaEnd := startIndex - offset
+
+	for i := smaStart; i < smaEnd; i++ {
+		sma += prices[i]
+	}
+	sma /= float64(period)
+
+	// Start with the initial SMA value as the first EMA
+	ema := sma
+
+	// Calculate EMA for each data point
+	for i := startIndex; i < len(stockData); i++ {
+		// For the first point, use the SMA calculated above
+		if i == startIndex {
+			results = append(results, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(ema),
+			})
+			continue
+		}
+
+		// Calculate EMA using the previous EMA and current price
+		currentPrice := prices[i-offset]
+		ema = ema + multiplier*(currentPrice-ema)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     util.Round(ema),
+		})
+	}
+
+	// Iterate through results to filter by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

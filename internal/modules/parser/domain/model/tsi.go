@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"math"
+	"time"
 )
 
 type TSI struct {
@@ -214,4 +215,62 @@ func (indicator *TSI) GetLookBack(config []any) int64 {
 	// - Plus any offset
 	totalPeriod := longPeriod + shortPeriod + signalPeriod
 	return int64(2*totalPeriod + 1 + offset)
+}
+
+// CalculateAll calculates TSI values for all data points
+func (indicator *TSI) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	// field := config[0].(string) - handled by Calculate method
+	// lineType := config[1].(string) - handled by Calculate method
+	longPeriod := int(config[2].(float64))
+	shortPeriod := int(config[3].(float64))
+	signalPeriod := int(config[4].(float64))
+	offset := int(config[5].(float64))
+
+	indicator.longPeriod = longPeriod
+	indicator.shortPeriod = shortPeriod
+	indicator.signalPeriod = signalPeriod
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	totalPeriod := longPeriod + shortPeriod + signalPeriod
+	minDataPoints := totalPeriod + offset + 1
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate TSI value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

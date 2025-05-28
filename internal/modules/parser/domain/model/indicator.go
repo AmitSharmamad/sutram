@@ -1,6 +1,9 @@
 package parser
 
-import instrument "algo/internal/modules/instrument/domain/model"
+import (
+	instrument "algo/internal/modules/instrument/domain/model"
+	"time"
+)
 
 type Indicator struct {
 	Type    string         `json:"type"`  /// Indicator / Number
@@ -10,11 +13,17 @@ type Indicator struct {
 	Returns string         `json:"returns"`
 }
 
+type IndicatorValues struct {
+	Timestamp time.Time
+	Value float64
+}
+
 type Prices []float64
 
 type IndicatorCalculator interface {
 	GetLookBack(config []any) int64
 	Calculate(config []any, ctx *EvaluationContext) float64
+	CalculateAll(config []any, ctx *EvaluationContext, startDate time.Time) []IndicatorValues
 	SliceData(prices Prices) Prices
 	GetDataRange(config map[string]any) int32
 }

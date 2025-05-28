@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"math"
+	"time"
 )
 
 type BollingerBands struct {
@@ -77,7 +78,8 @@ func (indicator *BollingerBands) Calculate(
 func (indicator *BollingerBands) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
-) (float64, float64, float64) {
+	startDate time.Time,
+) []IndicatorValues {
 	point := config[0].(string)
 	period := int(config[1].(float64))
 	multiplier := float64(config[2].(float64))
@@ -87,42 +89,82 @@ func (indicator *BollingerBands) CalculateAll(
 	indicator.multiplier = multiplier
 	indicator.offset = offset
 
-	prices := GetPrices(*ctx.Data, point)
-
-	// Check if we have enough data points
-	if len(prices) < period+offset {
-		return 0.0, 0.0, 0.0
+	// Get all stock data
+	stockData := *ctx.Data
+	if len(stockData) < period {
+		return []IndicatorValues{}
 	}
 
-	prices = indicator.SliceData(prices)
+	var result []IndicatorValues
 
-	// Need at least period data points to calculate
-	if len(prices) < period {
-		return 0.0, 0.0, 0.0
+	// Find the start index for startDate
+	startIndex := -1
+	for i, data := range stockData {
+		if !data.Timestamp.Before(startDate) {
+			startIndex = i
+			break
+		}
 	}
 
-	// Calculate SMA
-	var sum float64
-	for i := len(prices) - period; i < len(prices); i++ {
-		sum += prices[i]
+	if startIndex == -1 {
+		return []IndicatorValues{}
 	}
-	sma := sum / float64(period)
 
-	// Calculate standard deviation
-	var variance float64
-	for i := len(prices) - period; i < len(prices); i++ {
-		diff := prices[i] - sma
-		variance += diff * diff
+	// Calculate for each data point starting from when we have enough data
+	for i := period - 1; i < len(stockData); i++ {
+		// Get prices for the window ending at current point
+		var prices []float64
+		for j := i - period + 1; j <= i; j++ {
+			var value float64
+			switch point {
+			case "OPEN":
+				value = stockData[j].Open
+			case "HIGH":
+				value = stockData[j].High
+			case "CLOSE":
+				value = stockData[j].Close
+			case "LOW":
+				value = stockData[j].Low
+			case "VOLUME":
+				value = float64(stockData[j].Volume)
+			default:
+				value = stockData[j].Close
+			}
+			prices = append(prices, value)
+		}
+
+		// Calculate SMA
+		var sum float64
+		for _, price := range prices {
+			sum += price
+		}
+		sma := sum / float64(period)
+
+		// Calculate standard deviation
+		var variance float64
+		for _, price := range prices {
+			diff := price - sma
+			variance += diff * diff
+		}
+		variance /= float64(period)
+		stdDev := math.Sqrt(variance)
+
+		// Calculate Bollinger Bands - return middle band (SMA) as the main value
+		middleBand := sma
+		// Note: Upper band would be sma + (multiplier * stdDev)
+		// Note: Lower band would be sma - (multiplier * stdDev)
+		_ = stdDev // Suppress unused variable warning
+
+		// Only include values from startDate onwards
+		if !stockData[i].Timestamp.Before(startDate) {
+			result = append(result, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(middleBand),
+			})
+		}
 	}
-	variance /= float64(period)
-	stdDev := math.Sqrt(variance)
 
-	// Calculate Bollinger Bands
-	middleBand := sma
-	upperBand := sma + indicator.multiplier*stdDev
-	lowerBand := sma - indicator.multiplier*stdDev
-
-	return util.Round(upperBand), util.Round(middleBand), util.Round(lowerBand)
+	return result
 }
 
 func (indicator *BollingerBands) GetDataRange(config map[string]any) int32 {

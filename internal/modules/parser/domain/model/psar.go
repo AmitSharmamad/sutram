@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type ParabolicSAR struct {
@@ -199,4 +200,57 @@ func (indicator *ParabolicSAR) GetLookBack(config []any) int64 {
 	// - Plus any offset
 	// PSAR needs significant historical data to properly establish trend direction
 	return int64(50 + offset)
+}
+
+// CalculateAll calculates Parabolic SAR values for all data points
+func (indicator *ParabolicSAR) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	minimumAF := float64(config[0].(float64))
+	maximumAF := float64(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.acceleration = minimumAF
+	indicator.maxAcceleration = maximumAF
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := 20 + offset // Using the same as GetDataRange
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate Parabolic SAR value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

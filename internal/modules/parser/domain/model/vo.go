@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type VolumeOscillator struct {
@@ -138,4 +139,58 @@ func (indicator *VolumeOscillator) GetLookBack(config []any) int64 {
 	// - Additional buffer for stability (using 2*longPeriod like SliceData)
 	// - Plus any offset
 	return int64(2*longPeriod + offset)
+}
+
+// CalculateAll calculates Volume Oscillator values for all data points
+func (indicator *VolumeOscillator) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	shortPeriod := int(config[0].(float64))
+	longPeriod := int(config[1].(float64))
+	// pop := config[2].(string) - handled by Calculate method
+	offset := int(config[3].(float64))
+
+	indicator.shortPeriod = shortPeriod
+	indicator.longPeriod = longPeriod
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := longPeriod + offset
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate Volume Oscillator value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

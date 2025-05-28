@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"math"
+	"time"
 )
 
 type KeltnerChannels struct {
@@ -172,10 +173,11 @@ func (indicator *KeltnerChannels) Calculate(
 func (indicator *KeltnerChannels) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
-) (float64, float64, float64) {
+	startDate time.Time,
+) []IndicatorValues {
 	// Parse config parameters according to indicators.json
 	emaPeriod := int(config[0].(float64))      // default: 50
-	_ = config[1].(string)                     // bandType is not used in CalculateAll
+	bandType := config[1].(string)             // default: "MEDIAN"
 	maType := config[2].(string)               // default: "EXPONENTIAL"
 	multiplier := float64(config[3].(float64)) // default: 5
 	offset := 0
@@ -190,67 +192,103 @@ func (indicator *KeltnerChannels) CalculateAll(
 	indicator.multiplier = multiplier
 	indicator.offset = offset
 
-	highs := GetPrices(*ctx.Data, "high")
-	lows := GetPrices(*ctx.Data, "low")
-	closes := GetPrices(*ctx.Data, "close")
+	// Get all stock data
+	stockData := *ctx.Data
+	if len(stockData) == 0 {
+		return []IndicatorValues{}
+	}
 
 	// Check if we have enough data points
 	maxPeriod := emaPeriod
-	if len(highs) < maxPeriod+offset+1 || len(lows) < maxPeriod+offset+1 || len(closes) < maxPeriod+offset+1 {
-		return 0.0, 0.0, 0.0
+	if len(stockData) < maxPeriod+offset+1 {
+		return []IndicatorValues{}
 	}
 
-	highs, lows, closes = indicator.sliceAllData(highs, lows, closes)
+	var result []IndicatorValues
 
-	// Need at least maxPeriod+1 data points to calculate
-	if len(highs) < maxPeriod+1 || len(lows) < maxPeriod+1 || len(closes) < maxPeriod+1 {
-		return 0.0, 0.0, 0.0
+	// Find the start index for startDate
+	startIndex := -1
+	for i, data := range stockData {
+		if !data.Timestamp.Before(startDate) {
+			startIndex = i
+			break
+		}
 	}
 
-	// Calculate price series (always using median price for Keltner)
-	var prices = make([]float64, len(closes))
-	for i := 0; i < len(closes); i++ {
-		// For Keltner Channels, we typically use median price (high+low)/2
-		prices[i] = (highs[i] + lows[i]) / 2.0
+	if startIndex == -1 {
+		return []IndicatorValues{}
 	}
 
-	// Calculate moving average using utility function
-	emas := util.CalculateMovingAverage(prices, maType, indicator.emaPeriod)
+	// Calculate for each data point starting from startDate
+	for i := startIndex; i < len(stockData); i++ {
+		if i < maxPeriod {
+			continue // Need at least 'maxPeriod+1' data points (for TR calculation)
+		}
 
-	// Calculate ATR (Average True Range)
-	var tr = make([]float64, len(closes))
+		// Get data for calculation window ending at current point
+		var highs, lows, closes []float64
+		for j := i - maxPeriod; j <= i; j++ {
+			highs = append(highs, stockData[j].High)
+			lows = append(lows, stockData[j].Low)
+			closes = append(closes, stockData[j].Close)
+		}
 
-	// Calculate True Range
-	for i := 1; i < len(closes); i++ {
-		tr[i] = max(
-			highs[i]-lows[i],
-			max(
-				math.Abs(highs[i]-closes[i-1]),
-				math.Abs(lows[i]-closes[i-1]),
-			),
-		)
+		// Calculate price series (using median price for Keltner)
+		var prices = make([]float64, len(closes))
+		for k := 0; k < len(closes); k++ {
+			prices[k] = (highs[k] + lows[k]) / 2.0
+		}
+
+		// Calculate moving average using utility function
+		emas := util.CalculateMovingAverage(prices, maType, indicator.emaPeriod)
+
+		// Calculate ATR (Average True Range)
+		var tr = make([]float64, len(closes))
+
+		// Calculate True Range
+		for k := 1; k < len(closes); k++ {
+			tr[k] = max(
+				highs[k]-lows[k],
+				max(
+					math.Abs(highs[k]-closes[k-1]),
+					math.Abs(lows[k]-closes[k-1]),
+				),
+			)
+		}
+
+		// Calculate ATR using moving average on TR
+		trData := tr[1:] // Skip the first zero value
+		atrs := util.CalculateMovingAverage(trData, maType, indicator.atrPeriod)
+
+		// Get the last values for MA and ATR
+		var middleLine float64
+		if len(emas) > 0 {
+			middleLine = emas[len(emas)-1]
+		}
+
+		var atr float64
+		if len(atrs) > 0 {
+			atr = atrs[len(atrs)-1]
+		}
+
+		// Return the middle line value (like the original Calculate method for MEDIAN)
+		var resultValue float64
+		switch bandType {
+		case "TOP":
+			resultValue = middleLine + indicator.multiplier*atr
+		case "BOTTOM":
+			resultValue = middleLine - indicator.multiplier*atr
+		default: // "MEDIAN" or any other value
+			resultValue = middleLine
+		}
+
+		result = append(result, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     util.Round(resultValue),
+		})
 	}
 
-	// Calculate ATR using moving average on TR
-	trData := tr[1:] // Skip the first zero value
-	atrs := util.CalculateMovingAverage(trData, maType, indicator.atrPeriod)
-
-	// Get the last values for MA and ATR
-	var middleLine float64
-	if len(emas) > 0 {
-		middleLine = emas[len(emas)-1]
-	}
-
-	var atr float64
-	if len(atrs) > 0 {
-		atr = atrs[len(atrs)-1]
-	}
-
-	// Calculate bands using last values
-	upperBand := middleLine + indicator.multiplier*atr
-	lowerBand := middleLine - indicator.multiplier*atr
-
-	return util.Round(upperBand), util.Round(middleLine), util.Round(lowerBand)
+	return result
 }
 
 func (indicator *KeltnerChannels) GetDataRange(config map[string]any) int32 {
