@@ -387,6 +387,9 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		currentTradingDay = stockData[0].Timestamp.Truncate(24 * time.Hour)
 	}
 
+	evalContext := parser.NewEvaluationContext(nil)
+	evalContext.Strategy = strategy
+
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
 		// Safety check to avoid infinite loops
@@ -396,6 +399,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// Create data context using the data slice from the beginning up to the current position
 		data := e.toDataContext(stockData[:i+1])
+		evalContext.Data = data
 
 		// Check if we've moved to a new trading day
 		dateTruncated := stockData[i].Timestamp.Truncate(24 * time.Hour)
@@ -486,7 +490,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			// Only check entry conditions if we're within the allowed entry time window
 			if canCheckEntryCondition {
-				entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, data)
+				entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, evalContext)
 
 				if entrySignalTriggered {
 					// Calculate position size based on strategy
@@ -531,7 +535,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// If position is still open, check exit condition using timeframe data
 		if openPosition != nil {
-			isExit := e.TryExit(openPosition, strategy, secondLevelData)
+			isExit := e.TryExit(openPosition, strategy, secondLevelData, evalContext)
 
 			// If the position was exited
 			if isExit && openPosition.ExitTimeOrder != nil {
@@ -699,12 +703,12 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	}
 }
 
-func (e *BacktestEngine) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
-	return parser.Execute(expression, parser.NewEvaluationContext(data))
+func (e *BacktestEngine) evaluateEntryCondition(expression string, evalContext *parser.EvaluationContext) bool {
+	return parser.Execute(expression, evalContext)
 }
 
-func (e *BacktestEngine) evaluateExitCondition(expression string, data *instrumentModel.StockData) bool {
-	return parser.Execute(expression, parser.NewEvaluationContext(data))
+func (e *BacktestEngine) evaluateExitCondition(expression string, evalContext *parser.EvaluationContext) bool {
+	return parser.Execute(expression, evalContext)
 }
 
 func (e *BacktestEngine) calculateStopLoss(
@@ -1049,7 +1053,7 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
-func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time) bool {
+func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time, evalContext *parser.EvaluationContext) bool {
 	// Find the range of second-level data within the current timeframe window
 	var relevantData []*instrumentModel.Instrument
 	for _, data := range secondLevelData {
@@ -1067,11 +1071,12 @@ func (e *BacktestEngine) processSecondLevelData(position *model.Position, strate
 		// Create data context for evaluation using available second-level data
 		// We use the toDataContext method to create a compatible StockData object
 		dataContext := e.toDataContext(relevantData[:i+1])
+		evalContext.Data = dataContext
 
 		// Check exit conditions
 		exitSignalTriggered := false
 		if strategy.ExitExpression != "" {
-			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, nil)
 		}
 
 		// Check stop loss or target profit hit
@@ -1168,6 +1173,7 @@ func (e *BacktestEngine) TryExit(
 	position *model.Position,
 	strategy *strategyDto.StrategyResponse,
 	secondLevelData []*instrumentModel.Instrument,
+	evalContext *parser.EvaluationContext,
 ) bool {
 	// If the position is already closed, return
 	if position.State == model.Exited {
@@ -1211,11 +1217,12 @@ func (e *BacktestEngine) TryExit(
 	for i, data := range relevantData {
 		// Create data context for evaluation using available second-level data
 		dataContext := e.toDataContext(relevantData[:i+1])
+		evalContext.Data = dataContext
 
 		// Check exit conditions
 		exitSignalTriggered := false
 		if strategy.ExitExpression != "" {
-			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, evalContext)
 		}
 
 		// Update the Stop Loss based on trailing stop loss

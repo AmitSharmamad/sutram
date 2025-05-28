@@ -2,6 +2,8 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
+
 )
 
 type EMA struct {
@@ -48,6 +50,38 @@ func (indicator *EMA) Calculate(
 		return 0.0
 	}
 
+	// Create unique indicator key
+	indicatorKey := fmt.Sprintf("EMA_%s_%d", field, period)
+
+	// Get current timestamp (using the last data point's timestamp)
+	dataLen := len(*ctx.Data)
+	if dataLen == 0 {
+		return 0.0
+	}
+	currentTimestamp := (*ctx.Data)[dataLen-1].Timestamp.Unix()
+	// timeFrame := ctx.Strategy.ChartTimeframe
+
+
+	// Try to get previous EMA value from Results
+	if prevValue, exists := getPreviousValueFromResults(ctx, indicatorKey, currentTimestamp-3600); exists {
+		if prevEMA, ok := prevValue.(float64); ok {
+			// Calculate multiplier (alpha)
+			multiplier := 2.0 / float64(period+1)
+
+			// Use the most recent price for EMA calculation
+			currentPrice := prices[len(prices)-1]
+
+			// Calculate EMA using previous value: EMA = prevEMA + multiplier * (currentPrice - prevEMA)
+			ema := prevEMA + multiplier*(currentPrice-prevEMA)
+
+			// Store the result for future calculations
+			insertValueToResults(ctx, indicatorKey, currentTimestamp, ema)
+
+			return util.Round(ema)
+		}
+	}
+
+	// If no previous value exists, calculate from scratch
 	// Calculate multiplier (alpha)
 	multiplier := 2.0 / float64(period+1)
 
@@ -69,6 +103,9 @@ func (indicator *EMA) Calculate(
 		// Simplified: EMA = EMA + multiplier * (Price - EMA)
 		ema = ema + multiplier*(prices[i]-ema)
 	}
+
+	// Store the result for future calculations
+	insertValueToResults(ctx, indicatorKey, currentTimestamp, ema)
 
 	return util.Round(ema)
 }

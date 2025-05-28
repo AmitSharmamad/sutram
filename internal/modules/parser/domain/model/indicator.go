@@ -47,3 +47,31 @@ func GetPrices(data instrument.StockData, point string) Prices {
 
 	return results
 }
+
+// getPreviousValueFromResults retrieves a previous value from the Results map
+func getPreviousValueFromResults(ctx *EvaluationContext, indicatorName string, timestamp int64) (interface{}, bool) {
+	if ctx.Results == nil {
+		return nil, false
+	}
+
+	if timestampResults, exists := ctx.Results[timestamp]; exists {
+		if value, found := timestampResults[indicatorName]; found {
+			return value, true
+		}
+	}
+
+	return nil, false
+}
+
+// insertValueToResults stores a calculated value in the Results map
+func insertValueToResults(ctx *EvaluationContext, indicatorName string, timestamp int64, value interface{}) {
+	if ctx.Results == nil {
+		ctx.Results = make(map[int64]map[string]interface{})
+	}
+
+	if _, exists := ctx.Results[timestamp]; !exists {
+		ctx.Results[timestamp] = make(map[string]interface{})
+	}
+
+	ctx.Results[timestamp][indicatorName] = value
+}

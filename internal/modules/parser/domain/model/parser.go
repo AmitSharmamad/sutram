@@ -2,6 +2,9 @@ package parser
 
 import (
 	instrument "algo/internal/modules/instrument/domain/model"
+	// strategy "algo/internal/modules/strategy/domain/model"
+
+	strategyDto "algo/internal/modules/strategy/application/dto"
 	"errors"
 	"fmt"
 	"math"
@@ -672,6 +675,9 @@ type EvaluationContext struct {
 
 	Variables map[string]float64
 	// Functions TradingFunctions
+
+	Strategy *strategyDto.StrategyResponse
+	Results  map[int64]map[string]interface{}
 }
 
 // NewEvaluationContext creates a new evaluation context
