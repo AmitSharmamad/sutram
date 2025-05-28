@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type MACD struct {
@@ -190,4 +191,60 @@ func (indicator *MACD) GetLookBack(config []any) int64 {
 	// - Additional buffer for EMA stabilization (using 2*slowPeriod like SliceData)
 	// - Plus any offset
 	return int64(2*slowPeriod + signalPeriod + offset)
+}
+
+// CalculateAll calculates MACD values for all data points
+func (indicator *MACD) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	fastPeriod := int(config[0].(float64))   // default: 12
+	slowPeriod := int(config[1].(float64))   // default: 26
+	signalPeriod := int(config[2].(float64)) // default: 9
+	// macdType := config[3].(string)           // default: "STANDARD" - handled by Calculate method
+	offset := int(config[4].(float64)) // default: 0
+
+	indicator.fastPeriod = fastPeriod
+	indicator.slowPeriod = slowPeriod
+	indicator.signalPeriod = signalPeriod
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := slowPeriod + signalPeriod + offset
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate MACD value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

@@ -1,5 +1,7 @@
 package parser
 
+import "time"
+
 type Volume struct {
 	offset int
 }
@@ -47,4 +49,37 @@ func (indicator *Volume) GetLookBack(config []any) int64 {
 	// - 1 data point for current volume
 	// - Plus any offset to access historical volume values
 	return int64(offset + 1)
+}
+
+// CalculateAll implements the IndicatorCalculator interface
+func (indicator *Volume) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	offset := int(config[0].(int))
+	indicator.offset = offset
+
+	// Get all stock data
+	stockData := *ctx.Data
+	if len(stockData) == 0 {
+		return []IndicatorValues{}
+	}
+
+	var result []IndicatorValues
+
+	// Filter data starting from startDate
+	for _, data := range stockData {
+		if data.Timestamp.Before(startDate) {
+			continue
+		}
+
+		// Calculate indicator value for this data point
+		result = append(result, IndicatorValues{
+			Timestamp: data.Timestamp,
+			Value:     float64(data.Volume),
+		})
+	}
+
+	return result
 }

@@ -1,5 +1,7 @@
 package parser
 
+import "time"
+
 type Low struct {
 	offset int
 }
@@ -47,4 +49,37 @@ func (indicator *Low) GetLookBack(config []any) int64 {
 	// - 1 data point for current low
 	// - Plus any offset to access historical low values
 	return int64(offset + 1)
+}
+
+// CalculateAll implements the IndicatorCalculator interface
+func (indicator *Low) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	offset := int(config[0].(float64))
+	indicator.offset = offset
+
+	// Get all stock data
+	stockData := *ctx.Data
+	if len(stockData) == 0 {
+		return []IndicatorValues{}
+	}
+
+	var result []IndicatorValues
+
+	// Filter data starting from startDate
+	for _, data := range stockData {
+		if data.Timestamp.Before(startDate) {
+			continue
+		}
+
+		// Calculate indicator value for this data point
+		result = append(result, IndicatorValues{
+			Timestamp: data.Timestamp,
+			Value:     data.Low,
+		})
+	}
+
+	return result
 }
