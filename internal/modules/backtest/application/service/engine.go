@@ -293,6 +293,11 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Determine the fetch start time based on entry_start_time if available
 	fetchStartTime := run.PeriodStartTime
 
+	// ********* Remove this piece of code *********
+	out := run.PeriodStartTime.AddDate(0, 0, -3)
+	fetchStartTime = out
+	// ********* Remove this piece of code *********
+
 	// Calculate lookback duration for 100 candles
 	lookbackCandles := 100
 	lookbackDuration := e.calculateLookbackDuration(string(strategy.ChartTimeframe), lookbackCandles)
@@ -436,6 +441,23 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 	evalContext := parser.NewEvaluationContext(nil)
 	evalContext.Strategy = strategy
+
+	// ********* Remove this piece of code *********
+	evalContext.Data = e.toDataContext(stockData)
+
+	indicators, err := parser.ExtractIndicators(strategy.EntryExpression)
+	if err != nil {
+		println("Error extracting indicators from expression:", err.Error())
+	}
+
+	// Iterate through all indicators and find the maximum lookback
+	for _, indicator := range indicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		out := calculator.CalculateAll(indicator.Arguments, evalContext, *strategy.StartDate)
+		println(out)
+	}
+
+	// ********* Remove this piece of code *********
 
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
