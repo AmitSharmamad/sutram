@@ -66,3 +66,19 @@ func (indicator *SMA) GetDataRange(config map[string]any) int32 {
 
 	return int32(period + offset)
 }
+
+// GetLookBack returns the number of historical data points needed for SMA calculation
+// config[0] = field (string), config[1] = period (float64), config[2] = offset (float64)
+func (indicator *SMA) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is field (string) - not needed for lookback calculation
+	// config[1] is period (float64)
+	// config[2] is offset (float64)
+
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	// For SMA calculation, we need exactly period + offset data points
+	// The SMA needs 'period' consecutive data points plus any offset
+	return int64(period + offset)
+}

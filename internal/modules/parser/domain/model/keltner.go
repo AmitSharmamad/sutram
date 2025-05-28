@@ -281,3 +281,28 @@ func (indicator *KeltnerChannels) GetDataRange(config map[string]any) int32 {
 	// We need maxPeriod+1 data points (due to the use of previous values) + offset
 	return int32(maxPeriod + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Keltner Channels calculation
+// config[0] = emaPeriod (float64), config[1] = bandType (string), config[2] = maType (string)
+// config[3] = multiplier (float64), config[4] = offset (float64) [optional]
+func (indicator *KeltnerChannels) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	emaPeriod := int(config[0].(float64)) // default: 50
+	// config[1] is bandType (string) - not needed for lookback calculation
+	// config[2] is maType (string) - not needed for lookback calculation
+	// config[3] is multiplier (float64) - not needed for lookback calculation
+
+	offset := 0
+	if len(config) > 4 {
+		offset = int(config[4].(float64)) // default: 0
+	}
+
+	// For Keltner Channels calculation, we need:
+	// - emaPeriod for moving average calculation
+	// - Same period for ATR calculation
+	// - 1 additional for true range calculation
+	// - Additional buffer for stability (using 2*maxPeriod like SliceData)
+	// - Plus any offset
+	maxPeriod := emaPeriod // ATR uses same period
+	return int64(2*maxPeriod + 1 + offset)
+}

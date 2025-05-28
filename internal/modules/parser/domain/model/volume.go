@@ -36,3 +36,15 @@ func (indicator *Volume) GetDataRange(config map[string]any) int32 {
 	}
 	return int32(offset + 1)
 }
+
+// GetLookBack returns the number of historical data points needed for Volume calculation
+// config[0] = offset (int)
+func (indicator *Volume) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	offset := config[0].(int) // default: 0
+
+	// For Volume calculation, we need:
+	// - 1 data point for current volume
+	// - Plus any offset to access historical volume values
+	return int64(offset + 1)
+}

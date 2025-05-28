@@ -148,3 +148,18 @@ func (indicator *FisherTransform) GetDataRange(config map[string]any) int32 {
 
 	return int32(indicator.period + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Fisher Transform calculation
+// config[0] = period (float64), config[1] = line (string), config[2] = offset (float64)
+func (indicator *FisherTransform) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64)) // default: 10
+	// config[1] is line (string) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Fisher Transform calculation, we need:
+	// - Period data points for highest/lowest calculation in lookback period
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + offset)
+}

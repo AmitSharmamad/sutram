@@ -3,7 +3,6 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
-
 )
 
 type EMA struct {
@@ -60,7 +59,6 @@ func (indicator *EMA) Calculate(
 	}
 	currentTimestamp := (*ctx.Data)[dataLen-1].Timestamp.Unix()
 	// timeFrame := ctx.Strategy.ChartTimeframe
-
 
 	// Try to get previous EMA value from Results
 	if prevValue, exists := getPreviousValueFromResults(ctx, indicatorKey, currentTimestamp-3600); exists {
@@ -124,4 +122,19 @@ func (indicator *EMA) GetDataRange(config map[string]any) int32 {
 	}
 
 	return int32(indicator.period + indicator.offset)
+}
+
+func (indicator *EMA) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is field (string)
+	// config[1] is period (float64)
+	// config[2] is offset (float64)
+
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	// For EMA calculation, we need sufficient historical data
+	// Using 2*period to ensure we have enough data for proper EMA calculation
+	// as used in SliceData method, plus the offset
+	return int64(5*period + offset)
 }
