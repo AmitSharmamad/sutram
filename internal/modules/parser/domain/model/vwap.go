@@ -103,3 +103,19 @@ func (indicator *VWAP) GetDataRange(config map[string]any) int32 {
 
 	return int32(indicator.period + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for VWAP calculation
+// config[0] = offset (float64)
+func (indicator *VWAP) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	offset := int(config[0].(float64)) // default: 0
+
+	// For VWAP calculation, we use a default period of 20
+	defaultPeriod := 20
+
+	// For VWAP calculation, we need:
+	// - Default period data points for typical price and volume calculation
+	// - Plus any offset
+	// VWAP is typically calculated over the entire trading session or a fixed period
+	return int64(defaultPeriod + offset)
+}

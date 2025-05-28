@@ -137,3 +137,19 @@ func (indicator *Vortex) GetDataRange(config map[string]any) int32 {
 	// We need period+1 data points (due to the use of previous values) + offset
 	return int32(indicator.period + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Vortex calculation
+// config[0] = period (float64), config[1] = signal (string), config[2] = offset (float64)
+func (indicator *Vortex) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64)) // default: 14
+	// config[1] is signal (string) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Vortex calculation, we need:
+	// - Period data points for VM+/VM- and TR calculation
+	// - 1 additional for previous values calculation
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + 1 + offset)
+}

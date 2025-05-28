@@ -36,3 +36,15 @@ func (indicator *High) GetDataRange(config map[string]any) int32 {
 	}
 	return int32(offset + 1)
 }
+
+// GetLookBack returns the number of historical data points needed for High price calculation
+// config[0] = offset (float64)
+func (indicator *High) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	offset := int(config[0].(float64)) // default: 0
+
+	// For High price calculation, we need:
+	// - 1 data point for current high
+	// - Plus any offset to access historical high values
+	return int64(offset + 1)
+}

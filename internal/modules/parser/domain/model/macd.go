@@ -172,3 +172,22 @@ func (indicator *MACD) GetDataRange(config map[string]any) int32 {
 	// Return the maximum data range required
 	return int32(indicator.slowPeriod + indicator.signalPeriod + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for MACD calculation
+// config[0] = fastPeriod (float64), config[1] = slowPeriod (float64), config[2] = signalPeriod (float64)
+// config[3] = macdType (string), config[4] = offset (float64)
+func (indicator *MACD) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is fastPeriod (float64) - not needed for lookback calculation since slowPeriod is larger
+	slowPeriod := int(config[1].(float64))   // default: 26
+	signalPeriod := int(config[2].(float64)) // default: 9
+	// config[3] is macdType (string) - not needed for lookback calculation
+	offset := int(config[4].(float64)) // default: 0
+
+	// For MACD calculation, we need:
+	// - Enough data for slow EMA (slowPeriod)
+	// - Additional data for signal line calculation (signalPeriod)
+	// - Additional buffer for EMA stabilization (using 2*slowPeriod like SliceData)
+	// - Plus any offset
+	return int64(2*slowPeriod + signalPeriod + offset)
+}

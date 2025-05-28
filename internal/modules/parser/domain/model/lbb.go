@@ -292,3 +292,34 @@ func (indicator *LowerBollingerBands) GetDataRange(config map[string]any) int32 
 
 	return int32(additionalData + float64(offset))
 }
+
+// GetLookBack returns the number of historical data points needed for Lower Bollinger Bands calculation
+// config[0] = point (string), config[1] = period (float64), config[2] = standardDev (float64)
+// config[3] = maType (string), config[4] = offset (float64)
+func (indicator *LowerBollingerBands) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is point (string) - not needed for lookback calculation
+	period := config[1].(float64) // default: 20
+	// config[2] is standardDev (float64) - not needed for lookback calculation
+	maType := MovingAverageType(config[3].(string)) // default: SIMPLE
+	offset := int(config[4].(float64))              // default: 0
+
+	// Calculate additional data needed based on MA type
+	var multiplier float64
+	switch maType {
+	case TRIPLE:
+		multiplier = 3.0 // Triple EMA requires more data
+	case TRIANGULAR:
+		multiplier = 2.0 // Triangular MA requires double period
+	case EXPONENTIAL, WEIGHTED:
+		multiplier = 1.5 // EMA and WMA need some extra data for stabilization
+	default:
+		multiplier = 1.0 // Simple MA
+	}
+
+	// For Lower Bollinger Bands calculation, we need:
+	// - Period data points adjusted by MA type multiplier
+	// - Additional buffer for stability (add period again)
+	// - Plus any offset
+	return int64(period*multiplier + period + float64(offset))
+}

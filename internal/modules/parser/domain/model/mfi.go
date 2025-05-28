@@ -165,3 +165,20 @@ func (indicator *MFI) GetDataRange(config map[string]any) int32 {
 	// We need period+1 data points (due to the use of previous values) + offset
 	return int32(indicator.period + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for MFI calculation
+// config[0] = period (float64), config[1] = maType (string), config[2] = maPeriod (float64), config[3] = offset (float64)
+func (indicator *MFI) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64))
+	// config[1] is maType (string) - not needed for lookback calculation
+	// config[2] is maPeriod (float64) - not needed for lookback calculation
+	offset := int(config[3].(float64))
+
+	// For MFI calculation, we need:
+	// - Period data points for money flow calculation
+	// - 1 additional for typical price comparison
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + 1 + offset)
+}

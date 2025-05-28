@@ -172,3 +172,20 @@ func (indicator *UltimateOscillator) GetDataRange(config map[string]any) int32 {
 	// We need length3+1 data points (due to the use of previous values) + offset
 	return int32(indicator.length3 + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Ultimate Oscillator calculation
+// config[0] = length1 (float64), config[1] = length2 (float64), config[2] = length3 (float64), config[3] = offset (float64)
+func (indicator *UltimateOscillator) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is length1 (float64) - not needed since length3 is largest
+	// config[1] is length2 (float64) - not needed since length3 is largest
+	length3 := int(config[2].(float64)) // default: 28 (longest period)
+	offset := int(config[3].(float64))  // default: 0
+
+	// For Ultimate Oscillator calculation, we need:
+	// - length3 data points for longest period calculation
+	// - 1 additional for buying pressure and true range calculation
+	// - Additional buffer for stability (using 2*length3 like SliceData)
+	// - Plus any offset
+	return int64(2*length3 + 1 + offset)
+}

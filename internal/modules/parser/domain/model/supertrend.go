@@ -314,3 +314,19 @@ func (indicator *Supertrend) GetDataRange(config map[string]any) int32 {
 
 	return int32(indicator.period + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Supertrend calculation
+// config[0] = period (float64), config[1] = multiplier (float64), config[2] = offset (float64)
+func (indicator *Supertrend) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64)) // default: 10
+	// config[1] is multiplier (float64) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Supertrend calculation, we need:
+	// - Period data points for ATR calculation
+	// - 1 additional for true range calculation
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + 1 + offset)
+}

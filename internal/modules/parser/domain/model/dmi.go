@@ -172,3 +172,19 @@ func (indicator *DMI) GetDataRange(config map[string]any) int32 {
 	// We need 2*period data points for ADX calculation + 1 for previous values + offset
 	return int32(2*indicator.period + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for DMI calculation
+// config[0] = period (float64), config[1] = offset (float64)
+func (indicator *DMI) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64)) // default: 14
+	offset := int(config[1].(float64)) // default: 0
+
+	// For DMI/ADX calculation, we need:
+	// - Previous values for directional movement calculation (1 extra)
+	// - Period for initial smoothed values
+	// - Another period for ADX calculation from DX values
+	// - Plus any offset
+	// Using the same calculation as GetDataRange: 2*period + 1 + offset
+	return int64(2*period + 1 + offset)
+}

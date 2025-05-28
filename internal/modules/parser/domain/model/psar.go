@@ -184,3 +184,19 @@ func (indicator *ParabolicSAR) GetDataRange(config map[string]any) int32 {
 	// We need at least 20 data points to establish a good trend + offset
 	return int32(20 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for Parabolic SAR calculation
+// config[0] = acceleration (float64), config[1] = maxAcceleration (float64), config[2] = offset (float64)
+func (indicator *ParabolicSAR) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is acceleration (float64) - not needed for lookback calculation
+	// config[1] is maxAcceleration (float64) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Parabolic SAR calculation, we need:
+	// - At least 20 data points to establish a good trend pattern
+	// - Additional buffer for stability (minimum 50 points recommended for PSAR)
+	// - Plus any offset
+	// PSAR needs significant historical data to properly establish trend direction
+	return int64(50 + offset)
+}

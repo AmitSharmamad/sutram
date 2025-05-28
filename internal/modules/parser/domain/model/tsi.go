@@ -194,3 +194,24 @@ func (indicator *TSI) GetDataRange(config map[string]any) int32 {
 	totalPeriod := indicator.longPeriod + indicator.shortPeriod + indicator.signalPeriod
 	return int32(totalPeriod + 1 + indicator.offset)
 }
+
+// GetLookBack returns the number of historical data points needed for TSI calculation
+// config[0] = field (string), config[1] = lineType (string), config[2] = longPeriod (float64)
+// config[3] = shortPeriod (float64), config[4] = signalPeriod (float64), config[5] = offset (float64)
+func (indicator *TSI) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is field (string) - not needed for lookback calculation
+	// config[1] is lineType (string) - not needed for lookback calculation
+	longPeriod := int(config[2].(float64))   // default: 25
+	shortPeriod := int(config[3].(float64))  // default: 13
+	signalPeriod := int(config[4].(float64)) // default: 13
+	offset := int(config[5].(float64))       // default: 0
+
+	// For TSI calculation, we need:
+	// - Double smoothing requires longPeriod + shortPeriod + signalPeriod
+	// - Additional buffer for EMA stabilization (using 2*totalPeriod like SliceData)
+	// - Plus 1 for price change calculation
+	// - Plus any offset
+	totalPeriod := longPeriod + shortPeriod + signalPeriod
+	return int64(2*totalPeriod + 1 + offset)
+}

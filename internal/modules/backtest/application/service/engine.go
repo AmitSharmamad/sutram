@@ -226,6 +226,36 @@ func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int
 	return time.Duration(candles) * baseDuration
 }
 
+// getMaxLookback extracts indicators from the expression and returns the maximum lookback period required
+func (e *BacktestEngine) getMaxLookback(expression string) int64 {
+	// Extract all indicators from the expression
+	indicators, err := parser.ExtractIndicators(expression)
+	if err != nil {
+		println("Error extracting indicators from expression:", err.Error())
+		return 20 // Return a default lookback if there's an error
+	}
+
+	maxLookback := int64(0)
+
+	// Iterate through all indicators and find the maximum lookback
+	for _, indicator := range indicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		if calculator != nil {
+			lookback := calculator.GetLookBack(indicator.Arguments)
+			if lookback > maxLookback {
+				maxLookback = lookback
+			}
+		}
+	}
+
+	// Return at least 20 as minimum lookback if no indicators found or all have 0 lookback
+	if maxLookback < 20 {
+		maxLookback = 20
+	}
+
+	return maxLookback
+}
+
 // executeRunBacktest runs a backtest for a single instrument run
 func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run, instrumentID int64, strategy *strategyDto.StrategyResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -363,6 +393,9 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Started
 	}
 
+	// Calculate the maximum lookback period required for indicators in the entry expression
+	maxLookback := e.getMaxLookback(strategy.EntryExpression)
+
 	// Find the index where the actual backtest period starts
 	// (after the lookback period)
 	backtestStartIndex := 0
@@ -375,8 +408,8 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		}
 	}
 
-	// Minimum lookback period for indicators (use max of 20 or backtestStartIndex to ensure enough data)
-	minLookback := 20
+	// Minimum lookback period for indicators (use max of calculated lookback or backtestStartIndex to ensure enough data)
+	minLookback := int(maxLookback)
 	if backtestStartIndex > minLookback {
 		minLookback = backtestStartIndex
 	}
