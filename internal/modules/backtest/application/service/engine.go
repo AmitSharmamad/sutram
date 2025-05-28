@@ -226,6 +226,20 @@ func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int
 	return time.Duration(candles) * baseDuration
 }
 
+func (e *BacktestEngine) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) (int64) {
+
+	entryLookBack := e.getMaxLookback(strategy.EntryExpression)
+
+	exitLookBack := int64(0)
+	if (strategy.ExitExpression != "") {
+		exitLookBack = e.getMaxLookback(strategy.ExitExpression)
+	}
+
+	lookBack := max(entryLookBack, exitLookBack)
+
+	return lookBack
+}
+
 // getMaxLookback extracts indicators from the expression and returns the maximum lookback period required
 func (e *BacktestEngine) getMaxLookback(expression string) int64 {
 	// Extract all indicators from the expression
@@ -394,7 +408,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Calculate the maximum lookback period required for indicators in the entry expression
-	maxLookback := e.getMaxLookback(strategy.EntryExpression)
+	maxLookback := e.getLookBackFromExpressions(strategy)
 
 	// Find the index where the actual backtest period starts
 	// (after the lookback period)
