@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type VWAP struct {
@@ -102,4 +103,71 @@ func (indicator *VWAP) GetDataRange(config map[string]any) int32 {
 	}
 
 	return int32(indicator.period + indicator.offset)
+}
+
+// GetLookBack returns the number of historical data points needed for VWAP calculation
+// config[0] = offset (float64)
+func (indicator *VWAP) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	offset := int(config[0].(float64)) // default: 0
+
+	// For VWAP calculation, we use a default period of 20
+	defaultPeriod := 20
+
+	// For VWAP calculation, we need:
+	// - Default period data points for typical price and volume calculation
+	// - Plus any offset
+	// VWAP is typically calculated over the entire trading session or a fixed period
+	return int64(defaultPeriod + offset)
+}
+
+// CalculateAll calculates VWAP values for all data points
+func (indicator *VWAP) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	offset := int(config[0].(float64))
+
+	// Default period to 20 for VWAP calculation
+	indicator.period = 20
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := indicator.period + offset
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate VWAP value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

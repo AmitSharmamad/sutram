@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type MFI struct {
@@ -164,4 +165,75 @@ func (indicator *MFI) GetDataRange(config map[string]any) int32 {
 
 	// We need period+1 data points (due to the use of previous values) + offset
 	return int32(indicator.period + 1 + indicator.offset)
+}
+
+// GetLookBack returns the number of historical data points needed for MFI calculation
+// config[0] = period (float64), config[1] = maType (string), config[2] = maPeriod (float64), config[3] = offset (float64)
+func (indicator *MFI) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64))
+	// config[1] is maType (string) - not needed for lookback calculation
+	// config[2] is maPeriod (float64) - not needed for lookback calculation
+	offset := int(config[3].(float64))
+
+	// For MFI calculation, we need:
+	// - Period data points for money flow calculation
+	// - 1 additional for typical price comparison
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + 1 + offset)
+}
+
+// CalculateAll calculates MFI values for all data points
+func (indicator *MFI) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	period := int(config[0].(float64))
+	// maType := config[1].(string) - handled by Calculate method
+	maPeriod := int(config[2].(float64))
+	offset := int(config[3].(float64))
+
+	indicator.period = period
+	indicator.maPeriod = maPeriod
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := period + offset + 1
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate MFI value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

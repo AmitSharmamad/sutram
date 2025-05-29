@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type SMA struct {
@@ -65,4 +66,69 @@ func (indicator *SMA) GetDataRange(config map[string]any) int32 {
 	}
 
 	return int32(period + offset)
+}
+
+// GetLookBack returns the number of historical data points needed for SMA calculation
+// config[0] = field (string), config[1] = period (float64), config[2] = offset (float64)
+func (indicator *SMA) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is field (string) - not needed for lookback calculation
+	// config[1] is period (float64)
+	// config[2] is offset (float64)
+
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	// For SMA calculation, we need exactly period + offset data points
+	// The SMA needs 'period' consecutive data points plus any offset
+	return int64(period + offset)
+}
+
+// CalculateAll calculates SMA values for all data points
+func (indicator *SMA) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	field := config[0].(string)
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.period = period
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Get prices for the entire dataset
+	prices := GetPrices(stockData, field)
+
+	// Calculate SMA for each data point where we have enough historical data
+	for i := period + offset; i < len(stockData); i++ {
+		// Calculate SMA for current position
+		var sum float64
+		start := i - period - offset
+		end := i - offset
+
+		for j := start; j < end; j++ {
+			sum += prices[j]
+		}
+
+		smaValue := util.Round(sum / float64(period))
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     smaValue,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

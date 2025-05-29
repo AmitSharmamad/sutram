@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type UltimateOscillator struct {
@@ -171,4 +172,76 @@ func (indicator *UltimateOscillator) GetDataRange(config map[string]any) int32 {
 
 	// We need length3+1 data points (due to the use of previous values) + offset
 	return int32(indicator.length3 + 1 + indicator.offset)
+}
+
+// GetLookBack returns the number of historical data points needed for Ultimate Oscillator calculation
+// config[0] = length1 (float64), config[1] = length2 (float64), config[2] = length3 (float64), config[3] = offset (float64)
+func (indicator *UltimateOscillator) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is length1 (float64) - not needed since length3 is largest
+	// config[1] is length2 (float64) - not needed since length3 is largest
+	length3 := int(config[2].(float64)) // default: 28 (longest period)
+	offset := int(config[3].(float64))  // default: 0
+
+	// For Ultimate Oscillator calculation, we need:
+	// - length3 data points for longest period calculation
+	// - 1 additional for buying pressure and true range calculation
+	// - Additional buffer for stability (using 2*length3 like SliceData)
+	// - Plus any offset
+	return int64(2*length3 + 1 + offset)
+}
+
+// CalculateAll calculates Ultimate Oscillator values for all data points
+func (indicator *UltimateOscillator) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	length1 := int(config[0].(float64))
+	length2 := int(config[1].(float64))
+	length3 := int(config[2].(float64))
+	offset := int(config[3].(float64))
+
+	indicator.length1 = length1
+	indicator.length2 = length2
+	indicator.length3 = length3
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := length3 + offset + 1
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate Ultimate Oscillator value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }
