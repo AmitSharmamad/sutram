@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,46 @@ func (indicator *EMA) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for EMA indicator based on its configuration
+func (indicator *EMA) generateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("EMA requires 3 parameters: field, period, offset")
+	}
+
+	// Extract field parameter
+	field, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("EMA field parameter must be a string")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("EMA period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract offset parameter (though typically not used in the key)
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("EMA offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - typically we don't include offset in the key
+	// as it's used for historical lookback, not for identifying the indicator
+	// But if you want to include offset for different EMA calculations with same period:
+	if offset != 0 {
+		return fmt.Sprintf("EMA_%s_%d_%d", strings.ToUpper(field), period, offset), nil
+	}
+
+	return fmt.Sprintf("EMA_%s_%d", strings.ToUpper(field), period), nil
 }
 
 func (indicator *EMA) Calculate(
@@ -161,7 +202,7 @@ func (indicator *EMA) CalculateAll(
 
 	// We need at least enough data to calculate initial EMA
 	// For EMA, we typically need at least 2*period data points for proper calculation
-	minDataPoints := 2*period + offset
+	minDataPoints := 3*period + offset
 	if len(stockData) < minDataPoints {
 		return []IndicatorValues{}
 	}
