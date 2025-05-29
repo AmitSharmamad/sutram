@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"math"
+	"time"
 )
 
 type Vortex struct {
@@ -40,7 +41,7 @@ func (indicator *Vortex) Calculate(
 	ctx *EvaluationContext,
 ) float64 {
 	period := int(config[0].(float64)) // default: 14
-	signal := config[1].(string)       // default: "+VI"
+	signal := config[1].(string)       // default: "POSITIVE_VI"
 	offset := int(config[2].(float64)) // default: 0
 
 	indicator.period = period
@@ -114,9 +115,9 @@ func (indicator *Vortex) Calculate(
 
 	// Return the appropriate value based on signal parameter
 	lastIndex := len(viPlus) - 1
-	if signal == "-VI" {
+	if signal == "NEGATIVE_VI" {
 		return util.Round(viMinus[lastIndex])
-	} else { // Default to "+VI" for any other value
+	} else { // Default to "POSITIVE_VI" for any other value
 		return util.Round(viPlus[lastIndex])
 	}
 }
@@ -136,4 +137,72 @@ func (indicator *Vortex) GetDataRange(config map[string]any) int32 {
 
 	// We need period+1 data points (due to the use of previous values) + offset
 	return int32(indicator.period + 1 + indicator.offset)
+}
+
+// GetLookBack returns the number of historical data points needed for Vortex calculation
+// config[0] = period (float64), config[1] = signal (string), config[2] = offset (float64)
+func (indicator *Vortex) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	period := int(config[0].(float64)) // default: 14
+	// config[1] is signal (string) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Vortex calculation, we need:
+	// - Period data points for VM+/VM- and TR calculation
+	// - 1 additional for previous values calculation
+	// - Additional buffer for stability (using 2*period like SliceData)
+	// - Plus any offset
+	return int64(2*period + 1 + offset)
+}
+
+// CalculateAll calculates Vortex values for all data points
+func (indicator *Vortex) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	period := int(config[0].(float64)) // default: 14
+	// signal := config[1].(string)       // default: "POSITIVE_VI" - handled by Calculate method
+	offset := int(config[2].(float64)) // default: 0
+
+	indicator.period = period
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := period + offset + 1
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate Vortex value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }

@@ -22,9 +22,9 @@ import (
 // Response struct represents the response from a backtest run
 type Response struct {
 	InstrumentMaster *instrumentModel.InstrumentMaster `json:"instrument_master"`
-	InstrumentID string            `json:"instrument_id"`
-	Positions    []*model.Position `json:"positions"`
-	Metrics      *model.RunMetrics `json:"metrics"`
+	InstrumentID     string                            `json:"instrument_id"`
+	Positions        []*model.Position                 `json:"positions"`
+	Metrics          *model.RunMetrics                 `json:"metrics"`
 }
 
 // EngineService defines the service for backtest engine operations
@@ -186,15 +186,88 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 
 		resp := Response{
 			InstrumentMaster: run.InstrumentMaster,
-			InstrumentID:   instrumentIDStr,
-			Positions:    run.Positions,
-			Metrics:      run.RunMetrics,
+			InstrumentID:     instrumentIDStr,
+			Positions:        run.Positions,
+			Metrics:          run.RunMetrics,
 		}
 
 		response = append(response, resp)
 	}
 
 	return response, nil
+}
+
+// calculateLookbackDuration calculates the duration to look back based on timeframe and number of candles
+func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int) time.Duration {
+	var baseDuration time.Duration
+
+	switch timeframe {
+	case "1m":
+		baseDuration = time.Minute
+	case "3m":
+		baseDuration = 3 * time.Minute
+	case "5m":
+		baseDuration = 5 * time.Minute
+	case "15m":
+		baseDuration = 15 * time.Minute
+	case "30m":
+		baseDuration = 30 * time.Minute
+	case "1h":
+		baseDuration = time.Hour
+	case "3h":
+		baseDuration = 3 * time.Hour
+	case "1d":
+		baseDuration = 24 * time.Hour
+	default:
+		// Default to 1 minute if unknown timeframe
+		baseDuration = time.Minute
+	}
+
+	return time.Duration(candles) * baseDuration
+}
+
+func (e *BacktestEngine) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) (int64) {
+
+	entryLookBack := e.getMaxLookback(strategy.EntryExpression)
+
+	exitLookBack := int64(0)
+	if (strategy.ExitExpression != "") {
+		exitLookBack = e.getMaxLookback(strategy.ExitExpression)
+	}
+
+	lookBack := max(entryLookBack, exitLookBack)
+
+	return lookBack
+}
+
+// getMaxLookback extracts indicators from the expression and returns the maximum lookback period required
+func (e *BacktestEngine) getMaxLookback(expression string) int64 {
+	// Extract all indicators from the expression
+	indicators, err := parser.ExtractIndicators(expression)
+	if err != nil {
+		println("Error extracting indicators from expression:", err.Error())
+		return 20 // Return a default lookback if there's an error
+	}
+
+	maxLookback := int64(0)
+
+	// Iterate through all indicators and find the maximum lookback
+	for _, indicator := range indicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		if calculator != nil {
+			lookback := calculator.GetLookBack(indicator.Arguments)
+			if lookback > maxLookback {
+				maxLookback = lookback
+			}
+		}
+	}
+
+	// Return at least 20 as minimum lookback if no indicators found or all have 0 lookback
+	if maxLookback < 20 {
+		maxLookback = 20
+	}
+
+	return maxLookback
 }
 
 // executeRunBacktest runs a backtest for a single instrument run
@@ -220,31 +293,44 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	// Determine the fetch start time based on entry_start_time if available
 	fetchStartTime := run.PeriodStartTime
 
-	// If EntryStartTime is provided in the strategy, use it for fetching data
-	// We will fetch from the beginning of the backtest period to ensure we have
-	// enough data for indicators, but will respect the entry window during execution
+	// ********* Remove this piece of code *********
+	out := run.PeriodStartTime.AddDate(0, 0, -3)
+	fetchStartTime = out
+	// ********* Remove this piece of code *********
 
-	// Get data for the main chart timeframe
+	// Calculate lookback duration for 100 candles
+	lookbackCandles := 100
+	lookbackDuration := e.calculateLookbackDuration(string(strategy.ChartTimeframe), lookbackCandles)
+
+	// Adjust fetch start time to include lookback period
+	lookbackStartTime := fetchStartTime.Add(-lookbackDuration)
+
+	// Get data for the main chart timeframe with lookback
 	timeFrameDataStartTime := time.Now()
-	println("\tFetching timeframe data for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
+	println("\tFetching timeframe data with lookback for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
+	println("\t\tLookback period:", lookbackCandles, "candles,", lookbackDuration.String())
+	println("\t\tFetch range:", lookbackStartTime.Format(time.RFC3339), "to", run.PeriodEndTime.Format(time.RFC3339))
 
-	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
+	timeFrameDataWithLookback, err := e.instrumentService.GetInstrumentsByTimeRange(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
-		fetchStartTime,
+		lookbackStartTime,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
 	)
 
 	timeFrameDataEndTime := time.Now()
 	timeFrameDataDuration := timeFrameDataEndTime.Sub(timeFrameDataStartTime)
-	println("\tTimeframe data fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
-		"- Records:", len(timeFrameData))
+	println("\tTimeframe data with lookback fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
+		"- Records:", len(timeFrameDataWithLookback))
 
 	if err != nil {
 		println("Error getting timeframe data for instrument ID:", instrumentID, "Error:", err.Error())
 		return
 	}
+
+	// Use the data with lookback as our timeFrameData
+	timeFrameData := timeFrameDataWithLookback
 
 	// Get second-level data for more accurate exit condition checking
 	secondLevelDataStartTime := time.Now()
@@ -326,14 +412,52 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Started
 	}
 
-	// Minimum lookback period for indicators (for example, SMA(20) would need at least 20 candles)
-	minLookback := 20
+	// Calculate the maximum lookback period required for indicators in the entry expression
+	maxLookback := e.getLookBackFromExpressions(strategy)
+
+	// Find the index where the actual backtest period starts
+	// (after the lookback period)
+	backtestStartIndex := 0
+	if run != nil {
+		for i, candle := range stockData {
+			if candle.Timestamp.Equal(run.PeriodStartTime) || candle.Timestamp.After(run.PeriodStartTime) {
+				backtestStartIndex = i
+				break
+			}
+		}
+	}
+
+	// Minimum lookback period for indicators (use max of calculated lookback or backtestStartIndex to ensure enough data)
+	minLookback := int(maxLookback)
+	if backtestStartIndex > minLookback {
+		minLookback = backtestStartIndex
+	}
 
 	// Keep track of the current trading day for MIS trades
 	var currentTradingDay time.Time
 	if len(stockData) > 0 {
 		currentTradingDay = stockData[0].Timestamp.Truncate(24 * time.Hour)
 	}
+
+	evalContext := parser.NewEvaluationContext(nil)
+	evalContext.Strategy = strategy
+
+	// ********* Remove this piece of code *********
+	evalContext.Data = e.toDataContext(stockData)
+
+	indicators, err := parser.ExtractIndicators(strategy.EntryExpression)
+	if err != nil {
+		println("Error extracting indicators from expression:", err.Error())
+	}
+
+	// Iterate through all indicators and find the maximum lookback
+	for _, indicator := range indicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		out := calculator.CalculateAll(indicator.Arguments, evalContext, *strategy.StartDate)
+		println(out)
+	}
+
+	// ********* Remove this piece of code *********
 
 	// Process each candle from the minimum lookback period to the end of the data
 	for i := minLookback; i < len(stockData); i++ {
@@ -344,6 +468,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// Create data context using the data slice from the beginning up to the current position
 		data := e.toDataContext(stockData[:i+1])
+		evalContext.Data = data
 
 		// Check if we've moved to a new trading day
 		dateTruncated := stockData[i].Timestamp.Truncate(24 * time.Hour)
@@ -434,7 +559,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			// Only check entry conditions if we're within the allowed entry time window
 			if canCheckEntryCondition {
-				entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, data)
+				entrySignalTriggered := e.evaluateEntryCondition(strategy.EntryExpression, evalContext)
 
 				if entrySignalTriggered {
 					// Calculate position size based on strategy
@@ -479,7 +604,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// If position is still open, check exit condition using timeframe data
 		if openPosition != nil {
-			isExit := e.TryExit(openPosition, strategy, secondLevelData)
+			isExit := e.TryExit(openPosition, strategy, secondLevelData, evalContext)
 
 			// If the position was exited
 			if isExit && openPosition.ExitTimeOrder != nil {
@@ -594,14 +719,14 @@ func (e *BacktestEngine) IsMISEndOfDayHit(
 	exchange := "NSE"
 	endHour := 15
 	endMinute := 15
-	
+
 	if exchange == "MCX" {
 		// MCX has different timings, so we need to adjust accordingly
 		// MCX trading ends at 11:30 PM IST
 		endHour = 23
 		endMinute = 30
 	}
-	
+
 	// Extract the time from the data timestamp
 	currentTime := data.Timestamp
 
@@ -610,10 +735,10 @@ func (e *BacktestEngine) IsMISEndOfDayHit(
 		currentTime.Year(),
 		currentTime.Month(),
 		currentTime.Day(),
-		endHour, // 3 PM (24-hour format)
+		endHour,   // 3 PM (24-hour format)
 		endMinute, // 15 minutes
-		0,  // 0 seconds
-		0,  // 0 nanoseconds
+		0,         // 0 seconds
+		0,         // 0 nanoseconds
 		currentTime.Location(),
 	)
 
@@ -647,12 +772,12 @@ func (e *BacktestEngine) executeBacktest(ctx context.Context, strategy *strategy
 	}
 }
 
-func (e *BacktestEngine) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
-	return parser.Execute(expression, parser.NewEvaluationContext(data))
+func (e *BacktestEngine) evaluateEntryCondition(expression string, evalContext *parser.EvaluationContext) bool {
+	return parser.Execute(expression, evalContext)
 }
 
-func (e *BacktestEngine) evaluateExitCondition(expression string, data *instrumentModel.StockData) bool {
-	return parser.Execute(expression, parser.NewEvaluationContext(data))
+func (e *BacktestEngine) evaluateExitCondition(expression string, evalContext *parser.EvaluationContext) bool {
+	return parser.Execute(expression, evalContext)
 }
 
 func (e *BacktestEngine) calculateStopLoss(
@@ -997,7 +1122,7 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
-func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time) bool {
+func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time, evalContext *parser.EvaluationContext) bool {
 	// Find the range of second-level data within the current timeframe window
 	var relevantData []*instrumentModel.Instrument
 	for _, data := range secondLevelData {
@@ -1015,11 +1140,12 @@ func (e *BacktestEngine) processSecondLevelData(position *model.Position, strate
 		// Create data context for evaluation using available second-level data
 		// We use the toDataContext method to create a compatible StockData object
 		dataContext := e.toDataContext(relevantData[:i+1])
+		evalContext.Data = dataContext
 
 		// Check exit conditions
 		exitSignalTriggered := false
 		if strategy.ExitExpression != "" {
-			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, nil)
 		}
 
 		// Check stop loss or target profit hit
@@ -1116,6 +1242,7 @@ func (e *BacktestEngine) TryExit(
 	position *model.Position,
 	strategy *strategyDto.StrategyResponse,
 	secondLevelData []*instrumentModel.Instrument,
+	evalContext *parser.EvaluationContext,
 ) bool {
 	// If the position is already closed, return
 	if position.State == model.Exited {
@@ -1159,11 +1286,12 @@ func (e *BacktestEngine) TryExit(
 	for i, data := range relevantData {
 		// Create data context for evaluation using available second-level data
 		dataContext := e.toDataContext(relevantData[:i+1])
+		evalContext.Data = dataContext
 
 		// Check exit conditions
 		exitSignalTriggered := false
 		if strategy.ExitExpression != "" {
-			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, dataContext)
+			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, evalContext)
 		}
 
 		// Update the Stop Loss based on trailing stop loss

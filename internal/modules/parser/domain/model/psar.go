@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"time"
 )
 
 type ParabolicSAR struct {
@@ -183,4 +184,73 @@ func (indicator *ParabolicSAR) GetDataRange(config map[string]any) int32 {
 
 	// We need at least 20 data points to establish a good trend + offset
 	return int32(20 + indicator.offset)
+}
+
+// GetLookBack returns the number of historical data points needed for Parabolic SAR calculation
+// config[0] = acceleration (float64), config[1] = maxAcceleration (float64), config[2] = offset (float64)
+func (indicator *ParabolicSAR) GetLookBack(config []any) int64 {
+	// Parse config parameters same as Calculate function
+	// config[0] is acceleration (float64) - not needed for lookback calculation
+	// config[1] is maxAcceleration (float64) - not needed for lookback calculation
+	offset := int(config[2].(float64)) // default: 0
+
+	// For Parabolic SAR calculation, we need:
+	// - At least 20 data points to establish a good trend pattern
+	// - Additional buffer for stability (minimum 50 points recommended for PSAR)
+	// - Plus any offset
+	// PSAR needs significant historical data to properly establish trend direction
+	return int64(50 + offset)
+}
+
+// CalculateAll calculates Parabolic SAR values for all data points
+func (indicator *ParabolicSAR) CalculateAll(
+	config []any,
+	ctx *EvaluationContext,
+	startDate time.Time,
+) []IndicatorValues {
+	minimumAF := float64(config[0].(float64))
+	maximumAF := float64(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	indicator.acceleration = minimumAF
+	indicator.maxAcceleration = maximumAF
+	indicator.offset = offset
+
+	stockData := *ctx.Data
+	var results []IndicatorValues
+
+	// Need enough data for calculation
+	minDataPoints := 20 + offset // Using the same as GetDataRange
+	if len(stockData) < minDataPoints {
+		return []IndicatorValues{}
+	}
+
+	// Calculate for each valid data point
+	for i := minDataPoints - 1; i < len(stockData); i++ {
+		// Create a temporary context with data up to this point
+		tempData := stockData[:i+1]
+		tempCtx := &EvaluationContext{
+			Data:     &tempData,
+			Strategy: ctx.Strategy,
+			Results:  make(map[int64]map[string]interface{}),
+		}
+
+		// Calculate Parabolic SAR value for this point
+		value := indicator.Calculate(config, tempCtx)
+
+		results = append(results, IndicatorValues{
+			Timestamp: stockData[i].Timestamp,
+			Value:     value,
+		})
+	}
+
+	// Filter results by startDate
+	var filteredResults []IndicatorValues
+	for _, result := range results {
+		if !result.Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults
 }
