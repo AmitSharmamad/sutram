@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"time"
 )
 
@@ -22,6 +23,54 @@ func (indicator *UltimateOscillator) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for UltimateOscillator indicator based on its configuration
+func (indicator *UltimateOscillator) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 4 {
+		return "", fmt.Errorf("UltimateOscillator requires 4 parameters: length1, length2, length3, offset")
+	}
+
+	// Extract length1 parameter
+	length1Float, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("UltimateOscillator length1 parameter must be a number")
+	}
+	length1 := int(length1Float)
+
+	// Extract length2 parameter
+	length2Float, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("UltimateOscillator length2 parameter must be a number")
+	}
+	length2 := int(length2Float)
+
+	// Extract length3 parameter
+	length3Float, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("UltimateOscillator length3 parameter must be a number")
+	}
+	length3 := int(length3Float)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("UltimateOscillator offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("ULTIMATE_%d_%d_%d", length1, length2, length3)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Helper method to slice all required data

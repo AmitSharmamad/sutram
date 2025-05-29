@@ -2,6 +2,8 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -24,6 +26,64 @@ func (indicator *MACD) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for MACD indicator based on its configuration
+func (indicator *MACD) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 5 {
+		return "", fmt.Errorf("MACD requires 5 parameters: fastPeriod, slowPeriod, signalPeriod, macdType, offset")
+	}
+
+	// Extract fastPeriod parameter
+	fastPeriodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("MACD fastPeriod parameter must be a number")
+	}
+	fastPeriod := int(fastPeriodFloat)
+
+	// Extract slowPeriod parameter
+	slowPeriodFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("MACD slowPeriod parameter must be a number")
+	}
+	slowPeriod := int(slowPeriodFloat)
+
+	// Extract signalPeriod parameter
+	signalPeriodFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("MACD signalPeriod parameter must be a number")
+	}
+	signalPeriod := int(signalPeriodFloat)
+
+	// Extract macdType parameter
+	macdType, ok := config[3].(string)
+	if !ok {
+		return "", fmt.Errorf("MACD macdType parameter must be a string")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[4].(float64)
+	if !ok {
+		return "", fmt.Errorf("MACD offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include type and offset only if non-default
+	baseKey := fmt.Sprintf("MACD_%d_%d_%d", fastPeriod, slowPeriod, signalPeriod)
+
+	if strings.ToUpper(macdType) != "STANDARD" {
+		baseKey += "_" + strings.ToUpper(macdType)
+	}
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 func (indicator *MACD) Calculate(

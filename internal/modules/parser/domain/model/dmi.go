@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
 	"time"
 )
@@ -21,6 +22,38 @@ func (indicator *DMI) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for DMI indicator based on its configuration
+func (indicator *DMI) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 2 {
+		return "", fmt.Errorf("DMI requires 2 parameters: period, offset")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("DMI period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("DMI offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	if offset != 0 {
+		return fmt.Sprintf("DMI_%d_%d", period, offset), nil
+	}
+
+	return fmt.Sprintf("DMI_%d", period), nil
 }
 
 // Helper method to slice all required data

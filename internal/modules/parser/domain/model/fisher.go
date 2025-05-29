@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -21,6 +23,46 @@ func (indicator *FisherTransform) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for FisherTransform indicator based on its configuration
+func (indicator *FisherTransform) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("FisherTransform requires 3 parameters: period, line, offset")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("FisherTransform period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract line parameter
+	line, ok := config[1].(string)
+	if !ok {
+		return "", fmt.Errorf("FisherTransform line parameter must be a string")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("FisherTransform offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("FISHER_%d_%s", period, strings.ToUpper(line))
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Helper method to slice all required data

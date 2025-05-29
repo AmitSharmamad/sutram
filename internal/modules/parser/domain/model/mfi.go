@@ -2,6 +2,8 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -22,6 +24,53 @@ func (indicator *MFI) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for MFI indicator based on its configuration
+func (indicator *MFI) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 4 {
+		return "", fmt.Errorf("MFI requires 4 parameters: period, maType, maPeriod, offset")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("MFI period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract maType parameter
+	maType, ok := config[1].(string)
+	if !ok {
+		return "", fmt.Errorf("MFI maType parameter must be a string")
+	}
+
+	// Extract maPeriod parameter
+	maPeriodFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("MFI maPeriod parameter must be a number")
+	}
+	maPeriod := int(maPeriodFloat)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("MFI offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include non-default values
+	baseKey := fmt.Sprintf("MFI_%d_%s_%d", period, strings.ToUpper(maType), maPeriod)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Helper method to slice all required data

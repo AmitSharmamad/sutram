@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -26,6 +28,67 @@ func (indicator *TSI) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for TSI indicator based on its configuration
+func (indicator *TSI) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 6 {
+		return "", fmt.Errorf("TSI requires 6 parameters: field, lineType, longPeriod, shortPeriod, signalPeriod, offset")
+	}
+
+	// Extract field parameter
+	field, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("TSI field parameter must be a string")
+	}
+
+	// Extract lineType parameter
+	lineType, ok := config[1].(string)
+	if !ok {
+		return "", fmt.Errorf("TSI lineType parameter must be a string")
+	}
+
+	// Extract longPeriod parameter
+	longPeriodFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("TSI longPeriod parameter must be a number")
+	}
+	longPeriod := int(longPeriodFloat)
+
+	// Extract shortPeriod parameter
+	shortPeriodFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("TSI shortPeriod parameter must be a number")
+	}
+	shortPeriod := int(shortPeriodFloat)
+
+	// Extract signalPeriod parameter
+	signalPeriodFloat, ok := config[4].(float64)
+	if !ok {
+		return "", fmt.Errorf("TSI signalPeriod parameter must be a number")
+	}
+	signalPeriod := int(signalPeriodFloat)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[5].(float64)
+	if !ok {
+		return "", fmt.Errorf("TSI offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include non-default values
+	baseKey := fmt.Sprintf("TSI_%s_%s_%d_%d_%d",
+		strings.ToUpper(field), strings.ToUpper(lineType), longPeriod, shortPeriod, signalPeriod)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 func (indicator *TSI) Calculate(
