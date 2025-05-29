@@ -226,12 +226,12 @@ func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int
 	return time.Duration(candles) * baseDuration
 }
 
-func (e *BacktestEngine) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) (int64) {
+func (e *BacktestEngine) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) int64 {
 
 	entryLookBack := e.getMaxLookback(strategy.EntryExpression)
 
 	exitLookBack := int64(0)
-	if (strategy.ExitExpression != "") {
+	if strategy.ExitExpression != "" {
 		exitLookBack = e.getMaxLookback(strategy.ExitExpression)
 	}
 
@@ -291,11 +291,10 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	}
 
 	// Determine the fetch start time based on entry_start_time if available
-	fetchStartTime := run.PeriodStartTime
 
 	// ********* Remove this piece of code *********
-	out := run.PeriodStartTime.AddDate(0, 0, -3)
-	fetchStartTime = out
+	// out := run.PeriodStartTime.AddDate(0, 0, -3)
+	// fetchStartTime := out
 	// ********* Remove this piece of code *********
 
 	// Calculate lookback duration for 100 candles
@@ -303,7 +302,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	lookbackDuration := e.calculateLookbackDuration(string(strategy.ChartTimeframe), lookbackCandles)
 
 	// Adjust fetch start time to include lookback period
-	lookbackStartTime := fetchStartTime.Add(-lookbackDuration)
+	lookbackStartTime := strategy.StartDate.AddDate(0, 0, -30)
 
 	// Get data for the main chart timeframe with lookback
 	timeFrameDataStartTime := time.Now()
@@ -450,10 +449,34 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		println("Error extracting indicators from expression:", err.Error())
 	}
 
+	indicatorArrayMap := make(map[string][]parser.IndicatorValues)
+	length := 0
+
 	// Iterate through all indicators and find the maximum lookback
 	for _, indicator := range indicators {
+		// parts := []string{indicator.Name}
+		// for _, arg := range indicator.Arguments {
+		// 	parts = append(parts, fmt.Sprintf("%.0f", arg))
+		// }
+
 		calculator := parser.GetIndFactory(indicator.Name)
-		out := calculator.CalculateAll(indicator.Arguments, evalContext, *strategy.StartDate)
+		uniqueString, err := calculator.GenerateIndicatorKey(indicator.Arguments, evalContext)
+		if err != nil {
+			println("Error generating unique key for indicator:", err.Error())
+		}
+
+		indicatorArrayMap[uniqueString] = calculator.CalculateAll(indicator.Arguments, evalContext, *strategy.StartDate)
+		length = len(indicatorArrayMap[uniqueString])
+	}
+
+	for i := 0; i < length; i++ {
+		out, err := parser.EvaluateIndicatorExpression(
+			strategy.EntryExpression, indicatorArrayMap, stockData[i].Timestamp, nil, i,
+		)
+		if err != nil {
+			println("Error evaluating entry expression:", err.Error())
+		}
+
 		println(out)
 	}
 

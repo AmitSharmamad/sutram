@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -24,6 +26,66 @@ func (indicator *KeltnerChannels) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for KeltnerChannels indicator based on its configuration
+func (indicator *KeltnerChannels) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 6 {
+		return "", fmt.Errorf("KeltnerChannels requires 6 parameters: emaPeriod, bandType, maType, multiplier, atrPeriod, offset")
+	}
+
+	// Extract emaPeriod parameter
+	emaPeriodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels emaPeriod parameter must be a number")
+	}
+	emaPeriod := int(emaPeriodFloat)
+
+	// Extract bandType parameter
+	bandType, ok := config[1].(string)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels bandType parameter must be a string")
+	}
+
+	// Extract maType parameter
+	maType, ok := config[2].(string)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels maType parameter must be a string")
+	}
+
+	// Extract multiplier parameter
+	multiplier, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels multiplier parameter must be a number")
+	}
+
+	// Extract atrPeriod parameter
+	atrPeriodFloat, ok := config[4].(float64)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels atrPeriod parameter must be a number")
+	}
+	atrPeriod := int(atrPeriodFloat)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[5].(float64)
+	if !ok {
+		return "", fmt.Errorf("KeltnerChannels offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include non-default values
+	baseKey := fmt.Sprintf("KELTNER_%d_%s_%s_%.1f_%d",
+		emaPeriod, strings.ToUpper(bandType), strings.ToUpper(maType), multiplier, atrPeriod)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Helper method to slice all required data

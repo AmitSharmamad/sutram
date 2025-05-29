@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -21,6 +23,46 @@ func (indicator *Vortex) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for Vortex indicator based on its configuration
+func (indicator *Vortex) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("Vortex requires 3 parameters: period, signal, offset")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("Vortex period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract signal parameter
+	signal, ok := config[1].(string)
+	if !ok {
+		return "", fmt.Errorf("Vortex signal parameter must be a string")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("Vortex offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include non-default values
+	baseKey := fmt.Sprintf("VORTEX_%d_%s", period, strings.ToUpper(signal))
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Internal helper method to slice all required data

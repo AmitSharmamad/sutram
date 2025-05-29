@@ -1,6 +1,9 @@
 package parser
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Volume struct {
 	offset int
@@ -11,6 +14,36 @@ func (indicator *Volume) SliceData(prices Prices) Prices {
 		return prices[len(prices)-1:]
 	}
 	return prices[len(prices)-1-indicator.offset : len(prices)-indicator.offset]
+}
+
+// generateIndicatorKey generates a unique key for Volume indicator based on its configuration
+func (indicator *Volume) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 1 {
+		return "", fmt.Errorf("Volume requires 1 parameter: offset")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[0].(int)
+	if !ok {
+		// Try float64 conversion as fallback
+		if offsetFloatAlt, ok := config[0].(float64); ok {
+			offsetFloat = int(offsetFloatAlt)
+		} else {
+			return "", fmt.Errorf("Volume offset parameter must be a number")
+		}
+	}
+	offset := offsetFloat
+
+	// Generate the key - include offset only if non-zero
+	if offset != 0 {
+		return fmt.Sprintf("VOLUME_%d", offset), nil
+	}
+
+	return "VOLUME", nil
 }
 
 func (indicator *Volume) Calculate(

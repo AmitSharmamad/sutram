@@ -25,6 +25,46 @@ func (indicator *Supertrend) SliceData(prices Prices) Prices {
 	return prices[start:end]
 }
 
+// generateIndicatorKey generates a unique key for Supertrend indicator based on its configuration
+func (indicator *Supertrend) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("Supertrend requires 3 parameters: period, multiplier, offset")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("Supertrend period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract multiplier parameter
+	multiplier, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("Supertrend multiplier parameter must be a number")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("Supertrend offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("SUPERTREND_%d_%.1f", period, multiplier)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
+}
+
 // Internal helper method to slice all required data
 func (indicator *Supertrend) sliceAllData(highs, lows, closes Prices) (Prices, Prices, Prices) {
 	// We need enough data to calculate Supertrend properly
@@ -66,132 +106,29 @@ func (indicator *Supertrend) Calculate(
 		return 0.0
 	}
 
-	// Create unique indicator keys for different values we need to store
-	indicatorKey := fmt.Sprintf("SUPERTREND_%d_%.2f", period, multiplier)
-	atrKey := fmt.Sprintf("ATR_%d", period)
-	upperBandKey := fmt.Sprintf("UPPERBAND_%d_%.2f", period, multiplier)
-	lowerBandKey := fmt.Sprintf("LOWERBAND_%d_%.2f", period, multiplier)
-	trendKey := fmt.Sprintf("TREND_%d_%.2f", period, multiplier)
-
-	// Get current timestamp
-	dataLen := len(*ctx.Data)
-	if dataLen == 0 {
-		return 0.0
-	}
-	currentTimestamp := (*ctx.Data)[dataLen-1].Timestamp.Unix()
-
-	// Try to get previous values from Results for optimization
-	if prevATR, atrExists := getPreviousValueFromResults(ctx, atrKey, currentTimestamp-1); atrExists {
-		if prevUpper, upperExists := getPreviousValueFromResults(ctx, upperBandKey, currentTimestamp-1); upperExists {
-			if prevLower, lowerExists := getPreviousValueFromResults(ctx, lowerBandKey, currentTimestamp-1); lowerExists {
-				if prevTrend, trendExists := getPreviousValueFromResults(ctx, trendKey, currentTimestamp-1); trendExists {
-					if prevSupertrend, stExists := getPreviousValueFromResults(ctx, indicatorKey, currentTimestamp-1); stExists {
-						// Use optimized calculation with previous values
-						return indicator.calculateOptimized(
-							ctx, highs, lows, closes, currentTimestamp,
-							prevATR.(float64), prevUpper.(float64), prevLower.(float64),
-							prevTrend.(int), prevSupertrend.(float64),
-							indicatorKey, atrKey, upperBandKey, lowerBandKey, trendKey,
-						)
-					}
-				}
-			}
-		}
-	}
-
-	// If no previous values exist, calculate from scratch
-	return indicator.calculateFromScratch(ctx, highs, lows, closes, currentTimestamp,
-		indicatorKey, atrKey, upperBandKey, lowerBandKey, trendKey)
+	// Calculate Supertrend from scratch
+	return indicator.calculateSupertrend(highs, lows, closes)
 }
 
-// calculateOptimized uses previous values for faster calculation
-func (indicator *Supertrend) calculateOptimized(
-	ctx *EvaluationContext, highs, lows, closes []float64, currentTimestamp int64,
-	prevATR, prevUpper, prevLower float64, prevTrend int, prevSupertrend float64,
-	indicatorKey, atrKey, upperBandKey, lowerBandKey, trendKey string,
-) float64 {
-	// Get the current period data indices
-	currentIdx := len(closes) - 1
-
-	if currentIdx < 1 {
+// calculateSupertrend performs the complete Supertrend calculation
+// This implementation follows the pandas_ta algorithm exactly
+// Key improvements made to match Python pandas_ta:
+// 1. Uses direction tracking (dir) to determine trend changes
+// 2. Applies band adjustments only when direction doesn't change
+// 3. Sets supertrend value based on direction (bullish=lowerband, bearish=upperband)
+// 4. Initializes direction to bullish (1) at start
+func (indicator *Supertrend) calculateSupertrend(highs, lows, closes []float64) float64 {
+	m := len(closes)
+	if m < indicator.period+1 {
 		return 0.0
 	}
 
-	// Calculate True Range for current period
-	tr := max(
-		highs[currentIdx]-lows[currentIdx],
-		max(
-			math.Abs(highs[currentIdx]-closes[currentIdx-1]),
-			math.Abs(lows[currentIdx]-closes[currentIdx-1]),
-		),
-	)
-
-	// Update ATR using previous ATR
-	currentATR := (prevATR*(float64(indicator.period)-1) + tr) / float64(indicator.period)
-
-	// Calculate basic bands
-	basicUpperBand := (highs[currentIdx]+lows[currentIdx])/2 + indicator.multiplier*currentATR
-	basicLowerBand := (highs[currentIdx]+lows[currentIdx])/2 - indicator.multiplier*currentATR
-
-	// Adjust upper band
-	var currentUpper float64
-	if basicUpperBand < prevUpper || closes[currentIdx-1] > prevUpper {
-		currentUpper = basicUpperBand
-	} else {
-		currentUpper = prevUpper
-	}
-
-	// Adjust lower band
-	var currentLower float64
-	if basicLowerBand > prevLower || closes[currentIdx-1] < prevLower {
-		currentLower = basicLowerBand
-	} else {
-		currentLower = prevLower
-	}
-
-	// Determine trend and supertrend value
-	var currentSupertrend float64
-	var currentTrend int
-
-	if prevSupertrend == prevUpper {
-		if closes[currentIdx] <= currentUpper {
-			currentSupertrend = currentUpper
-			currentTrend = -1
-		} else {
-			currentSupertrend = currentLower
-			currentTrend = 1
-		}
-	} else { // prevSupertrend == prevLower
-		if closes[currentIdx] >= currentLower {
-			currentSupertrend = currentLower
-			currentTrend = 1
-		} else {
-			currentSupertrend = currentUpper
-			currentTrend = -1
-		}
-	}
-
-	// Store all values for future calculations
-	insertValueToResults(ctx, atrKey, currentTimestamp, currentATR)
-	insertValueToResults(ctx, upperBandKey, currentTimestamp, currentUpper)
-	insertValueToResults(ctx, lowerBandKey, currentTimestamp, currentLower)
-	insertValueToResults(ctx, trendKey, currentTimestamp, currentTrend)
-	insertValueToResults(ctx, indicatorKey, currentTimestamp, currentSupertrend)
-
-	return util.Round(currentSupertrend)
-}
-
-// calculateFromScratch performs full calculation when no previous values exist
-func (indicator *Supertrend) calculateFromScratch(
-	ctx *EvaluationContext, highs, lows, closes []float64, currentTimestamp int64,
-	indicatorKey, atrKey, upperBandKey, lowerBandKey, trendKey string,
-) float64 {
 	// Calculate ATR (Average True Range)
-	var atr = make([]float64, len(closes))
-	var tr = make([]float64, len(closes))
+	var atr = make([]float64, m)
+	var tr = make([]float64, m)
 
 	// Calculate True Range
-	for i := 1; i < len(closes); i++ {
+	for i := 1; i < m; i++ {
 		tr[i] = max(
 			highs[i]-lows[i],
 			max(
@@ -203,92 +140,75 @@ func (indicator *Supertrend) calculateFromScratch(
 
 	// Calculate initial ATR (simple average of TR for the first 'period' days)
 	var sumTR float64
-	for i := 1; i < indicator.period+1 && i < len(closes); i++ {
+	for i := 1; i < indicator.period+1 && i < m; i++ {
 		sumTR += tr[i]
 	}
-	if indicator.period < len(closes) {
+	if indicator.period < m {
 		atr[indicator.period] = sumTR / float64(indicator.period)
 	}
 
 	// Calculate ATR using the smoothing technique
-	for i := indicator.period + 1; i < len(closes); i++ {
+	for i := indicator.period + 1; i < m; i++ {
 		atr[i] = (atr[i-1]*(float64(indicator.period)-1) + tr[i]) / float64(indicator.period)
 	}
 
-	// Calculate upper and lower bands
-	var upperBand = make([]float64, len(closes))
-	var lowerBand = make([]float64, len(closes))
-	var supertrend = make([]float64, len(closes))
-	var trend = make([]int, len(closes)) // 1 for up, -1 for down
+	// Initialize arrays following pandas_ta algorithm
+	dir := make([]int, m)
+	trend := make([]float64, m)
 
-	// Calculate initial bands
-	for i := indicator.period; i < len(closes); i++ {
-		// Ensure we have valid ATR data
-		if i >= len(atr) || atr[i] == 0 {
-			continue
-		}
+	// Initialize direction to 1 (bullish) as per pandas_ta
+	for i := 0; i < m; i++ {
+		dir[i] = 1
+	}
 
-		basicUpperBand := (highs[i]+lows[i])/2 + indicator.multiplier*atr[i]
-		basicLowerBand := (highs[i]+lows[i])/2 - indicator.multiplier*atr[i]
+	// Calculate HL2 (median price) and bands
+	hl2 := make([]float64, m)
+	upperband := make([]float64, m)
+	lowerband := make([]float64, m)
 
-		// Set initial values
-		if i == indicator.period {
-			upperBand[i] = basicUpperBand
-			lowerBand[i] = basicLowerBand
-			if closes[i] <= upperBand[i] {
-				supertrend[i] = lowerBand[i]
-				trend[i] = -1
-			} else {
-				supertrend[i] = upperBand[i]
-				trend[i] = 1
-			}
-			continue
-		}
-
-		// Adjust upper band
-		if basicUpperBand < upperBand[i-1] || closes[i-1] > upperBand[i-1] {
-			upperBand[i] = basicUpperBand
-		} else {
-			upperBand[i] = upperBand[i-1]
-		}
-
-		// Adjust lower band
-		if basicLowerBand > lowerBand[i-1] || closes[i-1] < lowerBand[i-1] {
-			lowerBand[i] = basicLowerBand
-		} else {
-			lowerBand[i] = lowerBand[i-1]
-		}
-
-		// Determine trend and supertrend value
-		if supertrend[i-1] == upperBand[i-1] {
-			if closes[i] <= upperBand[i] {
-				supertrend[i] = upperBand[i]
-				trend[i] = -1
-			} else {
-				supertrend[i] = lowerBand[i]
-				trend[i] = 1
-			}
-		} else { // supertrend[i-1] == lowerBand[i-1]
-			if closes[i] >= lowerBand[i] {
-				supertrend[i] = lowerBand[i]
-				trend[i] = 1
-			} else {
-				supertrend[i] = upperBand[i]
-				trend[i] = -1
-			}
+	for i := 0; i < m; i++ {
+		hl2[i] = (highs[i] + lows[i]) / 2.0
+		if i >= indicator.period && atr[i] > 0 {
+			matr := indicator.multiplier * atr[i]
+			upperband[i] = hl2[i] + matr
+			lowerband[i] = hl2[i] - matr
 		}
 	}
 
-	// Store the final calculated values for future optimization
-	if len(supertrend) > 0 {
-		lastIdx := len(supertrend) - 1
-		insertValueToResults(ctx, atrKey, currentTimestamp, atr[lastIdx])
-		insertValueToResults(ctx, upperBandKey, currentTimestamp, upperBand[lastIdx])
-		insertValueToResults(ctx, lowerBandKey, currentTimestamp, lowerBand[lastIdx])
-		insertValueToResults(ctx, trendKey, currentTimestamp, trend[lastIdx])
-		insertValueToResults(ctx, indicatorKey, currentTimestamp, supertrend[lastIdx])
+	// Main supertrend calculation loop following pandas_ta algorithm
+	for i := 1; i < m; i++ {
+		if i < indicator.period {
+			continue
+		}
 
-		return util.Round(supertrend[lastIdx])
+		// Determine direction based on close vs previous bands
+		if closes[i] > upperband[i-1] {
+			dir[i] = 1
+		} else if closes[i] < lowerband[i-1] {
+			dir[i] = -1
+		} else {
+			dir[i] = dir[i-1]
+			// Adjust bands based on direction
+			if dir[i] > 0 && lowerband[i] < lowerband[i-1] {
+				lowerband[i] = lowerband[i-1]
+			}
+			if dir[i] < 0 && upperband[i] > upperband[i-1] {
+				upperband[i] = upperband[i-1]
+			}
+		}
+
+		// Set supertrend value based on direction
+		if dir[i] > 0 {
+			trend[i] = lowerband[i]
+		} else {
+			trend[i] = upperband[i]
+		}
+	}
+
+	// Return the final calculated supertrend value
+	if m > 0 {
+		lastIdx := m - 1
+		return util.Round(trend[lastIdx])
 	}
 
 	return 0.0
