@@ -107,7 +107,7 @@
   "VTX": {
     "name": "VORTEX",
     "label": "Vortex Indicator",
-    "description": "The Vortex indicator identifies trend direction and strength by comparing price highs and lows over a period, using +VI and -VI lines.",
+    "description": "The Vortex indicator identifies trend direction and strength by comparing price highs and lows over a period, using POSITIVE_VI and NEGATIVE_VI lines.",
     "type": "momentum",
     "config": [
       {
@@ -118,8 +118,8 @@
       {
         "name": "signal",
         "type": "string",
-        "enum": ["+VI", "-VI"],
-        "default": "+VI"
+        "enum": ["POSITIVE_VI", "NEGATIVE_VI"],
+        "default": "POSITIVE_VI"
       },
       {
         "name": "offset",

@@ -41,7 +41,7 @@ func (indicator *Vortex) Calculate(
 	ctx *EvaluationContext,
 ) float64 {
 	period := int(config[0].(float64)) // default: 14
-	signal := config[1].(string)       // default: "+VI"
+	signal := config[1].(string)       // default: "POSITIVE_VI"
 	offset := int(config[2].(float64)) // default: 0
 
 	indicator.period = period
@@ -115,9 +115,9 @@ func (indicator *Vortex) Calculate(
 
 	// Return the appropriate value based on signal parameter
 	lastIndex := len(viPlus) - 1
-	if signal == "-VI" {
+	if signal == "NEGATIVE_VI" {
 		return util.Round(viMinus[lastIndex])
-	} else { // Default to "+VI" for any other value
+	} else { // Default to "POSITIVE_VI" for any other value
 		return util.Round(viPlus[lastIndex])
 	}
 }
@@ -162,7 +162,7 @@ func (indicator *Vortex) CalculateAll(
 	startDate time.Time,
 ) []IndicatorValues {
 	period := int(config[0].(float64)) // default: 14
-	// signal := config[1].(string)       // default: "+VI" - handled by Calculate method
+	// signal := config[1].(string)       // default: "POSITIVE_VI" - handled by Calculate method
 	offset := int(config[2].(float64)) // default: 0
 
 	indicator.period = period
