@@ -23,7 +23,7 @@ func NewFactory() *IndicatorFactory {
 	// Technical Indicators
 	factory.indicators["SUPERTREND"] = &Supertrend{}
 	factory.indicators["MACD"] = &MACD{}
-	factory.indicators["VORTEX"] = &Vortex{}
+	factory.indicators["VTX"] = &Vortex{}
 	factory.indicators["BOLLINGER"] = &BollingerBands{}
 	factory.indicators["LBB"] = &LowerBollingerBands{}
 	factory.indicators["DMI"] = &DMI{}
