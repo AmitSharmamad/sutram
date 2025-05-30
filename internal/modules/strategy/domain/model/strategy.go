@@ -32,6 +32,7 @@ const (
 	OneMinute      ChartTimeframe = "1m"
 	ThreeMinutes   ChartTimeframe = "3m"
 	FiveMinutes    ChartTimeframe = "5m"
+	TenMinutes     ChartTimeframe = "10m"
 	FifteenMinutes ChartTimeframe = "15m"
 	OneHour        ChartTimeframe = "1h"
 	OneDay         ChartTimeframe = "1d"

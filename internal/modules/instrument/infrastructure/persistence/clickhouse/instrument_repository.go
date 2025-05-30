@@ -70,6 +70,10 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.
 					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
 					INTERVAL 5 MINUTE
 				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '10m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 10 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
 				WHEN ? = '15m' THEN toStartOfInterval(
 					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
 					INTERVAL 15 MINUTE
@@ -109,7 +113,7 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.
 
 	var instruments []*model.Instrument
 	err := r.db.SelectContext(ctx, &instruments, query,
-		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
+		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		exchangeSecurityID, start, end)
 

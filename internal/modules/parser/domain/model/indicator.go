@@ -86,3 +86,15 @@ func insertValueToResults(ctx *EvaluationContext, indicatorName string, timestam
 
 	ctx.Results[timestamp][indicatorName] = value
 }
+
+func createIndicatorValues(n int) []IndicatorValues {
+    // Initialize a slice with length n
+    values := make([]IndicatorValues, n)
+    
+    // Optionally, populate the slice with default values
+    for i := 0; i < n; i++ {
+        values[i] = IndicatorValues{}
+    }
+    
+    return values
+}
