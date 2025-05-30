@@ -243,7 +243,6 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	uniqueString, err := calculator.GenerateIndicatorKey(lindicators[0].Arguments, nil)
 	left := ctx.IndicatorArrayMap[uniqueString][ctx.Index].Value
 
-
 	if err != nil {
 		return 0, err
 	}
@@ -254,7 +253,6 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	rcalculator := GetIndFactory(rindicators[0].Name)
 	runiqueString, err := rcalculator.GenerateIndicatorKey(rindicators[0].Arguments, nil)
 	right := ctx.IndicatorArrayMap[runiqueString][ctx.Index].Value
-
 
 	if err != nil {
 		return 0, err
@@ -284,24 +282,18 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		return 0, nil
 	case "CROSSESABOVE":
 		// Handle existing CROSSESABOVE logic with legacy data structure
-		if ctx.Data != nil {
-			d := (*ctx.Data)[0 : len(*ctx.Data)-1]
-			prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
-			if err != nil {
-				return 0, nil
-			}
-			prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
-			if err != nil {
-				return 0, nil
-			}
-			if (left > right) && (prevLeft <= prevRight) {
-				return 1, nil
-			}
+
+		if ctx.Index == 0 {
+			return 0, nil
 		}
-		// Handle CROSSESABOVE with indicator array map
-		if ctx.IndicatorArrayMap != nil && ctx.CurrentTimestamp != nil {
-			return n.evaluateCrossesAbove(left, right, ctx)
+
+		prevLeft := ctx.IndicatorArrayMap[uniqueString][ctx.Index-1].Value
+		prevRight := ctx.IndicatorArrayMap[runiqueString][ctx.Index-1].Value
+
+		if (left > right) && (prevLeft <= prevRight) {
+			return 1, nil
 		}
+
 		return 0, nil
 	case "<":
 		if left < right {
@@ -310,24 +302,18 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		return 0, nil
 	case "CROSSESBELOW":
 		// Handle existing CROSSESBELOW logic with legacy data structure
-		if ctx.Data != nil {
-			d := (*ctx.Data)[0 : len(*ctx.Data)-1]
-			prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
-			if err != nil {
-				return 0, nil
-			}
-			prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
-			if err != nil {
-				return 0, nil
-			}
-			if (left < right) && (prevLeft >= prevRight) {
-				return 1, nil
-			}
+
+		if ctx.Index == 0 {
+			return 0, nil
 		}
-		// Handle CROSSESBELOW with indicator array map
-		if ctx.IndicatorArrayMap != nil && ctx.CurrentTimestamp != nil {
-			return n.evaluateCrossesBelow(left, right, ctx)
+
+		prevLeft := ctx.IndicatorArrayMap[uniqueString][ctx.Index-1].Value
+		prevRight := ctx.IndicatorArrayMap[runiqueString][ctx.Index-1].Value
+
+		if (left < right) && (prevLeft >= prevRight) {
+			return 1, nil
 		}
+
 		return 0, nil
 	case ">=":
 		if left >= right {
@@ -362,24 +348,6 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	default:
 		return 0, fmt.Errorf("unknown operator: %s", n.Operator)
 	}
-}
-
-// evaluateCrossesAbove checks if left crosses above right using indicator array map
-func (n *BinaryOpNode) evaluateCrossesAbove(left, right float64, ctx *EvaluationContext) (float64, error) {
-	prevLeft, err := n.getPreviousValue(n.Left, ctx)
-	if err != nil {
-		return 0, nil // Handle gracefully
-	}
-
-	prevRight, err := n.getPreviousValue(n.Right, ctx)
-	if err != nil {
-		return 0, nil // Handle gracefully
-	}
-
-	if (left > right) && (prevLeft <= prevRight) {
-		return 1, nil
-	}
-	return 0, nil
 }
 
 // evaluateCrossesBelow checks if left crosses below right using indicator array map
@@ -812,7 +780,6 @@ func NewIndicatorMapEvaluationContext(
 
 // ExpressionBuilder allows building expressions programmatically
 type ExpressionBuilder struct {
-	root Node
 }
 
 // NewExpressionBuilder creates a new expression builder
@@ -997,7 +964,7 @@ func GetLatestConditionResult(
 	return result, latestTimestamp, err
 }
 
-// ExtractIndicators parses an expression string and returns all indicator function calls
+// extractindicators parses an expression string and returns all indicator function calls
 func ExtractIndicators(expr string) ([]IndicatorInfo, error) {
 	// Parse the expression into an AST
 	node, err := Parse(expr)
@@ -1008,6 +975,46 @@ func ExtractIndicators(expr string) ([]IndicatorInfo, error) {
 	// Extract all function calls from the AST
 	var indicators []IndicatorInfo
 	extractFunctionCalls(node, &indicators)
+
+	closeNode, err := Parse("CLOSE(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CLOSE function: %w", err)
+	}
+
+	extractFunctionCalls(closeNode, &indicators)
+
+	openNode, err := Parse("OPEN(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CLOSE function: %w", err)
+	}
+
+	extractFunctionCalls(openNode, &indicators)
+
+	highNode, err := Parse("HIGH(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(highNode, &indicators)
+
+	lowNode, err := Parse("LOW(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(lowNode, &indicators)
+
+	volumeNode, err := Parse("VOLUME(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(volumeNode, &indicators)
 
 	return indicators, nil
 }
