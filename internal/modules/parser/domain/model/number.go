@@ -1,6 +1,9 @@
 package parser
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type IndNumber struct {
 	Value float64
@@ -8,6 +11,26 @@ type IndNumber struct {
 
 func (indicator *IndNumber) SliceData(prices Prices) Prices {
 	return []float64{}
+}
+
+// GenerateIndicatorKey generates a unique key for IndNumber indicator based on its configuration
+func (indicator *IndNumber) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 1 {
+		return "", fmt.Errorf("IndNumber requires 1 parameter: value")
+	}
+
+	// Extract value parameter
+	value, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("IndNumber value parameter must be a number")
+	}
+
+	// Generate the key - numbers are constants, so use the value
+	return fmt.Sprintf("NUMBER_%.6f", value), nil
 }
 
 func (indicator *IndNumber) Calculate(

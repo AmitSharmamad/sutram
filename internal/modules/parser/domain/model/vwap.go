@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"time"
 )
 
@@ -20,6 +21,32 @@ func (indicator *VWAP) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for VWAP indicator based on its configuration
+func (indicator *VWAP) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 1 {
+		return "", fmt.Errorf("VWAP requires 1 parameter: offset")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("VWAP offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	// VWAP typically doesn't have configurable periods, so we use a simple key
+	if offset != 0 {
+		return fmt.Sprintf("VWAP_%d", offset), nil
+	}
+
+	return "VWAP", nil
 }
 
 // Helper method to slice all required data

@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -36,6 +38,51 @@ func (indicator *LowerBollingerBands) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for LowerBollingerBands indicator based on its configuration
+func (indicator *LowerBollingerBands) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 4 {
+		return "", fmt.Errorf("LowerBollingerBands requires 4 parameters: point, period, standardDev, offset")
+	}
+
+	// Extract point parameter
+	point, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("LowerBollingerBands point parameter must be a string")
+	}
+
+	// Extract period parameter
+	period, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("LowerBollingerBands period parameter must be a number")
+	}
+
+	// Extract standardDev parameter
+	standardDev, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("LowerBollingerBands standardDev parameter must be a number")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("LowerBollingerBands offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("LBB_%s_%.0f_%.1f", strings.ToUpper(point), period, standardDev)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // Calculate the appropriate moving average based on the type
@@ -208,43 +255,44 @@ func (indicator *LowerBollingerBands) Calculate(
 	point := config[0].(string)
 	period := config[1].(float64)
 	standardDev := config[2].(float64)
-	maType := MovingAverageType(config[3].(string))
-	offset := int(config[4].(float64))
+	offset := int(config[3].(float64))
 
 	indicator.period = period
 	indicator.standardDev = standardDev
-	indicator.maType = maType
 	indicator.offset = offset
 
 	prices := GetPrices(*ctx.Data, point)
-	intPeriod := int(period)
 
 	// Check if we have enough data points
-	if len(prices) < intPeriod+offset {
+	if len(prices) < int(period)+offset {
 		return 0.0
 	}
 
 	prices = indicator.SliceData(prices)
 
 	// Need at least period data points to calculate
-	if len(prices) < intPeriod {
+	if len(prices) < int(period) {
 		return 0.0
 	}
 
-	// Calculate the moving average based on the type
-	middleBand := indicator.calculateMA(prices, intPeriod, maType)
+	// Calculate SMA (Simple Moving Average)
+	var sum float64
+	periodInt := int(period)
+	for i := len(prices) - periodInt; i < len(prices); i++ {
+		sum += prices[i]
+	}
+	sma := sum / period
 
 	// Calculate standard deviation
 	var variance float64
-	for i := len(prices) - intPeriod; i < len(prices); i++ {
-		diff := prices[i] - middleBand
+	for i := len(prices) - periodInt; i < len(prices); i++ {
+		diff := prices[i] - sma
 		variance += diff * diff
 	}
-	variance /= float64(intPeriod)
-	stdDev := math.Sqrt(variance)
+	stdDev := math.Sqrt(variance / period)
 
 	// Calculate Lower Bollinger Band
-	lowerBand := middleBand - (indicator.standardDev * stdDev)
+	lowerBand := sma - (standardDev * stdDev)
 
 	return util.Round(lowerBand)
 }

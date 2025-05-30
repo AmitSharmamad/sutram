@@ -2,7 +2,9 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -22,6 +24,52 @@ func (indicator *BollingerBands) SliceData(prices Prices) Prices {
 	}
 
 	return prices[start:end]
+}
+
+// GenerateIndicatorKey generates a unique key for BollingerBands indicator based on its configuration
+func (indicator *BollingerBands) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 4 {
+		return "", fmt.Errorf("BollingerBands requires 4 parameters: point, period, multiplier, offset")
+	}
+
+	// Extract point parameter
+	point, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("BollingerBands point parameter must be a string")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("BollingerBands period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract multiplier parameter
+	multiplier, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("BollingerBands multiplier parameter must be a number")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("BollingerBands offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("BOLLINGER_%s_%d_%.1f", strings.ToUpper(point), period, multiplier)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 // BOLLINGER_BANDS(SOURCE (OPEN, HIGH, LOW, CLOSE), PERIOD, STANDARD_DEVIATION, OFFSET)
