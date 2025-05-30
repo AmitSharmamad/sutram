@@ -138,10 +138,11 @@ func (indicator *SMA) CalculateAll(
 	indicator.offset = offset
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
 
 	// Get prices for the entire dataset
 	prices := GetPrices(stockData, field)
+
+	var filteredResults []IndicatorValues
 
 	// Calculate SMA for each data point where we have enough historical data
 	for i := period + offset; i < len(stockData); i++ {
@@ -156,19 +157,16 @@ func (indicator *SMA) CalculateAll(
 
 		smaValue := util.Round(sum / float64(period))
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     smaValue,
-		})
-	}
-
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
+		// Only include values from startDate onwards
+		if !stockData[i].Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     smaValue,
+			})
 		}
 	}
 
-	return filteredResults
+	values := append(createIndicatorValues(period+offset), filteredResults...)
+
+	return values
 }

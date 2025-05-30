@@ -105,7 +105,7 @@ func (m *DataMigrator) Run() error {
 // processSecurity handles the data fetching and file writing for a single security
 func (m *DataMigrator) processSecurity(security SecurityData) error {
 	// Start from January 2020
-	startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	startDate := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	currentDate := time.Now()
 
 	fmt.Printf("Processing security %s from %s to %s\n", security.SecurityID, startDate.Format("2006-01-02"), currentDate.Format("2006-01-02"))

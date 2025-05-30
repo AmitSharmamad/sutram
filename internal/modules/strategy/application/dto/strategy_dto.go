@@ -125,7 +125,7 @@ type UpdateStrategyRequest struct {
 	PositionType         model.Direction      `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
 	Instruments          pq.Int32Array        `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
 	ChartType            model.ChartType      `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
-	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
+	ChartTimeframe       model.ChartTimeframe `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
 	TradeType            model.TradeType      `json:"trade_type" validate:"required,oneof=MIS CNC/NRML" db:"trade_type"`
 	Qty                  int                  `json:"qty" validate:"required,gt=0" db:"qty"`
 	EntryExpression      string               `json:"entry_expression" validate:"required" db:"entry_expression"`
