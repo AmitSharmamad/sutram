@@ -511,7 +511,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Use timestamp array length for the main loop
-	for i := 0; i < len(timestamps); i++ {
+	for i := 0; i < len(timestamps)-1; i++ {
 		// Get current timestamp for this iteration
 		currentTimestamp := timestamps[i]
 
