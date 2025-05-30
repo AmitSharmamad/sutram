@@ -19,6 +19,10 @@ type InstrumentRepository interface {
 	// timeFrame parameter allows data aggregation by different time intervals ('1s', '1m', '3m', '5m', '15m', '30m', '1h', '3h', '1d', '1M')
 	FindByExchangeSecurityIDAndTimeRange(ctx context.Context, exchangeSecurityID int32, start, end time.Time, timeFrame string) ([]*model.Instrument, error)
 
+	// FindByExchangeSecurityIDWithLookback gets the exact number of historical data points before the given start time
+	// Returns the data in descending order (newest first) limited by lookback count
+	FindByExchangeSecurityIDWithLookback(ctx context.Context, exchangeSecurityID int32, startTime time.Time, timeFrame string, lookback int) ([]*model.Instrument, error)
+
 	// Create creates a new instrument
 	Create(ctx context.Context, instrument *model.Instrument) error
 

@@ -201,7 +201,7 @@ func (indicator *EMA) CalculateAll(
 
 	// We need at least enough data to calculate initial EMA
 	// For EMA, we typically need at least 2*period data points for proper calculation
-	minDataPoints := 3*period + offset
+	minDataPoints := 5*period + offset
 	if len(stockData) < minDataPoints {
 		return []IndicatorValues{}
 	}
@@ -229,10 +229,12 @@ func (indicator *EMA) CalculateAll(
 	for i := startIndex; i < len(stockData); i++ {
 		// For the first point, use the SMA calculated above
 		if i == startIndex {
-			filteredResults = append(filteredResults, IndicatorValues{
-				Timestamp: stockData[i].Timestamp,
-				Value:     util.Round(ema),
-			})
+			if !stockData[i].Timestamp.Before(startDate) {
+				filteredResults = append(filteredResults, IndicatorValues{
+					Timestamp: stockData[i].Timestamp,
+					Value:     util.Round(ema),
+				})
+			}
 			continue
 		}
 
@@ -248,7 +250,7 @@ func (indicator *EMA) CalculateAll(
 		}
 	}
 
-	values := append(createIndicatorValues(startIndex), filteredResults...)
+	// values := append(createIndicatorValues(startIndex), filteredResults...)
 
-	return values
+	return filteredResults
 }
