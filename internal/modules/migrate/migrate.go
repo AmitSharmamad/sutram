@@ -46,7 +46,7 @@ func NewDataMigrator(accessToken string) *DataMigrator {
 	// Hardcoded securities data
 	securities := []SecurityData{
 		{
-			SecurityID:      "3411", // 
+			SecurityID:      "3411",
 			ExchangeSegment: "NSE_EQ",
 			Instrument:      "EQUITY",
 			Interval:        "1",
@@ -54,33 +54,87 @@ func NewDataMigrator(accessToken string) *DataMigrator {
 			FromDate:        "2024-09-11 09:30:00",
 			ToDate:          "2024-09-15 13:00:00",
 		},
-		// {
-		// 	SecurityID:      "1333", // RELIANCE
-		// 	ExchangeSegment: "NSE_EQ",
-		// 	Instrument:      "EQUITY",
-		// 	Interval:        "1",
-		// 	OI:              false,
-		// 	FromDate:        "2024-09-11 09:30:00",
-		// 	ToDate:          "2024-09-15 13:00:00",
-		// },
-		// {
-		// 	SecurityID:      "3456", // WIPRO
-		// 	ExchangeSegment: "NSE_EQ",
-		// 	Instrument:      "EQUITY",
-		// 	Interval:        "1",
-		// 	OI:              false,
-		// 	FromDate:        "2024-09-11 09:30:00",
-		// 	ToDate:          "2024-09-15 13:00:00",
-		// },
-		// {
-		// 	SecurityID:      "11536", // INFY
-		// 	ExchangeSegment: "NSE_EQ",
-		// 	Instrument:      "EQUITY",
-		// 	Interval:        "1",
-		// 	OI:              false,
-		// 	FromDate:        "2024-09-11 09:30:00",
-		// 	ToDate:          "2024-09-15 13:00:00",
-		// },
+		{
+			SecurityID:      "12018",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "14366",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "11915",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "2029",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "1491",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "383",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "9552",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "17400",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
+		{
+			SecurityID:      "10604",
+			ExchangeSegment: "NSE_EQ",
+			Instrument:      "EQUITY",
+			Interval:        "1",
+			OI:              false,
+			FromDate:        "2024-09-11 09:30:00",
+			ToDate:          "2024-09-15 13:00:00",
+		},
 	}
 
 	return &DataMigrator{
@@ -105,7 +159,7 @@ func (m *DataMigrator) Run() error {
 // processSecurity handles the data fetching and file writing for a single security
 func (m *DataMigrator) processSecurity(security SecurityData) error {
 	// Start from January 2020
-	startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	startDate := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 	currentDate := time.Now()
 
 	fmt.Printf("Processing security %s from %s to %s\n", security.SecurityID, startDate.Format("2006-01-02"), currentDate.Format("2006-01-02"))

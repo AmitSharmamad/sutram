@@ -302,6 +302,26 @@ func (s *InstrumentService) GetInstrumentDataWithLookback(
 	return &result, nil
 }
 
+// GetInstrumentsByExchangeSecurityIDWithLookback gets the exact number of historical data points before the given start time
+func (s *InstrumentService) GetInstrumentsByExchangeSecurityIDWithLookback(
+	ctx context.Context,
+	exchangeSecurityID int32,
+	startTime time.Time,
+	timeFrame string,
+	lookback int,
+) ([]*model.Instrument, error) {
+	// Default to '1m' if timeFrame is empty
+	if timeFrame == "" {
+		timeFrame = "1m"
+	}
+
+	instruments, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(ctx, exchangeSecurityID, startTime, timeFrame, lookback)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instruments with lookback: %w", err)
+	}
+	return instruments, nil
+}
+
 // GetInstrumentMastersByExchangeSecurityIDs gets multiple instrument masters by their exchange security IDs
 func (s *InstrumentService) GetInstrumentMastersByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int64) ([]*model.InstrumentMaster, error) {
 	instrumentMasters, err := s.instrumentMasterRepo.FindByExchangeSecurityIDs(ctx, exchangeSecurityIDs)

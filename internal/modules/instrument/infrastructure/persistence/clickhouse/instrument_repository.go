@@ -70,6 +70,10 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.
 					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
 					INTERVAL 5 MINUTE
 				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
+				WHEN ? = '10m' THEN toStartOfInterval(
+					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
+					INTERVAL 10 MINUTE
+				) + INTERVAL 9 HOUR + INTERVAL 15 MINUTE
 				WHEN ? = '15m' THEN toStartOfInterval(
 					toTimeZone(timestamp, 'Asia/Kolkata') - INTERVAL 9 HOUR - INTERVAL 15 MINUTE,
 					INTERVAL 15 MINUTE
@@ -109,7 +113,7 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDAndTimeRange(ctx context.
 
 	var instruments []*model.Instrument
 	err := r.db.SelectContext(ctx, &instruments, query,
-		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
+		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		timeFrame, timeFrame, timeFrame, timeFrame, timeFrame,
 		exchangeSecurityID, start, end)
 
@@ -258,4 +262,65 @@ func (r *InstrumentRepository) FindByExchangeSecurityIDPaginated(ctx context.Con
 	}
 
 	return instruments, totalCount, nil
+}
+
+// FindByExchangeSecurityIDWithLookback gets the exact number of historical data points before the given start time
+func (r *InstrumentRepository) FindByExchangeSecurityIDWithLookback(ctx context.Context, exchangeSecurityID int32, startTime time.Time, timeFrame string, lookback int) ([]*model.Instrument, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			exchange_security_id,
+			CASE
+				WHEN '%s' = '1s' THEN toTimeZone(timestamp, 'Asia/Kolkata')
+				WHEN '%s' = '1m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MINUTE)
+				WHEN '%s' = '3m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 MINUTE)
+				WHEN '%s' = '5m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 5 MINUTE)
+				WHEN '%s' = '15m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 15 MINUTE)
+				WHEN '%s' = '30m' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 30 MINUTE)
+				WHEN '%s' = '1h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 HOUR)
+				WHEN '%s' = '3h' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 3 HOUR)
+				WHEN '%s' = '1d' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 DAY)
+				WHEN '%s' = '1M' THEN toStartOfInterval(toTimeZone(timestamp, 'Asia/Kolkata'), INTERVAL 1 MONTH)
+			END AS timestamp,
+			MIN(low) AS low,
+			MAX(high) AS high,
+			first_value(open) AS open,
+			last_value(close) AS close,
+			SUM(volume) AS volume,
+			MIN(created_at) AS created_at,
+			MAX(updated_at) AS updated_at
+		FROM
+			sutram.instrument
+		WHERE
+			exchange_security_id = %d
+			AND toTimeZone(timestamp, 'Asia/Kolkata') < toDateTime64('%s', 6, 'Asia/Kolkata')
+		GROUP BY
+			exchange_security_id,
+			timestamp
+		ORDER BY
+			timestamp DESC
+		LIMIT %d;
+	`,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		timeFrame,
+		exchangeSecurityID,
+		startTime.Format("2006-01-02 15:04:05"),
+		lookback,
+	)
+
+	var instruments []*model.Instrument
+	err := r.db.SelectContext(ctx, &instruments, query)
+
+	if err != nil {
+		return nil, fmt.Errorf("error querying instruments with lookback: %w", err)
+	}
+
+	return instruments, nil
 }
