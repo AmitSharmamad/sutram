@@ -2,6 +2,7 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
 	"time"
 )
 
@@ -23,11 +24,49 @@ func (indicator *ParabolicSAR) SliceData(prices Prices) Prices {
 	return prices[start:end]
 }
 
+// generateIndicatorKey generates a unique key for ParabolicSAR indicator based on its configuration
+func (indicator *ParabolicSAR) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("ParabolicSAR requires 3 parameters: minimumAF, maximumAF, offset")
+	}
+
+	// Extract minimumAF parameter
+	minimumAF, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("ParabolicSAR minimumAF parameter must be a number")
+	}
+
+	// Extract maximumAF parameter
+	maximumAF, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("ParabolicSAR maximumAF parameter must be a number")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("ParabolicSAR offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("PSAR_%.3f_%.3f", minimumAF, maximumAF)
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
+}
+
 // Helper method to slice all required data
 func (indicator *ParabolicSAR) sliceAllData(highs, lows Prices) (Prices, Prices) {
-	// We need enough data to calculate Parabolic SAR properly
-	// Need at least 2 data points + offset
-	start := max(0, len(highs)-(indicator.offset+20)) // Use more data for trend identification
+	// We need enough data to calculate PSAR properly
+	start := max(0, len(highs)-(indicator.offset+10)) // Need some initial data points
 	end := len(highs) - indicator.offset
 
 	if start < 0 || end <= start || end > len(highs) {

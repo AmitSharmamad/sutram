@@ -2,6 +2,8 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,44 @@ func (indicator *SMA) SliceData(prices Prices) Prices {
 	start := len(prices) - indicator.offset - indicator.period
 	end := len(prices) - indicator.offset
 	return prices[start:end]
+}
+
+// generateIndicatorKey generates a unique key for SMA indicator based on its configuration
+func (indicator *SMA) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 3 {
+		return "", fmt.Errorf("SMA requires 3 parameters: field, period, offset")
+	}
+
+	// Extract field parameter
+	field, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("SMA field parameter must be a string")
+	}
+
+	// Extract period parameter
+	periodFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("SMA period parameter must be a number")
+	}
+	period := int(periodFloat)
+
+	// Extract offset parameter
+	offsetFloat, ok := config[2].(float64)
+	if !ok {
+		return "", fmt.Errorf("SMA offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	if offset != 0 {
+		return fmt.Sprintf("SMA_%s_%d_%d", strings.ToUpper(field), period, offset), nil
+	}
+
+	return fmt.Sprintf("SMA_%s_%d", strings.ToUpper(field), period), nil
 }
 
 // SMA(field, period, offset)

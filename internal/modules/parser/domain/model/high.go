@@ -1,6 +1,9 @@
 package parser
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type High struct {
 	offset int
@@ -11,6 +14,31 @@ func (indicator *High) SliceData(prices Prices) Prices {
 		return prices[len(prices)-1:]
 	}
 	return prices[len(prices)-1-indicator.offset : len(prices)-indicator.offset]
+}
+
+// generateIndicatorKey generates a unique key for High indicator based on its configuration
+func (indicator *High) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 1 {
+		return "", fmt.Errorf("High requires 1 parameter: offset")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("High offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	if offset != 0 {
+		return fmt.Sprintf("HIGH_%d", offset), nil
+	}
+
+	return "HIGH", nil
 }
 
 func (indicator *High) Calculate(

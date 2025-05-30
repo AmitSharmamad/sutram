@@ -2,6 +2,8 @@ package parser
 
 import (
 	util "algo/internal/util/math"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -22,6 +24,53 @@ func (indicator *VolumeOscillator) SliceData(volumes Prices) Prices {
 	}
 
 	return volumes[start:end]
+}
+
+// generateIndicatorKey generates a unique key for VolumeOscillator indicator based on its configuration
+func (indicator *VolumeOscillator) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 4 {
+		return "", fmt.Errorf("VolumeOscillator requires 4 parameters: shortPeriod, longPeriod, pop, offset")
+	}
+
+	// Extract shortPeriod parameter
+	shortPeriodFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("VolumeOscillator shortPeriod parameter must be a number")
+	}
+	shortPeriod := int(shortPeriodFloat)
+
+	// Extract longPeriod parameter
+	longPeriodFloat, ok := config[1].(float64)
+	if !ok {
+		return "", fmt.Errorf("VolumeOscillator longPeriod parameter must be a number")
+	}
+	longPeriod := int(longPeriodFloat)
+
+	// Extract pop parameter
+	pop, ok := config[2].(string)
+	if !ok {
+		return "", fmt.Errorf("VolumeOscillator pop parameter must be a string")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[3].(float64)
+	if !ok {
+		return "", fmt.Errorf("VolumeOscillator offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include non-default values
+	baseKey := fmt.Sprintf("VO_%d_%d_%s", shortPeriod, longPeriod, strings.ToUpper(pop))
+
+	if offset != 0 {
+		baseKey += fmt.Sprintf("_%d", offset)
+	}
+
+	return baseKey, nil
 }
 
 func (indicator *VolumeOscillator) Calculate(

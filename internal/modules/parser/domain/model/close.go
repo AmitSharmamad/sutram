@@ -1,6 +1,9 @@
 package parser
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Close struct {
 	offset int
@@ -12,6 +15,31 @@ func (indicator *Close) SliceData(prices Prices) Prices {
 		return prices[len(prices)-1:]
 	}
 	return prices[len(prices)-1-indicator.offset : len(prices)-indicator.offset]
+}
+
+// GenerateIndicatorKey generates a unique key for Close indicator based on its configuration
+func (indicator *Close) GenerateIndicatorKey(
+	config []any,
+	ctx *EvaluationContext,
+) (string, error) {
+	// Validate we have the required number of parameters
+	if len(config) != 1 {
+		return "", fmt.Errorf("Close requires 1 parameter: offset")
+	}
+
+	// Extract offset parameter
+	offsetFloat, ok := config[0].(float64)
+	if !ok {
+		return "", fmt.Errorf("Close offset parameter must be a number")
+	}
+	offset := int(offsetFloat)
+
+	// Generate the key - include offset only if non-zero
+	if offset != 0 {
+		return fmt.Sprintf("CLOSE_%d", offset), nil
+	}
+
+	return "CLOSE", nil
 }
 
 // Calculate returns the closing price at the specified offset

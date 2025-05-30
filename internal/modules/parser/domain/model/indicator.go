@@ -15,13 +15,14 @@ type Indicator struct {
 
 type IndicatorValues struct {
 	Timestamp time.Time
-	Value float64
+	Value     float64
 }
 
 type Prices []float64
 
 type IndicatorCalculator interface {
 	GetLookBack(config []any) int64
+	GenerateIndicatorKey(config []any, ctx *EvaluationContext) (string, error)
 	Calculate(config []any, ctx *EvaluationContext) float64
 	CalculateAll(config []any, ctx *EvaluationContext, startDate time.Time) []IndicatorValues
 	SliceData(prices Prices) Prices

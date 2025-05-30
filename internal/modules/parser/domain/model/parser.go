@@ -2,14 +2,13 @@ package parser
 
 import (
 	instrument "algo/internal/modules/instrument/domain/model"
-	// strategy "algo/internal/modules/strategy/domain/model"
-
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -25,6 +24,12 @@ const (
 	COMMA
 	EOF
 )
+
+// IndicatorInfo represents information about an indicator function call
+type IndicatorInfo struct {
+	Name      string `json:"name"`
+	Arguments []any  `json:"arguments"`
+}
 
 // Token represents a token in our lexical analysis
 type Token struct {
@@ -230,12 +235,25 @@ func (n *BinaryOpNode) String() string {
 }
 
 func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
-	left, err := n.Left.Evaluate(ctx)
+
+	var lindicators []IndicatorInfo
+	extractFunctionCalls(n.Left, &lindicators)
+
+	calculator := GetIndFactory(lindicators[0].Name)
+	uniqueString, err := calculator.GenerateIndicatorKey(lindicators[0].Arguments, nil)
+	left := ctx.IndicatorArrayMap[uniqueString][ctx.Index].Value
+
 	if err != nil {
 		return 0, err
 	}
 
-	right, err := n.Right.Evaluate(ctx)
+	var rindicators []IndicatorInfo
+	extractFunctionCalls(n.Right, &rindicators)
+
+	rcalculator := GetIndFactory(rindicators[0].Name)
+	runiqueString, err := rcalculator.GenerateIndicatorKey(rindicators[0].Arguments, nil)
+	right := ctx.IndicatorArrayMap[runiqueString][ctx.Index].Value
+
 	if err != nil {
 		return 0, err
 	}
@@ -263,20 +281,14 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		}
 		return 0, nil
 	case "CROSSESABOVE":
-		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
-		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+		// Handle existing CROSSESABOVE logic with legacy data structure
 
-		if err != nil {
-			// TODO: handle err
+		if ctx.Index == 0 {
 			return 0, nil
 		}
 
-		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
-
-		if err != nil {
-			// TODO: handle err
-			return 0, nil
-		}
+		prevLeft := ctx.IndicatorArrayMap[uniqueString][ctx.Index-1].Value
+		prevRight := ctx.IndicatorArrayMap[runiqueString][ctx.Index-1].Value
 
 		if (left > right) && (prevLeft <= prevRight) {
 			return 1, nil
@@ -289,20 +301,14 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 		}
 		return 0, nil
 	case "CROSSESBELOW":
-		d := (*ctx.Data)[0 : len(*ctx.Data)-1]
-		prevLeft, err := n.Left.Evaluate(NewEvaluationContext(&d))
+		// Handle existing CROSSESBELOW logic with legacy data structure
 
-		if err != nil {
-			// TODO: handle err
+		if ctx.Index == 0 {
 			return 0, nil
 		}
 
-		prevRight, err := n.Right.Evaluate(NewEvaluationContext(&d))
-
-		if err != nil {
-			// TODO: handle err
-			return 0, nil
-		}
+		prevLeft := ctx.IndicatorArrayMap[uniqueString][ctx.Index-1].Value
+		prevRight := ctx.IndicatorArrayMap[runiqueString][ctx.Index-1].Value
 
 		if (left < right) && (prevLeft >= prevRight) {
 			return 1, nil
@@ -342,6 +348,43 @@ func (n *BinaryOpNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 	default:
 		return 0, fmt.Errorf("unknown operator: %s", n.Operator)
 	}
+}
+
+// evaluateCrossesBelow checks if left crosses below right using indicator array map
+func (n *BinaryOpNode) evaluateCrossesBelow(left, right float64, ctx *EvaluationContext) (float64, error) {
+	prevLeft, err := n.getPreviousValue(n.Left, ctx)
+	if err != nil {
+		return 0, nil // Handle gracefully
+	}
+
+	prevRight, err := n.getPreviousValue(n.Right, ctx)
+	if err != nil {
+		return 0, nil // Handle gracefully
+	}
+
+	if (left < right) && (prevLeft >= prevRight) {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// getPreviousValue gets the previous value for a node from indicator array map
+func (n *BinaryOpNode) getPreviousValue(node Node, ctx *EvaluationContext) (float64, error) {
+	if ctx.IndicatorArrayMap == nil || ctx.CurrentTimestamp == nil {
+		return 0, fmt.Errorf("indicator array map or timestamp not available")
+	}
+
+	// Create a context for previous timestamp evaluation
+	prevCtx := &EvaluationContext{
+		IndicatorArrayMap: ctx.IndicatorArrayMap,
+		CurrentTimestamp:  ctx.PreviousTimestamp,
+		PreviousTimestamp: nil, // We don't need to go further back
+		Variables:         ctx.Variables,
+		Strategy:          ctx.Strategy,
+		Results:           ctx.Results,
+	}
+
+	return node.Evaluate(prevCtx)
 }
 
 // UnaryOpNode represents a unary operation
@@ -385,6 +428,10 @@ type FunctionCallNode struct {
 	Arguments []Node
 }
 
+func (n *FunctionCallNode) This() FunctionCallNode {
+	return *n
+}
+
 func (n *FunctionCallNode) Type() NodeType {
 	return FUNCTION_CALL_NODE
 }
@@ -397,9 +444,13 @@ func (n *FunctionCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.Name, strings.Join(args, ", "))
 }
 
-// EMA(close, 50, 0)
-
 func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
+	// If we have indicator array map, use the new evaluation method
+	if ctx.IndicatorArrayMap != nil && ctx.CurrentTimestamp != nil {
+		return n.evaluateFromIndicatorMap(ctx)
+	}
+
+	// Otherwise, use the existing evaluation method for backward compatibility
 	args := make([]any, len(n.Arguments))
 	for i, arg := range n.Arguments {
 		if varNode, isVariable := arg.(*VariableNode); isVariable {
@@ -422,6 +473,26 @@ func (n *FunctionCallNode) Evaluate(ctx *EvaluationContext) (float64, error) {
 
 	result := calculator.Calculate(args, ctx)
 	return result, nil
+}
+
+// evaluateFromIndicatorMap evaluates function calls using the indicator array map
+func (n *FunctionCallNode) evaluateFromIndicatorMap(ctx *EvaluationContext) (float64, error) {
+	// key, err := n.generateIndicatorKey()
+	key := "srrin"
+
+	values, exists := ctx.IndicatorArrayMap[key]
+	if !exists {
+		return 0, fmt.Errorf("indicator %s not found in array map", key)
+	}
+
+	// Find the value at the current timestamp
+	for _, val := range values {
+		if val.Timestamp.Equal(*ctx.CurrentTimestamp) {
+			return val.Value, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no data found for indicator %s at timestamp %v", key, *ctx.CurrentTimestamp)
 }
 
 // Parser parses tokens into an AST
@@ -671,27 +742,44 @@ func (p *Parser) parseArguments() ([]Node, error) {
 
 // EvaluationContext holds the context for expression evaluation
 type EvaluationContext struct {
-	Data *instrument.StockData
-
+	// Legacy support
+	Data      *instrument.StockData
 	Variables map[string]float64
-	// Functions TradingFunctions
+	Strategy  *strategyDto.StrategyResponse
+	Results   map[int64]map[string]interface{}
 
-	Strategy *strategyDto.StrategyResponse
-	Results  map[int64]map[string]interface{}
+	// New indicator array map support
+	IndicatorArrayMap map[string][]IndicatorValues
+	CurrentTimestamp  *time.Time
+	PreviousTimestamp *time.Time
+	Index             int
 }
 
-// NewEvaluationContext creates a new evaluation context
+// NewEvaluationContext creates a new evaluation context (legacy)
 func NewEvaluationContext(data *instrument.StockData) *EvaluationContext {
 	return &EvaluationContext{
 		Data: data,
-		// Variables: vars,
-		// Functions: funcs,
+	}
+}
+
+// NewIndicatorMapEvaluationContext creates a new evaluation context for indicator array map
+func NewIndicatorMapEvaluationContext(
+	indicatorArrayMap map[string][]IndicatorValues,
+	currentTimestamp time.Time,
+	previousTimestamp *time.Time,
+	index int,
+) *EvaluationContext {
+	return &EvaluationContext{
+		IndicatorArrayMap: indicatorArrayMap,
+		CurrentTimestamp:  &currentTimestamp,
+		PreviousTimestamp: previousTimestamp,
+		Index:             index,
+		Variables:         make(map[string]float64),
 	}
 }
 
 // ExpressionBuilder allows building expressions programmatically
 type ExpressionBuilder struct {
-	root Node
 }
 
 // NewExpressionBuilder creates a new expression builder
@@ -741,7 +829,7 @@ func Parse(expr string) (Node, error) {
 	return parser.ParseExpression()
 }
 
-// Execute evaluates an expression
+// Execute evaluates an expression (legacy)
 func Execute(expr string, ctx *EvaluationContext) bool {
 	node, err := Parse(expr)
 	if err != nil {
@@ -758,13 +846,125 @@ func Execute(expr string, ctx *EvaluationContext) bool {
 	return result > 0
 }
 
-// IndicatorInfo represents information about an indicator function call
-type IndicatorInfo struct {
-	Name      string `json:"name"`
-	Arguments []any  `json:"arguments"`
+// EvaluateIndicatorExpression evaluates an expression against indicator array map
+func EvaluateIndicatorExpression(
+	expr string,
+	indicatorArrayMap map[string][]IndicatorValues,
+	currentTimestamp time.Time,
+	previousTimestamp *time.Time,
+	index int,
+) (bool, error) {
+	node, err := Parse(expr)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse expression: %w", err)
+	}
+
+	ctx := NewIndicatorMapEvaluationContext(indicatorArrayMap, currentTimestamp, previousTimestamp, index)
+
+	result, err := node.Evaluate(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate expression: %w", err)
+	}
+
+	return result > 0, nil
 }
 
-// ExtractIndicators parses an expression string and returns all indicator function calls
+// EvaluateConditionAtTimestamp evaluates the expression at a specific timestamp
+func EvaluateConditionAtTimestamp(
+	expr string,
+	indicatorArrayMap map[string][]IndicatorValues,
+	timestamp time.Time,
+) (bool, error) {
+	// Find previous timestamp for cross operations
+	var previousTimestamp *time.Time
+
+	// Get all unique timestamps and sort them to find the previous one
+	timestampSet := make(map[time.Time]bool)
+	for _, values := range indicatorArrayMap {
+		for _, val := range values {
+			timestampSet[val.Timestamp] = true
+		}
+	}
+
+	// Convert to slice and sort
+	timestamps := make([]time.Time, 0, len(timestampSet))
+	for ts := range timestampSet {
+		timestamps = append(timestamps, ts)
+	}
+
+	// Sort timestamps
+	for i := 0; i < len(timestamps)-1; i++ {
+		for j := i + 1; j < len(timestamps); j++ {
+			if timestamps[i].After(timestamps[j]) {
+				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
+			}
+		}
+	}
+
+	// Find previous timestamp
+	for i, ts := range timestamps {
+		if ts.Equal(timestamp) && i > 0 {
+			previousTimestamp = &timestamps[i-1]
+			break
+		}
+	}
+
+	return EvaluateIndicatorExpression(expr, indicatorArrayMap, timestamp, previousTimestamp, 0)
+}
+
+// EvaluateConditionForAllTimestamps evaluates the expression for all timestamps
+func EvaluateConditionForAllTimestamps(
+	expr string,
+	indicatorArrayMap map[string][]IndicatorValues,
+) (map[time.Time]bool, error) {
+	// Get all unique timestamps
+	timestampSet := make(map[time.Time]bool)
+	for _, values := range indicatorArrayMap {
+		for _, val := range values {
+			timestampSet[val.Timestamp] = true
+		}
+	}
+
+	results := make(map[time.Time]bool)
+
+	for timestamp := range timestampSet {
+		result, err := EvaluateConditionAtTimestamp(expr, indicatorArrayMap, timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating at timestamp %v: %w", timestamp, err)
+		}
+		results[timestamp] = result
+	}
+
+	return results, nil
+}
+
+// GetLatestConditionResult gets the latest evaluation result
+func GetLatestConditionResult(
+	expr string,
+	indicatorArrayMap map[string][]IndicatorValues,
+) (bool, time.Time, error) {
+	// Find the latest timestamp
+	var latestTimestamp time.Time
+	var hasTimestamp bool
+
+	for _, values := range indicatorArrayMap {
+		for _, val := range values {
+			if !hasTimestamp || val.Timestamp.After(latestTimestamp) {
+				latestTimestamp = val.Timestamp
+				hasTimestamp = true
+			}
+		}
+	}
+
+	if !hasTimestamp {
+		return false, time.Time{}, fmt.Errorf("no data found in indicator array map")
+	}
+
+	result, err := EvaluateConditionAtTimestamp(expr, indicatorArrayMap, latestTimestamp)
+	return result, latestTimestamp, err
+}
+
+// extractindicators parses an expression string and returns all indicator function calls
 func ExtractIndicators(expr string) ([]IndicatorInfo, error) {
 	// Parse the expression into an AST
 	node, err := Parse(expr)
@@ -775,6 +975,46 @@ func ExtractIndicators(expr string) ([]IndicatorInfo, error) {
 	// Extract all function calls from the AST
 	var indicators []IndicatorInfo
 	extractFunctionCalls(node, &indicators)
+
+	closeNode, err := Parse("CLOSE(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CLOSE function: %w", err)
+	}
+
+	extractFunctionCalls(closeNode, &indicators)
+
+	openNode, err := Parse("OPEN(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CLOSE function: %w", err)
+	}
+
+	extractFunctionCalls(openNode, &indicators)
+
+	highNode, err := Parse("HIGH(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(highNode, &indicators)
+
+	lowNode, err := Parse("LOW(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(lowNode, &indicators)
+
+	volumeNode, err := Parse("VOLUME(0)")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HIGH function: %w", err)
+	}
+
+	extractFunctionCalls(volumeNode, &indicators)
 
 	return indicators, nil
 }

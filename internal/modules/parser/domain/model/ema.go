@@ -27,7 +27,7 @@ func (indicator *EMA) SliceData(prices Prices) Prices {
 }
 
 // generateIndicatorKey generates a unique key for EMA indicator based on its configuration
-func (indicator *EMA) generateIndicatorKey(
+func (indicator *EMA) GenerateIndicatorKey(
 	config []any,
 	ctx *EvaluationContext,
 ) (string, error) {
