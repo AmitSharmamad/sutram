@@ -48,6 +48,7 @@ type DeploymentService interface {
 	GetDeploymentByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentResponse, error)
 	GetUserDeployments(ctx context.Context, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
 	GetDeploymentsByStrategyID(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
+	GetDeploymentStatus(ctx context.Context, strategyID uuid.UUID, instrumentIDs []int, userID uuid.UUID) (*dto.DeploymentStatusResponse, error)
 	UpdateDeployment(ctx context.Context, req *dto.UpdateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
 	DeleteDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 	ActivateDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
@@ -965,4 +966,111 @@ func (s *deploymentService) calculateDeploymentMetrics(ctx context.Context, depl
 	}
 
 	return metrics
+}
+
+// GetDeploymentStatus gets deployment status for specified instruments against a strategy
+func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID uuid.UUID, instrumentIDs []int, userID uuid.UUID) (*dto.DeploymentStatusResponse, error) {
+	// Verify the strategy exists and belongs to the user
+	strategy, err := s.strategyRepo.GetByID(ctx, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrStrategyNotFound, err)
+	}
+
+	if strategy.UserID != userID {
+		return nil, ErrUnauthorized
+	}
+
+	// Get all deployments for this strategy
+	deployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy deployments: %w", err)
+	}
+
+	// Create a map for quick lookup of deployments by instrument ID
+	deploymentMap := make(map[int]*model.Deployment)
+	for _, deployment := range deployments {
+		deploymentMap[deployment.InstrumentID] = deployment
+	}
+
+	// Build response for each requested instrument
+	instrumentStatuses := make([]dto.DeploymentInstrumentStatus, len(instrumentIDs))
+	for i, instrumentID := range instrumentIDs {
+		instrumentStatus := dto.DeploymentInstrumentStatus{
+			InstrumentID:  instrumentID,
+			HasDeployment: false,
+		}
+
+		if deployment, exists := deploymentMap[instrumentID]; exists {
+			instrumentStatus.HasDeployment = true
+			instrumentStatus.Deployment = &dto.DeploymentResponse{
+				ID:           deployment.ID,
+				UserID:       deployment.UserID,
+				StrategyID:   deployment.StrategyID,
+				InstrumentID: deployment.InstrumentID,
+				Name:         deployment.Name,
+				Description:  deployment.Description,
+				IsActive:     deployment.IsActive,
+				CreatedAt:    deployment.CreatedAt,
+				UpdatedAt:    deployment.UpdatedAt,
+			}
+
+			// Get position summary for this deployment
+			positions, err := s.positionRepo.GetByDeploymentID(ctx, deployment.ID)
+			if err == nil && len(positions) > 0 {
+				positionSummary := &dto.PositionSummary{}
+				totalPNL := 0.0
+				openCount := 0
+				closedCount := 0
+
+				for _, pos := range positions {
+					if pos.Status == model.PositionOpen {
+						openCount++
+					} else if pos.Status == model.PositionClosed {
+						closedCount++
+						if pos.PNL != nil {
+							totalPNL += *pos.PNL
+						}
+					}
+				}
+
+				positionSummary.TotalPositions = len(positions)
+				positionSummary.OpenPositions = openCount
+				positionSummary.ClosedPositions = closedCount
+				positionSummary.TotalPNL = totalPNL
+				instrumentStatus.PositionSummary = positionSummary
+			}
+
+			// Get latest metrics for this deployment
+			latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+			if err == nil && latestMetrics != nil {
+				instrumentStatus.LatestMetrics = &dto.MetricsResponse{
+					ID:           latestMetrics.ID,
+					DeploymentID: latestMetrics.DeploymentID,
+					MetricDate:   latestMetrics.MetricDate,
+					TotalTrades:  latestMetrics.TotalTrades,
+					WinTrades:    latestMetrics.WinTrades,
+					LossTrades:   latestMetrics.LossTrades,
+					TotalPNL:     latestMetrics.TotalPNL,
+					MaxDrawdown:  latestMetrics.MaxDrawdown,
+					SharpeRatio:  latestMetrics.SharpeRatio,
+					SortinoRatio: latestMetrics.SortinoRatio,
+					WinRate:      latestMetrics.WinRate,
+					AvgWin:       latestMetrics.AvgWin,
+					AvgLoss:      latestMetrics.AvgLoss,
+					Metadata:     latestMetrics.Metadata,
+					CreatedAt:    latestMetrics.CreatedAt,
+					UpdatedAt:    latestMetrics.UpdatedAt,
+				}
+			}
+		}
+
+		instrumentStatuses[i] = instrumentStatus
+	}
+
+	response := &dto.DeploymentStatusResponse{
+		StrategyID:  strategyID,
+		Instruments: instrumentStatuses,
+	}
+
+	return response, nil
 }
