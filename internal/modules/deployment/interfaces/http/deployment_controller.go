@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/application/service"
@@ -209,6 +210,98 @@ func (c *DeploymentController) GetDeploymentsByStrategy(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    deployments,
+	})
+}
+
+// GetDeploymentStatus handles the request to get deployment status for specified instruments against a strategy
+func (c *DeploymentController) GetDeploymentStatus(ctx *gin.Context) {
+	// Parse strategy ID from URL
+	idParam := ctx.Param("strategy_id")
+	strategyID, err := uuid.Parse(idParam)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid strategy ID",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Parse instruments query parameter
+	instrumentsParam := ctx.Query("instruments")
+	if instrumentsParam == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "instruments query parameter is required",
+		})
+		return
+	}
+
+	// Parse comma-separated instrument IDs
+	var instrumentIDs []int
+	instrumentStrings := strings.Split(instrumentsParam, ",")
+	for _, idStr := range instrumentStrings {
+		idStr = strings.TrimSpace(idStr)
+		if idStr == "" {
+			continue
+		}
+
+		var instrumentID int
+		_, err := fmt.Sscanf(idStr, "%d", &instrumentID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": fmt.Sprintf("Invalid instrument ID: %s", idStr),
+				"error":   err.Error(),
+			})
+			return
+		}
+		instrumentIDs = append(instrumentIDs, instrumentID)
+	}
+
+	if len(instrumentIDs) == 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "No valid instrument IDs provided",
+		})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, ok := getUserIDFromContext(ctx)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Invalid user ID",
+		})
+		return
+	}
+
+	deploymentStatus, err := c.deploymentService.GetDeploymentStatus(ctx, strategyID, instrumentIDs, userID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		message := "Failed to get deployment status"
+
+		switch err {
+		case service.ErrStrategyNotFound:
+			status = http.StatusNotFound
+			message = "Strategy not found"
+		case service.ErrUnauthorized:
+			status = http.StatusForbidden
+			message = "You don't have permission to access this strategy"
+		}
+
+		ctx.JSON(status, gin.H{
+			"success": false,
+			"message": message,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    deploymentStatus,
 	})
 }
 

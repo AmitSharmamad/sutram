@@ -35,6 +35,7 @@ func RegisterRoutes(
 
 		// Strategy-specific deployments
 		deploymentAuth.GET("/strategy/:strategy_id", controller.GetDeploymentsByStrategy)
+		deploymentAuth.GET("/strategy/:strategy_id/status", controller.GetDeploymentStatus)
 		deploymentAuth.POST("/all", controller.DeployAllInstruments)
 
 		// Deployment position logs

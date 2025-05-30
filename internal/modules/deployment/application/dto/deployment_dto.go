@@ -42,3 +42,26 @@ type DeploymentFilter struct {
 	IsActive     *bool      `json:"is_active,omitempty"`
 	Name         *string    `json:"name,omitempty"`
 }
+
+// DeploymentStatusResponse represents the status of deployments for specific instruments against a strategy
+type DeploymentStatusResponse struct {
+	StrategyID  uuid.UUID                    `json:"strategy_id"`
+	Instruments []DeploymentInstrumentStatus `json:"instruments"`
+}
+
+// DeploymentInstrumentStatus represents the deployment status for a specific instrument
+type DeploymentInstrumentStatus struct {
+	InstrumentID    int                 `json:"instrument_id"`
+	HasDeployment   bool                `json:"has_deployment"`
+	Deployment      *DeploymentResponse `json:"deployment,omitempty"`
+	PositionSummary *PositionSummary    `json:"position_summary,omitempty"`
+	LatestMetrics   *MetricsResponse    `json:"latest_metrics,omitempty"`
+}
+
+// PositionSummary represents a summary of positions for a deployment
+type PositionSummary struct {
+	TotalPositions  int     `json:"total_positions"`
+	OpenPositions   int     `json:"open_positions"`
+	ClosedPositions int     `json:"closed_positions"`
+	TotalPNL        float64 `json:"total_pnl"`
+}
