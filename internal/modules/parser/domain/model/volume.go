@@ -76,7 +76,7 @@ func (indicator *Volume) GetDataRange(config map[string]any) int32 {
 // config[0] = offset (int)
 func (indicator *Volume) GetLookBack(config []any) int64 {
 	// Parse config parameters same as Calculate function
-	offset := config[0].(int) // default: 0
+	offset := config[0].(float64) // default: 0
 
 	// For Volume calculation, we need:
 	// - 1 data point for current volume
@@ -90,7 +90,7 @@ func (indicator *Volume) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
-	offset := int(config[0].(int))
+	offset := int(config[0].(float64))
 	indicator.offset = offset
 
 	// Get all stock data
