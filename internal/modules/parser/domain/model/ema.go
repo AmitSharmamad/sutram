@@ -195,14 +195,13 @@ func (indicator *EMA) CalculateAll(
 	indicator.offset = offset
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
 
 	// Get prices for the entire dataset
 	prices := GetPrices(stockData, field)
 
 	// We need at least enough data to calculate initial EMA
 	// For EMA, we typically need at least 2*period data points for proper calculation
-	minDataPoints := 3*period + offset
+	minDataPoints := 5*period + offset
 	if len(stockData) < minDataPoints {
 		return []IndicatorValues{}
 	}
@@ -224,14 +223,18 @@ func (indicator *EMA) CalculateAll(
 	// Start with the initial SMA value as the first EMA
 	ema := sma
 
+	var filteredResults []IndicatorValues
+
 	// Calculate EMA for each data point
 	for i := startIndex; i < len(stockData); i++ {
 		// For the first point, use the SMA calculated above
 		if i == startIndex {
-			results = append(results, IndicatorValues{
-				Timestamp: stockData[i].Timestamp,
-				Value:     util.Round(ema),
-			})
+			if !stockData[i].Timestamp.Before(startDate) {
+				filteredResults = append(filteredResults, IndicatorValues{
+					Timestamp: stockData[i].Timestamp,
+					Value:     util.Round(ema),
+				})
+			}
 			continue
 		}
 
@@ -239,19 +242,15 @@ func (indicator *EMA) CalculateAll(
 		currentPrice := prices[i-offset]
 		ema = ema + multiplier*(currentPrice-ema)
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     util.Round(ema),
-		})
-	}
-
-	// Iterate through results to filter by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
+		if !stockData[i].Timestamp.Before(startDate) {
+			filteredResults = append(filteredResults, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(ema),
+			})
 		}
 	}
+
+	// values := append(createIndicatorValues(startIndex), filteredResults...)
 
 	return filteredResults
 }

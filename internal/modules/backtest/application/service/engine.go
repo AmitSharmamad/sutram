@@ -197,35 +197,6 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 	return response, nil
 }
 
-// calculateLookbackDuration calculates the duration to look back based on timeframe and number of candles
-func (e *BacktestEngine) calculateLookbackDuration(timeframe string, candles int) time.Duration {
-	var baseDuration time.Duration
-
-	switch timeframe {
-	case "1m":
-		baseDuration = time.Minute
-	case "3m":
-		baseDuration = 3 * time.Minute
-	case "5m":
-		baseDuration = 5 * time.Minute
-	case "15m":
-		baseDuration = 15 * time.Minute
-	case "30m":
-		baseDuration = 30 * time.Minute
-	case "1h":
-		baseDuration = time.Hour
-	case "3h":
-		baseDuration = 3 * time.Hour
-	case "1d":
-		baseDuration = 24 * time.Hour
-	default:
-		// Default to 1 minute if unknown timeframe
-		baseDuration = time.Minute
-	}
-
-	return time.Duration(candles) * baseDuration
-}
-
 func (e *BacktestEngine) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) int64 {
 
 	entryLookBack := e.getMaxLookback(strategy.EntryExpression)
@@ -292,44 +263,60 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 
 	// Determine the fetch start time based on entry_start_time if available
 
-	// ********* Remove this piece of code *********
-	// out := run.PeriodStartTime.AddDate(0, 0, -3)
-	// fetchStartTime := out
-	// ********* Remove this piece of code *********
+	// Calculate lookback from expressions
+	lookbackFromExpressions := e.getLookBackFromExpressions(strategy)
 
-	// Calculate lookback duration for 100 candles
-	lookbackCandles := 100
-	lookbackDuration := e.calculateLookbackDuration(string(strategy.ChartTimeframe), lookbackCandles)
-
-	// Adjust fetch start time to include lookback period
-	lookbackStartTime := strategy.StartDate.AddDate(0, 0, -30)
-
-	// Get data for the main chart timeframe with lookback
+	// Get historical data with exact lookback count
 	timeFrameDataStartTime := time.Now()
 	println("\tFetching timeframe data with lookback for instrument", instrumentID, "- Start:", timeFrameDataStartTime.Format(time.RFC3339))
-	println("\t\tLookback period:", lookbackCandles, "candles,", lookbackDuration.String())
-	println("\t\tFetch range:", lookbackStartTime.Format(time.RFC3339), "to", run.PeriodEndTime.Format(time.RFC3339))
+	println("\t\tLookback period:", lookbackFromExpressions, "candles")
+	println("\t\tFetch range: Before", strategy.StartDate.Format(time.RFC3339), "to", run.PeriodEndTime.Format(time.RFC3339))
 
-	timeFrameDataWithLookback, err := e.instrumentService.GetInstrumentsByTimeRange(
+	// Get lookback data (historical data before strategy start date)
+	lookbackData, err := e.instrumentService.GetInstrumentsByExchangeSecurityIDWithLookback(
 		ctx,
 		instrumentMaster.ExchangeSecurityID,
-		lookbackStartTime,
+		*strategy.StartDate,
+		string(strategy.ChartTimeframe),
+		int(lookbackFromExpressions),
+	)
+	if err != nil {
+		println("Error getting lookback data for instrument ID:", instrumentID, "Error:", err.Error())
+		lookbackData = []*instrumentModel.Instrument{} // Continue with empty lookback if error
+	}
+
+	// Get main data for the strategy period
+	timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
+		ctx,
+		instrumentMaster.ExchangeSecurityID,
+		*strategy.StartDate,
 		run.PeriodEndTime,
 		string(strategy.ChartTimeframe),
 	)
-
-	timeFrameDataEndTime := time.Now()
-	timeFrameDataDuration := timeFrameDataEndTime.Sub(timeFrameDataStartTime)
-	println("\tTimeframe data with lookback fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
-		"- Records:", len(timeFrameDataWithLookback))
 
 	if err != nil {
 		println("Error getting timeframe data for instrument ID:", instrumentID, "Error:", err.Error())
 		return
 	}
 
+	// Combine lookback data with main data (lookback data first, then main data)
+	// Reverse lookback data since it comes in descending order (newest first)
+	for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+		lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+	}
+
+	// Combine lookback and main data
+	timeFrameDataWithLookback := make([]*instrumentModel.Instrument, 0, len(lookbackData)+len(timeFrameData))
+	timeFrameDataWithLookback = append(timeFrameDataWithLookback, lookbackData...)
+	timeFrameDataWithLookback = append(timeFrameDataWithLookback, timeFrameData...)
+
+	timeFrameDataEndTime := time.Now()
+	timeFrameDataDuration := timeFrameDataEndTime.Sub(timeFrameDataStartTime)
+	println("\tTimeframe data with lookback fetched for instrument", instrumentID, "- Duration:", timeFrameDataDuration.String(),
+		"- Records: Lookback:", len(lookbackData), "Main:", len(timeFrameData), "Total:", len(timeFrameDataWithLookback))
+
 	// Use the data with lookback as our timeFrameData
-	timeFrameData := timeFrameDataWithLookback
+	timeFrameData = timeFrameDataWithLookback
 
 	// Get second-level data for more accurate exit condition checking
 	secondLevelDataStartTime := time.Now()
@@ -497,7 +484,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Sort timestamps chronologically
-	for i := 0; i < len(timestamps)-1; i++ {
+	for i := range len(timestamps)-1 {
 		for j := i + 1; j < len(timestamps); j++ {
 			if timestamps[i].After(timestamps[j]) {
 				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
@@ -511,7 +498,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Use timestamp array length for the main loop
-	for i := 0; i < len(timestamps); i++ {
+	for i := range len(timestamps) {
 		// Get current timestamp for this iteration
 		currentTimestamp := timestamps[i]
 
