@@ -1200,6 +1200,13 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		metrics.AvgTradeDuration = &avgTradeDuration
 	}
 
+	// Calculate position size metrics using helper functions
+	avgPositionSize := e.calculateAvgPositionSize(positions)
+	metrics.AvgPositionSize = &avgPositionSize
+
+	maxPositionSize := e.calculateMaxPositionSize(positions)
+	metrics.MaxPositionSize = &maxPositionSize
+
 	// Calculate more advanced metrics
 	returnsData := e.calculateReturns(positions)
 	metrics.DailyReturns = returnsData.DailyReturns
@@ -1238,6 +1245,43 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+// calculateAvgPositionSize calculates the average position size from all positions
+func (e *BacktestEngine) calculateAvgPositionSize(positions []*model.Position) float64 {
+	totalPositionSize := 0.0
+	positionCount := 0
+
+	for _, position := range positions {
+		if position.PositionSize > 0 {
+			totalPositionSize += position.PositionSize
+			positionCount++
+		}
+	}
+
+	avgPositionSize := 0.0
+	if positionCount > 0 {
+		avgPositionSize = totalPositionSize / float64(positionCount)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgPositionSize = e.clampFloat(avgPositionSize, -9999999999.99999999, 9999999999.99999999)
+	}
+
+	return avgPositionSize
+}
+
+// calculateMaxPositionSize calculates the maximum position size from all positions
+func (e *BacktestEngine) calculateMaxPositionSize(positions []*model.Position) float64 {
+	maxPositionSize := 0.0
+
+	for _, position := range positions {
+		if position.PositionSize > 0 && position.PositionSize > maxPositionSize {
+			maxPositionSize = position.PositionSize
+		}
+	}
+
+	// Clamp to fit in database DECIMAL(18, 8)
+	maxPositionSize = e.clampFloat(maxPositionSize, -9999999999.99999999, 9999999999.99999999)
+	return maxPositionSize
 }
 
 func (e *BacktestEngine) calculateReturns(positions []*model.Position) model.ReturnsData {
