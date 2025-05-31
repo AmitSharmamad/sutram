@@ -75,3 +75,10 @@ func (rm *RunMetrics) SetMetricData(data interface{}) error {
 	rm.metricData = data
 	return nil
 }
+
+// ReturnsData represents the different types of returns calculated from positions
+type ReturnsData struct {
+	DailyReturns     []float64 // Array of daily returns
+	MonthlyReturns   []float64 // Array of monthly returns
+	AnnualizedReturn float64   // Annualized return value
+}
