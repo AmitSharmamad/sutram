@@ -1207,6 +1207,10 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	maxPositionSize := e.calculateMaxPositionSize(positions)
 	metrics.MaxPositionSize = &maxPositionSize
 
+	// Calculate average exposure metric
+	avgExposure := e.calculateAvgExposure(positions)
+	metrics.AvgExposure = &avgExposure
+
 	// Calculate more advanced metrics
 	returnsData := e.calculateReturns(positions)
 	metrics.DailyReturns = returnsData.DailyReturns
@@ -1215,7 +1219,12 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 
 	metrics.SharpeRatio = 0.0  // Would require daily returns calculation
 	metrics.SortinoRatio = 0.0 // Would require daily returns calculation
-	metrics.MaxDrawdown = e.calculateMaxDrawdown(positions, initialCapital)
+
+	// Calculate max drawdown and duration
+	drawdownResult := e.calculateMaxDrawdownWithDuration(positions, initialCapital)
+	metrics.MaxDrawdown = drawdownResult.MaxDrawdown
+	metrics.MaxDrawdownDuration = drawdownResult.MaxDrawdownDuration
+
 	metrics.TotalSlippage = 0.0
 
 	// Store additional metrics as JSON
@@ -1282,6 +1291,31 @@ func (e *BacktestEngine) calculateMaxPositionSize(positions []*model.Position) f
 	// Clamp to fit in database DECIMAL(18, 8)
 	maxPositionSize = e.clampFloat(maxPositionSize, -9999999999.99999999, 9999999999.99999999)
 	return maxPositionSize
+}
+
+// calculateAvgExposure calculates the average dollar exposure from all positions
+// Formula: Average Exposure = Σ(entry_price × position_size) / number_of_positions
+func (e *BacktestEngine) calculateAvgExposure(positions []*model.Position) float64 {
+	totalExposure := 0.0
+	validPositionCount := 0
+
+	for _, position := range positions {
+		// Only consider positions that have actual entry price order (were executed)
+		if position.EntryPriceOrder != nil && position.PositionSize > 0 {
+			exposure := *position.EntryPriceOrder * position.PositionSize
+			totalExposure += exposure
+			validPositionCount++
+		}
+	}
+
+	avgExposure := 0.0
+	if validPositionCount > 0 {
+		avgExposure = totalExposure / float64(validPositionCount)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgExposure = e.clampFloat(avgExposure, -9999999999.99999999, 9999999999.99999999)
+	}
+
+	return avgExposure
 }
 
 func (e *BacktestEngine) calculateReturns(positions []*model.Position) model.ReturnsData {
@@ -1370,9 +1404,9 @@ func (e *BacktestEngine) calculateReturns(positions []*model.Position) model.Ret
 	}
 }
 
-func (e *BacktestEngine) calculateMaxDrawdown(positions []*model.Position, initialCapital float64) float64 {
+func (e *BacktestEngine) calculateMaxDrawdownWithDuration(positions []*model.Position, initialCapital float64) model.DrawdownResult {
 	if len(positions) == 0 {
-		return 0.0
+		return model.DrawdownResult{MaxDrawdown: 0.0, MaxDrawdownDuration: 0.0}
 	}
 
 	// Filter only exited positions and sort by exit time
@@ -1384,7 +1418,7 @@ func (e *BacktestEngine) calculateMaxDrawdown(positions []*model.Position, initi
 	}
 
 	if len(exitedPositions) == 0 {
-		return 0.0
+		return model.DrawdownResult{MaxDrawdown: 0.0, MaxDrawdownDuration: 0.0}
 	}
 
 	// Sort positions by exit time to ensure chronological order
@@ -1397,32 +1431,62 @@ func (e *BacktestEngine) calculateMaxDrawdown(positions []*model.Position, initi
 		}
 	}
 
-	// Calculate cumulative equity curve
+	// Calculate cumulative equity curve and track drawdowns
 	cumulativeEquity := initialCapital
 	runningPeak := initialCapital
 	maxDrawdown := 0.0
+	maxDrawdownDuration := 0.0
+
+	// Variables to track current drawdown period
+	var drawdownStartTime *time.Time
+	currentDrawdownDuration := 0.0
 
 	// Process each position to build cumulative equity curve
 	for _, position := range exitedPositions {
 		// Add position's P&L to cumulative equity
 		cumulativeEquity += *position.NetProfitLoss
 
-		// Update running peak if current equity is higher
+		// Check if we're at a new peak
 		if cumulativeEquity > runningPeak {
+			// If we were in a drawdown period, calculate its duration
+			if drawdownStartTime != nil {
+				currentDrawdownDuration = position.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
+				if currentDrawdownDuration > maxDrawdownDuration {
+					maxDrawdownDuration = currentDrawdownDuration
+				}
+				// Reset drawdown tracking since we reached a new peak
+				drawdownStartTime = nil
+			}
 			runningPeak = cumulativeEquity
-		}
-
-		// Calculate drawdown from peak (absolute value)
-		if runningPeak > 0 {
-			drawdown := (runningPeak - cumulativeEquity) / runningPeak
-			if drawdown > maxDrawdown {
-				maxDrawdown = drawdown
+		} else if cumulativeEquity < runningPeak {
+			// We're in a drawdown
+			if drawdownStartTime == nil {
+				// This is the start of a new drawdown period
+				drawdownStartTime = position.ExitTimeOrder
+			}
+			// Calculate current drawdown percentage
+			if runningPeak > 0 {
+				drawdown := (runningPeak - cumulativeEquity) / runningPeak
+				if drawdown > maxDrawdown {
+					maxDrawdown = drawdown
+				}
 			}
 		}
 	}
 
-	// Return as percentage
-	return maxDrawdown * 100.0
+	// Handle case where the backtest ends in a drawdown
+	if drawdownStartTime != nil && len(exitedPositions) > 0 {
+		lastPosition := exitedPositions[len(exitedPositions)-1]
+		currentDrawdownDuration = lastPosition.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
+		if currentDrawdownDuration > maxDrawdownDuration {
+			maxDrawdownDuration = currentDrawdownDuration
+		}
+	}
+
+	return model.DrawdownResult{
+		MaxDrawdown:         maxDrawdown * 100.0, // Return as percentage
+		MaxDrawdownDuration: maxDrawdownDuration,
+	}
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
