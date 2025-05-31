@@ -389,7 +389,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	var positions []*model.Position
 	var openPosition *model.Position
 	capital := strategy.Capital
-	initialCapital := capital
+	initialCapital := 0.0
 
 	// Mark run as started
 	startTime := time.Now()
@@ -484,7 +484,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Sort timestamps chronologically
-	for i := range len(timestamps)-1 {
+	for i := range len(timestamps) - 1 {
 		for j := i + 1; j < len(timestamps); j++ {
 			if timestamps[i].After(timestamps[j]) {
 				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
@@ -804,6 +804,15 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Ended
 	}
 
+	// Remove the positions that are not closed
+	closedPositions := make([]*model.Position, 0)
+	for _, position := range positions {
+		if position.State == model.Exited {
+			closedPositions = append(closedPositions, position)
+		}
+	}
+	positions = closedPositions
+
 	// Calculate metrics
 	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
 
@@ -1103,8 +1112,6 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	totalProfitLoss := 0.0
 	totalWinAmount := 0.0
 	totalLossAmount := 0.0
-	totalCommission := 0.0
-	totalSlippage := 0.0
 
 	// Process all positions
 	for _, position := range positions {
@@ -1125,23 +1132,15 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		}
 
 		totalProfitLoss += profitLoss
-
-		// Add transaction costs
-		if position.EntryFees != nil {
-			totalCommission += *position.EntryFees
-		}
-		if position.ExitFees != nil {
-			totalCommission += *position.ExitFees
-		}
 	}
 
 	// Set metrics
 	metrics.TotalTrades = totalTrades
 
 	if totalTrades > 0 {
-		// Clamp win rate to avoid PostgreSQL numeric field overflow
-		winRate := float64(winningTrades) / float64(totalTrades) * 100
-		metrics.WinRate = e.clampFloat(winRate, -9999.9999, 9999.9999)
+		// Calculate win rate as decimal (0.0 to 1.0) to match API documentation examples
+		winRate := float64(winningTrades) / float64(totalTrades)
+		metrics.WinRate = e.clampFloat(winRate, 0.0, 1.0)
 	}
 
 	// Calculate profit factor
@@ -1170,13 +1169,12 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	}
 	metrics.AvgLossSize = &avgLossSize
 
-	// Set transaction costs
-	metrics.TotalCommission = e.clampFloat(totalCommission, -9999999999.99999999, 9999999999.99999999)
-	metrics.TotalSlippage = e.clampFloat(totalSlippage, -9999999999.99999999, 9999999999.99999999)
+	// Set transaction costs to 0 for now, can be addressed later
+	metrics.TotalSlippage = 0.0
 
 	if initialCapital > 0 {
-		transactionCostsPct := (totalCommission + totalSlippage) / initialCapital * 100
-		metrics.TransactionCostsPct = e.clampFloat(transactionCostsPct, -9999.9999, 9999.9999)
+		// TransactionCostsPct set to 0 for now, can be addressed later
+		metrics.TransactionCostsPct = 0.0
 
 		totalReturnPct := (finalCapital - initialCapital) / initialCapital * 100
 		metrics.TotalReturnPct = e.clampFloat(totalReturnPct, -9999.9999, 9999.9999)
@@ -1202,10 +1200,11 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		metrics.AvgTradeDuration = &avgTradeDuration
 	}
 
-	// Calculate more advanced metrics (simplified)
+	// Calculate more advanced metrics
 	metrics.SharpeRatio = 0.0  // Would require daily returns calculation
 	metrics.SortinoRatio = 0.0 // Would require daily returns calculation
-	metrics.MaxDrawdown = 0.0  // Would require equity curve calculation
+	metrics.MaxDrawdown = e.calculateMaxDrawdown(positions, initialCapital)
+	metrics.TotalSlippage = 0.0
 
 	// Store additional metrics as JSON
 	additionalMetrics := map[string]interface{}{
@@ -1234,6 +1233,61 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+func (e *BacktestEngine) calculateMaxDrawdown(positions []*model.Position, initialCapital float64) float64 {
+	if len(positions) == 0 {
+		return 0.0
+	}
+
+	// Filter only exited positions and sort by exit time
+	var exitedPositions []*model.Position
+	for _, position := range positions {
+		if position.State == model.Exited && position.NetProfitLoss != nil && position.ExitTimeOrder != nil {
+			exitedPositions = append(exitedPositions, position)
+		}
+	}
+
+	if len(exitedPositions) == 0 {
+		return 0.0
+	}
+
+	// Sort positions by exit time to ensure chronological order
+	// Using a simple bubble sort for now - could optimize if needed
+	for i := 0; i < len(exitedPositions)-1; i++ {
+		for j := 0; j < len(exitedPositions)-i-1; j++ {
+			if exitedPositions[j].ExitTimeOrder.After(*exitedPositions[j+1].ExitTimeOrder) {
+				exitedPositions[j], exitedPositions[j+1] = exitedPositions[j+1], exitedPositions[j]
+			}
+		}
+	}
+
+	// Calculate cumulative equity curve
+	cumulativeEquity := initialCapital
+	runningPeak := initialCapital
+	maxDrawdown := 0.0
+
+	// Process each position to build cumulative equity curve
+	for _, position := range exitedPositions {
+		// Add position's P&L to cumulative equity
+		cumulativeEquity += *position.NetProfitLoss
+
+		// Update running peak if current equity is higher
+		if cumulativeEquity > runningPeak {
+			runningPeak = cumulativeEquity
+		}
+
+		// Calculate drawdown from peak (absolute value)
+		if runningPeak > 0 {
+			drawdown := (runningPeak - cumulativeEquity) / runningPeak
+			if drawdown > maxDrawdown {
+				maxDrawdown = drawdown
+			}
+		}
+	}
+
+	// Return as percentage
+	return maxDrawdown * 100.0
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
