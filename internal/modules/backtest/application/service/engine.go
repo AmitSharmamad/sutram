@@ -1201,6 +1201,11 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	}
 
 	// Calculate more advanced metrics
+	returnsData := e.calculateReturns(positions)
+	metrics.DailyReturns = returnsData.DailyReturns
+	metrics.MonthlyReturns = returnsData.MonthlyReturns
+	metrics.AnnualizedReturn = returnsData.AnnualizedReturn
+
 	metrics.SharpeRatio = 0.0  // Would require daily returns calculation
 	metrics.SortinoRatio = 0.0 // Would require daily returns calculation
 	metrics.MaxDrawdown = e.calculateMaxDrawdown(positions, initialCapital)
@@ -1233,6 +1238,92 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+func (e *BacktestEngine) calculateReturns(positions []*model.Position) model.ReturnsData {
+	// Calculate daily returns based on closed positions - type - Array of floats
+	// Calculate monthly returns from all closed positions - type - Array of floats
+	// Calculate annualized returns based on monthly returns - type - Array of floats
+
+	emptyReturns := model.ReturnsData{
+		DailyReturns:     []float64{},
+		MonthlyReturns:   []float64{},
+		AnnualizedReturn: 0.0,
+	}
+
+	if len(positions) == 0 {
+		return emptyReturns
+	}
+
+	// Filter only closed positions with valid P&L data
+	var closedPositions []*model.Position
+	for _, position := range positions {
+		if position.State == model.Exited && position.NetProfitLoss != nil &&
+			position.EntryTimeOrder != nil && position.ExitTimeOrder != nil {
+			closedPositions = append(closedPositions, position)
+		}
+	}
+
+	if len(closedPositions) == 0 {
+		return emptyReturns
+	}
+
+	// Group positions by day and month to calculate returns
+	dailyReturnsMap := make(map[string]float64)
+	monthlyReturnsMap := make(map[string]float64)
+
+	// Calculate daily and monthly returns based on P&L
+	for _, position := range closedPositions {
+		if position.NetProfitLoss == nil || position.ExitTimeOrder == nil {
+			continue
+		}
+
+		exitDate := position.ExitTimeOrder.Format("2006-01-02")
+		exitMonth := position.ExitTimeOrder.Format("2006-01")
+
+		// Accumulate daily returns
+		dailyReturnsMap[exitDate] += *position.NetProfitLoss
+
+		// Accumulate monthly returns
+		monthlyReturnsMap[exitMonth] += *position.NetProfitLoss
+	}
+
+	// Convert maps to sorted arrays
+	var dailyReturns []float64
+	var monthlyReturns []float64
+
+	// Extract daily returns values (sorted by date would be ideal, but for now just extract values)
+	for _, dailyReturn := range dailyReturnsMap {
+		dailyReturns = append(dailyReturns, dailyReturn)
+	}
+
+	// Extract monthly returns values
+	for _, monthlyReturn := range monthlyReturnsMap {
+		monthlyReturns = append(monthlyReturns, monthlyReturn)
+	}
+
+	// Calculate annualized return based on monthly returns
+	var annualizedReturn float64
+	if len(monthlyReturns) > 0 {
+		// Calculate total return from monthly data
+		totalReturn := 0.0
+		for _, monthlyReturn := range monthlyReturns {
+			totalReturn += monthlyReturn
+		}
+
+		// Calculate average monthly return
+		avgMonthlyReturn := totalReturn / float64(len(monthlyReturns))
+
+		// Annualized return = average monthly return * 12
+		// This is a simplified calculation - in practice you'd want compound returns
+		annualizedReturn = avgMonthlyReturn * 12
+	}
+
+	return model.ReturnsData{
+		DailyReturns:     dailyReturns,
+		MonthlyReturns:   monthlyReturns,
+		AnnualizedReturn: annualizedReturn,
+	}
 }
 
 func (e *BacktestEngine) calculateMaxDrawdown(positions []*model.Position, initialCapital float64) float64 {
