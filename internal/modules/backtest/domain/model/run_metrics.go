@@ -76,6 +76,12 @@ func (rm *RunMetrics) SetMetricData(data interface{}) error {
 	return nil
 }
 
+// DrawdownResult holds both max drawdown percentage and duration
+type DrawdownResult struct {
+	MaxDrawdown         float64 // Maximum drawdown as percentage
+	MaxDrawdownDuration float64 // Maximum drawdown duration in hours
+}
+
 // ReturnsData represents the different types of returns calculated from positions
 type ReturnsData struct {
 	DailyReturns     []float64 // Array of daily returns
