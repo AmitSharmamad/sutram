@@ -929,7 +929,8 @@ func (s *deploymentService) calculateDeploymentMetrics(ctx context.Context, depl
 	}
 
 	if totalTrades > 0 {
-		winRate := float64(winningTrades) / float64(totalTrades) * 100
+		// Calculate win rate as decimal (0.0 to 1.0) to match API documentation
+		winRate := float64(winningTrades) / float64(totalTrades)
 		metrics.WinRate = winRate
 
 		// Calculate total return percentage (simplified)
