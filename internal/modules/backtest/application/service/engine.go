@@ -399,27 +399,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Started
 	}
 
-	// Calculate the maximum lookback period required for indicators in the entry expression
-	maxLookback := e.getLookBackFromExpressions(strategy)
-
-	// Find the index where the actual backtest period starts
-	// (after the lookback period)
-	backtestStartIndex := 0
-	if run != nil {
-		for i, candle := range stockData {
-			if candle.Timestamp.Equal(run.PeriodStartTime) || candle.Timestamp.After(run.PeriodStartTime) {
-				backtestStartIndex = i
-				break
-			}
-		}
-	}
-
-	// Minimum lookback period for indicators (use max of calculated lookback or backtestStartIndex to ensure enough data)
-	minLookback := int(maxLookback)
-	if backtestStartIndex > minLookback {
-		minLookback = backtestStartIndex
-	}
-
 	// Keep track of the current trading day for MIS trades
 	// Initialize current trading day using first timestamp from indicators
 	var currentTradingDay time.Time
