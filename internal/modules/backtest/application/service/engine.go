@@ -389,7 +389,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	var positions []*model.Position
 	var openPosition *model.Position
 	capital := strategy.Capital
-	initialCapital := capital
+	initialCapital := 0.0
 
 	// Mark run as started
 	startTime := time.Now()
@@ -484,7 +484,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Sort timestamps chronologically
-	for i := range len(timestamps)-1 {
+	for i := range len(timestamps) - 1 {
 		for j := i + 1; j < len(timestamps); j++ {
 			if timestamps[i].After(timestamps[j]) {
 				timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
@@ -580,7 +580,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
 				// Extract time of day from the current candle timestamp
-
 				currentTime := currentTimestamp
 				currentTimeOfDay := time.Date(0, 1, 1,
 					currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
@@ -597,7 +596,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					}
 				}
 
-				if canCheckEntryCondition && strategy.EntryEndTime != nil {
+				if strategy.EntryEndTime != nil {
 					// Extract time component from EntryEndTime
 					entryEndTimeOfDay := time.Date(0, 1, 1,
 						strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
@@ -804,10 +803,107 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		run.State = model.Ended
 	}
 
+	// Remove the positions that are not closed
+	closedPositions := make([]*model.Position, 0)
+	for _, position := range positions {
+		if position.State == model.Exited {
+			closedPositions = append(closedPositions, position)
+		}
+	}
+	positions = closedPositions
+
 	// Calculate metrics
 	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
 
-	// Calculate and log function execution time
+	// Calculate capital progression over each position
+	// Assume initial capital is 0 for simplicity as mentioned in the comment
+	currentCapital := 0.0
+	var capitalProgression []interface{}
+
+	// Sort positions by exit time to ensure chronological order
+	sortedPositions := make([]*model.Position, len(positions))
+	copy(sortedPositions, positions)
+
+	// Simple bubble sort by exit time (optimize if needed for large position counts)
+	for i := 0; i < len(sortedPositions)-1; i++ {
+		for j := 0; j < len(sortedPositions)-i-1; j++ {
+			pos1 := sortedPositions[j]
+			pos2 := sortedPositions[j+1]
+
+			// Handle nil exit times by putting them at the end
+			if pos1.ExitTimeOrder == nil {
+				continue
+			}
+			if pos2.ExitTimeOrder == nil {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+				continue
+			}
+
+			if pos1.ExitTimeOrder.After(*pos2.ExitTimeOrder) {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+			}
+		}
+	}
+
+	// Calculate capital progression for each position
+	for i, position := range sortedPositions {
+		if position.NetProfitLoss != nil {
+			// Add the position's P&L to current capital
+			currentCapital += *position.NetProfitLoss
+
+			// Create capital progression entry
+			progressionEntry := map[string]interface{}{
+				"position_index":  i + 1,
+				"position_id":     position.ID.String(),
+				"entry_time":      position.EntryTimeSignal,
+				"exit_time":       position.ExitTimeOrder,
+				"net_profit_loss": *position.NetProfitLoss,
+				"capital_before":  currentCapital - *position.NetProfitLoss,
+				"capital_after":   currentCapital,
+				"capital_change":  *position.NetProfitLoss,
+				"direction":       string(position.Direction),
+				"position_size":   position.PositionSize,
+			}
+
+			// Add entry price if available
+			if position.EntryPriceOrder != nil {
+				progressionEntry["entry_price"] = *position.EntryPriceOrder
+			}
+
+			// Add exit price if available
+			if position.ExitPriceOrder != nil {
+				progressionEntry["exit_price"] = *position.ExitPriceOrder
+			}
+
+			// Add exit reason if available
+			if position.ExitReason != nil {
+				progressionEntry["exit_reason"] = *position.ExitReason
+			}
+
+			capitalProgression = append(capitalProgression, progressionEntry)
+		}
+	}
+
+	// Set capital progression in the metrics
+	if metrics != nil {
+		metrics.SetCapitalProgression(capitalProgression)
+
+		// Get existing metric data or create new
+		var existingData map[string]interface{}
+		if err := metrics.GetMetricData(&existingData); err != nil || existingData == nil {
+			existingData = make(map[string]interface{})
+		}
+
+		// Add capital progression data to MetricJSON for backwards compatibility
+		existingData["capital_progression"] = capitalProgression
+		existingData["final_capital"] = currentCapital
+		existingData["total_capital_change"] = currentCapital
+		existingData["positions_count"] = len(capitalProgression)
+
+		// Update the metric JSON
+		metrics.SetMetricData(existingData)
+	}
+
 	functionEndTime := time.Now()
 	executionDuration := functionEndTime.Sub(functionStartTime)
 
@@ -1103,8 +1199,6 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	totalProfitLoss := 0.0
 	totalWinAmount := 0.0
 	totalLossAmount := 0.0
-	totalCommission := 0.0
-	totalSlippage := 0.0
 
 	// Process all positions
 	for _, position := range positions {
@@ -1125,23 +1219,15 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		}
 
 		totalProfitLoss += profitLoss
-
-		// Add transaction costs
-		if position.EntryFees != nil {
-			totalCommission += *position.EntryFees
-		}
-		if position.ExitFees != nil {
-			totalCommission += *position.ExitFees
-		}
 	}
 
 	// Set metrics
 	metrics.TotalTrades = totalTrades
 
 	if totalTrades > 0 {
-		// Clamp win rate to avoid PostgreSQL numeric field overflow
-		winRate := float64(winningTrades) / float64(totalTrades) * 100
-		metrics.WinRate = e.clampFloat(winRate, -9999.9999, 9999.9999)
+		// Calculate win rate as decimal (0.0 to 1.0) to match API documentation examples
+		winRate := float64(winningTrades) / float64(totalTrades)
+		metrics.WinRate = e.clampFloat(winRate, 0.0, 1.0)
 	}
 
 	// Calculate profit factor
@@ -1170,13 +1256,12 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	}
 	metrics.AvgLossSize = &avgLossSize
 
-	// Set transaction costs
-	metrics.TotalCommission = e.clampFloat(totalCommission, -9999999999.99999999, 9999999999.99999999)
-	metrics.TotalSlippage = e.clampFloat(totalSlippage, -9999999999.99999999, 9999999999.99999999)
+	// Set transaction costs to 0 for now, can be addressed later
+	metrics.TotalSlippage = 0.0
 
 	if initialCapital > 0 {
-		transactionCostsPct := (totalCommission + totalSlippage) / initialCapital * 100
-		metrics.TransactionCostsPct = e.clampFloat(transactionCostsPct, -9999.9999, 9999.9999)
+		// TransactionCostsPct set to 0 for now, can be addressed later
+		metrics.TransactionCostsPct = 0.0
 
 		totalReturnPct := (finalCapital - initialCapital) / initialCapital * 100
 		metrics.TotalReturnPct = e.clampFloat(totalReturnPct, -9999.9999, 9999.9999)
@@ -1202,10 +1287,32 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		metrics.AvgTradeDuration = &avgTradeDuration
 	}
 
-	// Calculate more advanced metrics (simplified)
+	// Calculate position size metrics using helper functions
+	avgPositionSize := e.calculateAvgPositionSize(positions)
+	metrics.AvgPositionSize = &avgPositionSize
+
+	maxPositionSize := e.calculateMaxPositionSize(positions)
+	metrics.MaxPositionSize = &maxPositionSize
+
+	// Calculate average exposure metric
+	avgExposure := e.calculateAvgExposure(positions)
+	metrics.AvgExposure = &avgExposure
+
+	// Calculate more advanced metrics
+	returnsData := e.calculateReturns(positions)
+	metrics.DailyReturns = returnsData.DailyReturns
+	metrics.MonthlyReturns = returnsData.MonthlyReturns
+	metrics.AnnualizedReturn = returnsData.AnnualizedReturn
+
 	metrics.SharpeRatio = 0.0  // Would require daily returns calculation
 	metrics.SortinoRatio = 0.0 // Would require daily returns calculation
-	metrics.MaxDrawdown = 0.0  // Would require equity curve calculation
+
+	// Calculate max drawdown and duration
+	drawdownResult := e.calculateMaxDrawdownWithDuration(positions, initialCapital)
+	metrics.MaxDrawdown = drawdownResult.MaxDrawdown
+	metrics.MaxDrawdownDuration = drawdownResult.MaxDrawdownDuration
+
+	metrics.TotalSlippage = 0.0
 
 	// Store additional metrics as JSON
 	additionalMetrics := map[string]interface{}{
@@ -1234,6 +1341,239 @@ func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
 		return max
 	}
 	return value
+}
+
+// calculateAvgPositionSize calculates the average position size from all positions
+func (e *BacktestEngine) calculateAvgPositionSize(positions []*model.Position) float64 {
+	totalPositionSize := 0.0
+	positionCount := 0
+
+	for _, position := range positions {
+		if position.PositionSize > 0 {
+			totalPositionSize += position.PositionSize
+			positionCount++
+		}
+	}
+
+	avgPositionSize := 0.0
+	if positionCount > 0 {
+		avgPositionSize = totalPositionSize / float64(positionCount)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgPositionSize = e.clampFloat(avgPositionSize, -9999999999.99999999, 9999999999.99999999)
+	}
+
+	return avgPositionSize
+}
+
+// calculateMaxPositionSize calculates the maximum position size from all positions
+func (e *BacktestEngine) calculateMaxPositionSize(positions []*model.Position) float64 {
+	maxPositionSize := 0.0
+
+	for _, position := range positions {
+		if position.PositionSize > 0 && position.PositionSize > maxPositionSize {
+			maxPositionSize = position.PositionSize
+		}
+	}
+
+	// Clamp to fit in database DECIMAL(18, 8)
+	maxPositionSize = e.clampFloat(maxPositionSize, -9999999999.99999999, 9999999999.99999999)
+	return maxPositionSize
+}
+
+// calculateAvgExposure calculates the average dollar exposure from all positions
+// Formula: Average Exposure = Σ(entry_price × position_size) / number_of_positions
+func (e *BacktestEngine) calculateAvgExposure(positions []*model.Position) float64 {
+	totalExposure := 0.0
+	validPositionCount := 0
+
+	for _, position := range positions {
+		// Only consider positions that have actual entry price order (were executed)
+		if position.EntryPriceOrder != nil && position.PositionSize > 0 {
+			exposure := *position.EntryPriceOrder * position.PositionSize
+			totalExposure += exposure
+			validPositionCount++
+		}
+	}
+
+	avgExposure := 0.0
+	if validPositionCount > 0 {
+		avgExposure = totalExposure / float64(validPositionCount)
+		// Clamp to fit in database DECIMAL(18, 8)
+		avgExposure = e.clampFloat(avgExposure, -9999999999.99999999, 9999999999.99999999)
+	}
+
+	return avgExposure
+}
+
+func (e *BacktestEngine) calculateReturns(positions []*model.Position) model.ReturnsData {
+	// Calculate daily returns based on closed positions - type - Array of floats
+	// Calculate monthly returns from all closed positions - type - Array of floats
+	// Calculate annualized returns based on monthly returns - type - Array of floats
+
+	emptyReturns := model.ReturnsData{
+		DailyReturns:     []float64{},
+		MonthlyReturns:   []float64{},
+		AnnualizedReturn: 0.0,
+	}
+
+	if len(positions) == 0 {
+		return emptyReturns
+	}
+
+	// Filter only closed positions with valid P&L data
+	var closedPositions []*model.Position
+	for _, position := range positions {
+		if position.State == model.Exited && position.NetProfitLoss != nil &&
+			position.EntryTimeOrder != nil && position.ExitTimeOrder != nil {
+			closedPositions = append(closedPositions, position)
+		}
+	}
+
+	if len(closedPositions) == 0 {
+		return emptyReturns
+	}
+
+	// Group positions by day and month to calculate returns
+	dailyReturnsMap := make(map[string]float64)
+	monthlyReturnsMap := make(map[string]float64)
+
+	// Calculate daily and monthly returns based on P&L
+	for _, position := range closedPositions {
+		if position.NetProfitLoss == nil || position.ExitTimeOrder == nil {
+			continue
+		}
+
+		exitDate := position.ExitTimeOrder.Format("2006-01-02")
+		exitMonth := position.ExitTimeOrder.Format("2006-01")
+
+		// Accumulate daily returns
+		dailyReturnsMap[exitDate] += *position.NetProfitLoss
+
+		// Accumulate monthly returns
+		monthlyReturnsMap[exitMonth] += *position.NetProfitLoss
+	}
+
+	// Convert maps to sorted arrays
+	var dailyReturns []float64
+	var monthlyReturns []float64
+
+	// Extract daily returns values (sorted by date would be ideal, but for now just extract values)
+	for _, dailyReturn := range dailyReturnsMap {
+		dailyReturns = append(dailyReturns, dailyReturn)
+	}
+
+	// Extract monthly returns values
+	for _, monthlyReturn := range monthlyReturnsMap {
+		monthlyReturns = append(monthlyReturns, monthlyReturn)
+	}
+
+	// Calculate annualized return based on monthly returns
+	var annualizedReturn float64
+	if len(monthlyReturns) > 0 {
+		// Calculate total return from monthly data
+		totalReturn := 0.0
+		for _, monthlyReturn := range monthlyReturns {
+			totalReturn += monthlyReturn
+		}
+
+		// Calculate average monthly return
+		avgMonthlyReturn := totalReturn / float64(len(monthlyReturns))
+
+		// Annualized return = average monthly return * 12
+		// This is a simplified calculation - in practice you'd want compound returns
+		annualizedReturn = avgMonthlyReturn * 12
+	}
+
+	return model.ReturnsData{
+		DailyReturns:     dailyReturns,
+		MonthlyReturns:   monthlyReturns,
+		AnnualizedReturn: annualizedReturn,
+	}
+}
+
+func (e *BacktestEngine) calculateMaxDrawdownWithDuration(positions []*model.Position, initialCapital float64) model.DrawdownResult {
+	if len(positions) == 0 {
+		return model.DrawdownResult{MaxDrawdown: 0.0, MaxDrawdownDuration: 0.0}
+	}
+
+	// Filter only exited positions and sort by exit time
+	var exitedPositions []*model.Position
+	for _, position := range positions {
+		if position.State == model.Exited && position.NetProfitLoss != nil && position.ExitTimeOrder != nil {
+			exitedPositions = append(exitedPositions, position)
+		}
+	}
+
+	if len(exitedPositions) == 0 {
+		return model.DrawdownResult{MaxDrawdown: 0.0, MaxDrawdownDuration: 0.0}
+	}
+
+	// Sort positions by exit time to ensure chronological order
+	// Using a simple bubble sort for now - could optimize if needed
+	for i := 0; i < len(exitedPositions)-1; i++ {
+		for j := 0; j < len(exitedPositions)-i-1; j++ {
+			if exitedPositions[j].ExitTimeOrder.After(*exitedPositions[j+1].ExitTimeOrder) {
+				exitedPositions[j], exitedPositions[j+1] = exitedPositions[j+1], exitedPositions[j]
+			}
+		}
+	}
+
+	// Calculate cumulative equity curve and track drawdowns
+	cumulativeEquity := initialCapital
+	runningPeak := initialCapital
+	maxDrawdown := 0.0
+	maxDrawdownDuration := 0.0
+
+	// Variables to track current drawdown period
+	var drawdownStartTime *time.Time
+	currentDrawdownDuration := 0.0
+
+	// Process each position to build cumulative equity curve
+	for _, position := range exitedPositions {
+		// Add position's P&L to cumulative equity
+		cumulativeEquity += *position.NetProfitLoss
+
+		// Check if we're at a new peak
+		if cumulativeEquity > runningPeak {
+			// If we were in a drawdown period, calculate its duration
+			if drawdownStartTime != nil {
+				currentDrawdownDuration = position.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
+				if currentDrawdownDuration > maxDrawdownDuration {
+					maxDrawdownDuration = currentDrawdownDuration
+				}
+				// Reset drawdown tracking since we reached a new peak
+				drawdownStartTime = nil
+			}
+			runningPeak = cumulativeEquity
+		} else if cumulativeEquity < runningPeak {
+			// We're in a drawdown
+			if drawdownStartTime == nil {
+				// This is the start of a new drawdown period
+				drawdownStartTime = position.ExitTimeOrder
+			}
+			// Calculate current drawdown percentage
+			if runningPeak > 0 {
+				drawdown := (runningPeak - cumulativeEquity) / runningPeak
+				if drawdown > maxDrawdown {
+					maxDrawdown = drawdown
+				}
+			}
+		}
+	}
+
+	// Handle case where the backtest ends in a drawdown
+	if drawdownStartTime != nil && len(exitedPositions) > 0 {
+		lastPosition := exitedPositions[len(exitedPositions)-1]
+		currentDrawdownDuration = lastPosition.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
+		if currentDrawdownDuration > maxDrawdownDuration {
+			maxDrawdownDuration = currentDrawdownDuration
+		}
+	}
+
+	return model.DrawdownResult{
+		MaxDrawdown:         maxDrawdown * 100.0, // Return as percentage
+		MaxDrawdownDuration: maxDrawdownDuration,
+	}
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
