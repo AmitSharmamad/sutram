@@ -580,7 +580,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
 				// Extract time of day from the current candle timestamp
-
 				currentTime := currentTimestamp
 				currentTimeOfDay := time.Date(0, 1, 1,
 					currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
@@ -597,7 +596,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					}
 				}
 
-				if canCheckEntryCondition && strategy.EntryEndTime != nil {
+				if strategy.EntryEndTime != nil {
 					// Extract time component from EntryEndTime
 					entryEndTimeOfDay := time.Date(0, 1, 1,
 						strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
