@@ -816,7 +816,95 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	// Calculate metrics
 	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
 
-	// Calculate and log function execution time
+	// Calculate capital progression over each position
+	// Assume initial capital is 0 for simplicity as mentioned in the comment
+	currentCapital := 0.0
+	var capitalProgression []interface{}
+
+	// Sort positions by exit time to ensure chronological order
+	sortedPositions := make([]*model.Position, len(positions))
+	copy(sortedPositions, positions)
+
+	// Simple bubble sort by exit time (optimize if needed for large position counts)
+	for i := 0; i < len(sortedPositions)-1; i++ {
+		for j := 0; j < len(sortedPositions)-i-1; j++ {
+			pos1 := sortedPositions[j]
+			pos2 := sortedPositions[j+1]
+
+			// Handle nil exit times by putting them at the end
+			if pos1.ExitTimeOrder == nil {
+				continue
+			}
+			if pos2.ExitTimeOrder == nil {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+				continue
+			}
+
+			if pos1.ExitTimeOrder.After(*pos2.ExitTimeOrder) {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+			}
+		}
+	}
+
+	// Calculate capital progression for each position
+	for i, position := range sortedPositions {
+		if position.NetProfitLoss != nil {
+			// Add the position's P&L to current capital
+			currentCapital += *position.NetProfitLoss
+
+			// Create capital progression entry
+			progressionEntry := map[string]interface{}{
+				"position_index":  i + 1,
+				"position_id":     position.ID.String(),
+				"entry_time":      position.EntryTimeSignal,
+				"exit_time":       position.ExitTimeOrder,
+				"net_profit_loss": *position.NetProfitLoss,
+				"capital_before":  currentCapital - *position.NetProfitLoss,
+				"capital_after":   currentCapital,
+				"capital_change":  *position.NetProfitLoss,
+				"direction":       string(position.Direction),
+				"position_size":   position.PositionSize,
+			}
+
+			// Add entry price if available
+			if position.EntryPriceOrder != nil {
+				progressionEntry["entry_price"] = *position.EntryPriceOrder
+			}
+
+			// Add exit price if available
+			if position.ExitPriceOrder != nil {
+				progressionEntry["exit_price"] = *position.ExitPriceOrder
+			}
+
+			// Add exit reason if available
+			if position.ExitReason != nil {
+				progressionEntry["exit_reason"] = *position.ExitReason
+			}
+
+			capitalProgression = append(capitalProgression, progressionEntry)
+		}
+	}
+
+	// Set capital progression in the metrics
+	if metrics != nil {
+		metrics.SetCapitalProgression(capitalProgression)
+
+		// Get existing metric data or create new
+		var existingData map[string]interface{}
+		if err := metrics.GetMetricData(&existingData); err != nil || existingData == nil {
+			existingData = make(map[string]interface{})
+		}
+
+		// Add capital progression data to MetricJSON for backwards compatibility
+		existingData["capital_progression"] = capitalProgression
+		existingData["final_capital"] = currentCapital
+		existingData["total_capital_change"] = currentCapital
+		existingData["positions_count"] = len(capitalProgression)
+
+		// Update the metric JSON
+		metrics.SetMetricData(existingData)
+	}
+
 	functionEndTime := time.Now()
 	executionDuration := functionEndTime.Sub(functionStartTime)
 
