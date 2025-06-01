@@ -15,6 +15,7 @@ import (
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyService "algo/internal/modules/strategy/application/service"
 	strategyModel "algo/internal/modules/strategy/domain/model"
+	mathUtil "algo/internal/util/math"
 
 	"github.com/google/uuid"
 )
@@ -1227,7 +1228,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	if totalTrades > 0 {
 		// Calculate win rate as decimal (0.0 to 1.0) to match API documentation examples
 		winRate := float64(winningTrades) / float64(totalTrades)
-		metrics.WinRate = e.clampFloat(winRate, 0.0, 1.0)
+		metrics.WinRate = mathUtil.ClampFloat(winRate, 0.0, 1.0)
 	}
 
 	// Calculate profit factor
@@ -1235,7 +1236,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	if totalLossAmount != 0 {
 		profitFactor = totalWinAmount / math.Abs(totalLossAmount)
 		// Clamp profit factor to fit in database DECIMAL(10, 4)
-		profitFactor = e.clampFloat(profitFactor, -9999.9999, 9999.9999)
+		profitFactor = mathUtil.ClampFloat(profitFactor, -9999.9999, 9999.9999)
 	}
 	metrics.ProfitFactor = &profitFactor
 
@@ -1244,7 +1245,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	if winningTrades > 0 {
 		avgWinSize = totalWinAmount / float64(winningTrades)
 		// Clamp to fit in database DECIMAL(18, 8)
-		avgWinSize = e.clampFloat(avgWinSize, -9999999999.99999999, 9999999999.99999999)
+		avgWinSize = mathUtil.ClampFloat(avgWinSize, -9999999999.99999999, 9999999999.99999999)
 	}
 	metrics.AvgWinSize = &avgWinSize
 
@@ -1252,7 +1253,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	if losingTrades > 0 {
 		avgLossSize = totalLossAmount / float64(losingTrades)
 		// Clamp to fit in database DECIMAL(18, 8)
-		avgLossSize = e.clampFloat(avgLossSize, -9999999999.99999999, 9999999999.99999999)
+		avgLossSize = mathUtil.ClampFloat(avgLossSize, -9999999999.99999999, 9999999999.99999999)
 	}
 	metrics.AvgLossSize = &avgLossSize
 
@@ -1264,7 +1265,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 		metrics.TransactionCostsPct = 0.0
 
 		totalReturnPct := (finalCapital - initialCapital) / initialCapital * 100
-		metrics.TotalReturnPct = e.clampFloat(totalReturnPct, -9999.9999, 9999.9999)
+		metrics.TotalReturnPct = mathUtil.ClampFloat(totalReturnPct, -9999.9999, 9999.9999)
 	}
 
 	// Calculate duration-based metrics
@@ -1283,7 +1284,7 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	if count > 0 {
 		avgTradeDuration := totalDurationSeconds / float64(count) / 3600 // Convert to hours
 		// Clamp to fit in database DECIMAL(10, 4)
-		avgTradeDuration = e.clampFloat(avgTradeDuration, -9999.9999, 9999.9999)
+		avgTradeDuration = mathUtil.ClampFloat(avgTradeDuration, -9999.9999, 9999.9999)
 		metrics.AvgTradeDuration = &avgTradeDuration
 	}
 
@@ -1332,17 +1333,6 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	return metrics
 }
 
-// clampFloat restricts a float value to be within the specified range
-func (e *BacktestEngine) clampFloat(value, min, max float64) float64 {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}
-
 // calculateAvgPositionSize calculates the average position size from all positions
 func (e *BacktestEngine) calculateAvgPositionSize(positions []*model.Position) float64 {
 	totalPositionSize := 0.0
@@ -1359,7 +1349,7 @@ func (e *BacktestEngine) calculateAvgPositionSize(positions []*model.Position) f
 	if positionCount > 0 {
 		avgPositionSize = totalPositionSize / float64(positionCount)
 		// Clamp to fit in database DECIMAL(18, 8)
-		avgPositionSize = e.clampFloat(avgPositionSize, -9999999999.99999999, 9999999999.99999999)
+		avgPositionSize = mathUtil.ClampFloat(avgPositionSize, -9999999999.99999999, 9999999999.99999999)
 	}
 
 	return avgPositionSize
@@ -1376,7 +1366,7 @@ func (e *BacktestEngine) calculateMaxPositionSize(positions []*model.Position) f
 	}
 
 	// Clamp to fit in database DECIMAL(18, 8)
-	maxPositionSize = e.clampFloat(maxPositionSize, -9999999999.99999999, 9999999999.99999999)
+	maxPositionSize = mathUtil.ClampFloat(maxPositionSize, -9999999999.99999999, 9999999999.99999999)
 	return maxPositionSize
 }
 
@@ -1399,7 +1389,7 @@ func (e *BacktestEngine) calculateAvgExposure(positions []*model.Position) float
 	if validPositionCount > 0 {
 		avgExposure = totalExposure / float64(validPositionCount)
 		// Clamp to fit in database DECIMAL(18, 8)
-		avgExposure = e.clampFloat(avgExposure, -9999999999.99999999, 9999999999.99999999)
+		avgExposure = mathUtil.ClampFloat(avgExposure, -9999999999.99999999, 9999999999.99999999)
 	}
 
 	return avgExposure
