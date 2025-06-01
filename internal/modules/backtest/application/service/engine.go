@@ -1085,68 +1085,6 @@ func (e *BacktestEngine) calculateMetrics(positions []*model.Position, initialCa
 	return e.metricsService.CalculateRunMetrics(positions, initialCapital, finalCapital, run)
 }
 
-// processSecondLevelData processes second-level data for granular exit condition checking
-func (e *BacktestEngine) processSecondLevelData(position *model.Position, strategy *strategyDto.StrategyResponse, secondLevelData []*instrumentModel.Instrument, currentTime, nextTime time.Time, evalContext *parser.EvaluationContext) bool {
-	// Find the range of second-level data within the current timeframe window
-	var relevantData []*instrumentModel.Instrument
-	for _, data := range secondLevelData {
-		if data.Timestamp.After(currentTime) && data.Timestamp.Before(nextTime) {
-			relevantData = append(relevantData, data)
-		}
-	}
-
-	if len(relevantData) == 0 {
-		return false
-	}
-
-	// Process each second-level data point
-	for i, data := range relevantData {
-		// Create data context for evaluation using available second-level data
-		// We use the toDataContext method to create a compatible StockData object
-		dataContext := e.toDataContext(relevantData[:i+1])
-		evalContext.Data = dataContext
-
-		// Check exit conditions
-		exitSignalTriggered := false
-		if strategy.ExitExpression != "" {
-			exitSignalTriggered = e.evaluateExitCondition(strategy.ExitExpression, nil)
-		}
-
-		// Check stop loss or target profit hit
-		stopLossHit := e.isStopLossTriggered(position, data)
-		targetProfitHit := e.isTargetProfitTriggered(position, strategy, data)
-
-		if exitSignalTriggered || stopLossHit || targetProfitHit {
-			// Determine exit reason
-			exitReason := "Exit signal"
-			if stopLossHit {
-				exitReason = "Stop loss"
-			} else if targetProfitHit {
-				exitReason = "Target profit"
-			}
-
-			// Calculate fees
-			exitFees := 0.0
-
-			// Close the position
-			position.Exit(
-				data.Close,
-				data.Timestamp,
-				data.Close,
-				data.Timestamp,
-				strategy.ExitExpression,
-				exitReason,
-				exitFees,
-				nil,
-			)
-
-			return true
-		}
-	}
-
-	return false
-}
-
 // createSecondLevelContext creates a data context for second-level data evaluation
 func (e *BacktestEngine) createSecondLevelContext(instruments []*instrumentModel.Instrument) map[string]interface{} {
 	if len(instruments) == 0 {
