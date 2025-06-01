@@ -657,22 +657,33 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		EntryEndTime:     strategy.EntryEndTime,
 	}
 
-	// Fetch historical data needed for strategy execution
-	historicalData, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(
+	// Calculate lookback from strategy expressions (like backtesting engine)
+	lookbackFromExpressions := s.getLookBackFromExpressions(strategyResponse)
+
+	// Fetch historical data with proper lookback period using the same method as backtesting
+	// Get lookback data (historical data before current timestamp)
+	lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
 		ctx,
 		instrumentData.ExchangeSecurityID,
-		instrumentData.Timestamp.Add(-24*time.Hour), // Look back 24 hours for indicators
 		instrumentData.Timestamp,
 		string(strategy.ChartTimeframe),
+		int(lookbackFromExpressions),
 	)
 	if err != nil {
-		fmt.Printf("Error getting historical data for instrument %d: %v\n",
+		fmt.Printf("Error getting lookback data for instrument %d: %v\n",
 			instrumentData.ExchangeSecurityID, err)
 		// Use current data point only as fallback
-		historicalData = []*instrumentModel.Instrument{instrumentData}
+		lookbackData = []*instrumentModel.Instrument{}
 	}
 
-	// Add current instrument data to the end of historical data
+	// Reverse lookback data since it comes in descending order (newest first)
+	for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+		lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+	}
+
+	// Combine lookback data with current data (lookback data first, then current data)
+	historicalData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+1)
+	historicalData = append(historicalData, lookbackData...)
 	historicalData = append(historicalData, instrumentData)
 
 	// Handle existing position first - check exit conditions
@@ -680,12 +691,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		fmt.Printf("Found existing open position %s for deployment %s\n",
 			currentPosition.ID, deployment.ID)
 
-		// Evaluate exit condition using current market data
-		exitSignal, err := s.evaluateExitCondition(strategyResponse, historicalData, currentPosition)
-		if err != nil {
-			fmt.Printf("Error evaluating exit condition: %v\n", err)
-		} else if exitSignal {
-			// Close the position
+		// Check for MIS end-of-day square-off first
+		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayHit(instrumentData) {
+			// Force close the MIS position at end of day
 			exitPrice := instrumentData.Close
 			exitTime := instrumentData.Timestamp
 
@@ -694,9 +702,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 			// Persist the position update
 			if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
-				fmt.Printf("Error updating closed position: %v\n", err)
+				fmt.Printf("Error updating closed MIS position: %v\n", err)
 			} else {
-				fmt.Printf("Closed position %s at price %.2f\n",
+				fmt.Printf("MIS EOD Square-off: Closed position %s at price %.2f\n",
 					currentPosition.ID, exitPrice)
 
 				// Log the position closure
@@ -707,6 +715,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 						"position_id": currentPosition.ID,
 						"exit_price":  exitPrice,
 						"exit_time":   exitTime,
+						"exit_reason": "EOD MIS Square-off",
 						"pnl":         currentPosition.PNL,
 					},
 				)
@@ -719,6 +728,47 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			currentPosition = nil
 			// Update the DeploymentWithStrategy's position state
 			deploymentWithStrategy.CurrentPosition = nil
+		} else {
+			// Evaluate normal exit condition using current market data
+			exitSignal, err := s.evaluateExitCondition(strategyResponse, historicalData, currentPosition)
+			if err != nil {
+				fmt.Printf("Error evaluating exit condition: %v\n", err)
+			} else if exitSignal {
+				// Close the position
+				exitPrice := instrumentData.Close
+				exitTime := instrumentData.Timestamp
+
+				// Update position with exit details
+				currentPosition.ClosePosition(exitPrice, exitTime)
+
+				// Persist the position update
+				if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
+					fmt.Printf("Error updating closed position: %v\n", err)
+				} else {
+					fmt.Printf("Closed position %s at price %.2f\n",
+						currentPosition.ID, exitPrice)
+
+					// Log the position closure
+					logEntry, err := model.NewDeploymentLog(
+						deployment.ID,
+						model.StatusCompleted,
+						map[string]any{
+							"position_id": currentPosition.ID,
+							"exit_price":  exitPrice,
+							"exit_time":   exitTime,
+							"pnl":         currentPosition.PNL,
+						},
+					)
+					if err == nil {
+						s.logRepo.Create(ctx, logEntry)
+					}
+				}
+
+				// Clear current position since it's now closed
+				currentPosition = nil
+				// Update the DeploymentWithStrategy's position state
+				deploymentWithStrategy.CurrentPosition = nil
+			}
 		}
 	}
 
@@ -726,60 +776,99 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	if currentPosition == nil {
 		fmt.Printf("No open position for deployment %s, checking entry conditions\n", deployment.ID)
 
-		// Evaluate entry condition
-		dataContext := s.toDataContext(historicalData)
-		entrySignal := s.evaluateEntryCondition(strategyResponse.EntryExpression, dataContext)
-		if entrySignal {
-			// Create new position
-			entryPrice := instrumentData.Close
-			entryTime := instrumentData.Timestamp
-			quantity := s.calculatePositionSize(strategyResponse, entryPrice)
+		// Check if the current time is within the entry time window
+		// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
+		canCheckEntryCondition := true
 
-			newPosition, err := model.NewDeploymentPosition(
-				deployment.ID,
-				deployment.InstrumentID,
-				quantity,
-				entryPrice,
-				entryTime,
-				map[string]any{
-					"strategy_id": strategy.ID.String(),
-					"created_by":  "live_trading",
-					"timestamp":   time.Now().Format(time.RFC3339),
-				},
-			)
+		if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
+			// Extract time of day from the current instrument timestamp
+			currentTime := instrumentData.Timestamp
+			currentTimeOfDay := time.Date(0, 1, 1,
+				currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
 
-			if err != nil {
-				fmt.Printf("Error creating new deployment position: %v\n", err)
-			} else {
-				// Persist the new position
-				if err := s.positionRepo.Create(ctx, newPosition); err != nil {
-					fmt.Printf("Error saving new position: %v\n", err)
-				} else {
-					fmt.Printf("Created new position %s at price %.2f with quantity %.2f\n",
-						newPosition.ID, entryPrice, quantity)
+			// Check if we're within the entry time window
+			if strategy.EntryStartTime != nil {
+				// Extract time component from EntryStartTime
+				entryStartTimeOfDay := time.Date(0, 1, 1,
+					strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
+					strategy.EntryStartTime.Second(), 0, time.UTC)
 
-					// Log the position creation
-					logEntry, err := model.NewDeploymentLog(
-						deployment.ID,
-						model.StatusCreated,
-						map[string]any{
-							"position_id":   newPosition.ID,
-							"entry_price":   entryPrice,
-							"entry_time":    entryTime,
-							"quantity":      quantity,
-							"instrument_id": deployment.InstrumentID,
-						},
-					)
-					if err == nil {
-						s.logRepo.Create(ctx, logEntry)
-					}
-
-					// Set as current position for metrics calculation
-					currentPosition = newPosition
-					// Update the DeploymentWithStrategy's position state
-					deploymentWithStrategy.CurrentPosition = newPosition
+				if currentTimeOfDay.Before(entryStartTimeOfDay) {
+					canCheckEntryCondition = false
 				}
 			}
+
+			if canCheckEntryCondition && strategy.EntryEndTime != nil {
+				// Extract time component from EntryEndTime
+				entryEndTimeOfDay := time.Date(0, 1, 1,
+					strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
+					strategy.EntryEndTime.Second(), 0, time.UTC)
+
+				if currentTimeOfDay.After(entryEndTimeOfDay) {
+					canCheckEntryCondition = false
+				}
+			}
+		}
+
+		// Only check entry conditions if we're within the allowed entry time window
+		if canCheckEntryCondition {
+			// Evaluate entry condition
+			dataContext := s.toDataContext(historicalData)
+			entrySignal := s.evaluateEntryCondition(strategyResponse.EntryExpression, dataContext)
+			if entrySignal {
+				// Create new position
+				entryPrice := instrumentData.Close
+				entryTime := instrumentData.Timestamp
+				quantity := s.calculatePositionSize(strategyResponse, entryPrice)
+
+				newPosition, err := model.NewDeploymentPosition(
+					deployment.ID,
+					deployment.InstrumentID,
+					quantity,
+					entryPrice,
+					entryTime,
+					map[string]any{
+						"strategy_id": strategy.ID.String(),
+						"created_by":  "live_trading",
+						"timestamp":   time.Now().Format(time.RFC3339),
+					},
+				)
+
+				if err != nil {
+					fmt.Printf("Error creating new deployment position: %v\n", err)
+				} else {
+					// Persist the new position
+					if err := s.positionRepo.Create(ctx, newPosition); err != nil {
+						fmt.Printf("Error saving new position: %v\n", err)
+					} else {
+						fmt.Printf("Created new position %s at price %.2f with quantity %.2f\n",
+							newPosition.ID, entryPrice, quantity)
+
+						// Log the position creation
+						logEntry, err := model.NewDeploymentLog(
+							deployment.ID,
+							model.StatusCreated,
+							map[string]any{
+								"position_id":   newPosition.ID,
+								"entry_price":   entryPrice,
+								"entry_time":    entryTime,
+								"quantity":      quantity,
+								"instrument_id": deployment.InstrumentID,
+							},
+						)
+						if err == nil {
+							s.logRepo.Create(ctx, logEntry)
+						}
+
+						// Set as current position for metrics calculation
+						currentPosition = newPosition
+						// Update the DeploymentWithStrategy's position state
+						deploymentWithStrategy.CurrentPosition = newPosition
+					}
+				}
+			}
+		} else {
+			fmt.Printf("Entry time window check failed for deployment %s - outside allowed entry time\n", deployment.ID)
 		}
 	}
 
@@ -929,7 +1018,8 @@ func (s *deploymentService) calculateDeploymentMetrics(ctx context.Context, depl
 	}
 
 	if totalTrades > 0 {
-		winRate := float64(winningTrades) / float64(totalTrades) * 100
+		// Calculate win rate as decimal (0.0 to 1.0) to match API documentation
+		winRate := float64(winningTrades) / float64(totalTrades)
 		metrics.WinRate = winRate
 
 		// Calculate total return percentage (simplified)
@@ -1073,4 +1163,81 @@ func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID 
 	}
 
 	return response, nil
+}
+
+// getLookBackFromExpressions calculates the maximum lookback period required for strategy expressions
+func (s *deploymentService) getLookBackFromExpressions(strategy *strategyDto.StrategyResponse) int64 {
+	entryLookBack := s.getMaxLookback(strategy.EntryExpression)
+
+	exitLookBack := int64(0)
+	if strategy.ExitExpression != "" {
+		exitLookBack = s.getMaxLookback(strategy.ExitExpression)
+	}
+
+	lookBack := max(entryLookBack, exitLookBack)
+
+	return lookBack
+}
+
+// getMaxLookback extracts indicators from the expression and returns the maximum lookback period required
+func (s *deploymentService) getMaxLookback(expression string) int64 {
+	// Extract all indicators from the expression
+	indicators, err := parser.ExtractIndicators(expression)
+	if err != nil {
+		fmt.Printf("Error extracting indicators from expression: %v\n", err)
+		return 20 // Return a default lookback if there's an error
+	}
+
+	maxLookback := int64(0)
+
+	// Iterate through all indicators and find the maximum lookback
+	for _, indicator := range indicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		if calculator != nil {
+			lookback := calculator.GetLookBack(indicator.Arguments)
+			if lookback > maxLookback {
+				maxLookback = lookback
+			}
+		}
+	}
+
+	// Return at least 20 as minimum lookback if no indicators found or all have 0 lookback
+	if maxLookback < 20 {
+		maxLookback = 20
+	}
+
+	return maxLookback
+}
+
+// isMISEndOfDayHit checks if the current time is at or after the MIS end-of-day cutoff time
+func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) bool {
+	// NOTE: MIS close is 15 minutes prior to market close
+	exchange := "NSE"
+	endHour := 15
+	endMinute := 15
+
+	if exchange == "MCX" {
+		// MCX has different timings, so we need to adjust accordingly
+		// MCX trading ends at 11:30 PM IST
+		endHour = 23
+		endMinute = 30
+	}
+
+	// Extract the time from the data timestamp
+	currentTime := data.Timestamp
+
+	// Create a time representing 3:15 PM on the same date
+	eodTime := time.Date(
+		currentTime.Year(),
+		currentTime.Month(),
+		currentTime.Day(),
+		endHour,   // 3 PM (24-hour format)
+		endMinute, // 15 minutes
+		0,         // 0 seconds
+		0,         // 0 nanoseconds
+		currentTime.Location(),
+	)
+
+	// Return true if current time is at or after 3:15 PM
+	return currentTime.Equal(eodTime) || currentTime.After(eodTime)
 }

@@ -86,3 +86,12 @@ sync:
 	git push
 
 # ---------------------------------------------------------- #
+
+git:
+	cd ~/workspace/sutram
+	sudo lsof -i :9090 -t | xargs sudo kill -9
+	git pull --rebase
+
+	cd ~/workspace/mukham
+	sudo lsof -i :3000 -t | xargs sudo kill -9
+	git pull --rebase

@@ -808,5 +808,8 @@ func (s *backtestService) runMetricsToDTO(metrics *model.RunMetrics) *dto.RunMet
 		metricsDTO.AvgExposure = *metrics.AvgExposure
 	}
 
+	// Copy capital progression directly from domain model to DTO
+	metricsDTO.CapitalProgression = metrics.CapitalProgression
+
 	return metricsDTO
 }
