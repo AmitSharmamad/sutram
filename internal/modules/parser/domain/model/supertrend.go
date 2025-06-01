@@ -90,21 +90,21 @@ func (indicator *Supertrend) Calculate(
 	indicator.multiplier = multiplier
 	indicator.offset = offset
 
-	highs := GetPrices(*ctx.Data, "high")
-	lows := GetPrices(*ctx.Data, "low")
-	closes := GetPrices(*ctx.Data, "close")
+	highs := GetPrices(*ctx.Data, "HIGH")
+	lows := GetPrices(*ctx.Data, "LOW")
+	closes := GetPrices(*ctx.Data, "CLOSE")
 
 	// Check if we have enough data points
 	if len(highs) < period+offset || len(lows) < period+offset || len(closes) < period+offset {
 		return 0.0
 	}
 
-	highs, lows, closes = indicator.sliceAllData(highs, lows, closes)
+	// highs, lows, closes = indicator.sliceAllData(highs, lows, closes)
 
 	// Need at least period+1 data points to calculate Supertrend properly
-	if len(highs) <= period || len(lows) <= period || len(closes) <= period {
-		return 0.0
-	}
+	// if len(highs) <= period || len(lows) <= period || len(closes) <= period {
+	// 	return 0.0
+	// }
 
 	// Calculate Supertrend from scratch
 	return indicator.calculateSupertrend(highs, lows, closes)
@@ -253,6 +253,7 @@ func (indicator *Supertrend) GetLookBack(config []any) int64 {
 }
 
 // CalculateAll calculates Supertrend values for all data points
+// Following Excel flow: TR -> ATR -> Basic Bands -> Supertrend with Trend logic
 func (indicator *Supertrend) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
@@ -267,31 +268,107 @@ func (indicator *Supertrend) CalculateAll(
 	indicator.offset = offset
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
+	dataLen := len(stockData)
 
-	// Need enough data for calculation
-	minDataPoints := 2*period + 1 + offset
-	if len(stockData) < minDataPoints {
+	// Need enough data for calculation (period + 1 for initial ATR)
+	if dataLen < period+1 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Extract price arrays
+	highs := make([]float64, dataLen)
+	lows := make([]float64, dataLen)
+	closes := make([]float64, dataLen)
+
+	for i := 0; i < dataLen; i++ {
+		highs[i] = stockData[i].High
+		lows[i] = stockData[i].Low
+		closes[i] = stockData[i].Close
+	}
+
+	// Step 3: Calculate True Range (TR)
+	tr := make([]float64, dataLen)
+	for i := 1; i < dataLen; i++ {
+		// TR = MAX(High-Low, ABS(High-Previous Close), ABS(Low-Previous Close))
+		hl := highs[i] - lows[i]
+		hc := math.Abs(highs[i] - closes[i-1])
+		lc := math.Abs(lows[i] - closes[i-1])
+		tr[i] = math.Max(hl, math.Max(hc, lc))
+	}
+
+	// Step 4: Calculate ATR
+	atr := make([]float64, dataLen)
+
+	// Initial ATR after period rows (average of TR over period)
+	if period < dataLen {
+		var sumTR float64
+		for i := 1; i <= period; i++ {
+			sumTR += tr[i]
+		}
+		atr[period] = sumTR / float64(period)
+
+		// Smoothed ATR for subsequent rows: (ATR * (period-1) + TR) / period
+		for i := period + 1; i < dataLen; i++ {
+			atr[i] = (atr[i-1]*float64(period-1) + tr[i]) / float64(period)
+		}
+	}
+
+	// Step 5: Calculate Basic Upper and Lower Bands
+	upperBand := make([]float64, dataLen)
+	lowerBand := make([]float64, dataLen)
+
+	for i := 0; i < dataLen; i++ {
+		// HL2 = (High + Low) / 2
+		hl2 := (highs[i] + lows[i]) / 2.0
+
+		// Upper Band = HL2 + Multiplier * ATR
+		// Lower Band = HL2 - Multiplier * ATR
+		upperBand[i] = hl2 + multiplier*atr[i]
+		lowerBand[i] = hl2 - multiplier*atr[i]
+	}
+
+	// Step 6 & 7: Initialize Supertrend and calculate for all points
+	supertrend := make([]float64, dataLen)
+	trend := make([]int, dataLen)
+
+	// Initialize at period index
+	if period < dataLen {
+		supertrend[period] = lowerBand[period] // Initial Supertrend as Lower Band
+		trend[period] = 1                      // Assume uptrend initially
+	}
+
+	// Step 7 & 8: Calculate Supertrend and Trend for subsequent rows
+	for i := period + 1; i < dataLen; i++ {
+		// Step 7: Calculate Supertrend based on previous trend
+		if trend[i-1] == 1 {
+			// If previous trend was up, Supertrend = MAX(Lower Band, previous Supertrend)
+			supertrend[i] = math.Max(lowerBand[i], supertrend[i-1])
+		} else {
+			// If previous trend was down, Supertrend = MIN(Upper Band, previous Supertrend)
+			supertrend[i] = math.Min(upperBand[i], supertrend[i-1])
 		}
 
-		// Calculate Supertrend value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Step 8: Determine current trend
+		if closes[i] > supertrend[i-1] {
+			trend[i] = 1 // Uptrend
+		} else if closes[i] < supertrend[i-1] {
+			trend[i] = -1 // Downtrend
+		} else {
+			trend[i] = trend[i-1] // Continue previous trend
+		}
+	}
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     value,
-		})
+	// Build results starting from period index (when calculation becomes valid)
+	var results []IndicatorValues
+	for i := period; i < dataLen; i++ {
+		// Apply offset if specified
+		adjustedIndex := i + offset
+		if adjustedIndex >= 0 && adjustedIndex < dataLen {
+			results = append(results, IndicatorValues{
+				Timestamp: stockData[adjustedIndex].Timestamp,
+				Value:     util.Round(supertrend[i]),
+			})
+		}
 	}
 
 	// Filter results by startDate
