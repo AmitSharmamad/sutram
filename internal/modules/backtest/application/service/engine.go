@@ -822,29 +822,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	var capitalProgression []interface{}
 
 	// Sort positions by exit time to ensure chronological order
-	sortedPositions := make([]*model.Position, len(positions))
-	copy(sortedPositions, positions)
-
-	// Simple bubble sort by exit time (optimize if needed for large position counts)
-	for i := 0; i < len(sortedPositions)-1; i++ {
-		for j := 0; j < len(sortedPositions)-i-1; j++ {
-			pos1 := sortedPositions[j]
-			pos2 := sortedPositions[j+1]
-
-			// Handle nil exit times by putting them at the end
-			if pos1.ExitTimeOrder == nil {
-				continue
-			}
-			if pos2.ExitTimeOrder == nil {
-				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
-				continue
-			}
-
-			if pos1.ExitTimeOrder.After(*pos2.ExitTimeOrder) {
-				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
-			}
-		}
-	}
+	sortedPositions := e.sortPositionsByExitTime(positions)
 
 	// Calculate capital progression for each position
 	for i, position := range sortedPositions {
@@ -1564,6 +1542,37 @@ func (e *BacktestEngine) calculateMaxDrawdownWithDuration(positions []*model.Pos
 		MaxDrawdown:         maxDrawdown * 100.0, // Return as percentage
 		MaxDrawdownDuration: maxDrawdownDuration,
 	}
+}
+
+// sortPositionsByExitTime sorts positions chronologically by their exit time
+// Positions with nil exit times are placed at the end
+func (e *BacktestEngine) sortPositionsByExitTime(positions []*model.Position) []*model.Position {
+	// Create a copy to avoid modifying the original slice
+	sortedPositions := make([]*model.Position, len(positions))
+	copy(sortedPositions, positions)
+
+	// Simple bubble sort by exit time (optimize if needed for large position counts)
+	for i := 0; i < len(sortedPositions)-1; i++ {
+		for j := 0; j < len(sortedPositions)-i-1; j++ {
+			pos1 := sortedPositions[j]
+			pos2 := sortedPositions[j+1]
+
+			// Handle nil exit times by putting them at the end
+			if pos1.ExitTimeOrder == nil {
+				continue
+			}
+			if pos2.ExitTimeOrder == nil {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+				continue
+			}
+
+			if pos1.ExitTimeOrder.After(*pos2.ExitTimeOrder) {
+				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
+			}
+		}
+	}
+
+	return sortedPositions
 }
 
 // processSecondLevelData processes second-level data for granular exit condition checking
