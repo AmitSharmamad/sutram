@@ -12,10 +12,11 @@ import (
 
 // Module represents the broker module
 type Module struct {
-	controller          *http.BrokerController
-	dhanOrderService    *service.DhanOrderService
-	zerodhaOrderService *service.ZerodhaOrderService
-	brokerService       *service.BrokerService
+	controller           *http.BrokerController
+	dhanOrderService     *service.DhanOrderService
+	zerodhaOrderService  *service.ZerodhaOrderService
+	hdfcsecOrderService  *service.HDFCSecOrderService
+	brokerService        *service.BrokerService
 }
 
 // ProvideModule provides a wire provider set for the broker module
@@ -49,11 +50,18 @@ func (m *Module) initialize() {
 	zerodhaAPIKey := getEnv("ZERODHA_API_KEY", "")
 	zerodhaAccessToken := getEnv("ZERODHA_ACCESS_TOKEN", "")
 
+	// Get HDFC Securities API configuration from environment
+	hdfcsecBaseURL := getEnv("HDFCSEC_API_BASE_URL", "https://api.hdfcsec.com/v1")
+	hdfcsecAccessToken := getEnv("HDFCSEC_ACCESS_TOKEN", "")
+
 	// Create Dhan order service
 	m.dhanOrderService = service.NewDhanOrderService(dhanBaseURL, dhanAccessToken)
 
 	// Create Zerodha order service
 	m.zerodhaOrderService = service.NewZerodhaOrderService(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
+
+	// Create HDFC Securities order service
+	m.hdfcsecOrderService = service.NewHDFCSecOrderService(hdfcsecBaseURL, hdfcsecAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
@@ -81,6 +89,11 @@ func (m *Module) GetDhanOrderService() *service.DhanOrderService {
 // GetZerodhaOrderService returns the Zerodha order service
 func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
 	return m.zerodhaOrderService
+}
+
+// GetHDFCSecOrderService returns the HDFC Securities order service
+func (m *Module) GetHDFCSecOrderService() *service.HDFCSecOrderService {
+	return m.hdfcsecOrderService
 }
 
 // GetBrokerService returns the broker service
