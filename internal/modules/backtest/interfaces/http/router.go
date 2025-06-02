@@ -27,5 +27,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 		backtestAuth.POST("/run", controller.RunBacktest)
 		// Add Excel export endpoint
 		backtestAuth.GET("/export", controller.ExportToExcel)
+		// Add indicator export endpoint
+		backtestAuth.GET("/export/indicators", controller.ExportIndicatorsToExcel)
 	}
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -27,10 +28,18 @@ type Response struct {
 	Metrics          *model.RunMetrics                 `json:"metrics"`
 }
 
+// IndicatorValue represents a single indicator value with timestamp
+type IndicatorValue struct {
+	Timestamp time.Time `json:"timestamp"`
+	Value     float64   `json:"value"`
+}
+
 // EngineService defines the service for backtest engine operations
 type EngineService interface {
 	// Start a backtest run for the provided strategy
 	Start(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]Response, error)
+	// GetIndicatorData retrieves calculated indicator data for a strategy
+	GetIndicatorData(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (map[string]map[string][]IndicatorValue, error)
 }
 
 // BacktestEngine implements the engine for running backtests
@@ -1260,4 +1269,140 @@ func (e *BacktestEngine) findNextCandleIndex(stockData []*instrumentModel.Instru
 
 	// If no next candle is found, return the last valid index (not beyond the array)
 	return len(stockData) - 1
+}
+
+// GetIndicatorData retrieves calculated indicator data for a strategy
+func (e *BacktestEngine) GetIndicatorData(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) (map[string]map[string][]IndicatorValue, error) {
+	// Get strategy details
+	strategy, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy: %w", err)
+	}
+
+	result := make(map[string]map[string][]IndicatorValue)
+
+	// Process each instrument in the strategy
+	for _, instrumentID := range strategy.Instruments {
+		instrumentIDStr := strconv.FormatInt(int64(instrumentID), 10)
+
+		// Get instrument master for metadata
+		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
+			ctx,
+			int64(instrumentID),
+		)
+		if err != nil {
+			continue // Skip this instrument if we can't get master data
+		}
+
+		// Get historical data with lookback for proper indicator calculation
+		lookbackFromExpressions := e.getLookBackFromExpressions(strategy)
+
+		// Get lookback data (historical data before strategy start date)
+		lookbackData, err := e.instrumentService.GetInstrumentsByExchangeSecurityIDWithLookback(
+			ctx,
+			instrumentMaster.ExchangeSecurityID,
+			*strategy.StartDate,
+			string(strategy.ChartTimeframe),
+			int(lookbackFromExpressions),
+		)
+		if err != nil {
+			// Continue with empty lookback if error
+			lookbackData = []*instrumentModel.Instrument{}
+		}
+
+		// Get main data for the strategy period
+		timeFrameData, err := e.instrumentService.GetInstrumentsByTimeRange(
+			ctx,
+			instrumentMaster.ExchangeSecurityID,
+			*strategy.StartDate,
+			*strategy.EndDate,
+			string(strategy.ChartTimeframe),
+		)
+		if err != nil {
+			continue // Skip this instrument if data fetch fails
+		}
+
+		// Combine lookback data with main data
+		// Reverse lookback data since it comes in descending order (newest first)
+		for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+			lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+		}
+
+		// Combine lookback and main data
+		allData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+len(timeFrameData))
+		allData = append(allData, lookbackData...)
+		allData = append(allData, timeFrameData...)
+
+		// Set up evaluation context
+		evalContext := parser.NewEvaluationContext(nil)
+		evalContext.Strategy = strategy
+		evalContext.Data = e.toDataContext(allData)
+
+		// Extract indicators from both entry and exit expressions
+		entryIndicators, err := parser.ExtractIndicators(strategy.EntryExpression)
+		if err != nil {
+			continue
+		}
+
+		var exitIndicators []parser.IndicatorInfo
+		if strategy.ExitExpression != "" {
+			exitIndicators, err = parser.ExtractIndicators(strategy.ExitExpression)
+			if err != nil {
+				exitIndicators = []parser.IndicatorInfo{}
+			}
+		}
+
+		// Add basic OHLCV indicators explicitly
+		basicIndicators := []parser.IndicatorInfo{
+			{Name: "OPEN", Arguments: []any{0.0}},
+			{Name: "HIGH", Arguments: []any{0.0}},
+			{Name: "LOW", Arguments: []any{0.0}},
+			{Name: "CLOSE", Arguments: []any{0.0}},
+			{Name: "VOLUME", Arguments: []any{0.0}},
+		}
+
+		// Combine all indicators
+		allIndicators := append(basicIndicators, entryIndicators...)
+		allIndicators = append(allIndicators, exitIndicators...)
+
+		// Calculate indicators
+		indicatorMap := make(map[string][]IndicatorValue)
+		calculatedKeys := make(map[string]bool) // Track calculated indicators to avoid duplicates
+
+		for _, indicator := range allIndicators {
+			calculator := parser.GetIndFactory(indicator.Name)
+			if calculator == nil {
+				continue
+			}
+
+			uniqueKey, err := calculator.GenerateIndicatorKey(indicator.Arguments, evalContext)
+			if err != nil {
+				continue
+			}
+
+			// Skip if already calculated
+			if calculatedKeys[uniqueKey] {
+				continue
+			}
+			calculatedKeys[uniqueKey] = true
+
+			// Calculate indicator values
+			indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, *strategy.StartDate)
+
+			// Convert to IndicatorValue format
+			var convertedValues []IndicatorValue
+			for _, val := range indicatorValues {
+				convertedValues = append(convertedValues, IndicatorValue{
+					Timestamp: val.Timestamp,
+					Value:     val.Value,
+				})
+			}
+
+			indicatorMap[uniqueKey] = convertedValues
+		}
+
+		result[instrumentIDStr] = indicatorMap
+	}
+
+	return result, nil
 }
