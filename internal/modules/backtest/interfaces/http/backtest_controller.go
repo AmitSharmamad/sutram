@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 )
 
 // BacktestEvent represents an event sent via Server-Sent Events during backtest execution
@@ -175,4 +176,224 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 			return false // Client disconnected
 		}
 	})
+}
+
+// ExportToExcel handles the export backtest data to Excel endpoint
+func (c *BacktestController) ExportToExcel(ctx *gin.Context) {
+	// Get strategy ID from query parameter
+	strategyIDStr := ctx.Query("strategy_id")
+	if strategyIDStr == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "strategy_id query parameter is required",
+		})
+		return
+	}
+
+	// Parse strategy ID
+	strategyID, err := uuid.Parse(strategyIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid strategy_id format",
+		})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userIDValue, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	userID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Invalid user ID format",
+		})
+		return
+	}
+
+	// Get backtest data from engine service
+	response, err := c.engineService.Start(ctx, strategyID, userID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve backtest data: " + err.Error(),
+		})
+		return
+	}
+
+	// Generate Excel file
+	excelFile, err := c.generateExcelFile(response)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate Excel file: " + err.Error(),
+		})
+		return
+	}
+
+	// Generate filename with timestamp
+	filename := fmt.Sprintf("backtest_results_%s_%s.xlsx",
+		strategyIDStr,
+		time.Now().Format("20060102_150405"))
+
+	// Set response headers for file download
+	ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	// Write Excel file to response
+	if err := excelFile.Write(ctx.Writer); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to write Excel file: " + err.Error(),
+		})
+		return
+	}
+}
+
+// generateExcelFile creates an Excel file from backtest data
+func (c *BacktestController) generateExcelFile(responses []service.Response) (*excelize.File, error) {
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	// Create style for headers
+	headerStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+		Fill: excelize.Fill{
+			Type:    "pattern",
+			Color:   []string{"#D3D3D3"},
+			Pattern: 1,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for i, response := range responses {
+		sheetName := fmt.Sprintf("Backtest_%d", i+1)
+
+		// Create new sheet for each response (if multiple instruments)
+		if i > 0 {
+			index, err := f.NewSheet(sheetName)
+			if err != nil {
+				return nil, err
+			}
+			f.SetActiveSheet(index)
+		} else {
+			// Rename the default sheet
+			f.SetSheetName("Sheet1", sheetName)
+		}
+
+		// Add instrument information
+		if response.InstrumentMaster != nil {
+			f.SetCellValue(sheetName, "A1", "Instrument Information")
+			f.SetCellStyle(sheetName, "A1", "A1", headerStyle)
+			f.SetCellValue(sheetName, "A2", "Symbol")
+			f.SetCellValue(sheetName, "B2", response.InstrumentMaster.Symbol)
+			f.SetCellValue(sheetName, "A3", "Exchange")
+			f.SetCellValue(sheetName, "B3", response.InstrumentMaster.Exchange)
+			f.SetCellValue(sheetName, "A4", "Instrument ID")
+			f.SetCellValue(sheetName, "B4", response.InstrumentID)
+		}
+
+		// Add positions table
+		if len(response.Positions) > 0 {
+			startRow := 6
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow), "Positions")
+			f.SetCellStyle(sheetName, fmt.Sprintf("A%d", startRow), fmt.Sprintf("A%d", startRow), headerStyle)
+
+			// Position headers
+			headerRow := startRow + 1
+			headers := []string{
+				"Position ID", "State", "Direction", "Entry Signal", "Entry Time Signal",
+				"Entry Price Signal", "Exit Signal", "Exit Time Signal", "Exit Price Signal",
+				"P&L Absolute", "P&L Percentage", "Position Size", "Transaction Cost",
+				"Entry Fees", "Exit Fees", "Net P&L",
+			}
+
+			for j, header := range headers {
+				col := string(rune('A' + j))
+				f.SetCellValue(sheetName, fmt.Sprintf("%s%d", col, headerRow), header)
+				f.SetCellStyle(sheetName, fmt.Sprintf("%s%d", col, headerRow), fmt.Sprintf("%s%d", col, headerRow), headerStyle)
+			}
+
+			// Position data
+			for k, position := range response.Positions {
+				row := headerRow + 1 + k
+				f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), position.ID.String())
+				f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), string(position.State))
+				f.SetCellValue(sheetName, fmt.Sprintf("C%d", row), string(position.Direction))
+				f.SetCellValue(sheetName, fmt.Sprintf("D%d", row), position.EntrySignal)
+				f.SetCellValue(sheetName, fmt.Sprintf("E%d", row), position.EntryTimeSignal.Format("2006-01-02 15:04:05"))
+				f.SetCellValue(sheetName, fmt.Sprintf("F%d", row), position.EntryPriceSignal)
+				f.SetCellValue(sheetName, fmt.Sprintf("G%d", row), position.ExitSignal)
+				if !position.ExitTimeSignal.IsZero() {
+					f.SetCellValue(sheetName, fmt.Sprintf("H%d", row), position.ExitTimeSignal.Format("2006-01-02 15:04:05"))
+				}
+				f.SetCellValue(sheetName, fmt.Sprintf("I%d", row), position.ExitPriceSignal)
+				f.SetCellValue(sheetName, fmt.Sprintf("J%d", row), position.ProfitLossAbsolute)
+				f.SetCellValue(sheetName, fmt.Sprintf("K%d", row), position.ProfitLossPercentage)
+				f.SetCellValue(sheetName, fmt.Sprintf("L%d", row), position.PositionSize)
+				f.SetCellValue(sheetName, fmt.Sprintf("M%d", row), position.TransactionCost)
+				f.SetCellValue(sheetName, fmt.Sprintf("N%d", row), position.EntryFees)
+				f.SetCellValue(sheetName, fmt.Sprintf("O%d", row), position.ExitFees)
+				f.SetCellValue(sheetName, fmt.Sprintf("P%d", row), position.NetProfitLoss)
+			}
+		}
+
+		// Add metrics table
+		if response.Metrics != nil {
+			metricsStartRow := 6 + len(response.Positions) + 4
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", metricsStartRow), "Performance Metrics")
+			f.SetCellStyle(sheetName, fmt.Sprintf("A%d", metricsStartRow), fmt.Sprintf("A%d", metricsStartRow), headerStyle)
+
+			metricsData := [][]interface{}{
+				{"Total Return %", response.Metrics.TotalReturnPct},
+				{"Annualized Return", response.Metrics.AnnualizedReturn},
+				{"Risk Adjusted Return", response.Metrics.RiskAdjustedReturn},
+				{"Sharpe Ratio", response.Metrics.SharpeRatio},
+				{"Sortino Ratio", response.Metrics.SortinoRatio},
+				{"Max Drawdown", response.Metrics.MaxDrawdown},
+				{"Max Drawdown Duration", response.Metrics.MaxDrawdownDuration},
+				{"Value at Risk", response.Metrics.ValueAtRisk},
+				{"Standard Deviation", response.Metrics.StdDeviation},
+				{"Downside Deviation", response.Metrics.DownsideDeviation},
+				{"Total Trades", response.Metrics.TotalTrades},
+				{"Win Rate", response.Metrics.WinRate},
+				{"Average Win Size", response.Metrics.AvgWinSize},
+				{"Average Loss Size", response.Metrics.AvgLossSize},
+				{"Average Trade Duration", response.Metrics.AvgTradeDuration},
+				{"Profit Factor", response.Metrics.ProfitFactor},
+				{"Average Position Size", response.Metrics.AvgPositionSize},
+				{"Max Position Size", response.Metrics.MaxPositionSize},
+				{"Position Turnover", response.Metrics.PositionTurnover},
+				{"Average Exposure", response.Metrics.AvgExposure},
+				{"Total Commission", response.Metrics.TotalCommission},
+				{"Total Slippage", response.Metrics.TotalSlippage},
+				{"Transaction Costs %", response.Metrics.TransactionCostsPct},
+			}
+
+			for j, metric := range metricsData {
+				row := metricsStartRow + 1 + j
+				f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), metric[0])
+				f.SetCellValue(sheetName, fmt.Sprintf("B%d", row), metric[1])
+			}
+		}
+
+		// Auto-fit columns
+		cols := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"}
+		for _, col := range cols {
+			if err := f.SetColWidth(sheetName, col, col, 15); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return f, nil
 }
