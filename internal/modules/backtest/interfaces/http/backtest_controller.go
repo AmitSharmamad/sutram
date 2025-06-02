@@ -251,6 +251,79 @@ func (c *BacktestController) ExportToExcel(ctx *gin.Context) {
 	}
 }
 
+// ExportIndicatorsToExcel handles the export indicator values to Excel endpoint
+func (c *BacktestController) ExportIndicatorsToExcel(ctx *gin.Context) {
+	// Get strategy ID from query parameter
+	strategyIDStr := ctx.Query("strategy_id")
+	if strategyIDStr == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "strategy_id query parameter is required",
+		})
+		return
+	}
+
+	// Parse strategy ID
+	strategyID, err := uuid.Parse(strategyIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid strategy_id format",
+		})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userIDValue, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not authenticated",
+		})
+		return
+	}
+
+	userID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Invalid user ID format",
+		})
+		return
+	}
+
+	// Get indicator data from engine service
+	indicatorData, err := c.engineService.GetIndicatorData(ctx, strategyID, userID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve indicator data: " + err.Error(),
+		})
+		return
+	}
+
+	// Generate Excel file with indicator data
+	excelFile, err := c.generateIndicatorExcelFile(indicatorData)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate Excel file: " + err.Error(),
+		})
+		return
+	}
+
+	// Generate filename with timestamp
+	filename := fmt.Sprintf("indicator_data_%s_%s.xlsx",
+		strategyIDStr,
+		time.Now().Format("20060102_150405"))
+
+	// Set response headers for file download
+	ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	// Write Excel file to response
+	if err := excelFile.Write(ctx.Writer); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to write Excel file: " + err.Error(),
+		})
+		return
+	}
+}
+
 // generateExcelFile creates an Excel file from backtest data
 func (c *BacktestController) generateExcelFile(responses []service.Response) (*excelize.File, error) {
 	f := excelize.NewFile()
@@ -393,6 +466,122 @@ func (c *BacktestController) generateExcelFile(responses []service.Response) (*e
 				return nil, err
 			}
 		}
+	}
+
+	return f, nil
+}
+
+// generateIndicatorExcelFile creates an Excel file from indicator data
+func (c *BacktestController) generateIndicatorExcelFile(indicatorData map[string]map[string][]service.IndicatorValue) (*excelize.File, error) {
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	// Create style for headers
+	headerStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+		Fill: excelize.Fill{
+			Type:    "pattern",
+			Color:   []string{"#D3D3D3"},
+			Pattern: 1,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sheetIndex := 0
+	for instrumentID, indicators := range indicatorData {
+		sheetName := fmt.Sprintf("Instrument_%s", instrumentID)
+
+		// Create new sheet for each instrument
+		if sheetIndex > 0 {
+			index, err := f.NewSheet(sheetName)
+			if err != nil {
+				return nil, err
+			}
+			f.SetActiveSheet(index)
+		} else {
+			// Rename the default sheet
+			f.SetSheetName("Sheet1", sheetName)
+		}
+
+		// Collect all unique timestamps across all indicators for this instrument
+		timestampSet := make(map[time.Time]bool)
+		for _, values := range indicators {
+			for _, val := range values {
+				timestampSet[val.Timestamp] = true
+			}
+		}
+
+		// Convert to sorted slice
+		timestamps := make([]time.Time, 0, len(timestampSet))
+		for ts := range timestampSet {
+			timestamps = append(timestamps, ts)
+		}
+
+		// Sort timestamps
+		for i := 0; i < len(timestamps)-1; i++ {
+			for j := i + 1; j < len(timestamps); j++ {
+				if timestamps[i].After(timestamps[j]) {
+					timestamps[i], timestamps[j] = timestamps[j], timestamps[i]
+				}
+			}
+		}
+
+		// Create headers: Timestamp + indicator names
+		headers := []string{"Timestamp"}
+		indicatorNames := make([]string, 0, len(indicators))
+		for indicatorName := range indicators {
+			headers = append(headers, indicatorName)
+			indicatorNames = append(indicatorNames, indicatorName)
+		}
+
+		// Write headers
+		for i, header := range headers {
+			col := string(rune('A' + i))
+			f.SetCellValue(sheetName, fmt.Sprintf("%s1", col), header)
+			f.SetCellStyle(sheetName, fmt.Sprintf("%s1", col), fmt.Sprintf("%s1", col), headerStyle)
+		}
+
+		// Write data rows
+		for rowIndex, timestamp := range timestamps {
+			row := rowIndex + 2 // Start from row 2 (after header)
+
+			// Write timestamp
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", row), timestamp.Format("2006-01-02 15:04:05"))
+
+			// Write indicator values
+			for colIndex, indicatorName := range indicatorNames {
+				col := string(rune('B' + colIndex)) // Start from column B
+
+				// Find the value for this timestamp and indicator
+				var value interface{} = ""
+				for _, val := range indicators[indicatorName] {
+					if val.Timestamp.Equal(timestamp) {
+						value = val.Value
+						break
+					}
+				}
+
+				f.SetCellValue(sheetName, fmt.Sprintf("%s%d", col, row), value)
+			}
+		}
+
+		// Auto-fit columns
+		for i := 0; i < len(headers); i++ {
+			col := string(rune('A' + i))
+			if err := f.SetColWidth(sheetName, col, col, 20); err != nil {
+				return nil, err
+			}
+		}
+
+		sheetIndex++
 	}
 
 	return f, nil
