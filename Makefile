@@ -52,6 +52,8 @@ web:
 	@echo "Running the web application..."
 	@./bin/web
 
+run: web
+
 # ---------------------------------------------------------- #
 
 live:
