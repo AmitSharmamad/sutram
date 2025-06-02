@@ -12,9 +12,10 @@ import (
 
 // Module represents the broker module
 type Module struct {
-	controller       *http.BrokerController
-	dhanOrderService *service.DhanOrderService
-	brokerService    *service.BrokerService
+	controller          *http.BrokerController
+	dhanOrderService    *service.DhanOrderService
+	zerodhaOrderService *service.ZerodhaOrderService
+	brokerService       *service.BrokerService
 }
 
 // ProvideModule provides a wire provider set for the broker module
@@ -43,8 +44,16 @@ func (m *Module) initialize() {
 	dhanBaseURL := getEnv("DHAN_API_BASE_URL", "https://api.dhan.co/v2")
 	dhanAccessToken := getEnv("DHAN_ACCESS_TOKEN", "")
 
+	// Get Zerodha API configuration from environment
+	zerodhaBaseURL := getEnv("ZERODHA_API_BASE_URL", "https://api.kite.trade")
+	zerodhaAPIKey := getEnv("ZERODHA_API_KEY", "")
+	zerodhaAccessToken := getEnv("ZERODHA_ACCESS_TOKEN", "")
+
 	// Create Dhan order service
 	m.dhanOrderService = service.NewDhanOrderService(dhanBaseURL, dhanAccessToken)
+
+	// Create Zerodha order service
+	m.zerodhaOrderService = service.NewZerodhaOrderService(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
@@ -67,6 +76,11 @@ func (m *Module) GetController() *http.BrokerController {
 // GetDhanOrderService returns the Dhan order service
 func (m *Module) GetDhanOrderService() *service.DhanOrderService {
 	return m.dhanOrderService
+}
+
+// GetZerodhaOrderService returns the Zerodha order service
+func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
+	return m.zerodhaOrderService
 }
 
 // GetBrokerService returns the broker service
