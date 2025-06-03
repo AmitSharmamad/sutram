@@ -221,9 +221,8 @@ func (indicator *LowerBollingerBands) GetLookBack(config []any) int64 {
 
 	// For Lower Bollinger Bands calculation, we need:
 	// - Period data points adjusted by MA type multiplier
-	// - Additional buffer for stability (add period again)
 	// - Plus any offset
-	return int64(period*multiplier + period + float64(offset))
+	return int64(period*multiplier + float64(offset))
 }
 
 // CalculateAll calculates Lower Bollinger Bands values for all data points
