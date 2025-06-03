@@ -213,48 +213,122 @@ func (indicator *FisherTransform) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
+	// Parse config parameters
 	period := int(config[0].(float64))
-	// line := config[1].(string) - handled by Calculate method
+	line := config[1].(string)
 	offset := int(config[2].(float64))
 
 	indicator.period = period
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := period + offset
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	if len(stockData) < period {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+	}
+
+	// Step 1: Calculate median prices
+	medianPrices := make([]float64, len(stockData))
+	for i := 0; i < len(stockData); i++ {
+		medianPrices[i] = (highs[i] + lows[i]) / 2.0
+	}
+
+	// Step 2: Calculate normalized values and Fisher Transform
+	fisher := make([]float64, len(stockData))
+	value := make([]float64, len(stockData))
+
+	// Initialize first values
+	value[0] = 0.0
+	fisher[0] = 0.0
+
+	// Calculate for each point starting from index 1
+	for i := 1; i < len(stockData); i++ {
+		// Find highest high and lowest low in the lookback period
+		var highest, lowest float64
+		highest = medianPrices[i]
+		lowest = medianPrices[i]
+
+		lookbackStart := max(0, i-period+1)
+		for j := lookbackStart; j <= i; j++ {
+			if medianPrices[j] > highest {
+				highest = medianPrices[j]
+			}
+			if medianPrices[j] < lowest {
+				lowest = medianPrices[j]
+			}
 		}
 
-		// Calculate Fisher Transform value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Normalize price to -1 to +1 range
+		if highest == lowest {
+			value[i] = 0.0
+		} else {
+			normalizedPrice := 2.0*((medianPrices[i]-lowest)/(highest-lowest)) - 1.0
 
-		results = append(results, IndicatorValues{
+			// Apply smoothing: value = 0.33 * normalizedPrice + 0.67 * previous_value
+			value[i] = 0.33*normalizedPrice + 0.67*value[i-1]
+
+			// Bound value between -0.99 and 0.99 to avoid infinity in log transform
+			if value[i] > 0.99 {
+				value[i] = 0.99
+			}
+			if value[i] < -0.99 {
+				value[i] = -0.99
+			}
+		}
+
+		// Calculate Fisher Transform: 0.5 * ln((1 + value) / (1 - value))
+		fisher[i] = 0.5 * math.Log((1.0+value[i])/(1.0-value[i]))
+	}
+
+	// Step 3: Calculate trigger line (1-period lag of Fisher line)
+	trigger := make([]float64, len(stockData))
+	trigger[0] = 0.0
+	for i := 1; i < len(stockData); i++ {
+		trigger[i] = fisher[i-1]
+	}
+
+	// Step 4: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := period - 1; i < len(stockData); i++ {
+		// Apply offset
+		if i < period-1+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		// Determine result value based on line type
+		var resultValue float64
+		if line == "TRIGGER" {
+			resultValue = trigger[i]
+		} else {
+			// Default is "EF" (Fisher line)
+			resultValue = fisher[i]
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(resultValue),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }
