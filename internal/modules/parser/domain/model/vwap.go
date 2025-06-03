@@ -154,47 +154,83 @@ func (indicator *VWAP) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
+	// Parse config parameters
 	offset := int(config[0].(float64))
 
 	// Default period to 20 for VWAP calculation
 	indicator.period = 20
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := indicator.period + offset
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	if len(stockData) < indicator.period {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+	closes := make([]float64, len(stockData))
+	volumes := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+		closes[i] = data.Close
+		volumes[i] = data.Volume
+	}
+
+	// Step 1: Calculate Typical Price = (High + Low + Close) / 3
+	typicalPrices := make([]float64, len(stockData))
+	for i := 0; i < len(stockData); i++ {
+		typicalPrices[i] = (highs[i] + lows[i] + closes[i]) / 3.0
+	}
+
+	// Step 2: Calculate VWAP for each valid period
+	vwap := make([]float64, len(stockData))
+
+	for i := indicator.period - 1; i < len(stockData); i++ {
+		var cumulativeTPV float64 // Typical Price × Volume
+		var cumulativeVolume float64
+
+		// Calculate cumulative values for the period
+		for j := i - indicator.period + 1; j <= i; j++ {
+			cumulativeTPV += typicalPrices[j] * volumes[j]
+			cumulativeVolume += volumes[j]
 		}
 
-		// Calculate VWAP value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Calculate VWAP = Σ(Typical Price × Volume) / Σ(Volume)
+		if cumulativeVolume > 0 {
+			vwap[i] = cumulativeTPV / cumulativeVolume
+		} else {
+			vwap[i] = 0.0
+		}
+	}
 
-		results = append(results, IndicatorValues{
+	// Step 3: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := indicator.period - 1; i < len(stockData); i++ {
+		// Apply offset
+		if i < indicator.period-1+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(vwap[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }
