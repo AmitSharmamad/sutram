@@ -239,50 +239,139 @@ func (indicator *MFI) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
+	// Parse config parameters
 	period := int(config[0].(float64))
-	// maType := config[1].(string) - handled by Calculate method
+	maType := config[1].(string)
 	maPeriod := int(config[2].(float64))
 	offset := int(config[3].(float64))
 
 	indicator.period = period
+	indicator.maType = maType
 	indicator.maPeriod = maPeriod
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := period + offset + 1
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	if len(stockData) < period+1 {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+	closes := make([]float64, len(stockData))
+	volumes := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+		closes[i] = data.Close
+		volumes[i] = data.Volume
+	}
+
+	// Step 1: Calculate Typical Price = (High + Low + Close) / 3
+	typicalPrices := make([]float64, len(stockData))
+	for i := 0; i < len(stockData); i++ {
+		typicalPrices[i] = (highs[i] + lows[i] + closes[i]) / 3.0
+	}
+
+	// Step 2: Calculate Raw Money Flow = Typical Price × Volume
+	rawMoneyFlow := make([]float64, len(stockData))
+	for i := 0; i < len(stockData); i++ {
+		rawMoneyFlow[i] = typicalPrices[i] * volumes[i]
+	}
+
+	// Step 3: Determine Positive and Negative Money Flow
+	positiveMoneyFlow := make([]float64, len(stockData))
+	negativeMoneyFlow := make([]float64, len(stockData))
+
+	for i := 1; i < len(stockData); i++ {
+		if typicalPrices[i] > typicalPrices[i-1] {
+			positiveMoneyFlow[i] = rawMoneyFlow[i]
+			negativeMoneyFlow[i] = 0.0
+		} else if typicalPrices[i] < typicalPrices[i-1] {
+			positiveMoneyFlow[i] = 0.0
+			negativeMoneyFlow[i] = rawMoneyFlow[i]
+		} else {
+			positiveMoneyFlow[i] = 0.0
+			negativeMoneyFlow[i] = 0.0
+		}
+	}
+
+	// Step 4: Calculate MFI for each valid period
+	mfi := make([]float64, len(stockData))
+
+	for i := period; i < len(stockData); i++ {
+		var sumPositiveFlow float64
+		var sumNegativeFlow float64
+
+		// Sum positive and negative money flows for the period
+		for j := i - period + 1; j <= i; j++ {
+			sumPositiveFlow += positiveMoneyFlow[j]
+			sumNegativeFlow += negativeMoneyFlow[j]
 		}
 
-		// Calculate MFI value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Calculate Money Flow Ratio and MFI
+		if sumNegativeFlow == 0 {
+			mfi[i] = 100.0
+		} else {
+			moneyFlowRatio := sumPositiveFlow / sumNegativeFlow
+			mfi[i] = 100.0 - (100.0 / (1.0 + moneyFlowRatio))
+		}
+	}
 
-		results = append(results, IndicatorValues{
+	// Step 5: Apply moving average smoothing if maPeriod > 0
+	var finalMFI []float64
+	if maPeriod > 0 {
+		// Extract valid MFI values (skip initial zeros)
+		validMfi := make([]float64, 0)
+		for i := period; i < len(stockData); i++ {
+			validMfi = append(validMfi, mfi[i])
+		}
+
+		// Apply the specified moving average type using utility function
+		smoothedMfi := util.CalculateMovingAverage(validMfi, maType, maPeriod)
+
+		// Create full-length array with proper positioning
+		finalMFI = make([]float64, len(stockData))
+		startIdx := period + maPeriod - 1
+		for i, val := range smoothedMfi {
+			if startIdx+i < len(finalMFI) {
+				finalMFI[startIdx+i] = val
+			}
+		}
+	} else {
+		finalMFI = mfi
+	}
+
+	// Step 6: Build results starting from valid calculation points
+	var result []IndicatorValues
+	startIdx := period
+	if maPeriod > 0 {
+		startIdx = period + maPeriod - 1
+	}
+
+	for i := startIdx; i < len(stockData); i++ {
+		// Apply offset
+		if i < startIdx+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(finalMFI[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }
