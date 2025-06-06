@@ -499,55 +499,21 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			if openPosition != nil && openPosition.State == model.Entered && strategy.TradeType == strategyModel.TradeType("MIS") {
 				// Find the last timestamp from the previous day
 				var lastTimestampFromPreviousDay *time.Time
-				var lastCloseFromPreviousDay float64
 
 				// Look for the most recent timestamp from the previous trading day
 				for j := i - 1; j >= 0 && j >= max(0, i-100); j-- { // Limit search to avoid excessive iteration
 					checkTimestamp := timestamps[j]
 					if checkTimestamp.Truncate(24 * time.Hour).Equal(currentTradingDay) {
 						lastTimestampFromPreviousDay = &checkTimestamp
-						// Get close price from CLOSE indicator for this timestamp
-						if closeIndicator, exists := indicatorArrayMap["CLOSE"]; exists {
-							for _, val := range closeIndicator {
-								if val.Timestamp.Equal(checkTimestamp) {
-									lastCloseFromPreviousDay = val.Value
-									break
-								}
-							}
-						}
 						break
 					}
 				}
 
-				if lastTimestampFromPreviousDay != nil && lastCloseFromPreviousDay > 0 {
-					// Calculate fees
-					exitFees := 0.0
-					exitOrderPrice := lastCloseFromPreviousDay // Use the close price from indicator
-
-					// Close the position with "EOD MIS Square-off" as the reason
-					exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
-
-					openPosition.Exit(
-						lastCloseFromPreviousDay,
-						*lastTimestampFromPreviousDay,
-						exitOrderPrice,
-						*lastTimestampFromPreviousDay,
-						"",         // No exit expression for auto square-offs
-						exitReason, // Use our defined exit reason
-						exitFees,
-						nil,
-					)
-
-					// Collect position
-					positions = append(positions, openPosition)
-
-					// Add net profit/loss if available
-					if openPosition.NetProfitLoss != nil {
-						capital += *openPosition.NetProfitLoss
+				if lastTimestampFromPreviousDay != nil {
+					// Use the consolidated MIS square-off function
+					if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, *lastTimestampFromPreviousDay, &positions, &capital) {
+						openPosition = nil
 					}
-
-					// Reset open position
-					openPosition = nil
 				}
 			}
 			// Update the current trading day
@@ -556,173 +522,36 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// Check entry condition if no position is open
 		if openPosition == nil {
-			// Evaluate entry expression using indicator array map
-			entryResult, err := parser.EvaluateIndicatorExpression(
-				strategy.EntryExpression, indicatorArrayMap, currentTimestamp, nil, i,
+			newPosition, updatedCapital := e.checkAndCreateNewPosition(
+				strategy,
+				indicatorArrayMap,
+				currentTimestamp,
+				i,
+				run,
+				capital,
 			)
-			if err != nil {
-				println("Error evaluating entry expression:", err.Error())
-			}
 
-			// Check if the current time is within the entry time window
-			// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
-			canCheckEntryCondition := true
-
-			if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
-				// Extract time of day from the current candle timestamp
-				currentTime := currentTimestamp
-				currentTimeOfDay := time.Date(0, 1, 1,
-					currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
-
-				// Check if we're within the entry time window
-				if strategy.EntryStartTime != nil {
-					// Extract time component from EntryStartTime
-					entryStartTimeOfDay := time.Date(0, 1, 1,
-						strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
-						strategy.EntryStartTime.Second(), 0, time.UTC)
-
-					if currentTimeOfDay.Before(entryStartTimeOfDay) {
-						canCheckEntryCondition = false
-					}
-				}
-
-				if strategy.EntryEndTime != nil {
-					// Extract time component from EntryEndTime
-					entryEndTimeOfDay := time.Date(0, 1, 1,
-						strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
-						strategy.EntryEndTime.Second(), 0, time.UTC)
-
-					if currentTimeOfDay.After(entryEndTimeOfDay) {
-						canCheckEntryCondition = false
-					}
-				}
-			}
-
-			// Only check entry conditions if we're within the allowed entry time window
-			if canCheckEntryCondition && entryResult {
-				// Get current close price from CLOSE indicator
-				var currentClosePrice float64
-				if closeIndicator, exists := indicatorArrayMap["CLOSE"]; exists {
-					for _, val := range closeIndicator {
-						if val.Timestamp.Equal(currentTimestamp) {
-							currentClosePrice = val.Value
-							break
-						}
-					}
-				}
-
-				if currentClosePrice <= 0 {
-					// Skip this iteration if we can't get a valid close price
-					continue
-				}
-
-				// Calculate position size based on strategy
-				positionSize := e.calculatePositionSize(strategy, currentClosePrice)
-
-				// Determine position direction from strategy
-				var direction model.Direction
-				if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
-					direction = model.Long
-				} else {
-					direction = model.Short
-				}
-
-				// Create new position
-				openPosition = model.NewPosition(
-					run.ID,
-					direction,
-					currentClosePrice,
-					currentTimestamp,
-					strategy.EntryExpression,
-					positionSize,
-				)
-
-				// Simulate order execution
-				entryPrice := currentClosePrice
-				entryFees := 0.0
-				openPosition.Enter(entryPrice, currentTimestamp, entryFees, nil)
-
-				openPosition.StopLossPrice = e.calculateStopLoss(
-					*openPosition.EntryPriceOrder,
-					strategy.StopLoss,
-					strategy.StopLossType,
-					strategy.PositionType,
-				)
-
-				// Update capital for position entry
-				capital = e.updateCapitalOnPositionChange(capital, openPosition, entryPrice, entryFees, true)
+			if newPosition != nil {
+				openPosition = newPosition
+				capital = updatedCapital
 			}
 		}
 
 		// If position is still open, check exit condition
 		if openPosition != nil {
-			// 1. Create instrument object first
-			currentInstrument := &instrumentModel.Instrument{
-				Open:      indicatorArrayMap["OPEN"][i].Value,
-				High:      indicatorArrayMap["HIGH"][i].Value,
-				Low:       indicatorArrayMap["LOW"][i].Value,
-				Close:     indicatorArrayMap["CLOSE"][i].Value,
-				Volume:    indicatorArrayMap["VOLUME"][i].Value,
-				Timestamp: currentTimestamp,
-			}
-
-			// 2. Update trailing stop loss BEFORE other checks
-			e.updateStopLossBasedOnTrailing(openPosition, strategy, currentInstrument)
-
-			// 3. Check stop loss and target profit
-			stopLossHit := e.isStopLossTriggered(openPosition, currentInstrument)
-			targetProfitHit := e.isTargetProfitTriggered(openPosition, strategy, currentInstrument)
-
-			// 4. Evaluate exit expression last (with updated trailing stop)
-			var exitResult bool
-			if strategy.ExitExpression != "" {
-				exitResult, err = parser.EvaluateIndicatorExpression(
-					strategy.ExitExpression, indicatorArrayMap, currentTimestamp, nil, i,
-				)
-				if err != nil {
-					println("Error evaluating exit expression:", err.Error())
-				}
-			}
-
-			// Check if exit condition is met
-			if exitResult || stopLossHit || targetProfitHit {
-				// Determine exit reason
-				exitReason := "Exit signal"
-				if stopLossHit {
-					exitReason = "Stop loss"
-				} else if targetProfitHit {
-					exitReason = "Target profit"
-				}
-
-				// Calculate fees
-				exitFees := 0.0
-				exitOrderPrice := currentInstrument.Close // Use close price from instrument
-
-				// Close the position
-				openPosition.Exit(
-					currentInstrument.Close,
-					currentTimestamp,
-					exitOrderPrice,
-					currentTimestamp,
-					strategy.ExitExpression,
-					exitReason,
-					exitFees,
-					nil,
-				)
-
-				// Collect position
-				positions = append(positions, openPosition)
-
-				// Add net profit/loss if available
-				if openPosition.NetProfitLoss != nil {
-					capital += *openPosition.NetProfitLoss
-				}
-
-				// Reset open position
+			// Process exit conditions and check if position was closed
+			if e.processExitConditions(openPosition, strategy, indicatorArrayMap, currentTimestamp, i, &positions, &capital) {
+				// Position was closed, reset open position and continue to next iteration
 				openPosition = nil
-
-				// Continue to next iteration
 				continue
+			}
+
+			// Close the position if MIS end-of-day is hit
+			if strategy.TradeType == strategyModel.TradeType("MIS") && e.IsMISEndOfDayHit(currentTimestamp) {
+				// Use the consolidated MIS square-off function
+				if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, currentTimestamp, &positions, &capital) {
+					openPosition = nil
+				}
 			}
 		}
 	}
@@ -818,7 +647,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 }
 
 func (e *BacktestEngine) IsMISEndOfDayHit(
-	data *instrumentModel.Instrument,
+	timestamp time.Time,
 ) bool {
 	// NOTE: MIS close is 15 minutes prior to market close
 	exchange := "NSE"
@@ -832,8 +661,8 @@ func (e *BacktestEngine) IsMISEndOfDayHit(
 		endMinute = 30
 	}
 
-	// Extract the time from the data timestamp
-	currentTime := data.Timestamp
+	// Extract the time from the provided timestamp
+	currentTime := timestamp
 
 	// Create a time representing 3:15 PM on the same date
 	eodTime := time.Date(
@@ -1398,4 +1227,264 @@ func (e *BacktestEngine) GetIndicatorData(ctx context.Context, strategyID uuid.U
 	}
 
 	return result, nil
+}
+
+// processExitConditions checks and processes exit conditions for an open position
+// Returns true if position was closed, false if position remains open
+func (e *BacktestEngine) processExitConditions(
+	openPosition *model.Position,
+	strategy *strategyDto.StrategyResponse,
+	indicatorArrayMap map[string][]parser.IndicatorValues,
+	currentTimestamp time.Time,
+	i int,
+	positions *[]*model.Position,
+	capital *float64,
+) bool {
+	// 1. Create instrument object first
+	currentInstrument := &instrumentModel.Instrument{
+		Open:      indicatorArrayMap["OPEN"][i].Value,
+		High:      indicatorArrayMap["HIGH"][i].Value,
+		Low:       indicatorArrayMap["LOW"][i].Value,
+		Close:     indicatorArrayMap["CLOSE"][i].Value,
+		Volume:    indicatorArrayMap["VOLUME"][i].Value,
+		Timestamp: currentTimestamp,
+	}
+
+	// 2. Update trailing stop loss BEFORE other checks
+	e.updateStopLossBasedOnTrailing(openPosition, strategy, currentInstrument)
+
+	// 3. Check stop loss and target profit
+	stopLossHit := e.isStopLossTriggered(openPosition, currentInstrument)
+	targetProfitHit := e.isTargetProfitTriggered(openPosition, strategy, currentInstrument)
+
+	// 4. Evaluate exit expression last (with updated trailing stop)
+	var exitResult bool
+	var err error
+	if strategy.ExitExpression != "" {
+		exitResult, err = parser.EvaluateIndicatorExpression(
+			strategy.ExitExpression, indicatorArrayMap, currentTimestamp, nil, i,
+		)
+		if err != nil {
+			println("Error evaluating exit expression:", err.Error())
+		}
+	}
+
+	// Check if exit condition is met
+	if exitResult || stopLossHit || targetProfitHit {
+		// Determine exit reason
+		exitReason := "Exit signal"
+		if stopLossHit {
+			exitReason = "Stop loss"
+		} else if targetProfitHit {
+			exitReason = "Target profit"
+		}
+
+		// Calculate fees
+		exitFees := 0.0
+		exitOrderPrice := currentInstrument.Close // Use close price from instrument
+
+		// Close the position
+		openPosition.Exit(
+			currentInstrument.Close,
+			currentTimestamp,
+			exitOrderPrice,
+			currentTimestamp,
+			strategy.ExitExpression,
+			exitReason,
+			exitFees,
+			nil,
+		)
+
+		// Collect position
+		*positions = append(*positions, openPosition)
+
+		// Add net profit/loss if available
+		if openPosition.NetProfitLoss != nil {
+			*capital += *openPosition.NetProfitLoss
+		}
+
+		// Position was closed
+		return true
+	}
+
+	// Position remains open
+	return false
+}
+
+// checkAndCreateNewPosition evaluates entry conditions and creates a new position if conditions are met
+// Returns the created position and updated capital, or nil position if no entry was made
+func (e *BacktestEngine) checkAndCreateNewPosition(
+	strategy *strategyDto.StrategyResponse,
+	indicatorArrayMap map[string][]parser.IndicatorValues,
+	currentTimestamp time.Time,
+	i int,
+	run *model.Run,
+	capital float64,
+) (*model.Position, float64) {
+	// Evaluate entry expression using indicator array map
+	entryResult, err := parser.EvaluateIndicatorExpression(
+		strategy.EntryExpression, indicatorArrayMap, currentTimestamp, nil, i,
+	)
+	if err != nil {
+		println("Error evaluating entry expression:", err.Error())
+	}
+
+	// Check if the current time is within the entry time window
+	// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
+	canCheckEntryCondition := true
+
+	if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
+		// Extract time of day from the current candle timestamp
+		currentTime := currentTimestamp
+		currentTimeOfDay := time.Date(0, 1, 1,
+			currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
+
+		// Check if we're within the entry time window
+		if strategy.EntryStartTime != nil {
+			// Extract time component from EntryStartTime
+			entryStartTimeOfDay := time.Date(0, 1, 1,
+				strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
+				strategy.EntryStartTime.Second(), 0, time.UTC)
+
+			if currentTimeOfDay.Before(entryStartTimeOfDay) {
+				canCheckEntryCondition = false
+			}
+		}
+
+		if strategy.EntryEndTime != nil {
+			// Extract time component from EntryEndTime
+			entryEndTimeOfDay := time.Date(0, 1, 1,
+				strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
+				strategy.EntryEndTime.Second(), 0, time.UTC)
+
+			if currentTimeOfDay.After(entryEndTimeOfDay) {
+				canCheckEntryCondition = false
+			}
+		}
+	}
+
+	// Check if MIS square-off time has been reached (3:15 PM IST)
+	// Prevent new MIS entries after this time
+	if strategy.TradeType == strategyModel.TradeType("MIS") {
+		if e.IsMISEndOfDayHit(currentTimestamp) {
+			canCheckEntryCondition = false
+		}
+	}
+
+	// Only check entry conditions if we're within the allowed entry time window
+	if canCheckEntryCondition && entryResult {
+		// Get current close price from CLOSE indicator
+		var currentClosePrice float64
+		if closeIndicator, exists := indicatorArrayMap["CLOSE"]; exists {
+			for _, val := range closeIndicator {
+				if val.Timestamp.Equal(currentTimestamp) {
+					currentClosePrice = val.Value
+					break
+				}
+			}
+		}
+
+		if currentClosePrice <= 0 {
+			// Return nil if we can't get a valid close price
+			return nil, capital
+		}
+
+		// Calculate position size based on strategy
+		positionSize := e.calculatePositionSize(strategy, currentClosePrice)
+
+		// Determine position direction from strategy
+		var direction model.Direction
+		if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
+			direction = model.Long
+		} else {
+			direction = model.Short
+		}
+
+		// Create new position
+		newPosition := model.NewPosition(
+			run.ID,
+			direction,
+			currentClosePrice,
+			currentTimestamp,
+			strategy.EntryExpression,
+			positionSize,
+		)
+
+		// Simulate order execution
+		entryPrice := currentClosePrice
+		entryFees := 0.0
+		newPosition.Enter(entryPrice, currentTimestamp, entryFees, nil)
+
+		newPosition.StopLossPrice = e.calculateStopLoss(
+			*newPosition.EntryPriceOrder,
+			strategy.StopLoss,
+			strategy.StopLossType,
+			strategy.PositionType,
+		)
+
+		// Update capital for position entry
+		updatedCapital := e.updateCapitalOnPositionChange(capital, newPosition, entryPrice, entryFees, true)
+
+		return newPosition, updatedCapital
+	}
+
+	// No entry conditions met, return nil position with unchanged capital
+	return nil, capital
+}
+
+func (e *BacktestEngine) handleMISSquareOff(
+	openPosition *model.Position,
+	strategy *strategyDto.StrategyResponse,
+	indicatorArrayMap map[string][]parser.IndicatorValues,
+	currentTimestamp time.Time,
+	positions *[]*model.Position,
+	capital *float64,
+) bool {
+	// Only process MIS positions that are entered
+	if openPosition == nil || openPosition.State != model.Entered ||
+		strategy.TradeType != strategyModel.TradeType("MIS") {
+		return false
+	}
+
+	// Get close price for current timestamp
+	var closePrice float64
+	if closeIndicator, exists := indicatorArrayMap["CLOSE"]; exists {
+		for _, val := range closeIndicator {
+			if val.Timestamp.Equal(currentTimestamp) {
+				closePrice = val.Value
+				break
+			}
+		}
+	}
+
+	if closePrice <= 0 {
+		return false
+	}
+
+	// Calculate fees and exit details
+	exitFees := 0.0
+	exitOrderPrice := closePrice
+	exitReason := "EOD MIS Square-off"
+
+	// Close the position
+	openPosition.Exit(
+		closePrice,
+		currentTimestamp,
+		exitOrderPrice,
+		currentTimestamp,
+		"", // No exit expression for auto square-offs
+		exitReason,
+		exitFees,
+		nil,
+	)
+
+	// Collect position
+	*positions = append(*positions, openPosition)
+
+	// Add net profit/loss if available
+	if openPosition.NetProfitLoss != nil {
+		*capital += *openPosition.NetProfitLoss
+	}
+
+	return true // Position was closed
 }
