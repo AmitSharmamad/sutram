@@ -656,7 +656,24 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 		// If position is still open, check exit condition
 		if openPosition != nil {
-			// Evaluate exit expression if available
+			// 1. Create instrument object first
+			currentInstrument := &instrumentModel.Instrument{
+				Open:      indicatorArrayMap["OPEN"][i].Value,
+				High:      indicatorArrayMap["HIGH"][i].Value,
+				Low:       indicatorArrayMap["LOW"][i].Value,
+				Close:     indicatorArrayMap["CLOSE"][i].Value,
+				Volume:    indicatorArrayMap["VOLUME"][i].Value,
+				Timestamp: currentTimestamp,
+			}
+
+			// 2. Update trailing stop loss BEFORE other checks
+			e.updateStopLossBasedOnTrailing(openPosition, strategy, currentInstrument)
+
+			// 3. Check stop loss and target profit
+			stopLossHit := e.isStopLossTriggered(openPosition, currentInstrument)
+			targetProfitHit := e.isTargetProfitTriggered(openPosition, strategy, currentInstrument)
+
+			// 4. Evaluate exit expression last (with updated trailing stop)
 			var exitResult bool
 			if strategy.ExitExpression != "" {
 				exitResult, err = parser.EvaluateIndicatorExpression(
@@ -666,30 +683,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 					println("Error evaluating exit expression:", err.Error())
 				}
 			}
-
-			// Create instrument object from indicator data for current timestamp
-			var currentInstrument *instrumentModel.Instrument
-			var currentOpenPrice, currentHighPrice, currentLowPrice, currentClosePrice, currentVolume float64
-
-			currentOpenPrice = indicatorArrayMap["OPEN"][i].Value
-			currentHighPrice = indicatorArrayMap["HIGH"][i].Value
-			currentLowPrice = indicatorArrayMap["LOW"][i].Value
-			currentClosePrice = indicatorArrayMap["CLOSE"][i].Value
-			currentVolume = indicatorArrayMap["VOLUME"][i].Value
-
-			// Create instrument object for stop loss and target profit checks
-			currentInstrument = &instrumentModel.Instrument{
-				Open:      currentOpenPrice,
-				High:      currentHighPrice,
-				Low:       currentLowPrice,
-				Close:     currentClosePrice,
-				Volume:    currentVolume,
-				Timestamp: currentTimestamp,
-			}
-
-			// Check stop loss or target profit hit
-			stopLossHit := e.isStopLossTriggered(openPosition, currentInstrument)
-			targetProfitHit := e.isTargetProfitTriggered(openPosition, strategy, currentInstrument)
 
 			// Check if exit condition is met
 			if exitResult || stopLossHit || targetProfitHit {
@@ -703,11 +696,11 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				// Calculate fees
 				exitFees := 0.0
-				exitOrderPrice := currentClosePrice // Use close price from indicator
+				exitOrderPrice := currentInstrument.Close // Use close price from instrument
 
 				// Close the position
 				openPosition.Exit(
-					currentClosePrice,
+					currentInstrument.Close,
 					currentTimestamp,
 					exitOrderPrice,
 					currentTimestamp,
