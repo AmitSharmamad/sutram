@@ -1327,3 +1327,63 @@ func (e *BacktestEngine) handleMISSquareOff(
 
 	return true // Position was closed
 }
+
+// getDefaultMarketHours returns the default trading hours for different exchanges
+func (e *BacktestEngine) getDefaultMarketHours(exchange string) (startHour, startMinute, endHour, endMinute int) {
+	switch exchange {
+	case "NSE", "BSE":
+		// Indian equity markets: 9:15 AM to 3:30 PM IST
+		return 9, 15, 15, 30
+	case "MCX":
+		// MCX commodity market: 9:00 AM to 11:30 PM IST
+		return 9, 0, 23, 30
+	case "NCDEX":
+		// NCDEX commodity market: 10:00 AM to 5:00 PM IST
+		return 10, 0, 17, 0
+	default:
+		// Default to NSE timings
+		return 9, 15, 15, 30
+	}
+}
+
+// isWithinEntryTimeWindow validates if the current time is within the entry time window
+func (e *BacktestEngine) isWithinEntryTimeWindow(
+	currentTimestamp time.Time,
+	strategy *strategyDto.StrategyResponse,
+	exchange string,
+) bool {
+	// Extract time of day from the current timestamp
+	currentTimeOfDay := time.Date(0, 1, 1,
+		currentTimestamp.Hour(), currentTimestamp.Minute(), currentTimestamp.Second(), 0, time.UTC)
+
+	var entryStartTime, entryEndTime time.Time
+
+	// Determine entry start time
+	if strategy.EntryStartTime != nil {
+		// Use provided entry start time
+		entryStartTime = time.Date(0, 1, 1,
+			strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
+			strategy.EntryStartTime.Second(), 0, time.UTC)
+	} else {
+		// Use default market start time if not specified
+		startHour, startMinute, _, _ := e.getDefaultMarketHours(exchange)
+		entryStartTime = time.Date(0, 1, 1, startHour, startMinute, 0, 0, time.UTC)
+	}
+
+	// Determine entry end time
+	if strategy.EntryEndTime != nil {
+		// Use provided entry end time
+		entryEndTime = time.Date(0, 1, 1,
+			strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
+			strategy.EntryEndTime.Second(), 0, time.UTC)
+	} else {
+		// Use default market end time if not specified
+		_, _, endHour, endMinute := e.getDefaultMarketHours(exchange)
+		entryEndTime = time.Date(0, 1, 1, endHour, endMinute, 0, 0, time.UTC)
+	}
+
+	// Check if current time is within the entry window
+	// Current time must be >= start time AND <= end time
+	return (currentTimeOfDay.Equal(entryStartTime) || currentTimeOfDay.After(entryStartTime)) &&
+		(currentTimeOfDay.Equal(entryEndTime) || currentTimeOfDay.Before(entryEndTime))
+}
