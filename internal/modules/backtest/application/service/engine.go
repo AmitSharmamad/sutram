@@ -579,7 +579,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			exitOrderPrice := lastClosePrice // Use close price from indicator
 
 			// Close the position with "EOD MIS Square-off" as the reason
-			exitReason := "EOD MIS Square-off" // Special reason for MIS end-of-day square-off
+			exitReason := string(model.ExitReasonMISSquareOff) // Special reason for MIS end-of-day square-off
 
 			openPosition.Exit(
 				lastClosePrice,
@@ -741,14 +741,41 @@ func (e *BacktestEngine) calculateStopLoss(
 	return &stopPrice
 }
 
+func (e *BacktestEngine) calculateTargetProfit(
+	entryPrice float64,
+	targetProfit float64,
+	targetProfitType strategyModel.ValueType,
+	direction strategyModel.Direction,
+) *float64 {
+
+	var targetPrice float64
+	if direction == strategyModel.Long {
+		if targetProfitType == "PERCENTAGE" {
+			targetPrice = entryPrice * (1 + targetProfit/100)
+		} else {
+			targetPrice = entryPrice + targetProfit
+		}
+	} else { // Short position
+		if targetProfitType == "PERCENTAGE" {
+			targetPrice = entryPrice * (1 - targetProfit/100)
+		} else {
+			targetPrice = entryPrice - targetProfit
+		}
+	}
+
+	targetPrice = math.Round(targetPrice*100) / 100 // Round to 2 decimal places
+
+	return &targetPrice
+}
+
 func (e *BacktestEngine) updateStopLossBasedOnTrailing(
 	position *model.Position,
 	strategy *strategyDto.StrategyResponse,
 	instrument *instrumentModel.Instrument,
-) {
+) bool {
 	// Skip if trailing stop loss isn't enabled or position doesn't have a stop loss
 	if strategy.TrailingStopLoss <= 0 || position.StopLossPrice == nil || position.EntryPriceOrder == nil {
-		return
+		return false
 	}
 
 	currentPrice := instrument.Close
@@ -786,6 +813,7 @@ func (e *BacktestEngine) updateStopLossBasedOnTrailing(
 			// This ensures the stop loss only moves up, never down
 			if newStopLoss > currentStopLoss {
 				*position.StopLossPrice = newStopLoss
+				return true
 			}
 		}
 	} else { // Handle short position trailing stop
@@ -802,9 +830,11 @@ func (e *BacktestEngine) updateStopLossBasedOnTrailing(
 			// This ensures the stop loss only moves down, never up
 			if newStopLoss < currentStopLoss {
 				*position.StopLossPrice = newStopLoss
+				return true
 			}
 		}
 	}
+	return false
 }
 
 // isStopLossTriggered checks if stop loss is triggered
@@ -829,23 +859,10 @@ func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strat
 		return false
 	}
 
-	entryPrice := *position.EntryPriceOrder
-	targetPrice := 0.0
-
 	if position.Direction == model.Long {
-		if strategy.TargetProfitType == "PERCENTAGE" {
-			targetPrice = entryPrice * (1 + strategy.TargetProfit/100)
-		} else {
-			targetPrice = entryPrice + strategy.TargetProfit
-		}
-		return instrument.Close >= targetPrice
+		return instrument.Close >= *position.TargetProfitPrice
 	} else { // Short position
-		if strategy.TargetProfitType == "PERCENTAGE" {
-			targetPrice = entryPrice * (1 - strategy.TargetProfit/100)
-		} else {
-			targetPrice = entryPrice - strategy.TargetProfit
-		}
-		return instrument.Close <= targetPrice
+		return instrument.Close <= *position.TargetProfitPrice
 	}
 }
 
@@ -1040,11 +1057,18 @@ func (e *BacktestEngine) TryExit(
 
 		if exitSignalTriggered || stopLossHit || targetProfitHit {
 			// Determine exit reason
-			exitReason := "Exit signal"
+			exitReason := string(model.ExitReasonSignal)
 			if stopLossHit {
-				exitReason = "Stop loss"
+				// Check if this is a trailing stop loss exit
+				if position.InitialStopLossPrice != nil &&
+					position.StopLossPrice != nil &&
+					*position.StopLossPrice > *position.InitialStopLossPrice {
+					exitReason = string(model.ExitReasonTrailingStopLoss)
+				} else {
+					exitReason = string(model.ExitReasonStopLoss)
+				}
 			} else if targetProfitHit {
-				exitReason = "Target profit"
+				exitReason = string(model.ExitReasonTargetProfit)
 			}
 
 			// Calculate fees
@@ -1272,22 +1296,33 @@ func (e *BacktestEngine) processExitConditions(
 	// Check if exit condition is met
 	if exitResult || stopLossHit || targetProfitHit {
 		// Determine exit reason
-		exitReason := "Exit signal"
+
+		exitReason := string(model.ExitReasonSignal)
+		exitPrice := currentInstrument.Close
+
 		if stopLossHit {
-			exitReason = "Stop loss"
+			// Check if this is a trailing stop loss exit
+			if openPosition.InitialStopLossPrice != nil &&
+				openPosition.StopLossPrice != nil &&
+				*openPosition.StopLossPrice != *openPosition.InitialStopLossPrice {
+				exitReason = string(model.ExitReasonTrailingStopLoss)
+			} else {
+				exitReason = string(model.ExitReasonStopLoss)
+			}
+			exitPrice = *openPosition.StopLossPrice
 		} else if targetProfitHit {
-			exitReason = "Target profit"
+			exitReason = string(model.ExitReasonTargetProfit)
+			exitPrice = *openPosition.TargetProfitPrice
 		}
 
 		// Calculate fees
 		exitFees := 0.0
-		exitOrderPrice := currentInstrument.Close // Use close price from instrument
 
 		// Close the position
 		openPosition.Exit(
-			currentInstrument.Close,
+			exitPrice,
 			currentTimestamp,
-			exitOrderPrice,
+			exitPrice,
 			currentTimestamp,
 			strategy.ExitExpression,
 			exitReason,
@@ -1422,6 +1457,20 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 			strategy.PositionType,
 		)
 
+		// Store the initial stop loss price for trailing stop loss detection
+		// Create a copy of the value to avoid both pointers pointing to the same memory
+		if newPosition.StopLossPrice != nil {
+			initialStopLoss := *newPosition.StopLossPrice
+			newPosition.InitialStopLossPrice = &initialStopLoss
+		}
+
+		newPosition.TargetProfitPrice = e.calculateTargetProfit(
+			*newPosition.EntryPriceOrder,
+			strategy.TargetProfit,
+			strategy.TargetProfitType,
+			strategy.PositionType,
+		)
+
 		// Update capital for position entry
 		updatedCapital := e.updateCapitalOnPositionChange(capital, newPosition, entryPrice, entryFees, true)
 
@@ -1464,7 +1513,7 @@ func (e *BacktestEngine) handleMISSquareOff(
 	// Calculate fees and exit details
 	exitFees := 0.0
 	exitOrderPrice := closePrice
-	exitReason := "EOD MIS Square-off"
+	exitReason := string(model.ExitReasonMISSquareOff)
 
 	// Close the position
 	openPosition.Exit(
