@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"algo/internal/modules/strategy/domain/model"
+	"algo/internal/util/types"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -111,8 +112,8 @@ type CreateStrategyRequest struct {
 	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
 	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
-	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
-	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
+	EntryStartTime       *types.TimeOnly      `json:"entry_start_time" db:"entry_start_time"`
+	EntryEndTime         *types.TimeOnly      `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date" db:"start_date"`
 	EndDate              *time.Time           `json:"end_date" db:"end_date"`
 }
@@ -140,8 +141,8 @@ type UpdateStrategyRequest struct {
 	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
 	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
-	EntryStartTime       *time.Time           `json:"entry_start_time" db:"entry_start_time"`
-	EntryEndTime         *time.Time           `json:"entry_end_time" db:"entry_end_time"`
+	EntryStartTime       *types.TimeOnly      `json:"entry_start_time" db:"entry_start_time"`
+	EntryEndTime         *types.TimeOnly      `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date" db:"start_date"`
 	EndDate              *time.Time           `json:"end_date" db:"end_date"`
 }
@@ -170,8 +171,8 @@ type StrategyResponse struct {
 	Capital              float64              `json:"capital,omitempty" db:"capital"`
 	MaxAllocation        float64              `json:"max_allocation,omitempty" db:"max_allocation"`
 	MaxTrades            int                  `json:"max_trades,omitempty" db:"max_trades"`
-	EntryStartTime       *time.Time           `json:"entry_start_time,omitempty" db:"entry_start_time"`
-	EntryEndTime         *time.Time           `json:"entry_end_time,omitempty" db:"entry_end_time"`
+	EntryStartTime       *types.TimeOnly      `json:"entry_start_time,omitempty" db:"entry_start_time"`
+	EntryEndTime         *types.TimeOnly      `json:"entry_end_time,omitempty" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date,omitempty" db:"start_date"`
 	EndDate              *time.Time           `json:"end_date,omitempty" db:"end_date"`
 	CreatedAt            time.Time            `json:"created_at" db:"created_at"`
