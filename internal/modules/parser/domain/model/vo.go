@@ -196,50 +196,95 @@ func (indicator *VolumeOscillator) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
+	// Parse config parameters
 	shortPeriod := int(config[0].(float64))
 	longPeriod := int(config[1].(float64))
-	// pop := config[2].(string) - handled by Calculate method
+	pop := config[2].(string)
 	offset := int(config[3].(float64))
 
 	indicator.shortPeriod = shortPeriod
 	indicator.longPeriod = longPeriod
+	indicator.pop = pop
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := longPeriod + offset
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	if len(stockData) < longPeriod {
+		return []IndicatorValues{}
+	}
+
+	// Extract volume array
+	volumes := make([]float64, len(stockData))
+	for i, data := range stockData {
+		volumes[i] = data.Volume
+	}
+
+	// Step 1: Calculate short-term SMA of volume using utility function
+	shortSMAValues := util.CalculateMovingAverage(volumes, "SIMPLE", shortPeriod)
+
+	// Create full-length array with proper positioning
+	shortSMA := make([]float64, len(stockData))
+	startIdxShort := shortPeriod - 1
+	for i, val := range shortSMAValues {
+		if startIdxShort+i < len(shortSMA) {
+			shortSMA[startIdxShort+i] = val
+		}
+	}
+
+	// Step 2: Calculate long-term SMA of volume using utility function
+	longSMAValues := util.CalculateMovingAverage(volumes, "SIMPLE", longPeriod)
+
+	// Create full-length array with proper positioning
+	longSMA := make([]float64, len(stockData))
+	startIdxLong := longPeriod - 1
+	for i, val := range longSMAValues {
+		if startIdxLong+i < len(longSMA) {
+			longSMA[startIdxLong+i] = val
+		}
+	}
+
+	// Step 3: Calculate Volume Oscillator
+	vo := make([]float64, len(stockData))
+
+	for i := longPeriod - 1; i < len(stockData); i++ {
+		if pop == "PCT" {
+			// Percentage-based Volume Oscillator
+			// Avoid division by zero
+			if longSMA[i] != 0 {
+				vo[i] = 100 * ((shortSMA[i] - longSMA[i]) / longSMA[i])
+			} else {
+				vo[i] = 0
+			}
+		} else {
+			// POINT-based Volume Oscillator is simply the difference
+			vo[i] = shortSMA[i] - longSMA[i]
+		}
+	}
+
+	// Step 4: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := longPeriod - 1; i < len(stockData); i++ {
+		// Apply offset
+		if i < longPeriod-1+offset {
+			continue
 		}
 
-		// Calculate Volume Oscillator value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
 
-		results = append(results, IndicatorValues{
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(vo[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }

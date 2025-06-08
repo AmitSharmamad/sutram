@@ -246,6 +246,7 @@ func (indicator *UltimateOscillator) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
+	// Parse config parameters
 	length1 := int(config[0].(float64))
 	length2 := int(config[1].(float64))
 	length3 := int(config[2].(float64))
@@ -256,41 +257,114 @@ func (indicator *UltimateOscillator) CalculateAll(
 	indicator.length3 = length3
 	indicator.offset = offset
 
-	stockData := *ctx.Data
-	var results []IndicatorValues
+	// Standard weights for Ultimate Oscillator calculation
+	// Using 4:2:1 ratio as per traditional implementation
+	weightShort := 4.0
+	weightMid := 2.0
+	weightLong := 1.0
 
-	// Need enough data for calculation
-	minDataPoints := length3 + offset + 1
-	if len(stockData) < minDataPoints {
+	// Get stock data
+	stockData := *ctx.Data
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	if len(stockData) < length3+1 {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+	closes := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+		closes[i] = data.Close
+	}
+
+	// Step 1: Calculate Buying Pressure (BP) and True Range (TR)
+	bp := make([]float64, len(stockData))
+	tr := make([]float64, len(stockData))
+
+	// First values (no previous close available)
+	bp[0] = 0
+	tr[0] = highs[0] - lows[0]
+
+	for i := 1; i < len(stockData); i++ {
+		// Buying Pressure = Close - Minimum(Low, Previous Close)
+		bp[i] = closes[i] - min(lows[i], closes[i-1])
+
+		// True Range = Maximum(High, Previous Close) - Minimum(Low, Previous Close)
+		tr[i] = max(highs[i], closes[i-1]) - min(lows[i], closes[i-1])
+	}
+
+	// Step 2: Calculate Ultimate Oscillator for each valid point
+	uo := make([]float64, len(stockData))
+
+	for i := length3; i < len(stockData); i++ {
+		// Calculate short period sums (length1)
+		var sumBP1, sumTR1 float64
+		for j := i - length1 + 1; j <= i; j++ {
+			sumBP1 += bp[j]
+			sumTR1 += tr[j]
 		}
 
-		// Calculate Ultimate Oscillator value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Calculate mid period sums (length2)
+		var sumBP2, sumTR2 float64
+		for j := i - length2 + 1; j <= i; j++ {
+			sumBP2 += bp[j]
+			sumTR2 += tr[j]
+		}
 
-		results = append(results, IndicatorValues{
+		// Calculate long period sums (length3)
+		var sumBP3, sumTR3 float64
+		for j := i - length3 + 1; j <= i; j++ {
+			sumBP3 += bp[j]
+			sumTR3 += tr[j]
+		}
+
+		// Calculate averages with division by zero protection
+		var avg1, avg2, avg3 float64
+
+		if sumTR1 > 0 {
+			avg1 = sumBP1 / sumTR1
+		}
+
+		if sumTR2 > 0 {
+			avg2 = sumBP2 / sumTR2
+		}
+
+		if sumTR3 > 0 {
+			avg3 = sumBP3 / sumTR3
+		}
+
+		// Calculate Ultimate Oscillator using weighted formula
+		totalWeight := weightShort + weightMid + weightLong
+		uo[i] = 100 * ((weightShort*avg1 + weightMid*avg2 + weightLong*avg3) / totalWeight)
+	}
+
+	// Step 3: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := length3; i < len(stockData); i++ {
+		// Apply offset
+		if i < length3+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(uo[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }

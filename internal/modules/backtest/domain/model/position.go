@@ -23,6 +23,17 @@ const (
 	Short Direction = "SHORT"
 )
 
+// ExitReason defines the reason for exiting a position
+type ExitReason string
+
+const (
+	ExitReasonSignal           ExitReason = "Exit signal"
+	ExitReasonStopLoss         ExitReason = "Stop loss"
+	ExitReasonTrailingStopLoss ExitReason = "Trailing Stop loss"
+	ExitReasonTargetProfit     ExitReason = "Target profit"
+	ExitReasonMISSquareOff     ExitReason = "EOD Square-off"
+)
+
 // Position represents a trading position within a run
 type Position struct {
 	ID                   uuid.UUID     `json:"id" db:"id"`
@@ -47,11 +58,13 @@ type Position struct {
 	ExitFees             *float64      `json:"exit_fees,omitempty" db:"exit_fees"`
 	NetProfitLoss        *float64      `json:"net_profit_loss,omitempty" db:"net_profit_loss"`
 	PositionSize         float64       `json:"position_size" db:"position_size"`
-	StopLossPrice		 *float64
-	EntryOrderID         *uuid.UUID    `json:"entry_order_id,omitempty" db:"entry_order_id"`
-	ExitOrderID          *uuid.UUID    `json:"exit_order_id,omitempty" db:"exit_order_id"`
-	CreatedAt            time.Time     `json:"created_at" db:"created_at"`
-	UpdatedAt            time.Time     `json:"updated_at" db:"updated_at"`
+	StopLossPrice        *float64
+	InitialStopLossPrice *float64
+	TargetProfitPrice    *float64
+	EntryOrderID         *uuid.UUID `json:"entry_order_id,omitempty" db:"entry_order_id"`
+	ExitOrderID          *uuid.UUID `json:"exit_order_id,omitempty" db:"exit_order_id"`
+	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 // NewPosition creates a new trading position

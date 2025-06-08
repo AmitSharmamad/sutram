@@ -4,6 +4,7 @@ import (
 	util "algo/internal/util/math"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -30,30 +31,38 @@ func (indicator *DMI) GenerateIndicatorKey(
 	ctx *EvaluationContext,
 ) (string, error) {
 	// Validate we have the required number of parameters
-	if len(config) != 2 {
-		return "", fmt.Errorf("DMI requires 2 parameters: period, offset")
+	if len(config) != 3 {
+		return "", fmt.Errorf("DMI requires 3 parameters: point, period, offset")
+	}
+
+	// Extract point parameter
+	point, ok := config[0].(string)
+	if !ok {
+		return "", fmt.Errorf("DMI point parameter must be a string")
 	}
 
 	// Extract period parameter
-	periodFloat, ok := config[0].(float64)
+	periodFloat, ok := config[1].(float64)
 	if !ok {
 		return "", fmt.Errorf("DMI period parameter must be a number")
 	}
 	period := int(periodFloat)
 
 	// Extract offset parameter
-	offsetFloat, ok := config[1].(float64)
+	offsetFloat, ok := config[2].(float64)
 	if !ok {
 		return "", fmt.Errorf("DMI offset parameter must be a number")
 	}
 	offset := int(offsetFloat)
 
 	// Generate the key - include offset only if non-zero
+	baseKey := fmt.Sprintf("DMI_%s_%d", strings.ToUpper(point), period)
+
 	if offset != 0 {
-		return fmt.Sprintf("DMI_%d_%d", period, offset), nil
+		baseKey += fmt.Sprintf("_%d", offset)
 	}
 
-	return fmt.Sprintf("DMI_%d", period), nil
+	return baseKey, nil
 }
 
 // Helper method to slice all required data
@@ -73,8 +82,12 @@ func (indicator *DMI) Calculate(
 	config []any,
 	ctx *EvaluationContext,
 ) float64 {
-	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	point := config[0].(string) // Point parameter - DMI always uses High/Low/Close
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	// Note: DMI calculation doesn't use the point parameter as it always uses High, Low, Close
+	_ = point // Acknowledge the parameter but don't use it
 
 	indicator.period = period
 	indicator.offset = offset
@@ -208,11 +221,12 @@ func (indicator *DMI) GetDataRange(config map[string]any) int32 {
 }
 
 // GetLookBack returns the number of historical data points needed for DMI calculation
-// config[0] = period (float64), config[1] = offset (float64)
+// config[0] = point (string), config[1] = period (float64), config[2] = offset (float64)
 func (indicator *DMI) GetLookBack(config []any) int64 {
 	// Parse config parameters same as Calculate function
-	period := int(config[0].(float64)) // default: 14
-	offset := int(config[1].(float64)) // default: 0
+	// config[0] is point (string) - not needed for lookback calculation
+	period := int(config[1].(float64)) // default: 14
+	offset := int(config[2].(float64)) // default: 0
 
 	// For DMI/ADX calculation, we need:
 	// - Previous values for directional movement calculation (1 extra)
@@ -229,47 +243,149 @@ func (indicator *DMI) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
-	period := int(config[0].(float64))
-	offset := int(config[1].(float64))
+	// Parse config parameters
+	point := config[0].(string) // Point parameter - DMI always uses High/Low/Close
+	period := int(config[1].(float64))
+	offset := int(config[2].(float64))
+
+	// Note: DMI calculation doesn't use the point parameter as it always uses High, Low, Close
+	_ = point // Acknowledge the parameter but don't use it
 
 	indicator.period = period
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := 2*period + 1 + offset
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data (need 2*period + 1 for ADX calculation)
+	if len(stockData) < 2*period+1 {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+	closes := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+		closes[i] = data.Close
+	}
+
+	// Step 1: Calculate +DM, -DM, and TR (True Range)
+	posDM := make([]float64, len(stockData))
+	negDM := make([]float64, len(stockData))
+	tr := make([]float64, len(stockData))
+
+	for i := 1; i < len(stockData); i++ {
+		// Calculate directional movements
+		upMove := highs[i] - highs[i-1]
+		downMove := lows[i-1] - lows[i]
+
+		// Calculate +DM and -DM
+		if upMove > downMove && upMove > 0 {
+			posDM[i] = upMove
+		} else {
+			posDM[i] = 0
 		}
 
-		// Calculate DMI/ADX value for this point
-		value := indicator.Calculate(config, tempCtx)
+		if downMove > upMove && downMove > 0 {
+			negDM[i] = downMove
+		} else {
+			negDM[i] = 0
+		}
 
-		results = append(results, IndicatorValues{
+		// Calculate True Range
+		hl := highs[i] - lows[i]
+		hc := math.Abs(highs[i] - closes[i-1])
+		lc := math.Abs(lows[i] - closes[i-1])
+
+		tr[i] = math.Max(hl, math.Max(hc, lc))
+	}
+
+	// Step 2: Calculate smoothed +DM, -DM, and TR using Wilder's smoothing
+	smoothPosDM := make([]float64, len(stockData))
+	smoothNegDM := make([]float64, len(stockData))
+	smoothTR := make([]float64, len(stockData))
+
+	// Initial values for smoothed series (first period sum)
+	var sumPosDM, sumNegDM, sumTR float64
+	for i := 1; i <= period; i++ {
+		sumPosDM += posDM[i]
+		sumNegDM += negDM[i]
+		sumTR += tr[i]
+	}
+	smoothPosDM[period] = sumPosDM
+	smoothNegDM[period] = sumNegDM
+	smoothTR[period] = sumTR
+
+	// Calculate subsequent smoothed values using Wilder's smoothing
+	for i := period + 1; i < len(stockData); i++ {
+		smoothPosDM[i] = smoothPosDM[i-1] - (smoothPosDM[i-1] / float64(period)) + posDM[i]
+		smoothNegDM[i] = smoothNegDM[i-1] - (smoothNegDM[i-1] / float64(period)) + negDM[i]
+		smoothTR[i] = smoothTR[i-1] - (smoothTR[i-1] / float64(period)) + tr[i]
+	}
+
+	// Step 3: Calculate +DI and -DI
+	posDI := make([]float64, len(stockData))
+	negDI := make([]float64, len(stockData))
+
+	for i := period; i < len(stockData); i++ {
+		if smoothTR[i] > 0 {
+			posDI[i] = 100 * (smoothPosDM[i] / smoothTR[i])
+			negDI[i] = 100 * (smoothNegDM[i] / smoothTR[i])
+		}
+	}
+
+	// Step 4: Calculate DX (Directional Index)
+	dx := make([]float64, len(stockData))
+	for i := period; i < len(stockData); i++ {
+		diSum := posDI[i] + negDI[i]
+		if diSum > 0 {
+			dx[i] = 100 * (math.Abs(posDI[i]-negDI[i]) / diSum)
+		}
+	}
+
+	// Step 5: Calculate ADX (Average Directional Index)
+	adx := make([]float64, len(stockData))
+
+	// Initial ADX value as simple average of DX for the first period
+	var sumDX float64
+	for i := period; i < 2*period; i++ {
+		sumDX += dx[i]
+	}
+	if 2*period-1 < len(stockData) {
+		adx[2*period-1] = sumDX / float64(period)
+	}
+
+	// Calculate subsequent ADX values using Wilder's smoothing
+	for i := 2 * period; i < len(stockData); i++ {
+		adx[i] = ((adx[i-1] * float64(period-1)) + dx[i]) / float64(period)
+	}
+
+	// Step 6: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := 2*period - 1; i < len(stockData); i++ {
+		// Apply offset
+		if i < 2*period-1+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(adx[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }
