@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"algo/internal/modules/broker/application/dto"
+	"algo/internal/modules/broker/domain"
 )
 
 // HDFCSecOrderService handles HDFC Securities order API operations
@@ -17,6 +18,9 @@ type HDFCSecOrderService struct {
 	accessToken string
 	httpClient  *http.Client
 }
+
+// Ensure HDFCSecOrderService implements the Broker interface
+var _ domain.Broker = (*HDFCSecOrderService)(nil)
 
 // NewHDFCSecOrderService creates a new HDFC Securities order service
 func NewHDFCSecOrderService(baseURL, accessToken string) *HDFCSecOrderService {
@@ -29,8 +33,8 @@ func NewHDFCSecOrderService(baseURL, accessToken string) *HDFCSecOrderService {
 	}
 }
 
-// PlaceOrder places a new order through HDFC Securities API
-func (s *HDFCSecOrderService) PlaceOrder(ctx context.Context, request *dto.HDFCSecPlaceOrderRequest) (*dto.HDFCSecPlaceOrderResponse, error) {
+// PlaceHDFCSecOrder places a new order through HDFC Securities API
+func (s *HDFCSecOrderService) PlaceHDFCSecOrder(ctx context.Context, request *dto.HDFCSecPlaceOrderRequest) (*dto.HDFCSecPlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -64,8 +68,8 @@ func (s *HDFCSecOrderService) PlaceOrder(ctx context.Context, request *dto.HDFCS
 	return &response, nil
 }
 
-// ModifyOrder modifies an existing order through HDFC Securities API
-func (s *HDFCSecOrderService) ModifyOrder(ctx context.Context, request *dto.HDFCSecModifyOrderRequest) (*dto.HDFCSecModifyOrderResponse, error) {
+// ModifyHDFCSecOrder modifies an existing order through HDFC Securities API
+func (s *HDFCSecOrderService) ModifyHDFCSecOrder(ctx context.Context, request *dto.HDFCSecModifyOrderRequest) (*dto.HDFCSecModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	jsonData, err := json.Marshal(request)
@@ -99,8 +103,8 @@ func (s *HDFCSecOrderService) ModifyOrder(ctx context.Context, request *dto.HDFC
 	return &response, nil
 }
 
-// CancelOrder cancels an existing order through HDFC Securities API
-func (s *HDFCSecOrderService) CancelOrder(ctx context.Context, request *dto.HDFCSecCancelOrderRequest) (*dto.HDFCSecCancelOrderResponse, error) {
+// CancelHDFCSecOrder cancels an existing order through HDFC Securities API
+func (s *HDFCSecOrderService) CancelHDFCSecOrder(ctx context.Context, request *dto.HDFCSecCancelOrderRequest) (*dto.HDFCSecCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -300,4 +304,133 @@ func (s *HDFCSecOrderService) GetPositions(ctx context.Context) (*dto.HDFCSecPos
 	}
 
 	return &response, nil
+}
+
+// Broker interface implementation
+
+// PlaceOrder implements the Broker interface for placing orders
+func (s *HDFCSecOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to HDFC Securities-specific request
+	hdfcRequest := s.convertToPlaceOrderRequest(request)
+	
+	// Call the existing HDFC Securities-specific PlaceOrder method
+	hdfcResponse, err := s.PlaceHDFCSecOrder(ctx, hdfcRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert HDFC Securities response to common response
+	return s.convertToOrderResponse(request, hdfcResponse), nil
+}
+
+// UpdateOrder implements the Broker interface for modifying orders
+func (s *HDFCSecOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to HDFC Securities-specific request
+	hdfcRequest := s.convertToModifyOrderRequest(request)
+	
+	// Call the existing HDFC Securities-specific ModifyOrder method
+	hdfcResponse, err := s.ModifyHDFCSecOrder(ctx, hdfcRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert HDFC Securities response to common response
+	return s.convertModifyToOrderResponse(request, hdfcResponse), nil
+}
+
+// CancelOrder implements the Broker interface for canceling orders
+func (s *HDFCSecOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to HDFC Securities-specific request
+	hdfcRequest := &dto.HDFCSecCancelOrderRequest{
+		OrderID: request.OrderID,
+	}
+	
+	// Call the existing HDFC Securities-specific CancelOrder method
+	hdfcResponse, err := s.CancelHDFCSecOrder(ctx, hdfcRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert HDFC Securities response to common response
+	return s.convertCancelToOrderResponse(request, hdfcResponse), nil
+}
+
+// Helper conversion methods
+
+func (s *HDFCSecOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.HDFCSecPlaceOrderRequest {
+	return &dto.HDFCSecPlaceOrderRequest{
+		ClientCode:      "", // This would need to be populated from user context
+		Symbol:          request.Instrument,
+		Exchange:        request.Exchange,
+		Segment:         request.Segment,
+		TransactionType: request.TransactionType,
+		OrderType:       request.OrderType,
+		ProductType:     request.ProductType,
+		Quantity:        request.Quantity,
+		Price:           request.Price,
+		Validity:        "DAY", // Default validity
+		DisclosedQty:    0,     // Default
+		TriggerPrice:    0,     // Default
+	}
+}
+
+func (s *HDFCSecOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.HDFCSecModifyOrderRequest {
+	hdfcRequest := &dto.HDFCSecModifyOrderRequest{
+		OrderID: request.OrderID,
+	}
+	
+	if request.Quantity != nil {
+		hdfcRequest.Quantity = *request.Quantity
+	}
+	if request.Price != nil {
+		hdfcRequest.Price = *request.Price
+	}
+	if request.OrderType != nil {
+		hdfcRequest.OrderType = *request.OrderType
+	}
+	if request.TriggerPrice != nil {
+		hdfcRequest.TriggerPrice = *request.TriggerPrice
+	}
+	
+	return hdfcRequest
+}
+
+func (s *HDFCSecOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, hdfcResponse *dto.HDFCSecPlaceOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		ID:                  request.ID,
+		UserID:              request.UserID,
+		PositionID:          request.PositionID,
+		Exchange:            request.Exchange,
+		Segment:             request.Segment,
+		Instrument:          request.Instrument,
+		TransactionType:     request.TransactionType,
+		Quantity:            request.Quantity,
+		Price:               request.Price,
+		State:               hdfcResponse.OrderStatus,
+		ProductType:         request.ProductType,
+		OrderType:           request.OrderType,
+		BrokerOrderID:       hdfcResponse.OrderID,
+		BrokerOrderResponse: hdfcResponse,
+		AlgoID:              request.AlgoID,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+}
+
+func (s *HDFCSecOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, hdfcResponse *dto.HDFCSecModifyOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: hdfcResponse,
+		UpdatedAt:           time.Now(),
+		State:               hdfcResponse.OrderStatus,
+	}
+}
+
+func (s *HDFCSecOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, hdfcResponse *dto.HDFCSecCancelOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: hdfcResponse,
+		UpdatedAt:           time.Now(),
+		State:               hdfcResponse.OrderStatus,
+	}
 }

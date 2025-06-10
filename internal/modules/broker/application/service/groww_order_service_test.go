@@ -61,7 +61,7 @@ func TestGrowwOrderService_PlaceOrder(t *testing.T) {
 		Price:       2500.00,
 	}
 
-	response, err := service.PlaceOrder(context.Background(), request)
+	response, err := service.PlaceGrowwOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -103,7 +103,7 @@ func TestGrowwOrderService_ModifyOrder(t *testing.T) {
 		Validity:  "DAY",
 	}
 
-	response, err := service.ModifyOrder(context.Background(), request)
+	response, err := service.ModifyGrowwOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -139,7 +139,7 @@ func TestGrowwOrderService_CancelOrder(t *testing.T) {
 		OrderID: "GRW12345",
 	}
 
-	response, err := service.CancelOrder(context.Background(), request)
+	response, err := service.CancelGrowwOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)

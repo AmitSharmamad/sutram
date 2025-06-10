@@ -63,7 +63,7 @@ func TestHDFCSecOrderService_PlaceOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.PlaceOrder(ctx, request)
+	response, err := service.PlaceHDFCSecOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestHDFCSecOrderService_CancelOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.CancelOrder(ctx, request)
+	response, err := service.CancelHDFCSecOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestHDFCSecOrderService_ModifyOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.ModifyOrder(ctx, request)
+	response, err := service.ModifyHDFCSecOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)

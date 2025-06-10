@@ -59,7 +59,7 @@ func TestAngelOneOrderService_PlaceOrder(t *testing.T) {
 	}
 
 	// Execute test
-	response, err := service.PlaceOrder(context.Background(), request)
+	response, err := service.PlaceAngelOneOrder(context.Background(), request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestAngelOneOrderService_PlaceOrder_Error(t *testing.T) {
 	}
 
 	// Execute test
-	_, err := service.PlaceOrder(context.Background(), request)
+	_, err := service.PlaceAngelOneOrder(context.Background(), request)
 
 	// Assertions
 	require.Error(t, err)
@@ -149,7 +149,7 @@ func TestAngelOneOrderService_ModifyOrder(t *testing.T) {
 	}
 
 	// Execute test
-	response, err := service.ModifyOrder(context.Background(), request)
+	response, err := service.ModifyAngelOneOrder(context.Background(), request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestAngelOneOrderService_CancelOrder(t *testing.T) {
 	}
 
 	// Execute test
-	response, err := service.CancelOrder(context.Background(), request)
+	response, err := service.CancelAngelOneOrder(context.Background(), request)
 
 	// Assertions
 	require.NoError(t, err)
