@@ -203,48 +203,115 @@ func (indicator *Vortex) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
-	period := int(config[0].(float64)) // default: 14
-	// signal := config[1].(string)       // default: "POSITIVE_VI" - handled by Calculate method
-	offset := int(config[2].(float64)) // default: 0
+	// Parse config parameters
+	period := int(config[0].(float64))
+	signal := config[1].(string)
+	offset := int(config[2].(float64))
 
 	indicator.period = period
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Need enough data for calculation
-	minDataPoints := period + offset + 1
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data (need period + 1 for previous values)
+	if len(stockData) < period+1 {
+		return []IndicatorValues{}
+	}
+
+	// Extract price arrays
+	highs := make([]float64, len(stockData))
+	lows := make([]float64, len(stockData))
+	closes := make([]float64, len(stockData))
+
+	for i, data := range stockData {
+		highs[i] = data.High
+		lows[i] = data.Low
+		closes[i] = data.Close
+	}
+
+	// Step 1: Calculate VM+ (Vortex Movement Plus), VM- (Vortex Movement Minus), and TR (True Range)
+	vmPlus := make([]float64, len(stockData))
+	vmMinus := make([]float64, len(stockData))
+	tr := make([]float64, len(stockData))
+
+	for i := 1; i < len(stockData); i++ {
+		// VM+ = |Current High - Prior Low|
+		vmPlus[i] = math.Abs(highs[i] - lows[i-1])
+
+		// VM- = |Current Low - Prior High|
+		vmMinus[i] = math.Abs(lows[i] - highs[i-1])
+
+		// Calculate True Range: max(H-L, |H-C_prev|, |L-C_prev|)
+		hl := highs[i] - lows[i]
+		hc := math.Abs(highs[i] - closes[i-1])
+		lc := math.Abs(lows[i] - closes[i-1])
+
+		tr[i] = math.Max(hl, math.Max(hc, lc))
+	}
+
+	// Step 2: Calculate VI+ and VI- (Vortex Indicators)
+	viPlus := make([]float64, len(stockData))
+	viMinus := make([]float64, len(stockData))
+
+	for i := period; i < len(stockData); i++ {
+		// Calculate sum of VM+ for the period
+		var sumVMPlus float64
+		for j := i - period + 1; j <= i; j++ {
+			sumVMPlus += vmPlus[j]
 		}
 
-		// Calculate Vortex value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Calculate sum of VM- for the period
+		var sumVMMinus float64
+		for j := i - period + 1; j <= i; j++ {
+			sumVMMinus += vmMinus[j]
+		}
 
-		results = append(results, IndicatorValues{
+		// Calculate sum of TR for the period
+		var sumTR float64
+		for j := i - period + 1; j <= i; j++ {
+			sumTR += tr[j]
+		}
+
+		// Calculate Vortex Indicators
+		// VI+ = Sum(VM+) / Sum(TR)
+		// VI- = Sum(VM-) / Sum(TR)
+		if sumTR > 0 {
+			viPlus[i] = sumVMPlus / sumTR
+			viMinus[i] = sumVMMinus / sumTR
+		}
+	}
+
+	// Step 3: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := period; i < len(stockData); i++ {
+		// Apply offset
+		if i < period+offset {
+			continue
+		}
+
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
+
+		// Select the appropriate value based on signal parameter
+		var value float64
+		if strings.ToUpper(signal) == "NEGATIVE_VI" {
+			value = viMinus[i]
+		} else { // Default to "POSITIVE_VI" for any other value
+			value = viPlus[i]
+		}
+
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(value),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }
