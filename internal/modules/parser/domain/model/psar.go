@@ -3,6 +3,7 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -242,6 +243,7 @@ func (indicator *ParabolicSAR) GetLookBack(config []any) int64 {
 }
 
 // CalculateAll calculates Parabolic SAR values for all data points
+// Following Excel flow: Initialize SAR/Trend -> Calculate SAR -> Update AF/EP/Trend -> Handle Reversals
 func (indicator *ParabolicSAR) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
@@ -256,31 +258,120 @@ func (indicator *ParabolicSAR) CalculateAll(
 	indicator.offset = offset
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
+	dataLen := len(stockData)
 
-	// Need enough data for calculation
-	minDataPoints := 20 + offset // Using the same as GetDataRange
-	if len(stockData) < minDataPoints {
+	// Need at least 3 data points for initial calculations
+	if dataLen < 3 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Extract price arrays
+	highs := make([]float64, dataLen)
+	lows := make([]float64, dataLen)
+	closes := make([]float64, dataLen)
+
+	for i := 0; i < dataLen; i++ {
+		highs[i] = stockData[i].High
+		lows[i] = stockData[i].Low
+		closes[i] = stockData[i].Close
+	}
+
+	// Initialize arrays for PSAR calculation
+	sar := make([]float64, dataLen)
+	af := make([]float64, dataLen)
+	ep := make([]float64, dataLen)
+	trend := make([]int, dataLen)
+
+	// Step 2: Initialize SAR and Trend (E2, F2, G2, H2 in Excel)
+	sar[1] = lows[1]  // Initial SAR = first Low (E2)
+	af[1] = minimumAF // Initial AF = 0.02 (F2)
+	ep[1] = highs[1]  // Initial EP = first High (G2)
+	trend[1] = 1      // Assume initial uptrend (H2)
+
+	// Step 3 & 4: Calculate SAR for subsequent rows
+	for i := 2; i < dataLen; i++ {
+		// Step 3: Calculate preliminary SAR (E3 in Excel)
+		// SAR = Prior SAR + Prior AF * (Prior EP - Prior SAR)
+		sar[i] = sar[i-1] + af[i-1]*(ep[i-1]-sar[i-1])
+
+		// Step 4: Update AF, EP, and Trend
+		prevTrend := trend[i-1]
+
+		// Check for trend reversal first
+		var reversed bool
+		if prevTrend == 1 && closes[i] < sar[i] {
+			// Reverse to downtrend if Close < SAR
+			trend[i] = -1
+			reversed = true
+		} else if prevTrend == -1 && closes[i] > sar[i] {
+			// Reverse to uptrend if Close > SAR
+			trend[i] = 1
+			reversed = true
+		} else {
+			// Continue previous trend
+			trend[i] = prevTrend
+			reversed = false
 		}
 
-		// Calculate Parabolic SAR value for this point
-		value := indicator.Calculate(config, tempCtx)
+		if reversed {
+			// Handle trend reversal - reset SAR, AF, and EP
+			if trend[i] == 1 {
+				// Reversing to uptrend: SAR = lowest low of prior 2 days
+				sar[i] = math.Min(lows[i-1], lows[i-2])
+				ep[i] = highs[i] // EP = current high
+			} else {
+				// Reversing to downtrend: SAR = highest high of prior 2 days
+				sar[i] = math.Max(highs[i-1], highs[i-2])
+				ep[i] = lows[i] // EP = current low
+			}
+			af[i] = minimumAF // Reset AF to initial value
+		} else {
+			// Continue trend - update AF and EP
+			if trend[i] == 1 {
+				// Uptrend: check for new high
+				if highs[i] > ep[i-1] {
+					ep[i] = highs[i] // Update EP to new high
+					// Increase AF, capped at maximum
+					af[i] = math.Min(af[i-1]+minimumAF, maximumAF)
+				} else {
+					ep[i] = ep[i-1] // Keep previous EP
+					af[i] = af[i-1] // Keep previous AF
+				}
+				// Ensure SAR doesn't cross Low (SAR ≤ Low)
+				sar[i] = math.Min(sar[i], lows[i])
+				if i > 2 {
+					sar[i] = math.Min(sar[i], lows[i-1])
+				}
+			} else {
+				// Downtrend: check for new low
+				if lows[i] < ep[i-1] {
+					ep[i] = lows[i] // Update EP to new low
+					// Increase AF, capped at maximum
+					af[i] = math.Min(af[i-1]+minimumAF, maximumAF)
+				} else {
+					ep[i] = ep[i-1] // Keep previous EP
+					af[i] = af[i-1] // Keep previous AF
+				}
+				// Ensure SAR doesn't cross High (SAR ≥ High)
+				sar[i] = math.Max(sar[i], highs[i])
+				if i > 2 {
+					sar[i] = math.Max(sar[i], highs[i-1])
+				}
+			}
+		}
+	}
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     value,
-		})
+	// Build results starting from index 2 (when calculation becomes valid)
+	var results []IndicatorValues
+	for i := 2; i < dataLen; i++ {
+		// Apply offset if specified
+		adjustedIndex := i + offset
+		if adjustedIndex >= 0 && adjustedIndex < dataLen {
+			results = append(results, IndicatorValues{
+				Timestamp: stockData[adjustedIndex].Timestamp,
+				Value:     util.Round(sar[i]),
+			})
+		}
 	}
 
 	// Filter results by startDate
