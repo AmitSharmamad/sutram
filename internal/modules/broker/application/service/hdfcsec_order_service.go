@@ -33,105 +33,6 @@ func NewHDFCSecBroker(baseURL, accessToken string) *HDFCSecBroker {
 	}
 }
 
-// PlaceHDFCSecOrder places a new order through HDFC Securities API
-func (s *HDFCSecBroker) PlaceHDFCSecOrder(ctx context.Context, request *dto.HDFCSecPlaceOrderRequest) (*dto.HDFCSecPlaceOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders", s.baseURL)
-	
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.HDFCSecPlaceOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// ModifyHDFCSecOrder modifies an existing order through HDFC Securities API
-func (s *HDFCSecBroker) ModifyHDFCSecOrder(ctx context.Context, request *dto.HDFCSecModifyOrderRequest) (*dto.HDFCSecModifyOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
-	
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.HDFCSecModifyOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// CancelHDFCSecOrder cancels an existing order through HDFC Securities API
-func (s *HDFCSecBroker) CancelHDFCSecOrder(ctx context.Context, request *dto.HDFCSecCancelOrderRequest) (*dto.HDFCSecCancelOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
-	
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.HDFCSecCancelOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
 // GetOrders retrieves all orders for the client
 func (s *HDFCSecBroker) GetOrders(ctx context.Context) (*dto.HDFCSecOrderListResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
@@ -313,14 +214,39 @@ func (s *HDFCSecBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderR
 	// Convert common request to HDFC Securities-specific request
 	hdfcRequest := s.convertToPlaceOrderRequest(request)
 	
-	// Call the existing HDFC Securities-specific PlaceOrder method
-	hdfcResponse, err := s.PlaceHDFCSecOrder(ctx, hdfcRequest)
+	// Call HDFC Securities API directly
+	url := fmt.Sprintf("%s/orders", s.baseURL)
+	
+	jsonData, err := json.Marshal(hdfcRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var hdfcResponse dto.HDFCSecPlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hdfcResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert HDFC Securities response to common response
-	return s.convertToOrderResponse(request, hdfcResponse), nil
+	return s.convertToOrderResponse(request, &hdfcResponse), nil
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
@@ -328,31 +254,70 @@ func (s *HDFCSecBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrde
 	// Convert common request to HDFC Securities-specific request
 	hdfcRequest := s.convertToModifyOrderRequest(request)
 	
-	// Call the existing HDFC Securities-specific ModifyOrder method
-	hdfcResponse, err := s.ModifyHDFCSecOrder(ctx, hdfcRequest)
+	// Call HDFC Securities API directly
+	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
+	
+	jsonData, err := json.Marshal(hdfcRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var hdfcResponse dto.HDFCSecModifyOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hdfcResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert HDFC Securities response to common response
-	return s.convertModifyToOrderResponse(request, hdfcResponse), nil
+	return s.convertModifyToOrderResponse(request, &hdfcResponse), nil
 }
 
 // CancelOrder implements the Broker interface for canceling orders
 func (s *HDFCSecBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to HDFC Securities-specific request
-	hdfcRequest := &dto.HDFCSecCancelOrderRequest{
-		OrderID: request.OrderID,
-	}
+	// Call HDFC Securities API directly
+	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
-	// Call the existing HDFC Securities-specific CancelOrder method
-	hdfcResponse, err := s.CancelHDFCSecOrder(ctx, hdfcRequest)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var hdfcResponse dto.HDFCSecCancelOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hdfcResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert HDFC Securities response to common response
-	return s.convertCancelToOrderResponse(request, hdfcResponse), nil
+	return s.convertCancelToOrderResponse(request, &hdfcResponse), nil
 }
 
 // Helper conversion methods

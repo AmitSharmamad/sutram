@@ -33,13 +33,13 @@ func NewBrokerController(dhanBroker *service.DhanBroker) *BrokerController {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/orders [post]
 func (c *BrokerController) PlaceOrder(ctx *gin.Context) {
-	var request dto.DhanPlaceOrderRequest
+	var request dto.PlaceOrderRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	response, err := c.dhanBroker.PlaceDhanOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.PlaceOrder(ctx.Request.Context(), &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,7 +61,7 @@ func (c *BrokerController) PlaceOrder(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/orders/{orderID} [put]
 func (c *BrokerController) ModifyOrder(ctx *gin.Context) {
-	var request dto.DhanModifyOrderRequest
+	var request dto.ModifyOrderRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -71,7 +71,7 @@ func (c *BrokerController) ModifyOrder(ctx *gin.Context) {
 	orderID := ctx.Param("orderID")
 	request.OrderID = orderID
 
-	response, err := c.dhanBroker.ModifyDhanOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.UpdateOrder(ctx.Request.Context(), &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -93,17 +93,13 @@ func (c *BrokerController) ModifyOrder(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/orders/{orderID} [delete]
 func (c *BrokerController) CancelOrder(ctx *gin.Context) {
-	var request dto.DhanCancelOrderRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	orderID := ctx.Param("orderID")
+	
+	request := &dto.CancelOrderRequest{
+		OrderID: orderID,
 	}
 
-	// Ensure the order ID from URL matches the request
-	orderID := ctx.Param("orderID")
-	request.OrderID = orderID
-
-	response, err := c.dhanBroker.CancelDhanOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.CancelOrder(ctx.Request.Context(), request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -294,14 +294,40 @@ func (s *SharekhanBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrde
 	// Convert common request to Sharekhan-specific request
 	sharekhanRequest := s.convertToPlaceOrderRequest(request)
 	
-	// Call the existing Sharekhan-specific PlaceOrder method
-	sharekhanResponse, err := s.PlaceSharekhanOrder(ctx, sharekhanRequest)
+	// Call Sharekhan API directly
+	url := fmt.Sprintf("%s/orders", s.baseURL)
+	
+	jsonData, err := json.Marshal(sharekhanRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+	req.Header.Set("X-API-Key", s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var sharekhanResponse dto.SharekhanPlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&sharekhanResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert Sharekhan response to common response
-	return s.convertToOrderResponse(request, sharekhanResponse), nil
+	return s.convertToOrderResponse(request, &sharekhanResponse), nil
 }
 
 // UpdateOrder implements the Broker interface for modifying orders

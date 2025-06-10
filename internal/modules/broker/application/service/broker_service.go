@@ -37,21 +37,24 @@ func NewBrokerService(
 
 // PlaceOrderWithDhan places an order through Dhan and saves it locally
 func (s *BrokerService) PlaceOrderWithDhan(ctx context.Context, orderDTO *dto.PlaceOrderDTO) (*dto.OrderResponseDTO, error) {
-	// Convert internal DTO to Dhan request
-	dhanRequest := &dto.DhanPlaceOrderRequest{
-		DhanClientID:    "default", // This should come from user configuration
+	// Convert internal DTO to common interface request
+	commonRequest := &dto.PlaceOrderRequest{
+		ID:              orderDTO.ID,
+		UserID:          orderDTO.UserID,
+		PositionID:      orderDTO.PositionID,
+		Exchange:        orderDTO.Exchange,
+		Segment:         orderDTO.Segment,
+		Instrument:      orderDTO.Instrument,
 		TransactionType: orderDTO.TransactionType,
-		ExchangeSegment: fmt.Sprintf("%s_%s", orderDTO.Exchange, orderDTO.Segment),
-		ProductType:     orderDTO.ProductType,
-		OrderType:       orderDTO.OrderType,
-		Validity:        "DAY", // Default validity
-		SecurityID:      orderDTO.Instrument,
 		Quantity:        orderDTO.Quantity,
 		Price:           orderDTO.Price,
+		ProductType:     orderDTO.ProductType,
+		OrderType:       orderDTO.OrderType,
+		AlgoID:          orderDTO.AlgoID,
 	}
 
-	// Place order with Dhan
-	dhanResponse, err := s.dhanService.PlaceDhanOrder(ctx, dhanRequest)
+	// Place order with Dhan using common interface
+	orderResponse, err := s.dhanService.PlaceOrder(ctx, commonRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order with Dhan: %w", err)
 	}
@@ -70,8 +73,8 @@ func (s *BrokerService) PlaceOrderWithDhan(ctx context.Context, orderDTO *dto.Pl
 		State:               "SENT",
 		ProductType:         orderDTO.ProductType,
 		OrderType:           orderDTO.OrderType,
-		BrokerOrderID:       &dhanResponse.OrderID,
-		BrokerOrderResponse: dhanResponse,
+		BrokerOrderID:       &orderResponse.BrokerOrderID,
+		BrokerOrderResponse: orderResponse.BrokerOrderResponse,
 		AlgoID:              &orderDTO.AlgoID,
 		CreatedAt:           time.Now(),
 		UpdatedAt:           time.Now(),
@@ -165,20 +168,19 @@ func (s *BrokerService) CancelOrderWithDhan(ctx context.Context, orderID uuid.UU
 		return nil, fmt.Errorf("order has no broker order ID")
 	}
 
-	// Cancel order with Dhan
-	cancelRequest := &dto.DhanCancelOrderRequest{
-		DhanClientID: "default", // This should come from user configuration
-		OrderID:      *order.BrokerOrderID,
+	// Cancel order with Dhan using common interface
+	cancelRequest := &dto.CancelOrderRequest{
+		OrderID: *order.BrokerOrderID,
 	}
 
-	dhanResponse, err := s.dhanService.CancelDhanOrder(ctx, cancelRequest)
+	orderResponse, err := s.dhanService.CancelOrder(ctx, cancelRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel order with Dhan: %w", err)
 	}
 
 	// Update local record
-	order.State = dhanResponse.OrderStatus
-	order.BrokerOrderResponse = dhanResponse
+	order.State = orderResponse.State
+	order.BrokerOrderResponse = orderResponse.BrokerOrderResponse
 	order.UpdatedAt = time.Now()
 
 	if err := s.orderRepo.Update(ctx, order); err != nil {

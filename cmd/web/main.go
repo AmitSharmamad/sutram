@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"algo/internal/modules/backtest"
+	"algo/internal/modules/broker"
 	"algo/internal/modules/community"
 	"algo/internal/modules/deployment"
 	"algo/internal/modules/instrument"
@@ -173,6 +174,10 @@ func initializeModules(router *gin.RouterGroup) {
 	backtestModule := backtest.New()
 	backtestModule.SetUserController(userController)
 	backtestModule.RegisterRoutes(router)
+
+	// Initialize broker module
+	brokerModule := broker.New()
+	brokerModule.RegisterRoutes(router)
 
 	// Initialize marketplace module
 	marketplaceModule := marketplace.New()
