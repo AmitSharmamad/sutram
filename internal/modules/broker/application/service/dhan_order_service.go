@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"algo/internal/modules/broker/application/dto"
+	"algo/internal/modules/broker/domain"
 )
 
 // DhanOrderService handles Dhan order API operations
@@ -17,6 +18,9 @@ type DhanOrderService struct {
 	accessToken string
 	httpClient  *http.Client
 }
+
+// Ensure DhanOrderService implements the Broker interface
+var _ domain.Broker = (*DhanOrderService)(nil)
 
 // NewDhanOrderService creates a new Dhan order service
 func NewDhanOrderService(baseURL, accessToken string) *DhanOrderService {
@@ -29,8 +33,8 @@ func NewDhanOrderService(baseURL, accessToken string) *DhanOrderService {
 	}
 }
 
-// PlaceOrder places a new order through Dhan API
-func (s *DhanOrderService) PlaceOrder(ctx context.Context, request *dto.DhanPlaceOrderRequest) (*dto.DhanPlaceOrderResponse, error) {
+// PlaceDhanOrder places a new order through Dhan API
+func (s *DhanOrderService) PlaceDhanOrder(ctx context.Context, request *dto.DhanPlaceOrderRequest) (*dto.DhanPlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -64,8 +68,8 @@ func (s *DhanOrderService) PlaceOrder(ctx context.Context, request *dto.DhanPlac
 	return &response, nil
 }
 
-// ModifyOrder modifies an existing order through Dhan API
-func (s *DhanOrderService) ModifyOrder(ctx context.Context, request *dto.DhanModifyOrderRequest) (*dto.DhanModifyOrderResponse, error) {
+// ModifyDhanOrder modifies an existing order through Dhan API
+func (s *DhanOrderService) ModifyDhanOrder(ctx context.Context, request *dto.DhanModifyOrderRequest) (*dto.DhanModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	jsonData, err := json.Marshal(request)
@@ -99,8 +103,8 @@ func (s *DhanOrderService) ModifyOrder(ctx context.Context, request *dto.DhanMod
 	return &response, nil
 }
 
-// CancelOrder cancels an existing order through Dhan API
-func (s *DhanOrderService) CancelOrder(ctx context.Context, request *dto.DhanCancelOrderRequest) (*dto.DhanCancelOrderResponse, error) {
+// CancelDhanOrder cancels an existing order through Dhan API
+func (s *DhanOrderService) CancelDhanOrder(ctx context.Context, request *dto.DhanCancelOrderRequest) (*dto.DhanCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -271,4 +275,136 @@ func (s *DhanOrderService) GetTradeBook(ctx context.Context) (*dto.DhanTradeList
 	}
 
 	return &response, nil
+}
+
+// Broker interface implementation
+
+// PlaceOrder implements the Broker interface for placing orders
+func (s *DhanOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Dhan-specific request
+	dhanRequest := s.convertToPlaceOrderRequest(request)
+	
+	// Call the existing Dhan-specific PlaceOrder method
+	dhanResponse, err := s.PlaceDhanOrder(ctx, dhanRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Dhan response to common response
+	return s.convertToOrderResponse(request, dhanResponse), nil
+}
+
+// UpdateOrder implements the Broker interface for modifying orders
+func (s *DhanOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Dhan-specific request
+	dhanRequest := s.convertToModifyOrderRequest(request)
+	
+	// Call the existing Dhan-specific ModifyOrder method
+	dhanResponse, err := s.ModifyDhanOrder(ctx, dhanRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Dhan response to common response
+	return s.convertModifyToOrderResponse(request, dhanResponse), nil
+}
+
+// CancelOrder implements the Broker interface for canceling orders
+func (s *DhanOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Dhan-specific request
+	dhanRequest := &dto.DhanCancelOrderRequest{
+		OrderID: request.OrderID,
+	}
+	
+	// Call the existing Dhan-specific CancelOrder method
+	dhanResponse, err := s.CancelDhanOrder(ctx, dhanRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Dhan response to common response
+	return s.convertCancelToOrderResponse(request, dhanResponse), nil
+}
+
+// Helper conversion methods
+
+func (s *DhanOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.DhanPlaceOrderRequest {
+	return &dto.DhanPlaceOrderRequest{
+		DhanClientID:       "", // This would need to be populated from user context
+		TransactionType:    request.TransactionType,
+		ExchangeSegment:    fmt.Sprintf("%s_%s", request.Exchange, request.Segment),
+		ProductType:        request.ProductType,
+		OrderType:          request.OrderType,
+		Validity:           "DAY", // Default validity
+		SecurityID:         request.Instrument,
+		Quantity:           request.Quantity,
+		Price:              request.Price,
+		DisclosedQuantity:  0,
+		TriggerPrice:       0,
+		AfterMarketOrder:   false,
+		AmoTime:           "",
+		BolBlockDeal:      false,
+		CorrelationID:     request.AlgoID,
+	}
+}
+
+func (s *DhanOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.DhanModifyOrderRequest {
+	dhanRequest := &dto.DhanModifyOrderRequest{
+		OrderID: request.OrderID,
+	}
+	
+	if request.Quantity != nil {
+		dhanRequest.Quantity = *request.Quantity
+	}
+	if request.Price != nil {
+		dhanRequest.Price = *request.Price
+	}
+	if request.OrderType != nil {
+		dhanRequest.OrderType = *request.OrderType
+	}
+	if request.TriggerPrice != nil {
+		dhanRequest.TriggerPrice = *request.TriggerPrice
+	}
+	
+	return dhanRequest
+}
+
+func (s *DhanOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, dhanResponse *dto.DhanPlaceOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		ID:                  request.ID,
+		UserID:              request.UserID,
+		PositionID:          request.PositionID,
+		Exchange:            request.Exchange,
+		Segment:             request.Segment,
+		Instrument:          request.Instrument,
+		TransactionType:     request.TransactionType,
+		Quantity:            request.Quantity,
+		Price:               request.Price,
+		State:               dhanResponse.OrderStatus,
+		ProductType:         request.ProductType,
+		OrderType:           request.OrderType,
+		BrokerOrderID:       dhanResponse.OrderID,
+		BrokerOrderResponse: dhanResponse,
+		AlgoID:              request.AlgoID,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+}
+
+func (s *DhanOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, dhanResponse *dto.DhanModifyOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: dhanResponse,
+		UpdatedAt:           time.Now(),
+		State:               dhanResponse.OrderStatus,
+	}
+}
+
+func (s *DhanOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, dhanResponse *dto.DhanCancelOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: dhanResponse,
+		UpdatedAt:           time.Now(),
+		State:               dhanResponse.OrderStatus,
+	}
 }

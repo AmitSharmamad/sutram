@@ -62,7 +62,7 @@ func TestDhanOrderService_PlaceOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.PlaceOrder(ctx, request)
+	response, err := service.PlaceDhanOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestDhanOrderService_CancelOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.CancelOrder(ctx, request)
+	response, err := service.CancelDhanOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)

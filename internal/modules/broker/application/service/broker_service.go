@@ -51,7 +51,7 @@ func (s *BrokerService) PlaceOrderWithDhan(ctx context.Context, orderDTO *dto.Pl
 	}
 
 	// Place order with Dhan
-	dhanResponse, err := s.dhanService.PlaceOrder(ctx, dhanRequest)
+	dhanResponse, err := s.dhanService.PlaceDhanOrder(ctx, dhanRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order with Dhan: %w", err)
 	}
@@ -171,7 +171,7 @@ func (s *BrokerService) CancelOrderWithDhan(ctx context.Context, orderID uuid.UU
 		OrderID:      *order.BrokerOrderID,
 	}
 
-	dhanResponse, err := s.dhanService.CancelOrder(ctx, cancelRequest)
+	dhanResponse, err := s.dhanService.CancelDhanOrder(ctx, cancelRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel order with Dhan: %w", err)
 	}
