@@ -17,6 +17,7 @@ type Module struct {
 	zerodhaOrderService  *service.ZerodhaOrderService
 	hdfcsecOrderService  *service.HDFCSecOrderService
   sharekhanOrderService *service.SharekhanOrderService
+  angeloneOrderService  *service.AngelOneOrderService
 	brokerService        *service.BrokerService
 }
 
@@ -51,6 +52,11 @@ func (m *Module) initialize() {
 	zerodhaAPIKey := getEnv("ZERODHA_API_KEY", "")
 	zerodhaAccessToken := getEnv("ZERODHA_ACCESS_TOKEN", "")
 
+	// Get AngelOne API configuration from environment
+	angeloneBaseURL := getEnv("ANGELONE_API_BASE_URL", "https://apiconnect.angelbroking.com")
+	angeloneAPIKey := getEnv("ANGELONE_API_KEY", "")
+	angeloneAccessToken := getEnv("ANGELONE_ACCESS_TOKEN", "")
+
 	// Get HDFC Securities API configuration from environment
 	hdfcsecBaseURL := getEnv("HDFCSEC_API_BASE_URL", "https://api.hdfcsec.com/v1")
 	hdfcsecAccessToken := getEnv("HDFCSEC_ACCESS_TOKEN", "")
@@ -67,6 +73,8 @@ func (m *Module) initialize() {
 	// Create Zerodha order service
 	m.zerodhaOrderService = service.NewZerodhaOrderService(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
 
+	// Create AngelOne order service
+	m.angeloneOrderService = service.NewAngelOneOrderService(angeloneBaseURL, angeloneAPIKey, angeloneAccessToken)
 
   // Create HDFC Securities order service
 	m.hdfcsecOrderService = service.NewHDFCSecOrderService(hdfcsecBaseURL, hdfcsecAccessToken)
@@ -74,7 +82,6 @@ func (m *Module) initialize() {
   // Create Sharekhan order service
 	m.sharekhanOrderService = service.NewSharekhanOrderService(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
 
-  
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
 
@@ -103,6 +110,10 @@ func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
 	return m.zerodhaOrderService
 }
 
+// GetAngelOneOrderService returns the AngelOne order service
+func (m *Module) GetAngelOneOrderService() *service.AngelOneOrderService {
+	return m.angeloneOrderService
+}
 
 // GetHDFCSecOrderService returns the HDFC Securities order service
 func (m *Module) GetHDFCSecOrderService() *service.HDFCSecOrderService {
