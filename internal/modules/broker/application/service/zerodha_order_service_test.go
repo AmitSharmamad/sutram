@@ -59,7 +59,7 @@ func TestZerodhaOrderService_PlaceOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.PlaceOrder(ctx, request)
+	response, err := service.PlaceZerodhaOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestZerodhaOrderService_ModifyOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.ModifyOrder(ctx, request)
+	response, err := service.ModifyZerodhaOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestZerodhaOrderService_CancelOrder(t *testing.T) {
 
 	// Execute test
 	ctx := context.Background()
-	response, err := service.CancelOrder(ctx, request)
+	response, err := service.CancelZerodhaOrder(ctx, request)
 
 	// Assertions
 	require.NoError(t, err)

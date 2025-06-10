@@ -58,7 +58,7 @@ func TestSharekhanOrderService_PlaceOrder(t *testing.T) {
 		Validity:        "DAY",
 	}
 
-	response, err := service.PlaceOrder(context.Background(), request)
+	response, err := service.PlaceSharekhanOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	assert.Equal(t, "SK12345", response.OrderNumber)
@@ -108,7 +108,7 @@ func TestSharekhanOrderService_ModifyOrder(t *testing.T) {
 		Validity:    "DAY",
 	}
 
-	response, err := service.ModifyOrder(context.Background(), request)
+	response, err := service.ModifySharekhanOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	assert.Equal(t, "SK12345", response.OrderNumber)
@@ -145,7 +145,7 @@ func TestSharekhanOrderService_CancelOrder(t *testing.T) {
 		OrderNumber: "SK12345",
 	}
 
-	response, err := service.CancelOrder(context.Background(), request)
+	response, err := service.CancelSharekhanOrder(context.Background(), request)
 
 	require.NoError(t, err)
 	assert.Equal(t, "SK12345", response.OrderNumber)

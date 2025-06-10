@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"algo/internal/modules/broker/application/dto"
+	"algo/internal/modules/broker/domain"
 )
 
 // ZerodhaOrderService handles Zerodha Kite order API operations
@@ -18,6 +19,9 @@ type ZerodhaOrderService struct {
 	accessToken string
 	httpClient  *http.Client
 }
+
+// Ensure ZerodhaOrderService implements the Broker interface
+var _ domain.Broker = (*ZerodhaOrderService)(nil)
 
 // NewZerodhaOrderService creates a new Zerodha order service
 func NewZerodhaOrderService(baseURL, apiKey, accessToken string) *ZerodhaOrderService {
@@ -31,8 +35,8 @@ func NewZerodhaOrderService(baseURL, apiKey, accessToken string) *ZerodhaOrderSe
 	}
 }
 
-// PlaceOrder places a new order through Zerodha Kite API
-func (s *ZerodhaOrderService) PlaceOrder(ctx context.Context, request *dto.ZerodhaPlaceOrderRequest) (*dto.ZerodhaPlaceOrderResponse, error) {
+// PlaceZerodhaOrder places a new order through Zerodha Kite API
+func (s *ZerodhaOrderService) PlaceZerodhaOrder(ctx context.Context, request *dto.ZerodhaPlaceOrderRequest) (*dto.ZerodhaPlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, "regular")
 	
 	// Convert to form data as Zerodha expects form-encoded data
@@ -65,8 +69,8 @@ func (s *ZerodhaOrderService) PlaceOrder(ctx context.Context, request *dto.Zerod
 	return &response, nil
 }
 
-// ModifyOrder modifies an existing order through Zerodha Kite API
-func (s *ZerodhaOrderService) ModifyOrder(ctx context.Context, request *dto.ZerodhaModifyOrderRequest) (*dto.ZerodhaModifyOrderResponse, error) {
+// ModifyZerodhaOrder modifies an existing order through Zerodha Kite API
+func (s *ZerodhaOrderService) ModifyZerodhaOrder(ctx context.Context, request *dto.ZerodhaModifyOrderRequest) (*dto.ZerodhaModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
 	
 	// Convert to form data as Zerodha expects form-encoded data
@@ -99,8 +103,8 @@ func (s *ZerodhaOrderService) ModifyOrder(ctx context.Context, request *dto.Zero
 	return &response, nil
 }
 
-// CancelOrder cancels an existing order through Zerodha Kite API
-func (s *ZerodhaOrderService) CancelOrder(ctx context.Context, request *dto.ZerodhaCancelOrderRequest) (*dto.ZerodhaCancelOrderResponse, error) {
+// CancelZerodhaOrder cancels an existing order through Zerodha Kite API
+func (s *ZerodhaOrderService) CancelZerodhaOrder(ctx context.Context, request *dto.ZerodhaCancelOrderRequest) (*dto.ZerodhaCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -338,4 +342,131 @@ func (s *ZerodhaOrderService) convertModifyToFormData(request *dto.ZerodhaModify
 	}
 	
 	return formData
+}
+// Broker interface implementation
+
+// PlaceOrder implements the Broker interface for placing orders
+func (s *ZerodhaOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Zerodha-specific request
+	zerodhaRequest := s.convertToPlaceOrderRequest(request)
+	
+	// Call the existing Zerodha-specific PlaceOrder method
+	zerodhaResponse, err := s.PlaceZerodhaOrder(ctx, zerodhaRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Zerodha response to common response
+	return s.convertToOrderResponse(request, zerodhaResponse), nil
+}
+
+// UpdateOrder implements the Broker interface for modifying orders
+func (s *ZerodhaOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Zerodha-specific request
+	zerodhaRequest := s.convertToModifyOrderRequest(request)
+	
+	// Call the existing Zerodha-specific ModifyOrder method
+	zerodhaResponse, err := s.ModifyZerodhaOrder(ctx, zerodhaRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Zerodha response to common response
+	return s.convertModifyToOrderResponse(request, zerodhaResponse), nil
+}
+
+// CancelOrder implements the Broker interface for canceling orders
+func (s *ZerodhaOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Zerodha-specific request
+	zerodhaRequest := &dto.ZerodhaCancelOrderRequest{
+		OrderID: request.OrderID,
+		Variety: "regular", // Default variety for Zerodha
+	}
+	
+	// Call the existing Zerodha-specific CancelOrder method
+	zerodhaResponse, err := s.CancelZerodhaOrder(ctx, zerodhaRequest)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert Zerodha response to common response
+	return s.convertCancelToOrderResponse(request, zerodhaResponse), nil
+}
+
+// Helper conversion methods
+
+func (s *ZerodhaOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.ZerodhaPlaceOrderRequest {
+	return &dto.ZerodhaPlaceOrderRequest{
+		TradingSymbol:   request.Instrument,
+		Exchange:        request.Exchange,
+		TransactionType: request.TransactionType,
+		OrderType:       request.OrderType,
+		Quantity:        request.Quantity,
+		Price:           request.Price,
+		Product:         request.ProductType,
+		Validity:        "DAY", // Default validity
+		Variety:         "regular", // Default variety
+		Tag:             request.AlgoID,
+	}
+}
+
+func (s *ZerodhaOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.ZerodhaModifyOrderRequest {
+	zerodhaRequest := &dto.ZerodhaModifyOrderRequest{
+		OrderID: request.OrderID,
+	}
+	
+	if request.Quantity != nil {
+		zerodhaRequest.Quantity = *request.Quantity
+	}
+	if request.Price != nil {
+		zerodhaRequest.Price = *request.Price
+	}
+	if request.OrderType != nil {
+		zerodhaRequest.OrderType = *request.OrderType
+	}
+	if request.TriggerPrice != nil {
+		zerodhaRequest.TriggerPrice = *request.TriggerPrice
+	}
+	
+	return zerodhaRequest
+}
+
+func (s *ZerodhaOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, zerodhaResponse *dto.ZerodhaPlaceOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		ID:                  request.ID,
+		UserID:              request.UserID,
+		PositionID:          request.PositionID,
+		Exchange:            request.Exchange,
+		Segment:             request.Segment,
+		Instrument:          request.Instrument,
+		TransactionType:     request.TransactionType,
+		Quantity:            request.Quantity,
+		Price:               request.Price,
+		State:               "SENT", // Zerodha response typically just has OrderID
+		ProductType:         request.ProductType,
+		OrderType:           request.OrderType,
+		BrokerOrderID:       zerodhaResponse.OrderID,
+		BrokerOrderResponse: zerodhaResponse,
+		AlgoID:              request.AlgoID,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+}
+
+func (s *ZerodhaOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, zerodhaResponse *dto.ZerodhaModifyOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: zerodhaResponse,
+		UpdatedAt:           time.Now(),
+		State:               "MODIFIED", // Default state for modified orders
+	}
+}
+
+func (s *ZerodhaOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, zerodhaResponse *dto.ZerodhaCancelOrderResponse) *dto.OrderResponse {
+	return &dto.OrderResponse{
+		BrokerOrderID:       request.OrderID,
+		BrokerOrderResponse: zerodhaResponse,
+		UpdatedAt:           time.Now(),
+		State:               "CANCELLED", // Default state for cancelled orders
+	}
 }
