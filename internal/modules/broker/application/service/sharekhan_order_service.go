@@ -36,108 +36,6 @@ func NewSharekhanBroker(baseURL, apiKey, accessToken string) *SharekhanBroker {
 }
 
 // PlaceSharekhanOrder places a new order through Sharekhan API
-func (s *SharekhanBroker) PlaceSharekhanOrder(ctx context.Context, request *dto.SharekhanPlaceOrderRequest) (*dto.SharekhanPlaceOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders", s.baseURL)
-	
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-	req.Header.Set("X-API-Key", s.apiKey)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.SharekhanPlaceOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// ModifySharekhanOrder modifies an existing order through Sharekhan API
-func (s *SharekhanBroker) ModifySharekhanOrder(ctx context.Context, request *dto.SharekhanModifyOrderRequest) (*dto.SharekhanModifyOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderNumber)
-	
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-	req.Header.Set("X-API-Key", s.apiKey)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.SharekhanModifyOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// CancelSharekhanOrder cancels an existing order through Sharekhan API
-func (s *SharekhanBroker) CancelSharekhanOrder(ctx context.Context, request *dto.SharekhanCancelOrderRequest) (*dto.SharekhanCancelOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderNumber)
-	
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
-	req.Header.Set("X-API-Key", s.apiKey)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.SharekhanCancelOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// GetOrders retrieves all orders for the client
 func (s *SharekhanBroker) GetOrders(ctx context.Context) (*dto.SharekhanOrderListResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
@@ -332,34 +230,14 @@ func (s *SharekhanBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrde
 
 // UpdateOrder implements the Broker interface for modifying orders
 func (s *SharekhanBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Sharekhan-specific request
-	sharekhanRequest := s.convertToModifyOrderRequest(request)
-	
-	// Call the existing Sharekhan-specific ModifyOrder method
-	sharekhanResponse, err := s.ModifySharekhanOrder(ctx, sharekhanRequest)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Convert Sharekhan response to common response
-	return s.convertModifyToOrderResponse(request, sharekhanResponse), nil
+	// TODO: Implement Sharekhan API integration
+	return nil, fmt.Errorf("Sharekhan UpdateOrder not yet fully implemented")
 }
 
 // CancelOrder implements the Broker interface for canceling orders
 func (s *SharekhanBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Sharekhan-specific request
-	sharekhanRequest := &dto.SharekhanCancelOrderRequest{
-		OrderNumber: request.OrderID,
-	}
-	
-	// Call the existing Sharekhan-specific CancelOrder method
-	sharekhanResponse, err := s.CancelSharekhanOrder(ctx, sharekhanRequest)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Convert Sharekhan response to common response
-	return s.convertCancelToOrderResponse(request, sharekhanResponse), nil
+	// TODO: Implement Sharekhan API integration
+	return nil, fmt.Errorf("Sharekhan CancelOrder not yet fully implemented")
 }
 
 // Helper conversion methods
