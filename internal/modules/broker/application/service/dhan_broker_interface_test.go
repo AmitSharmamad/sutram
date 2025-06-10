@@ -31,7 +31,7 @@ func TestDhanOrderService_BrokerInterface_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service instance
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Prepare request using common DTO
 	request := &dto.PlaceOrderRequest{
@@ -82,7 +82,7 @@ func TestDhanOrderService_BrokerInterface_UpdateOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service instance
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Prepare request using common DTO
 	newQuantity := 20
@@ -119,7 +119,7 @@ func TestDhanOrderService_BrokerInterface_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service instance
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Prepare request using common DTO
 	request := &dto.CancelOrderRequest{

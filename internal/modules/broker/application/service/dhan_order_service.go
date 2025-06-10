@@ -12,19 +12,19 @@ import (
 	"algo/internal/modules/broker/domain"
 )
 
-// DhanOrderService handles Dhan order API operations
-type DhanOrderService struct {
+// DhanBroker handles Dhan order API operations
+type DhanBroker struct {
 	baseURL     string
 	accessToken string
 	httpClient  *http.Client
 }
 
-// Ensure DhanOrderService implements the Broker interface
-var _ domain.Broker = (*DhanOrderService)(nil)
+// Ensure DhanBroker implements the Broker interface
+var _ domain.Broker = (*DhanBroker)(nil)
 
-// NewDhanOrderService creates a new Dhan order service
-func NewDhanOrderService(baseURL, accessToken string) *DhanOrderService {
-	return &DhanOrderService{
+// NewDhanBroker creates a new Dhan broker
+func NewDhanBroker(baseURL, accessToken string) *DhanBroker {
+	return &DhanBroker{
 		baseURL:     baseURL,
 		accessToken: accessToken,
 		httpClient: &http.Client{
@@ -33,11 +33,15 @@ func NewDhanOrderService(baseURL, accessToken string) *DhanOrderService {
 	}
 }
 
-// PlaceDhanOrder places a new order through Dhan API
-func (s *DhanOrderService) PlaceDhanOrder(ctx context.Context, request *dto.DhanPlaceOrderRequest) (*dto.DhanPlaceOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders", s.baseURL)
+// PlaceOrder implements the Broker interface for placing orders
+func (b *DhanBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Dhan-specific request
+	dhanRequest := b.convertToPlaceOrderRequest(request)
 	
-	jsonData, err := json.Marshal(request)
+	// Call Dhan API directly
+	url := fmt.Sprintf("%s/orders", b.baseURL)
+	
+	jsonData, err := json.Marshal(dhanRequest)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
@@ -48,9 +52,9 @@ func (s *DhanOrderService) PlaceDhanOrder(ctx context.Context, request *dto.Dhan
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -60,19 +64,24 @@ func (s *DhanOrderService) PlaceDhanOrder(ctx context.Context, request *dto.Dhan
 		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 	}
 
-	var response dto.DhanPlaceOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	var dhanResponse dto.DhanPlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dhanResponse); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
-
-	return &response, nil
+	
+	// Convert Dhan response to common response
+	return b.convertToOrderResponse(request, &dhanResponse), nil
 }
 
-// ModifyDhanOrder modifies an existing order through Dhan API
-func (s *DhanOrderService) ModifyDhanOrder(ctx context.Context, request *dto.DhanModifyOrderRequest) (*dto.DhanModifyOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
+// UpdateOrder implements the Broker interface for modifying orders
+func (b *DhanBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+	// Convert common request to Dhan-specific request
+	dhanRequest := b.convertToModifyOrderRequest(request)
 	
-	jsonData, err := json.Marshal(request)
+	// Call Dhan API directly
+	url := fmt.Sprintf("%s/orders/%s", b.baseURL, request.OrderID)
+	
+	jsonData, err := json.Marshal(dhanRequest)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
@@ -83,9 +92,9 @@ func (s *DhanOrderService) ModifyDhanOrder(ctx context.Context, request *dto.Dha
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -95,26 +104,28 @@ func (s *DhanOrderService) ModifyDhanOrder(ctx context.Context, request *dto.Dha
 		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 	}
 
-	var response dto.DhanModifyOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	var dhanResponse dto.DhanModifyOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dhanResponse); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
-
-	return &response, nil
+	
+	// Convert Dhan response to common response
+	return b.convertModifyToOrderResponse(request, &dhanResponse), nil
 }
 
-// CancelDhanOrder cancels an existing order through Dhan API
-func (s *DhanOrderService) CancelDhanOrder(ctx context.Context, request *dto.DhanCancelOrderRequest) (*dto.DhanCancelOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
+// CancelOrder implements the Broker interface for canceling orders
+func (b *DhanBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+	// Call Dhan API directly
+	url := fmt.Sprintf("%s/orders/%s", b.baseURL, request.OrderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -124,26 +135,27 @@ func (s *DhanOrderService) CancelDhanOrder(ctx context.Context, request *dto.Dha
 		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 	}
 
-	var response dto.DhanCancelOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	var dhanResponse dto.DhanCancelOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dhanResponse); err != nil {
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
-
-	return &response, nil
+	
+	// Convert Dhan response to common response
+	return b.convertCancelToOrderResponse(request, &dhanResponse), nil
 }
 
 // GetOrders retrieves all orders for the client
-func (s *DhanOrderService) GetOrders(ctx context.Context) (*dto.DhanOrderListResponse, error) {
-	url := fmt.Sprintf("%s/orders", s.baseURL)
+func (b *DhanBroker) GetOrders(ctx context.Context) (*dto.DhanOrderListResponse, error) {
+	url := fmt.Sprintf("%s/orders", b.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -162,17 +174,17 @@ func (s *DhanOrderService) GetOrders(ctx context.Context) (*dto.DhanOrderListRes
 }
 
 // GetOrderByID retrieves a specific order by ID
-func (s *DhanOrderService) GetOrderByID(ctx context.Context, orderID string) (*dto.DhanOrderByIDResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, orderID)
+func (b *DhanBroker) GetOrderByID(ctx context.Context, orderID string) (*dto.DhanOrderByIDResponse, error) {
+	url := fmt.Sprintf("%s/orders/%s", b.baseURL, orderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -191,17 +203,17 @@ func (s *DhanOrderService) GetOrderByID(ctx context.Context, orderID string) (*d
 }
 
 // GetTrades retrieves all trades for the client
-func (s *DhanOrderService) GetTrades(ctx context.Context) (*dto.DhanTradeListResponse, error) {
-	url := fmt.Sprintf("%s/trades", s.baseURL)
+func (b *DhanBroker) GetTrades(ctx context.Context) (*dto.DhanTradeListResponse, error) {
+	url := fmt.Sprintf("%s/trades", b.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -220,17 +232,17 @@ func (s *DhanOrderService) GetTrades(ctx context.Context) (*dto.DhanTradeListRes
 }
 
 // GetOrderBook retrieves the order book for the client
-func (s *DhanOrderService) GetOrderBook(ctx context.Context) (*dto.DhanOrderListResponse, error) {
-	url := fmt.Sprintf("%s/orderbook", s.baseURL)
+func (b *DhanBroker) GetOrderBook(ctx context.Context) (*dto.DhanOrderListResponse, error) {
+	url := fmt.Sprintf("%s/orderbook", b.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -249,17 +261,17 @@ func (s *DhanOrderService) GetOrderBook(ctx context.Context) (*dto.DhanOrderList
 }
 
 // GetTradeBook retrieves the trade book for the client
-func (s *DhanOrderService) GetTradeBook(ctx context.Context) (*dto.DhanTradeListResponse, error) {
-	url := fmt.Sprintf("%s/tradebook", s.baseURL)
+func (b *DhanBroker) GetTradeBook(ctx context.Context) (*dto.DhanTradeListResponse, error) {
+	url := fmt.Sprintf("%s/tradebook", b.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.Header.Set("access-token", s.accessToken)
+	req.Header.Set("access-token", b.accessToken)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -277,58 +289,9 @@ func (s *DhanOrderService) GetTradeBook(ctx context.Context) (*dto.DhanTradeList
 	return &response, nil
 }
 
-// Broker interface implementation
-
-// PlaceOrder implements the Broker interface for placing orders
-func (s *DhanOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Dhan-specific request
-	dhanRequest := s.convertToPlaceOrderRequest(request)
-	
-	// Call the existing Dhan-specific PlaceOrder method
-	dhanResponse, err := s.PlaceDhanOrder(ctx, dhanRequest)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Convert Dhan response to common response
-	return s.convertToOrderResponse(request, dhanResponse), nil
-}
-
-// UpdateOrder implements the Broker interface for modifying orders
-func (s *DhanOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Dhan-specific request
-	dhanRequest := s.convertToModifyOrderRequest(request)
-	
-	// Call the existing Dhan-specific ModifyOrder method
-	dhanResponse, err := s.ModifyDhanOrder(ctx, dhanRequest)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Convert Dhan response to common response
-	return s.convertModifyToOrderResponse(request, dhanResponse), nil
-}
-
-// CancelOrder implements the Broker interface for canceling orders
-func (s *DhanOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Dhan-specific request
-	dhanRequest := &dto.DhanCancelOrderRequest{
-		OrderID: request.OrderID,
-	}
-	
-	// Call the existing Dhan-specific CancelOrder method
-	dhanResponse, err := s.CancelDhanOrder(ctx, dhanRequest)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Convert Dhan response to common response
-	return s.convertCancelToOrderResponse(request, dhanResponse), nil
-}
-
 // Helper conversion methods
 
-func (s *DhanOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.DhanPlaceOrderRequest {
+func (b *DhanBroker) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.DhanPlaceOrderRequest {
 	return &dto.DhanPlaceOrderRequest{
 		DhanClientID:       "", // This would need to be populated from user context
 		TransactionType:    request.TransactionType,
@@ -348,7 +311,7 @@ func (s *DhanOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderReq
 	}
 }
 
-func (s *DhanOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.DhanModifyOrderRequest {
+func (b *DhanBroker) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.DhanModifyOrderRequest {
 	dhanRequest := &dto.DhanModifyOrderRequest{
 		OrderID: request.OrderID,
 	}
@@ -369,7 +332,7 @@ func (s *DhanOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderR
 	return dhanRequest
 }
 
-func (s *DhanOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, dhanResponse *dto.DhanPlaceOrderResponse) *dto.OrderResponse {
+func (b *DhanBroker) convertToOrderResponse(request *dto.PlaceOrderRequest, dhanResponse *dto.DhanPlaceOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		ID:                  request.ID,
 		UserID:              request.UserID,
@@ -391,7 +354,7 @@ func (s *DhanOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest
 	}
 }
 
-func (s *DhanOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, dhanResponse *dto.DhanModifyOrderResponse) *dto.OrderResponse {
+func (b *DhanBroker) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, dhanResponse *dto.DhanModifyOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: dhanResponse,
@@ -400,11 +363,113 @@ func (s *DhanOrderService) convertModifyToOrderResponse(request *dto.ModifyOrder
 	}
 }
 
-func (s *DhanOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, dhanResponse *dto.DhanCancelOrderResponse) *dto.OrderResponse {
+func (b *DhanBroker) convertCancelToOrderResponse(request *dto.CancelOrderRequest, dhanResponse *dto.DhanCancelOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: dhanResponse,
 		UpdatedAt:           time.Now(),
 		State:               dhanResponse.OrderStatus,
 	}
+}
+
+// Legacy broker-specific methods for backward compatibility
+// These are now wrappers around the internal implementation
+
+// PlaceDhanOrder places a new order through Dhan API (legacy method)
+func (b *DhanBroker) PlaceDhanOrder(ctx context.Context, request *dto.DhanPlaceOrderRequest) (*dto.DhanPlaceOrderResponse, error) {
+	url := fmt.Sprintf("%s/orders", b.baseURL)
+	
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("access-token", b.accessToken)
+
+	resp, err := b.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var response dto.DhanPlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// ModifyDhanOrder modifies an existing order through Dhan API (legacy method)
+func (b *DhanBroker) ModifyDhanOrder(ctx context.Context, request *dto.DhanModifyOrderRequest) (*dto.DhanModifyOrderResponse, error) {
+	url := fmt.Sprintf("%s/orders/%s", b.baseURL, request.OrderID)
+	
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("access-token", b.accessToken)
+
+	resp, err := b.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var response dto.DhanModifyOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// CancelDhanOrder cancels an existing order through Dhan API (legacy method)
+func (b *DhanBroker) CancelDhanOrder(ctx context.Context, request *dto.DhanCancelOrderRequest) (*dto.DhanCancelOrderResponse, error) {
+	url := fmt.Sprintf("%s/orders/%s", b.baseURL, request.OrderID)
+	
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("access-token", b.accessToken)
+
+	resp, err := b.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var response dto.DhanCancelOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &response, nil
 }

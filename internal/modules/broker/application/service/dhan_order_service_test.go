@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDhanOrderService_PlaceOrder(t *testing.T) {
+func TestDhanBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -45,7 +45,7 @@ func TestDhanOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Test request
 	request := &dto.DhanPlaceOrderRequest{
@@ -73,7 +73,7 @@ func TestDhanOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, 2500.00, response.Price)
 }
 
-func TestDhanOrderService_GetOrders(t *testing.T) {
+func TestDhanBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -103,7 +103,7 @@ func TestDhanOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -117,7 +117,7 @@ func TestDhanOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, 10, response.Orders[0].FilledQty)
 }
 
-func TestDhanOrderService_CancelOrder(t *testing.T) {
+func TestDhanBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -136,7 +136,7 @@ func TestDhanOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewDhanOrderService(server.URL, "test-token")
+	service := NewDhanBroker(server.URL, "test-token")
 
 	// Test request
 	request := &dto.DhanCancelOrderRequest{

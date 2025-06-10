@@ -12,20 +12,20 @@ import (
 	"algo/internal/modules/broker/domain"
 )
 
-// ZerodhaOrderService handles Zerodha Kite order API operations
-type ZerodhaOrderService struct {
+// ZerodhaBroker handles Zerodha Kite order API operations
+type ZerodhaBroker struct {
 	baseURL     string
 	apiKey      string
 	accessToken string
 	httpClient  *http.Client
 }
 
-// Ensure ZerodhaOrderService implements the Broker interface
-var _ domain.Broker = (*ZerodhaOrderService)(nil)
+// Ensure ZerodhaBroker implements the Broker interface
+var _ domain.Broker = (*ZerodhaBroker)(nil)
 
-// NewZerodhaOrderService creates a new Zerodha order service
-func NewZerodhaOrderService(baseURL, apiKey, accessToken string) *ZerodhaOrderService {
-	return &ZerodhaOrderService{
+// NewZerodhaBroker creates a new Zerodha broker
+func NewZerodhaBroker(baseURL, apiKey, accessToken string) *ZerodhaBroker {
+	return &ZerodhaBroker{
 		baseURL:     baseURL,
 		apiKey:      apiKey,
 		accessToken: accessToken,

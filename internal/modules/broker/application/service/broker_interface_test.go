@@ -12,7 +12,7 @@ func TestAllBrokersImplementInterface(t *testing.T) {
 	var brokers []domain.Broker
 	
 	// Test that each service can be assigned to the interface
-	brokers = append(brokers, NewDhanOrderService("", ""))
+	brokers = append(brokers, NewDhanBroker("", ""))
 	brokers = append(brokers, NewZerodhaOrderService("", "", ""))
 	brokers = append(brokers, NewSharekhanOrderService("", "", ""))
 	brokers = append(brokers, NewHDFCSecOrderService("", ""))

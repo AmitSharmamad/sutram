@@ -17,7 +17,7 @@ type BrokerService struct {
 	brokerRepo     repository.BrokerRepository
 	brokerUserRepo repository.BrokerUserRepository
 	orderRepo      repository.OrderRepository
-	dhanService    *DhanOrderService
+	dhanService    *DhanBroker
 }
 
 // NewBrokerService creates a new broker service
@@ -25,7 +25,7 @@ func NewBrokerService(
 	brokerRepo repository.BrokerRepository,
 	brokerUserRepo repository.BrokerUserRepository,
 	orderRepo repository.OrderRepository,
-	dhanService *DhanOrderService,
+	dhanService *DhanBroker,
 ) *BrokerService {
 	return &BrokerService{
 		brokerRepo:     brokerRepo,
