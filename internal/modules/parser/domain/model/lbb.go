@@ -46,8 +46,8 @@ func (indicator *LowerBollingerBands) GenerateIndicatorKey(
 	ctx *EvaluationContext,
 ) (string, error) {
 	// Validate we have the required number of parameters
-	if len(config) != 4 {
-		return "", fmt.Errorf("LowerBollingerBands requires 4 parameters: point, period, standardDev, offset")
+	if len(config) != 5 {
+		return "", fmt.Errorf("LowerBollingerBands requires 5 parameters: point, period, standardDev, maType, offset")
 	}
 
 	// Extract point parameter
@@ -68,15 +68,21 @@ func (indicator *LowerBollingerBands) GenerateIndicatorKey(
 		return "", fmt.Errorf("LowerBollingerBands standardDev parameter must be a number")
 	}
 
+	// Extract maType parameter
+	maType, ok := config[3].(string)
+	if !ok {
+		return "", fmt.Errorf("LowerBollingerBands maType parameter must be a string")
+	}
+
 	// Extract offset parameter
-	offsetFloat, ok := config[3].(float64)
+	offsetFloat, ok := config[4].(float64)
 	if !ok {
 		return "", fmt.Errorf("LowerBollingerBands offset parameter must be a number")
 	}
 	offset := int(offsetFloat)
 
 	// Generate the key - include offset only if non-zero
-	baseKey := fmt.Sprintf("LBB_%s_%.0f_%.1f", strings.ToUpper(point), period, standardDev)
+	baseKey := fmt.Sprintf("LBB_%s_%.0f_%.1f_%s", strings.ToUpper(point), period, standardDev, strings.ToUpper(maType))
 
 	if offset != 0 {
 		baseKey += fmt.Sprintf("_%d", offset)
@@ -85,164 +91,7 @@ func (indicator *LowerBollingerBands) GenerateIndicatorKey(
 	return baseKey, nil
 }
 
-// Calculate the appropriate moving average based on the type
-func (indicator *LowerBollingerBands) calculateMA(prices Prices, period int, maType MovingAverageType) float64 {
-	if len(prices) < period {
-		return 0.0
-	}
-
-	switch maType {
-	case SIMPLE:
-		// Simple Moving Average
-		var sum float64
-		for i := len(prices) - period; i < len(prices); i++ {
-			sum += prices[i]
-		}
-		return sum / float64(period)
-
-	case EXPONENTIAL:
-		// Exponential Moving Average
-		var ema float64
-		multiplier := 2.0 / float64(period+1)
-
-		// Initialize with SMA
-		var sum float64
-		for i := len(prices) - period; i < len(prices)-(period/2); i++ {
-			sum += prices[i]
-		}
-		ema = sum / float64(period/2)
-
-		// Calculate EMA
-		for i := len(prices) - (period / 2); i < len(prices); i++ {
-			ema = (prices[i]-ema)*multiplier + ema
-		}
-		return ema
-
-	case WEIGHTED:
-		// Weighted Moving Average
-		var sum, weightSum float64
-		for i := 0; i < period; i++ {
-			weight := float64(i + 1)
-			sum += prices[len(prices)-period+i] * weight
-			weightSum += weight
-		}
-		return sum / weightSum
-
-	case TRIPLE:
-		// Triple Exponential Moving Average (TEMA)
-		// TEMA = 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))
-		if len(prices) < 3*period {
-			return 0.0
-		}
-
-		// Calculate first EMA
-		multiplier := 2.0 / float64(period+1)
-		var ema1 float64
-
-		// Initialize with SMA
-		var sum float64
-		for i := len(prices) - period; i < len(prices); i++ {
-			sum += prices[i]
-		}
-		ema1 = sum / float64(period)
-
-		// Create EMA prices for second EMA
-		ema1Prices := make(Prices, len(prices))
-		for i := 0; i < len(prices)-period; i++ {
-			ema1Prices[i] = 0
-		}
-
-		for i := len(prices) - period; i < len(prices); i++ {
-			if i == len(prices)-period {
-				ema1Prices[i] = ema1
-			} else {
-				ema1 = (prices[i]-ema1)*multiplier + ema1
-				ema1Prices[i] = ema1
-			}
-		}
-
-		// Calculate second EMA (EMA of EMA)
-		var ema2 float64
-		sum = 0
-		for i := len(ema1Prices) - period; i < len(ema1Prices); i++ {
-			sum += ema1Prices[i]
-		}
-		ema2 = sum / float64(period)
-
-		// Create EMA2 prices for third EMA
-		ema2Prices := make(Prices, len(prices))
-		for i := 0; i < len(prices)-period; i++ {
-			ema2Prices[i] = 0
-		}
-
-		for i := len(ema1Prices) - period; i < len(ema1Prices); i++ {
-			if i == len(ema1Prices)-period {
-				ema2Prices[i] = ema2
-			} else {
-				ema2 = (ema1Prices[i]-ema2)*multiplier + ema2
-				ema2Prices[i] = ema2
-			}
-		}
-
-		// Calculate third EMA (EMA of EMA of EMA)
-		var ema3 float64
-		sum = 0
-		for i := len(ema2Prices) - period; i < len(ema2Prices); i++ {
-			sum += ema2Prices[i]
-		}
-		ema3 = sum / float64(period)
-
-		for i := len(ema2Prices) - period; i < len(ema2Prices); i++ {
-			if i == len(ema2Prices)-period {
-				continue
-			} else {
-				ema3 = (ema2Prices[i]-ema3)*multiplier + ema3
-			}
-		}
-
-		// TEMA = 3*EMA1 - 3*EMA2 + EMA3
-		return 3*ema1 - 3*ema2 + ema3
-
-	case TRIANGULAR:
-		// Triangular Moving Average
-		// First, calculate SMA with period
-		if len(prices) < 2*period {
-			return 0.0
-		}
-
-		n := period
-		smaValues := make(Prices, period)
-
-		for i := 0; i < period; i++ {
-			var sum float64
-			for j := 0; j < n; j++ {
-				idx := len(prices) - period - n + i + j
-				if idx >= 0 && idx < len(prices) {
-					sum += prices[idx]
-				}
-			}
-			smaValues[i] = sum / float64(n)
-		}
-
-		// Then, calculate SMA of those SMAs
-		var sum float64
-		for _, sma := range smaValues {
-			sum += sma
-		}
-
-		return sum / float64(len(smaValues))
-
-	default:
-		// Default to Simple Moving Average
-		var sum float64
-		for i := len(prices) - period; i < len(prices); i++ {
-			sum += prices[i]
-		}
-		return sum / float64(period)
-	}
-}
-
-// LOWER_BOLLINGER_BANDS(CLOSE, 20, 2, TRIPLE, 0)
+// LOWER_BOLLINGER_BANDS(CLOSE, 20, 2, SIMPLE, 0)
 // Fields: OHLCV
 // Period: float
 // Standard Deviations: float
@@ -255,10 +104,12 @@ func (indicator *LowerBollingerBands) Calculate(
 	point := config[0].(string)
 	period := config[1].(float64)
 	standardDev := config[2].(float64)
-	offset := int(config[3].(float64))
+	maType := config[3].(string)
+	offset := int(config[4].(float64))
 
 	indicator.period = period
 	indicator.standardDev = standardDev
+	indicator.maType = MovingAverageType(strings.ToUpper(maType))
 	indicator.offset = offset
 
 	prices := GetPrices(*ctx.Data, point)
@@ -275,16 +126,18 @@ func (indicator *LowerBollingerBands) Calculate(
 		return 0.0
 	}
 
-	// Calculate SMA (Simple Moving Average)
-	var sum float64
-	periodInt := int(period)
-	for i := len(prices) - periodInt; i < len(prices); i++ {
-		sum += prices[i]
+	// Calculate Moving Average using utility function based on maType
+	maValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), int(period))
+	if len(maValues) == 0 {
+		return 0.0
 	}
-	sma := sum / period
+
+	// Get the latest moving average value
+	sma := maValues[len(maValues)-1]
 
 	// Calculate standard deviation
 	var variance float64
+	periodInt := int(period)
 	for i := len(prices) - periodInt; i < len(prices); i++ {
 		diff := prices[i] - sma
 		variance += diff * diff
@@ -368,9 +221,8 @@ func (indicator *LowerBollingerBands) GetLookBack(config []any) int64 {
 
 	// For Lower Bollinger Bands calculation, we need:
 	// - Period data points adjusted by MA type multiplier
-	// - Additional buffer for stability (add period again)
 	// - Plus any offset
-	return int64(period*multiplier + period + float64(offset))
+	return int64(period*multiplier + float64(offset))
 }
 
 // CalculateAll calculates Lower Bollinger Bands values for all data points
@@ -379,63 +231,94 @@ func (indicator *LowerBollingerBands) CalculateAll(
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
-	// point := config[0].(string) - handled by Calculate method
+	// Parse config parameters
+	point := config[0].(string)
 	period := config[1].(float64)
-	// standardDev := config[2].(float64) - handled by Calculate method
-	maType := MovingAverageType(config[3].(string))
+	standardDev := config[2].(float64)
+	maType := config[3].(string)
 	offset := int(config[4].(float64))
 
 	indicator.period = period
-	indicator.maType = maType
+	indicator.standardDev = standardDev
+	indicator.maType = MovingAverageType(strings.ToUpper(maType))
 	indicator.offset = offset
 
+	// Get stock data
 	stockData := *ctx.Data
-	var results []IndicatorValues
-
-	// Calculate additional data needed based on MA type
-	var multiplier float64
-	switch maType {
-	case TRIPLE:
-		multiplier = 3.0
-	case TRIANGULAR:
-		multiplier = 2.0
-	case EXPONENTIAL, WEIGHTED:
-		multiplier = 1.5
-	default:
-		multiplier = 1.0
-	}
-
-	minDataPoints := int(period*multiplier) + offset
-	if len(stockData) < minDataPoints {
+	if len(stockData) == 0 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Check if we have enough data
+	periodInt := int(period)
+	if len(stockData) < periodInt {
+		return []IndicatorValues{}
+	}
+
+	// Extract price array based on point type
+	prices := make([]float64, len(stockData))
+	for i, data := range stockData {
+		switch strings.ToUpper(point) {
+		case "HIGH":
+			prices[i] = data.High
+		case "LOW":
+			prices[i] = data.Low
+		case "OPEN":
+			prices[i] = data.Open
+		case "VOLUME":
+			prices[i] = data.Volume
+		default: // "CLOSE"
+			prices[i] = data.Close
+		}
+	}
+
+	// Step 1: Calculate Moving Average using utility function based on maType
+	smaValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), periodInt)
+
+	// Create full-length array with proper positioning
+	sma := make([]float64, len(stockData))
+	startIdx := periodInt - 1
+	for i, val := range smaValues {
+		if startIdx+i < len(sma) {
+			sma[startIdx+i] = val
+		}
+	}
+
+	// Step 2: Calculate Standard Deviation and Lower Bollinger Bands
+	lowerBand := make([]float64, len(stockData))
+
+	for i := periodInt - 1; i < len(stockData); i++ {
+		// Calculate standard deviation for this period
+		var variance float64
+		for j := i - periodInt + 1; j <= i; j++ {
+			diff := prices[j] - sma[i]
+			variance += diff * diff
+		}
+		stdDev := math.Sqrt(variance / period)
+
+		// Calculate Lower Bollinger Band = SMA - (standardDev × σ)
+		lowerBand[i] = sma[i] - (standardDev * stdDev)
+	}
+
+	// Step 3: Build results starting from valid calculation points
+	var result []IndicatorValues
+
+	for i := periodInt - 1; i < len(stockData); i++ {
+		// Apply offset
+		if i < periodInt-1+offset {
+			continue
 		}
 
-		// Calculate Lower Bollinger Bands value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Check start date filter
+		if stockData[i].Timestamp.Before(startDate) {
+			continue
+		}
 
-		results = append(results, IndicatorValues{
+		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     value,
+			Value:     util.Round(lowerBand[i]),
 		})
 	}
 
-	// Filter results by startDate
-	var filteredResults []IndicatorValues
-	for _, result := range results {
-		if !result.Timestamp.Before(startDate) {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults
+	return result
 }

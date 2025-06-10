@@ -281,13 +281,14 @@ func (indicator *TSI) GetLookBack(config []any) int64 {
 }
 
 // CalculateAll calculates TSI values for all data points
+// Following Excel flow: Price Changes -> First EMA -> Second EMA -> TSI -> Signal Line
 func (indicator *TSI) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
 	startDate time.Time,
 ) []IndicatorValues {
-	// field := config[0].(string) - handled by Calculate method
-	// lineType := config[1].(string) - handled by Calculate method
+	field := config[0].(string)
+	lineType := config[1].(string)
 	longPeriod := int(config[2].(float64))
 	shortPeriod := int(config[3].(float64))
 	signalPeriod := int(config[4].(float64))
@@ -297,34 +298,143 @@ func (indicator *TSI) CalculateAll(
 	indicator.shortPeriod = shortPeriod
 	indicator.signalPeriod = signalPeriod
 	indicator.offset = offset
+	indicator.lineType = lineType
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
+	dataLen := len(stockData)
 
 	// Need enough data for calculation
 	totalPeriod := longPeriod + shortPeriod + signalPeriod
-	minDataPoints := totalPeriod + offset + 1
-	if len(stockData) < minDataPoints {
+	if dataLen < totalPeriod+1 {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Extract prices based on field
+	prices := make([]float64, dataLen)
+	for i := 0; i < dataLen; i++ {
+		switch strings.ToUpper(field) {
+		case "HIGH":
+			prices[i] = stockData[i].High
+		case "LOW":
+			prices[i] = stockData[i].Low
+		case "OPEN":
+			prices[i] = stockData[i].Open
+		case "VOLUME":
+			prices[i] = stockData[i].Volume
+		default: // "CLOSE"
+			prices[i] = stockData[i].Close
 		}
+	}
 
-		// Calculate TSI value for this point
-		value := indicator.Calculate(config, tempCtx)
+	// Step 1: Calculate Price Changes (Momentum)
+	momentum := make([]float64, dataLen)
+	absMomentum := make([]float64, dataLen)
+	for i := 1; i < dataLen; i++ {
+		momentum[i] = prices[i] - prices[i-1]
+		absMomentum[i] = math.Abs(momentum[i])
+	}
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     value,
-		})
+	// Step 2: Calculate First EMA of Momentum (Long Period)
+	ema1Momentum := make([]float64, dataLen)
+	ema1AbsMomentum := make([]float64, dataLen)
+	multiplier1 := 2.0 / float64(longPeriod+1)
+
+	// Initial SMA for long period
+	if longPeriod < dataLen {
+		var sumMomentum, sumAbsMomentum float64
+		for i := 1; i <= longPeriod; i++ {
+			sumMomentum += momentum[i]
+			sumAbsMomentum += absMomentum[i]
+		}
+		ema1Momentum[longPeriod] = sumMomentum / float64(longPeriod)
+		ema1AbsMomentum[longPeriod] = sumAbsMomentum / float64(longPeriod)
+
+		// Calculate EMA for subsequent periods
+		for i := longPeriod + 1; i < dataLen; i++ {
+			// EMA = Current * multiplier + Previous EMA * (1 - multiplier)
+			ema1Momentum[i] = momentum[i]*multiplier1 + ema1Momentum[i-1]*(1-multiplier1)
+			ema1AbsMomentum[i] = absMomentum[i]*multiplier1 + ema1AbsMomentum[i-1]*(1-multiplier1)
+		}
+	}
+
+	// Step 3: Calculate Second EMA of First EMA (Short Period)
+	ema2Momentum := make([]float64, dataLen)
+	ema2AbsMomentum := make([]float64, dataLen)
+	multiplier2 := 2.0 / float64(shortPeriod+1)
+
+	// Calculate starting index for second EMA
+	secondEmaStartIndex := longPeriod + shortPeriod
+	if secondEmaStartIndex < dataLen {
+		// Initial SMA of first EMA for short period
+		var sumEma1, sumAbsEma1 float64
+		for i := longPeriod + 1; i <= secondEmaStartIndex; i++ {
+			sumEma1 += ema1Momentum[i]
+			sumAbsEma1 += ema1AbsMomentum[i]
+		}
+		ema2Momentum[secondEmaStartIndex] = sumEma1 / float64(shortPeriod)
+		ema2AbsMomentum[secondEmaStartIndex] = sumAbsEma1 / float64(shortPeriod)
+
+		// Calculate EMA for subsequent periods
+		for i := secondEmaStartIndex + 1; i < dataLen; i++ {
+			// EMA = Current * multiplier + Previous EMA * (1 - multiplier)
+			ema2Momentum[i] = ema1Momentum[i]*multiplier2 + ema2Momentum[i-1]*(1-multiplier2)
+			ema2AbsMomentum[i] = ema1AbsMomentum[i]*multiplier2 + ema2AbsMomentum[i-1]*(1-multiplier2)
+		}
+	}
+
+	// Step 4: Calculate TSI
+	tsi := make([]float64, dataLen)
+	for i := secondEmaStartIndex; i < dataLen; i++ {
+		// TSI = 100 * (Double Smoothed Momentum / Double Smoothed Absolute Momentum)
+		if ema2AbsMomentum[i] != 0 {
+			tsi[i] = 100 * (ema2Momentum[i] / ema2AbsMomentum[i])
+		} else {
+			tsi[i] = 0
+		}
+	}
+
+	// Step 5: Calculate Signal Line (EMA of TSI)
+	signalLine := make([]float64, dataLen)
+	signalMultiplier := 2.0 / float64(signalPeriod+1)
+
+	// Calculate starting index for signal line
+	signalStartIndex := secondEmaStartIndex + signalPeriod
+	if signalStartIndex < dataLen {
+		// Initial SMA of TSI for signal period
+		var sumTSI float64
+		for i := secondEmaStartIndex; i < signalStartIndex; i++ {
+			sumTSI += tsi[i]
+		}
+		signalLine[signalStartIndex-1] = sumTSI / float64(signalPeriod)
+
+		// Calculate EMA for subsequent periods
+		for i := signalStartIndex; i < dataLen; i++ {
+			// Signal EMA = TSI * multiplier + Previous Signal * (1 - multiplier)
+			signalLine[i] = tsi[i]*signalMultiplier + signalLine[i-1]*(1-signalMultiplier)
+		}
+	}
+
+	// Build results starting from when all calculations are valid
+	startIndex := signalStartIndex - 1
+	var results []IndicatorValues
+	for i := startIndex; i < dataLen; i++ {
+		// Apply offset if specified
+		adjustedIndex := i + offset
+		if adjustedIndex >= 0 && adjustedIndex < dataLen {
+			var value float64
+			// Return the appropriate value based on lineType
+			if strings.ToUpper(lineType) == "SIGNAL" {
+				value = util.Round(signalLine[i])
+			} else {
+				// Default is "TSI"
+				value = util.Round(tsi[i])
+			}
+
+			results = append(results, IndicatorValues{
+				Timestamp: stockData[adjustedIndex].Timestamp,
+				Value:     value,
+			})
+		}
 	}
 
 	// Filter results by startDate

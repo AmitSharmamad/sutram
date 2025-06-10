@@ -12,11 +12,13 @@ import (
 
 // Module represents the broker module
 type Module struct {
-	controller            *http.BrokerController
-	dhanOrderService      *service.DhanOrderService
-	zerodhaOrderService   *service.ZerodhaOrderService
-	angeloneOrderService  *service.AngelOneOrderService
-	brokerService         *service.BrokerService
+	controller           *http.BrokerController
+	dhanOrderService     *service.DhanOrderService
+	zerodhaOrderService  *service.ZerodhaOrderService
+	hdfcsecOrderService  *service.HDFCSecOrderService
+  sharekhanOrderService *service.SharekhanOrderService
+  angeloneOrderService  *service.AngelOneOrderService
+	brokerService        *service.BrokerService
 }
 
 // ProvideModule provides a wire provider set for the broker module
@@ -55,6 +57,16 @@ func (m *Module) initialize() {
 	angeloneAPIKey := getEnv("ANGELONE_API_KEY", "")
 	angeloneAccessToken := getEnv("ANGELONE_ACCESS_TOKEN", "")
 
+	// Get HDFC Securities API configuration from environment
+	hdfcsecBaseURL := getEnv("HDFCSEC_API_BASE_URL", "https://api.hdfcsec.com/v1")
+	hdfcsecAccessToken := getEnv("HDFCSEC_ACCESS_TOKEN", "")
+
+  // Get Sharekhan API configuration from environment
+	sharekhanBaseURL := getEnv("SHAREKHAN_API_BASE_URL", "https://api.sharekhan.com")
+	sharekhanAPIKey := getEnv("SHAREKHAN_API_KEY", "")
+	sharekhanAccessToken := getEnv("SHAREKHAN_ACCESS_TOKEN", "")
+
+  
 	// Create Dhan order service
 	m.dhanOrderService = service.NewDhanOrderService(dhanBaseURL, dhanAccessToken)
 
@@ -63,6 +75,12 @@ func (m *Module) initialize() {
 
 	// Create AngelOne order service
 	m.angeloneOrderService = service.NewAngelOneOrderService(angeloneBaseURL, angeloneAPIKey, angeloneAccessToken)
+
+  // Create HDFC Securities order service
+	m.hdfcsecOrderService = service.NewHDFCSecOrderService(hdfcsecBaseURL, hdfcsecAccessToken)
+
+  // Create Sharekhan order service
+	m.sharekhanOrderService = service.NewSharekhanOrderService(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
@@ -95,6 +113,16 @@ func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
 // GetAngelOneOrderService returns the AngelOne order service
 func (m *Module) GetAngelOneOrderService() *service.AngelOneOrderService {
 	return m.angeloneOrderService
+}
+
+// GetHDFCSecOrderService returns the HDFC Securities order service
+func (m *Module) GetHDFCSecOrderService() *service.HDFCSecOrderService {
+	return m.hdfcsecOrderService
+}
+
+// GetSharekhanOrderService returns the Sharekhan order service
+func (m *Module) GetSharekhanOrderService() *service.SharekhanOrderService {
+	return m.sharekhanOrderService
 }
 
 // GetBrokerService returns the broker service
