@@ -254,6 +254,7 @@ func (indicator *MACD) GetLookBack(config []any) int64 {
 }
 
 // CalculateAll calculates MACD values for all data points
+// Following Excel flow: Fast EMA -> Slow EMA -> MACD Line -> Signal Line -> Histogram
 func (indicator *MACD) CalculateAll(
 	config []any,
 	ctx *EvaluationContext,
@@ -262,8 +263,8 @@ func (indicator *MACD) CalculateAll(
 	fastPeriod := int(config[0].(float64))   // default: 12
 	slowPeriod := int(config[1].(float64))   // default: 26
 	signalPeriod := int(config[2].(float64)) // default: 9
-	// macdType := config[3].(string)           // default: "STANDARD" - handled by Calculate method
-	offset := int(config[4].(float64)) // default: 0
+	macdType := config[3].(string)           // default: "STANDARD"
+	offset := int(config[4].(float64))       // default: 0
 
 	indicator.fastPeriod = fastPeriod
 	indicator.slowPeriod = slowPeriod
@@ -271,31 +272,114 @@ func (indicator *MACD) CalculateAll(
 	indicator.offset = offset
 
 	stockData := *ctx.Data
-	var results []IndicatorValues
+	dataLen := len(stockData)
 
-	// Need enough data for calculation
-	minDataPoints := slowPeriod + signalPeriod + offset
-	if len(stockData) < minDataPoints {
+	// Need enough data for calculation (slow period + signal period)
+	if dataLen < slowPeriod+signalPeriod {
 		return []IndicatorValues{}
 	}
 
-	// Calculate for each valid data point
-	for i := minDataPoints - 1; i < len(stockData); i++ {
-		// Create a temporary context with data up to this point
-		tempData := stockData[:i+1]
-		tempCtx := &EvaluationContext{
-			Data:     &tempData,
-			Strategy: ctx.Strategy,
-			Results:  make(map[int64]map[string]interface{}),
+	// Extract close prices
+	closes := make([]float64, dataLen)
+	for i := 0; i < dataLen; i++ {
+		closes[i] = stockData[i].Close
+	}
+
+	// Step 1: Calculate 12-Period EMA (Fast EMA)
+	fastEMA := make([]float64, dataLen)
+	fastMultiplier := 2.0 / float64(fastPeriod+1)
+
+	// Initial SMA for fast period (C13 in Excel)
+	if fastPeriod <= dataLen {
+		var sum float64
+		for i := 0; i < fastPeriod; i++ {
+			sum += closes[i]
 		}
+		fastEMA[fastPeriod-1] = sum / float64(fastPeriod)
 
-		// Calculate MACD value for this point
-		value := indicator.Calculate(config, tempCtx)
+		// Calculate EMA for subsequent periods (C14 onwards)
+		for i := fastPeriod; i < dataLen; i++ {
+			// EMA = Close * multiplier + Previous EMA * (1 - multiplier)
+			fastEMA[i] = closes[i]*fastMultiplier + fastEMA[i-1]*(1-fastMultiplier)
+		}
+	}
 
-		results = append(results, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     value,
-		})
+	// Step 2: Calculate 26-Period EMA (Slow EMA)
+	slowEMA := make([]float64, dataLen)
+	slowMultiplier := 2.0 / float64(slowPeriod+1)
+
+	// Initial SMA for slow period (D27 in Excel)
+	if slowPeriod <= dataLen {
+		var sum float64
+		for i := 0; i < slowPeriod; i++ {
+			sum += closes[i]
+		}
+		slowEMA[slowPeriod-1] = sum / float64(slowPeriod)
+
+		// Calculate EMA for subsequent periods (D28 onwards)
+		for i := slowPeriod; i < dataLen; i++ {
+			// EMA = Close * multiplier + Previous EMA * (1 - multiplier)
+			slowEMA[i] = closes[i]*slowMultiplier + slowEMA[i-1]*(1-slowMultiplier)
+		}
+	}
+
+	// Step 3: Calculate MACD Line (E27 onwards)
+	macdLine := make([]float64, dataLen)
+	for i := slowPeriod - 1; i < dataLen; i++ {
+		// MACD Line = Fast EMA - Slow EMA
+		macdLine[i] = fastEMA[i] - slowEMA[i]
+	}
+
+	// Step 4: Calculate 9-Period EMA of MACD (Signal Line)
+	signalLine := make([]float64, dataLen)
+	signalMultiplier := 2.0 / float64(signalPeriod+1)
+
+	// Calculate initial signal line starting index (F35 in Excel)
+	signalStartIndex := slowPeriod + signalPeriod - 2
+	if signalStartIndex < dataLen {
+		// Initial SMA of MACD for signal period
+		var sum float64
+		for i := 0; i < signalPeriod; i++ {
+			sum += macdLine[slowPeriod-1+i]
+		}
+		signalLine[signalStartIndex] = sum / float64(signalPeriod)
+
+		// Calculate EMA for subsequent periods (F36 onwards)
+		for i := signalStartIndex + 1; i < dataLen; i++ {
+			// Signal EMA = MACD * multiplier + Previous Signal * (1 - multiplier)
+			signalLine[i] = macdLine[i]*signalMultiplier + signalLine[i-1]*(1-signalMultiplier)
+		}
+	}
+
+	// Step 5: Calculate MACD Histogram (G35 onwards)
+	histogram := make([]float64, dataLen)
+	for i := signalStartIndex; i < dataLen; i++ {
+		// Histogram = MACD Line - Signal Line
+		histogram[i] = macdLine[i] - signalLine[i]
+	}
+
+	// Build results starting from when all calculations are valid
+	var results []IndicatorValues
+	for i := signalStartIndex; i < dataLen; i++ {
+		// Apply offset if specified
+		adjustedIndex := i + offset
+		if adjustedIndex >= 0 && adjustedIndex < dataLen {
+			var value float64
+			// Return the appropriate value based on macdType
+			switch macdType {
+			case "HISTOGRAM":
+				value = util.Round(histogram[i])
+			case "SIGNAL":
+				value = util.Round(signalLine[i])
+			default: // "STANDARD" or any other value
+				value = util.Round(macdLine[i])
+			}
+
+			results = append(results, IndicatorValues{
+				Timestamp: stockData[adjustedIndex].Timestamp,
+				Value:     value,
+			})
+		}
 	}
 
 	// Filter results by startDate
