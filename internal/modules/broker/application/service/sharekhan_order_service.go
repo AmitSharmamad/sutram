@@ -12,20 +12,20 @@ import (
 	"algo/internal/modules/broker/domain"
 )
 
-// SharekhanOrderService handles Sharekhan order API operations
-type SharekhanOrderService struct {
+// SharekhanBroker handles Sharekhan order API operations
+type SharekhanBroker struct {
 	baseURL     string
 	apiKey      string
 	accessToken string
 	httpClient  *http.Client
 }
 
-// Ensure SharekhanOrderService implements the Broker interface
-var _ domain.Broker = (*SharekhanOrderService)(nil)
+// Ensure SharekhanBroker implements the Broker interface
+var _ domain.Broker = (*SharekhanBroker)(nil)
 
-// NewSharekhanOrderService creates a new Sharekhan order service
-func NewSharekhanOrderService(baseURL, apiKey, accessToken string) *SharekhanOrderService {
-	return &SharekhanOrderService{
+// NewSharekhanBroker creates a new Sharekhan order service
+func NewSharekhanBroker(baseURL, apiKey, accessToken string) *SharekhanBroker {
+	return &SharekhanBroker{
 		baseURL:     baseURL,
 		apiKey:      apiKey,
 		accessToken: accessToken,
@@ -36,7 +36,7 @@ func NewSharekhanOrderService(baseURL, apiKey, accessToken string) *SharekhanOrd
 }
 
 // PlaceSharekhanOrder places a new order through Sharekhan API
-func (s *SharekhanOrderService) PlaceSharekhanOrder(ctx context.Context, request *dto.SharekhanPlaceOrderRequest) (*dto.SharekhanPlaceOrderResponse, error) {
+func (s *SharekhanBroker) PlaceSharekhanOrder(ctx context.Context, request *dto.SharekhanPlaceOrderRequest) (*dto.SharekhanPlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -72,7 +72,7 @@ func (s *SharekhanOrderService) PlaceSharekhanOrder(ctx context.Context, request
 }
 
 // ModifySharekhanOrder modifies an existing order through Sharekhan API
-func (s *SharekhanOrderService) ModifySharekhanOrder(ctx context.Context, request *dto.SharekhanModifyOrderRequest) (*dto.SharekhanModifyOrderResponse, error) {
+func (s *SharekhanBroker) ModifySharekhanOrder(ctx context.Context, request *dto.SharekhanModifyOrderRequest) (*dto.SharekhanModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderNumber)
 	
 	jsonData, err := json.Marshal(request)
@@ -108,7 +108,7 @@ func (s *SharekhanOrderService) ModifySharekhanOrder(ctx context.Context, reques
 }
 
 // CancelSharekhanOrder cancels an existing order through Sharekhan API
-func (s *SharekhanOrderService) CancelSharekhanOrder(ctx context.Context, request *dto.SharekhanCancelOrderRequest) (*dto.SharekhanCancelOrderResponse, error) {
+func (s *SharekhanBroker) CancelSharekhanOrder(ctx context.Context, request *dto.SharekhanCancelOrderRequest) (*dto.SharekhanCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderNumber)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -138,7 +138,7 @@ func (s *SharekhanOrderService) CancelSharekhanOrder(ctx context.Context, reques
 }
 
 // GetOrders retrieves all orders for the client
-func (s *SharekhanOrderService) GetOrders(ctx context.Context) (*dto.SharekhanOrderListResponse, error) {
+func (s *SharekhanBroker) GetOrders(ctx context.Context) (*dto.SharekhanOrderListResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -168,7 +168,7 @@ func (s *SharekhanOrderService) GetOrders(ctx context.Context) (*dto.SharekhanOr
 }
 
 // GetOrderByID retrieves a specific order by ID
-func (s *SharekhanOrderService) GetOrderByID(ctx context.Context, orderNumber string) (*dto.SharekhanOrderByIDResponse, error) {
+func (s *SharekhanBroker) GetOrderByID(ctx context.Context, orderNumber string) (*dto.SharekhanOrderByIDResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, orderNumber)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -198,7 +198,7 @@ func (s *SharekhanOrderService) GetOrderByID(ctx context.Context, orderNumber st
 }
 
 // GetTrades retrieves all trades for the client
-func (s *SharekhanOrderService) GetTrades(ctx context.Context) (*dto.SharekhanTradeListResponse, error) {
+func (s *SharekhanBroker) GetTrades(ctx context.Context) (*dto.SharekhanTradeListResponse, error) {
 	url := fmt.Sprintf("%s/trades", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -228,7 +228,7 @@ func (s *SharekhanOrderService) GetTrades(ctx context.Context) (*dto.SharekhanTr
 }
 
 // GetOrderBook retrieves the order book for the client
-func (s *SharekhanOrderService) GetOrderBook(ctx context.Context) (*dto.SharekhanOrderBookResponse, error) {
+func (s *SharekhanBroker) GetOrderBook(ctx context.Context) (*dto.SharekhanOrderBookResponse, error) {
 	url := fmt.Sprintf("%s/orderbook", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -258,7 +258,7 @@ func (s *SharekhanOrderService) GetOrderBook(ctx context.Context) (*dto.Sharekha
 }
 
 // GetTradeBook retrieves the trade book for the client
-func (s *SharekhanOrderService) GetTradeBook(ctx context.Context) (*dto.SharekhanTradeBookResponse, error) {
+func (s *SharekhanBroker) GetTradeBook(ctx context.Context) (*dto.SharekhanTradeBookResponse, error) {
 	url := fmt.Sprintf("%s/tradebook", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -290,7 +290,7 @@ func (s *SharekhanOrderService) GetTradeBook(ctx context.Context) (*dto.Sharekha
 // Broker interface implementation
 
 // PlaceOrder implements the Broker interface for placing orders
-func (s *SharekhanOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+func (s *SharekhanBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Sharekhan-specific request
 	sharekhanRequest := s.convertToPlaceOrderRequest(request)
 	
@@ -305,7 +305,7 @@ func (s *SharekhanOrderService) PlaceOrder(ctx context.Context, request *dto.Pla
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
-func (s *SharekhanOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+func (s *SharekhanBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Sharekhan-specific request
 	sharekhanRequest := s.convertToModifyOrderRequest(request)
 	
@@ -320,7 +320,7 @@ func (s *SharekhanOrderService) UpdateOrder(ctx context.Context, request *dto.Mo
 }
 
 // CancelOrder implements the Broker interface for canceling orders
-func (s *SharekhanOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+func (s *SharekhanBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Sharekhan-specific request
 	sharekhanRequest := &dto.SharekhanCancelOrderRequest{
 		OrderNumber: request.OrderID,
@@ -338,7 +338,7 @@ func (s *SharekhanOrderService) CancelOrder(ctx context.Context, request *dto.Ca
 
 // Helper conversion methods
 
-func (s *SharekhanOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.SharekhanPlaceOrderRequest {
+func (s *SharekhanBroker) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.SharekhanPlaceOrderRequest {
 	return &dto.SharekhanPlaceOrderRequest{
 		TradingSymbol:   request.Instrument,
 		Exchange:        request.Exchange,
@@ -353,7 +353,7 @@ func (s *SharekhanOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrd
 	}
 }
 
-func (s *SharekhanOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.SharekhanModifyOrderRequest {
+func (s *SharekhanBroker) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.SharekhanModifyOrderRequest {
 	sharekhanRequest := &dto.SharekhanModifyOrderRequest{
 		OrderNumber: request.OrderID,
 	}
@@ -374,7 +374,7 @@ func (s *SharekhanOrderService) convertToModifyOrderRequest(request *dto.ModifyO
 	return sharekhanRequest
 }
 
-func (s *SharekhanOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, sharekhanResponse *dto.SharekhanPlaceOrderResponse) *dto.OrderResponse {
+func (s *SharekhanBroker) convertToOrderResponse(request *dto.PlaceOrderRequest, sharekhanResponse *dto.SharekhanPlaceOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		ID:                  request.ID,
 		UserID:              request.UserID,
@@ -396,7 +396,7 @@ func (s *SharekhanOrderService) convertToOrderResponse(request *dto.PlaceOrderRe
 	}
 }
 
-func (s *SharekhanOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, sharekhanResponse *dto.SharekhanModifyOrderResponse) *dto.OrderResponse {
+func (s *SharekhanBroker) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, sharekhanResponse *dto.SharekhanModifyOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: sharekhanResponse,
@@ -405,7 +405,7 @@ func (s *SharekhanOrderService) convertModifyToOrderResponse(request *dto.Modify
 	}
 }
 
-func (s *SharekhanOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, sharekhanResponse *dto.SharekhanCancelOrderResponse) *dto.OrderResponse {
+func (s *SharekhanBroker) convertCancelToOrderResponse(request *dto.CancelOrderRequest, sharekhanResponse *dto.SharekhanCancelOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: sharekhanResponse,

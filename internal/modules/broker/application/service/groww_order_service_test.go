@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGrowwOrderService_PlaceOrder(t *testing.T) {
+func TestGrowwBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -46,7 +46,7 @@ func TestGrowwOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.GrowwPlaceOrderRequest{
@@ -70,7 +70,7 @@ func TestGrowwOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, "PENDING", response.Status)
 }
 
-func TestGrowwOrderService_ModifyOrder(t *testing.T) {
+func TestGrowwBroker_ModifyOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
@@ -92,7 +92,7 @@ func TestGrowwOrderService_ModifyOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.GrowwModifyOrderRequest{
@@ -111,7 +111,7 @@ func TestGrowwOrderService_ModifyOrder(t *testing.T) {
 	assert.Equal(t, "MODIFIED", response.Status)
 }
 
-func TestGrowwOrderService_CancelOrder(t *testing.T) {
+func TestGrowwBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -132,7 +132,7 @@ func TestGrowwOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.GrowwCancelOrderRequest{
@@ -147,7 +147,7 @@ func TestGrowwOrderService_CancelOrder(t *testing.T) {
 	assert.Equal(t, "CANCELLED", response.Status)
 }
 
-func TestGrowwOrderService_GetOrders(t *testing.T) {
+func TestGrowwBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -179,7 +179,7 @@ func TestGrowwOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetOrders(context.Background())
 
@@ -190,7 +190,7 @@ func TestGrowwOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, "GRW12345", response.Orders[0].OrderID)
 }
 
-func TestGrowwOrderService_GetOrderByID(t *testing.T) {
+func TestGrowwBroker_GetOrderByID(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -220,7 +220,7 @@ func TestGrowwOrderService_GetOrderByID(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetOrderByID(context.Background(), "GRW12345")
 
@@ -230,7 +230,7 @@ func TestGrowwOrderService_GetOrderByID(t *testing.T) {
 	assert.Equal(t, "GRW12345", response.Order.OrderID)
 }
 
-func TestGrowwOrderService_GetTrades(t *testing.T) {
+func TestGrowwBroker_GetTrades(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -261,7 +261,7 @@ func TestGrowwOrderService_GetTrades(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewGrowwOrderService(server.URL, "test-api-key", "test-token")
+	service := NewGrowwBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetTrades(context.Background())
 

@@ -13,11 +13,11 @@ import (
 // Module represents the broker module
 type Module struct {
 	controller           *http.BrokerController
-	dhanOrderService     *service.DhanOrderService
-	zerodhaOrderService  *service.ZerodhaOrderService
-	hdfcsecOrderService  *service.HDFCSecOrderService
-  sharekhanOrderService *service.SharekhanOrderService
-  angeloneOrderService  *service.AngelOneOrderService
+	dhanBroker     *service.DhanBroker
+	zerodhaBroker  *service.ZerodhaBroker
+	hdfcsecBroker  *service.HDFCSecBroker
+  sharekhanBroker *service.SharekhanBroker
+  angeloneBroker  *service.AngelOneBroker
 	brokerService        *service.BrokerService
 }
 
@@ -68,25 +68,25 @@ func (m *Module) initialize() {
 
   
 	// Create Dhan order service
-	m.dhanOrderService = service.NewDhanOrderService(dhanBaseURL, dhanAccessToken)
+	m.dhanBroker = service.NewDhanBroker(dhanBaseURL, dhanAccessToken)
 
 	// Create Zerodha order service
-	m.zerodhaOrderService = service.NewZerodhaOrderService(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
+	m.zerodhaBroker = service.NewZerodhaBroker(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
 
 	// Create AngelOne order service
-	m.angeloneOrderService = service.NewAngelOneOrderService(angeloneBaseURL, angeloneAPIKey, angeloneAccessToken)
+	m.angeloneBroker = service.NewAngelOneBroker(angeloneBaseURL, angeloneAPIKey, angeloneAccessToken)
 
   // Create HDFC Securities order service
-	m.hdfcsecOrderService = service.NewHDFCSecOrderService(hdfcsecBaseURL, hdfcsecAccessToken)
+	m.hdfcsecBroker = service.NewHDFCSecBroker(hdfcsecBaseURL, hdfcsecAccessToken)
 
   // Create Sharekhan order service
-	m.sharekhanOrderService = service.NewSharekhanOrderService(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
+	m.sharekhanBroker = service.NewSharekhanBroker(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
-	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
+	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanBroker)
 
 	// Create controller
-	m.controller = http.NewBrokerController(m.dhanOrderService)
+	m.controller = http.NewBrokerController(m.dhanBroker)
 }
 
 // RegisterRoutes registers the broker module routes with the given router
@@ -100,29 +100,29 @@ func (m *Module) GetController() *http.BrokerController {
 	return m.controller
 }
 
-// GetDhanOrderService returns the Dhan order service
-func (m *Module) GetDhanOrderService() *service.DhanOrderService {
-	return m.dhanOrderService
+// GetDhanBroker returns the Dhan order service
+func (m *Module) GetDhanBroker() *service.DhanBroker {
+	return m.dhanBroker
 }
 
-// GetZerodhaOrderService returns the Zerodha order service
-func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
-	return m.zerodhaOrderService
+// GetZerodhaBroker returns the Zerodha order service
+func (m *Module) GetZerodhaBroker() *service.ZerodhaBroker {
+	return m.zerodhaBroker
 }
 
-// GetAngelOneOrderService returns the AngelOne order service
-func (m *Module) GetAngelOneOrderService() *service.AngelOneOrderService {
-	return m.angeloneOrderService
+// GetAngelOneBroker returns the AngelOne order service
+func (m *Module) GetAngelOneBroker() *service.AngelOneBroker {
+	return m.angeloneBroker
 }
 
-// GetHDFCSecOrderService returns the HDFC Securities order service
-func (m *Module) GetHDFCSecOrderService() *service.HDFCSecOrderService {
-	return m.hdfcsecOrderService
+// GetHDFCSecBroker returns the HDFC Securities order service
+func (m *Module) GetHDFCSecBroker() *service.HDFCSecBroker {
+	return m.hdfcsecBroker
 }
 
-// GetSharekhanOrderService returns the Sharekhan order service
-func (m *Module) GetSharekhanOrderService() *service.SharekhanOrderService {
-	return m.sharekhanOrderService
+// GetSharekhanBroker returns the Sharekhan order service
+func (m *Module) GetSharekhanBroker() *service.SharekhanBroker {
+	return m.sharekhanBroker
 }
 
 // GetBrokerService returns the broker service

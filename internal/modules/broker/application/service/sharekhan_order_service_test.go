@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSharekhanOrderService_PlaceOrder(t *testing.T) {
+func TestSharekhanBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -44,7 +44,7 @@ func TestSharekhanOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.SharekhanPlaceOrderRequest{
@@ -67,7 +67,7 @@ func TestSharekhanOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, "RELIANCE", response.TradingSymbol)
 }
 
-func TestSharekhanOrderService_ModifyOrder(t *testing.T) {
+func TestSharekhanBroker_ModifyOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
@@ -97,7 +97,7 @@ func TestSharekhanOrderService_ModifyOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.SharekhanModifyOrderRequest{
@@ -117,7 +117,7 @@ func TestSharekhanOrderService_ModifyOrder(t *testing.T) {
 	assert.Equal(t, 2400.00, response.Price)
 }
 
-func TestSharekhanOrderService_CancelOrder(t *testing.T) {
+func TestSharekhanBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -138,7 +138,7 @@ func TestSharekhanOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.SharekhanCancelOrderRequest{
@@ -152,7 +152,7 @@ func TestSharekhanOrderService_CancelOrder(t *testing.T) {
 	assert.Equal(t, "CANCELLED", response.OrderStatus)
 }
 
-func TestSharekhanOrderService_GetOrders(t *testing.T) {
+func TestSharekhanBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -188,7 +188,7 @@ func TestSharekhanOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetOrders(context.Background())
 
@@ -199,7 +199,7 @@ func TestSharekhanOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, "RELIANCE", response.Orders[0].TradingSymbol)
 }
 
-func TestSharekhanOrderService_GetOrderByID(t *testing.T) {
+func TestSharekhanBroker_GetOrderByID(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -233,7 +233,7 @@ func TestSharekhanOrderService_GetOrderByID(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetOrderByID(context.Background(), "SK12345")
 
@@ -243,7 +243,7 @@ func TestSharekhanOrderService_GetOrderByID(t *testing.T) {
 	assert.Equal(t, "RELIANCE", response.Order.TradingSymbol)
 }
 
-func TestSharekhanOrderService_GetTrades(t *testing.T) {
+func TestSharekhanBroker_GetTrades(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -280,7 +280,7 @@ func TestSharekhanOrderService_GetTrades(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetTrades(context.Background())
 
@@ -291,7 +291,7 @@ func TestSharekhanOrderService_GetTrades(t *testing.T) {
 	assert.Equal(t, "SK12345", response.Trades[0].OrderNumber)
 }
 
-func TestSharekhanOrderService_GetOrderBook(t *testing.T) {
+func TestSharekhanBroker_GetOrderBook(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -327,7 +327,7 @@ func TestSharekhanOrderService_GetOrderBook(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetOrderBook(context.Background())
 
@@ -337,7 +337,7 @@ func TestSharekhanOrderService_GetOrderBook(t *testing.T) {
 	assert.Equal(t, "SK12345", response.OrderBook[0].OrderNumber)
 }
 
-func TestSharekhanOrderService_GetTradeBook(t *testing.T) {
+func TestSharekhanBroker_GetTradeBook(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -374,7 +374,7 @@ func TestSharekhanOrderService_GetTradeBook(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewSharekhanOrderService(server.URL, "test-api-key", "test-token")
+	service := NewSharekhanBroker(server.URL, "test-api-key", "test-token")
 
 	response, err := service.GetTradeBook(context.Background())
 

@@ -13,11 +13,11 @@ func TestAllBrokersImplementInterface(t *testing.T) {
 	
 	// Test that each service can be assigned to the interface
 	brokers = append(brokers, NewDhanBroker("", ""))
-	brokers = append(brokers, NewZerodhaOrderService("", "", ""))
-	brokers = append(brokers, NewSharekhanOrderService("", "", ""))
-	brokers = append(brokers, NewHDFCSecOrderService("", ""))
-	brokers = append(brokers, NewAngelOneOrderService("", "", ""))
-	brokers = append(brokers, NewGrowwOrderService("", "", ""))
+	brokers = append(brokers, NewZerodhaBroker("", "", ""))
+	brokers = append(brokers, NewSharekhanBroker("", "", ""))
+	brokers = append(brokers, NewHDFCSecBroker("", ""))
+	brokers = append(brokers, NewAngelOneBroker("", "", ""))
+	brokers = append(brokers, NewGrowwBroker("", "", ""))
 	
 	// Verify we have all expected brokers
 	expectedCount := 6

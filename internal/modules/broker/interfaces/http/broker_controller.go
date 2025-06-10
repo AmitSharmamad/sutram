@@ -11,13 +11,13 @@ import (
 
 // BrokerController handles HTTP requests for broker operations
 type BrokerController struct {
-	dhanOrderService *service.DhanOrderService
+	dhanBroker *service.DhanBroker
 }
 
 // NewBrokerController creates a new broker controller
-func NewBrokerController(dhanOrderService *service.DhanOrderService) *BrokerController {
+func NewBrokerController(dhanBroker *service.DhanBroker) *BrokerController {
 	return &BrokerController{
-		dhanOrderService: dhanOrderService,
+		dhanBroker: dhanBroker,
 	}
 }
 
@@ -39,7 +39,7 @@ func (c *BrokerController) PlaceOrder(ctx *gin.Context) {
 		return
 	}
 
-	response, err := c.dhanOrderService.PlaceOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.PlaceDhanOrder(ctx.Request.Context(), &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -71,7 +71,7 @@ func (c *BrokerController) ModifyOrder(ctx *gin.Context) {
 	orderID := ctx.Param("orderID")
 	request.OrderID = orderID
 
-	response, err := c.dhanOrderService.ModifyOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.ModifyDhanOrder(ctx.Request.Context(), &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -103,7 +103,7 @@ func (c *BrokerController) CancelOrder(ctx *gin.Context) {
 	orderID := ctx.Param("orderID")
 	request.OrderID = orderID
 
-	response, err := c.dhanOrderService.CancelOrder(ctx.Request.Context(), &request)
+	response, err := c.dhanBroker.CancelDhanOrder(ctx.Request.Context(), &request)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -121,7 +121,7 @@ func (c *BrokerController) CancelOrder(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/orders [get]
 func (c *BrokerController) GetOrders(ctx *gin.Context) {
-	response, err := c.dhanOrderService.GetOrders(ctx.Request.Context())
+	response, err := c.dhanBroker.GetOrders(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -142,7 +142,7 @@ func (c *BrokerController) GetOrders(ctx *gin.Context) {
 func (c *BrokerController) GetOrderByID(ctx *gin.Context) {
 	orderID := ctx.Param("orderID")
 	
-	response, err := c.dhanOrderService.GetOrderByID(ctx.Request.Context(), orderID)
+	response, err := c.dhanBroker.GetOrderByID(ctx.Request.Context(), orderID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -160,7 +160,7 @@ func (c *BrokerController) GetOrderByID(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/trades [get]
 func (c *BrokerController) GetTrades(ctx *gin.Context) {
-	response, err := c.dhanOrderService.GetTrades(ctx.Request.Context())
+	response, err := c.dhanBroker.GetTrades(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -178,7 +178,7 @@ func (c *BrokerController) GetTrades(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/orderbook [get]
 func (c *BrokerController) GetOrderBook(ctx *gin.Context) {
-	response, err := c.dhanOrderService.GetOrderBook(ctx.Request.Context())
+	response, err := c.dhanBroker.GetOrderBook(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -196,7 +196,7 @@ func (c *BrokerController) GetOrderBook(ctx *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/broker/dhan/tradebook [get]
 func (c *BrokerController) GetTradeBook(ctx *gin.Context) {
-	response, err := c.dhanOrderService.GetTradeBook(ctx.Request.Context())
+	response, err := c.dhanBroker.GetTradeBook(ctx.Request.Context())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHDFCSecOrderService_PlaceOrder(t *testing.T) {
+func TestHDFCSecBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -45,7 +45,7 @@ func TestHDFCSecOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Test request
 	request := &dto.HDFCSecPlaceOrderRequest{
@@ -75,7 +75,7 @@ func TestHDFCSecOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, "Order placed successfully", response.Message)
 }
 
-func TestHDFCSecOrderService_GetOrders(t *testing.T) {
+func TestHDFCSecBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -109,7 +109,7 @@ func TestHDFCSecOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -124,7 +124,7 @@ func TestHDFCSecOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, 10, response.Orders[0].FilledQuantity)
 }
 
-func TestHDFCSecOrderService_CancelOrder(t *testing.T) {
+func TestHDFCSecBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -144,7 +144,7 @@ func TestHDFCSecOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Test request
 	request := &dto.HDFCSecCancelOrderRequest{
@@ -163,7 +163,7 @@ func TestHDFCSecOrderService_CancelOrder(t *testing.T) {
 	assert.Equal(t, "Order cancelled successfully", response.Message)
 }
 
-func TestHDFCSecOrderService_ModifyOrder(t *testing.T) {
+func TestHDFCSecBroker_ModifyOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
@@ -187,7 +187,7 @@ func TestHDFCSecOrderService_ModifyOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Test request
 	request := &dto.HDFCSecModifyOrderRequest{
@@ -212,7 +212,7 @@ func TestHDFCSecOrderService_ModifyOrder(t *testing.T) {
 	assert.Equal(t, "Order modified successfully", response.Message)
 }
 
-func TestHDFCSecOrderService_GetOrderByID(t *testing.T) {
+func TestHDFCSecBroker_GetOrderByID(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -244,7 +244,7 @@ func TestHDFCSecOrderService_GetOrderByID(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -258,7 +258,7 @@ func TestHDFCSecOrderService_GetOrderByID(t *testing.T) {
 	assert.Equal(t, 10, response.Order.FilledQuantity)
 }
 
-func TestHDFCSecOrderService_GetTrades(t *testing.T) {
+func TestHDFCSecBroker_GetTrades(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -294,7 +294,7 @@ func TestHDFCSecOrderService_GetTrades(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -309,7 +309,7 @@ func TestHDFCSecOrderService_GetTrades(t *testing.T) {
 	assert.Equal(t, 2500.00, response.Trades[0].TradePrice)
 }
 
-func TestHDFCSecOrderService_GetPositions(t *testing.T) {
+func TestHDFCSecBroker_GetPositions(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -347,7 +347,7 @@ func TestHDFCSecOrderService_GetPositions(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewHDFCSecOrderService(server.URL, "test-token")
+	service := NewHDFCSecBroker(server.URL, "test-token")
 
 	// Execute test
 	ctx := context.Background()

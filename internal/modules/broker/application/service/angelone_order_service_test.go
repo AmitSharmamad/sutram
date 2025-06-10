@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAngelOneOrderService_PlaceOrder(t *testing.T) {
+func TestAngelOneBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -43,7 +43,7 @@ func TestAngelOneOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.AngelOnePlaceOrderRequest{
@@ -69,7 +69,7 @@ func TestAngelOneOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, "RELIANCE-EQ", response.Data.Script)
 }
 
-func TestAngelOneOrderService_PlaceOrder_Error(t *testing.T) {
+func TestAngelOneBroker_PlaceOrder_Error(t *testing.T) {
 	// Mock HTTP server that returns error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := dto.AngelOnePlaceOrderResponse{
@@ -84,7 +84,7 @@ func TestAngelOneOrderService_PlaceOrder_Error(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.AngelOnePlaceOrderRequest{
@@ -108,7 +108,7 @@ func TestAngelOneOrderService_PlaceOrder_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "AG8001")
 }
 
-func TestAngelOneOrderService_ModifyOrder(t *testing.T) {
+func TestAngelOneBroker_ModifyOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -135,7 +135,7 @@ func TestAngelOneOrderService_ModifyOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.AngelOneModifyOrderRequest{
@@ -158,7 +158,7 @@ func TestAngelOneOrderService_ModifyOrder(t *testing.T) {
 	assert.Equal(t, "221114000000372", response.Data.OrderID)
 }
 
-func TestAngelOneOrderService_CancelOrder(t *testing.T) {
+func TestAngelOneBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -185,7 +185,7 @@ func TestAngelOneOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Test request
 	request := &dto.AngelOneCancelOrderRequest{
@@ -203,7 +203,7 @@ func TestAngelOneOrderService_CancelOrder(t *testing.T) {
 	assert.Equal(t, "221114000000372", response.Data.OrderID)
 }
 
-func TestAngelOneOrderService_GetOrders(t *testing.T) {
+func TestAngelOneBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -235,7 +235,7 @@ func TestAngelOneOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Execute test
 	response, err := service.GetOrders(context.Background())
@@ -249,7 +249,7 @@ func TestAngelOneOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, "RELIANCE-EQ", response.Data[0].TradingSymbol)
 }
 
-func TestAngelOneOrderService_GetOrderByID(t *testing.T) {
+func TestAngelOneBroker_GetOrderByID(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -279,7 +279,7 @@ func TestAngelOneOrderService_GetOrderByID(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Execute test
 	response, err := service.GetOrderByID(context.Background(), "221114000000372")
@@ -292,7 +292,7 @@ func TestAngelOneOrderService_GetOrderByID(t *testing.T) {
 	assert.Equal(t, "RELIANCE-EQ", response.Data.TradingSymbol)
 }
 
-func TestAngelOneOrderService_GetTrades(t *testing.T) {
+func TestAngelOneBroker_GetTrades(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -324,7 +324,7 @@ func TestAngelOneOrderService_GetTrades(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewAngelOneOrderService(server.URL, "test-api-key", "test-token")
+	service := NewAngelOneBroker(server.URL, "test-api-key", "test-token")
 
 	// Execute test
 	response, err := service.GetTrades(context.Background())

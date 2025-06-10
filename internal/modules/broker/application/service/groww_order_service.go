@@ -12,20 +12,20 @@ import (
 	"algo/internal/modules/broker/domain"
 )
 
-// GrowwOrderService handles Groww order API operations
-type GrowwOrderService struct {
+// GrowwBroker handles Groww order API operations
+type GrowwBroker struct {
 	baseURL     string
 	apiKey      string
 	accessToken string
 	httpClient  *http.Client
 }
 
-// Ensure GrowwOrderService implements the Broker interface
-var _ domain.Broker = (*GrowwOrderService)(nil)
+// Ensure GrowwBroker implements the Broker interface
+var _ domain.Broker = (*GrowwBroker)(nil)
 
-// NewGrowwOrderService creates a new Groww order service
-func NewGrowwOrderService(baseURL, apiKey, accessToken string) *GrowwOrderService {
-	return &GrowwOrderService{
+// NewGrowwBroker creates a new Groww order service
+func NewGrowwBroker(baseURL, apiKey, accessToken string) *GrowwBroker {
+	return &GrowwBroker{
 		baseURL:     baseURL,
 		apiKey:      apiKey,
 		accessToken: accessToken,
@@ -36,7 +36,7 @@ func NewGrowwOrderService(baseURL, apiKey, accessToken string) *GrowwOrderServic
 }
 
 // PlaceOrder places a new order through Groww API
-func (s *GrowwOrderService) PlaceGrowwOrder(ctx context.Context, request *dto.GrowwPlaceOrderRequest) (*dto.GrowwPlaceOrderResponse, error) {
+func (s *GrowwBroker) PlaceGrowwOrder(ctx context.Context, request *dto.GrowwPlaceOrderRequest) (*dto.GrowwPlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -72,7 +72,7 @@ func (s *GrowwOrderService) PlaceGrowwOrder(ctx context.Context, request *dto.Gr
 }
 
 // ModifyOrder modifies an existing order through Groww API
-func (s *GrowwOrderService) ModifyGrowwOrder(ctx context.Context, request *dto.GrowwModifyOrderRequest) (*dto.GrowwModifyOrderResponse, error) {
+func (s *GrowwBroker) ModifyGrowwOrder(ctx context.Context, request *dto.GrowwModifyOrderRequest) (*dto.GrowwModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	jsonData, err := json.Marshal(request)
@@ -108,7 +108,7 @@ func (s *GrowwOrderService) ModifyGrowwOrder(ctx context.Context, request *dto.G
 }
 
 // CancelOrder cancels an existing order through Groww API
-func (s *GrowwOrderService) CancelGrowwOrder(ctx context.Context, request *dto.GrowwCancelOrderRequest) (*dto.GrowwCancelOrderResponse, error) {
+func (s *GrowwBroker) CancelGrowwOrder(ctx context.Context, request *dto.GrowwCancelOrderRequest) (*dto.GrowwCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, request.OrderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -138,7 +138,7 @@ func (s *GrowwOrderService) CancelGrowwOrder(ctx context.Context, request *dto.G
 }
 
 // GetOrders retrieves all orders for the client
-func (s *GrowwOrderService) GetOrders(ctx context.Context) (*dto.GrowwOrderListResponse, error) {
+func (s *GrowwBroker) GetOrders(ctx context.Context) (*dto.GrowwOrderListResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -168,7 +168,7 @@ func (s *GrowwOrderService) GetOrders(ctx context.Context) (*dto.GrowwOrderListR
 }
 
 // GetOrderByID retrieves a specific order by ID
-func (s *GrowwOrderService) GetOrderByID(ctx context.Context, orderID string) (*dto.GrowwOrderByIDResponse, error) {
+func (s *GrowwBroker) GetOrderByID(ctx context.Context, orderID string) (*dto.GrowwOrderByIDResponse, error) {
 	url := fmt.Sprintf("%s/orders/%s", s.baseURL, orderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -198,7 +198,7 @@ func (s *GrowwOrderService) GetOrderByID(ctx context.Context, orderID string) (*
 }
 
 // GetTrades retrieves all trades for the client
-func (s *GrowwOrderService) GetTrades(ctx context.Context) (*dto.GrowwTradeListResponse, error) {
+func (s *GrowwBroker) GetTrades(ctx context.Context) (*dto.GrowwTradeListResponse, error) {
 	url := fmt.Sprintf("%s/trades", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -230,7 +230,7 @@ func (s *GrowwOrderService) GetTrades(ctx context.Context) (*dto.GrowwTradeListR
 // Broker interface implementation
 
 // PlaceOrder implements the Broker interface for placing orders
-func (s *GrowwOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+func (s *GrowwBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Groww-specific request
 	growwRequest := s.convertToPlaceOrderRequest(request)
 	
@@ -245,7 +245,7 @@ func (s *GrowwOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOr
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
-func (s *GrowwOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+func (s *GrowwBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Groww-specific request
 	growwRequest := s.convertToModifyOrderRequest(request)
 	
@@ -260,7 +260,7 @@ func (s *GrowwOrderService) UpdateOrder(ctx context.Context, request *dto.Modify
 }
 
 // CancelOrder implements the Broker interface for canceling orders
-func (s *GrowwOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+func (s *GrowwBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to Groww-specific request
 	growwRequest := &dto.GrowwCancelOrderRequest{
 		OrderID: request.OrderID,
@@ -278,7 +278,7 @@ func (s *GrowwOrderService) CancelOrder(ctx context.Context, request *dto.Cancel
 
 // Helper conversion methods
 
-func (s *GrowwOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.GrowwPlaceOrderRequest {
+func (s *GrowwBroker) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.GrowwPlaceOrderRequest {
 	return &dto.GrowwPlaceOrderRequest{
 		Symbol:          request.Instrument,
 		Exchange:        request.Exchange,
@@ -294,7 +294,7 @@ func (s *GrowwOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRe
 	}
 }
 
-func (s *GrowwOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.GrowwModifyOrderRequest {
+func (s *GrowwBroker) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.GrowwModifyOrderRequest {
 	growwRequest := &dto.GrowwModifyOrderRequest{
 		OrderID:   request.OrderID,
 		OrderType: "LIMIT",  // Default
@@ -318,7 +318,7 @@ func (s *GrowwOrderService) convertToModifyOrderRequest(request *dto.ModifyOrder
 	return growwRequest
 }
 
-func (s *GrowwOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, growwResponse *dto.GrowwPlaceOrderResponse) *dto.OrderResponse {
+func (s *GrowwBroker) convertToOrderResponse(request *dto.PlaceOrderRequest, growwResponse *dto.GrowwPlaceOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		ID:                  request.ID,
 		UserID:              request.UserID,
@@ -340,7 +340,7 @@ func (s *GrowwOrderService) convertToOrderResponse(request *dto.PlaceOrderReques
 	}
 }
 
-func (s *GrowwOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, growwResponse *dto.GrowwModifyOrderResponse) *dto.OrderResponse {
+func (s *GrowwBroker) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, growwResponse *dto.GrowwModifyOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: growwResponse,
@@ -349,7 +349,7 @@ func (s *GrowwOrderService) convertModifyToOrderResponse(request *dto.ModifyOrde
 	}
 }
 
-func (s *GrowwOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, growwResponse *dto.GrowwCancelOrderResponse) *dto.OrderResponse {
+func (s *GrowwBroker) convertCancelToOrderResponse(request *dto.CancelOrderRequest, growwResponse *dto.GrowwCancelOrderResponse) *dto.OrderResponse {
 	return &dto.OrderResponse{
 		BrokerOrderID:       request.OrderID,
 		BrokerOrderResponse: growwResponse,

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestZerodhaOrderService_PlaceOrder(t *testing.T) {
+func TestZerodhaBroker_PlaceOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
@@ -43,7 +43,7 @@ func TestZerodhaOrderService_PlaceOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Test request
 	request := &dto.ZerodhaPlaceOrderRequest{
@@ -66,7 +66,7 @@ func TestZerodhaOrderService_PlaceOrder(t *testing.T) {
 	assert.Equal(t, "240308000000001", response.OrderID)
 }
 
-func TestZerodhaOrderService_ModifyOrder(t *testing.T) {
+func TestZerodhaBroker_ModifyOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
@@ -85,7 +85,7 @@ func TestZerodhaOrderService_ModifyOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Test request
 	request := &dto.ZerodhaModifyOrderRequest{
@@ -103,7 +103,7 @@ func TestZerodhaOrderService_ModifyOrder(t *testing.T) {
 	assert.Equal(t, "240308000000001", response.OrderID)
 }
 
-func TestZerodhaOrderService_CancelOrder(t *testing.T) {
+func TestZerodhaBroker_CancelOrder(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -121,7 +121,7 @@ func TestZerodhaOrderService_CancelOrder(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Test request
 	request := &dto.ZerodhaCancelOrderRequest{
@@ -137,7 +137,7 @@ func TestZerodhaOrderService_CancelOrder(t *testing.T) {
 	assert.Equal(t, "240308000000001", response.OrderID)
 }
 
-func TestZerodhaOrderService_GetOrders(t *testing.T) {
+func TestZerodhaBroker_GetOrders(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -172,7 +172,7 @@ func TestZerodhaOrderService_GetOrders(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -187,7 +187,7 @@ func TestZerodhaOrderService_GetOrders(t *testing.T) {
 	assert.Equal(t, "RELIANCE", response.Data[0].TradingSymbol)
 }
 
-func TestZerodhaOrderService_GetOrderHistory(t *testing.T) {
+func TestZerodhaBroker_GetOrderHistory(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -222,7 +222,7 @@ func TestZerodhaOrderService_GetOrderHistory(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -236,7 +236,7 @@ func TestZerodhaOrderService_GetOrderHistory(t *testing.T) {
 	assert.Equal(t, "COMPLETE", response.Data[0].Status)
 }
 
-func TestZerodhaOrderService_GetTrades(t *testing.T) {
+func TestZerodhaBroker_GetTrades(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -268,7 +268,7 @@ func TestZerodhaOrderService_GetTrades(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -283,7 +283,7 @@ func TestZerodhaOrderService_GetTrades(t *testing.T) {
 	assert.Equal(t, "RELIANCE", response.Data[0].TradingSymbol)
 }
 
-func TestZerodhaOrderService_GetPositions(t *testing.T) {
+func TestZerodhaBroker_GetPositions(t *testing.T) {
 	// Mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -318,7 +318,7 @@ func TestZerodhaOrderService_GetPositions(t *testing.T) {
 	defer server.Close()
 
 	// Create service with mock server
-	service := NewZerodhaOrderService(server.URL, "test-api-key", "test-access-token")
+	service := NewZerodhaBroker(server.URL, "test-api-key", "test-access-token")
 
 	// Execute test
 	ctx := context.Background()
@@ -333,8 +333,8 @@ func TestZerodhaOrderService_GetPositions(t *testing.T) {
 	assert.Equal(t, 10, response.Data.Net[0].Quantity)
 }
 
-func TestZerodhaOrderService_ConvertToFormData(t *testing.T) {
-	service := NewZerodhaOrderService("http://test.com", "test-api-key", "test-access-token")
+func TestZerodhaBroker_ConvertToFormData(t *testing.T) {
+	service := NewZerodhaBroker("http://test.com", "test-api-key", "test-access-token")
 
 	request := &dto.ZerodhaPlaceOrderRequest{
 		TradingSymbol:   "RELIANCE",

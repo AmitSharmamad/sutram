@@ -12,20 +12,20 @@ import (
 	"algo/internal/modules/broker/domain"
 )
 
-// AngelOneOrderService handles AngelOne Smart API order operations
-type AngelOneOrderService struct {
+// AngelOneBroker handles AngelOne Smart API order operations
+type AngelOneBroker struct {
 	baseURL     string
 	apiKey      string
 	accessToken string
 	httpClient  *http.Client
 }
 
-// Ensure AngelOneOrderService implements the Broker interface
-var _ domain.Broker = (*AngelOneOrderService)(nil)
+// Ensure AngelOneBroker implements the Broker interface
+var _ domain.Broker = (*AngelOneBroker)(nil)
 
-// NewAngelOneOrderService creates a new AngelOne order service
-func NewAngelOneOrderService(baseURL, apiKey, accessToken string) *AngelOneOrderService {
-	return &AngelOneOrderService{
+// NewAngelOneBroker creates a new AngelOne order service
+func NewAngelOneBroker(baseURL, apiKey, accessToken string) *AngelOneBroker {
+	return &AngelOneBroker{
 		baseURL:     baseURL,
 		apiKey:      apiKey,
 		accessToken: accessToken,
@@ -36,7 +36,7 @@ func NewAngelOneOrderService(baseURL, apiKey, accessToken string) *AngelOneOrder
 }
 
 // PlaceOrder places a new order through AngelOne Smart API
-func (s *AngelOneOrderService) PlaceAngelOneOrder(ctx context.Context, request *dto.AngelOnePlaceOrderRequest) (*dto.AngelOnePlaceOrderResponse, error) {
+func (s *AngelOneBroker) PlaceAngelOneOrder(ctx context.Context, request *dto.AngelOnePlaceOrderRequest) (*dto.AngelOnePlaceOrderResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/placeOrder", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -78,7 +78,7 @@ func (s *AngelOneOrderService) PlaceAngelOneOrder(ctx context.Context, request *
 }
 
 // ModifyOrder modifies an existing order through AngelOne Smart API
-func (s *AngelOneOrderService) ModifyAngelOneOrder(ctx context.Context, request *dto.AngelOneModifyOrderRequest) (*dto.AngelOneModifyOrderResponse, error) {
+func (s *AngelOneBroker) ModifyAngelOneOrder(ctx context.Context, request *dto.AngelOneModifyOrderRequest) (*dto.AngelOneModifyOrderResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/modifyOrder", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -120,7 +120,7 @@ func (s *AngelOneOrderService) ModifyAngelOneOrder(ctx context.Context, request 
 }
 
 // CancelOrder cancels an existing order through AngelOne Smart API
-func (s *AngelOneOrderService) CancelAngelOneOrder(ctx context.Context, request *dto.AngelOneCancelOrderRequest) (*dto.AngelOneCancelOrderResponse, error) {
+func (s *AngelOneBroker) CancelAngelOneOrder(ctx context.Context, request *dto.AngelOneCancelOrderRequest) (*dto.AngelOneCancelOrderResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/cancelOrder", s.baseURL)
 	
 	jsonData, err := json.Marshal(request)
@@ -162,7 +162,7 @@ func (s *AngelOneOrderService) CancelAngelOneOrder(ctx context.Context, request 
 }
 
 // GetOrders retrieves all orders for the client
-func (s *AngelOneOrderService) GetOrders(ctx context.Context) (*dto.AngelOneOrderListResponse, error) {
+func (s *AngelOneBroker) GetOrders(ctx context.Context) (*dto.AngelOneOrderListResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/getOrderBook", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -198,7 +198,7 @@ func (s *AngelOneOrderService) GetOrders(ctx context.Context) (*dto.AngelOneOrde
 }
 
 // GetOrderByID retrieves a specific order by ID
-func (s *AngelOneOrderService) GetOrderByID(ctx context.Context, orderID string) (*dto.AngelOneOrderByIDResponse, error) {
+func (s *AngelOneBroker) GetOrderByID(ctx context.Context, orderID string) (*dto.AngelOneOrderByIDResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/details/%s", s.baseURL, orderID)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -234,7 +234,7 @@ func (s *AngelOneOrderService) GetOrderByID(ctx context.Context, orderID string)
 }
 
 // GetTrades retrieves all trades for the client
-func (s *AngelOneOrderService) GetTrades(ctx context.Context) (*dto.AngelOneTradeListResponse, error) {
+func (s *AngelOneBroker) GetTrades(ctx context.Context) (*dto.AngelOneTradeListResponse, error) {
 	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/getTradeBook", s.baseURL)
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -270,19 +270,19 @@ func (s *AngelOneOrderService) GetTrades(ctx context.Context) (*dto.AngelOneTrad
 }
 
 // GetOrderBook retrieves the order book for the client (alias for GetOrders)
-func (s *AngelOneOrderService) GetOrderBook(ctx context.Context) (*dto.AngelOneOrderListResponse, error) {
+func (s *AngelOneBroker) GetOrderBook(ctx context.Context) (*dto.AngelOneOrderListResponse, error) {
 	return s.GetOrders(ctx)
 }
 
 // GetTradeBook retrieves the trade book for the client (alias for GetTrades)
-func (s *AngelOneOrderService) GetTradeBook(ctx context.Context) (*dto.AngelOneTradeListResponse, error) {
+func (s *AngelOneBroker) GetTradeBook(ctx context.Context) (*dto.AngelOneTradeListResponse, error) {
 	return s.GetTrades(ctx)
 }
 
 // Broker interface implementation
 
 // PlaceOrder implements the Broker interface for placing orders
-func (s *AngelOneOrderService) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
+func (s *AngelOneBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to AngelOne-specific request
 	angelRequest := s.convertToPlaceOrderRequest(request)
 	
@@ -297,7 +297,7 @@ func (s *AngelOneOrderService) PlaceOrder(ctx context.Context, request *dto.Plac
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
-func (s *AngelOneOrderService) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
+func (s *AngelOneBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to AngelOne-specific request
 	angelRequest := s.convertToModifyOrderRequest(request)
 	
@@ -312,7 +312,7 @@ func (s *AngelOneOrderService) UpdateOrder(ctx context.Context, request *dto.Mod
 }
 
 // CancelOrder implements the Broker interface for canceling orders
-func (s *AngelOneOrderService) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
+func (s *AngelOneBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
 	// Convert common request to AngelOne-specific request
 	angelRequest := &dto.AngelOneCancelOrderRequest{
 		OrderID: request.OrderID,
@@ -331,7 +331,7 @@ func (s *AngelOneOrderService) CancelOrder(ctx context.Context, request *dto.Can
 
 // Helper conversion methods
 
-func (s *AngelOneOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.AngelOnePlaceOrderRequest {
+func (s *AngelOneBroker) convertToPlaceOrderRequest(request *dto.PlaceOrderRequest) *dto.AngelOnePlaceOrderRequest {
 	return &dto.AngelOnePlaceOrderRequest{
 		Variety:         "regular", // Default variety
 		TradingSymbol:   request.Instrument,
@@ -349,7 +349,7 @@ func (s *AngelOneOrderService) convertToPlaceOrderRequest(request *dto.PlaceOrde
 	}
 }
 
-func (s *AngelOneOrderService) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.AngelOneModifyOrderRequest {
+func (s *AngelOneBroker) convertToModifyOrderRequest(request *dto.ModifyOrderRequest) *dto.AngelOneModifyOrderRequest {
 	angelRequest := &dto.AngelOneModifyOrderRequest{
 		Variety:     "regular", // Default variety
 		OrderID:     request.OrderID,
@@ -374,7 +374,7 @@ func (s *AngelOneOrderService) convertToModifyOrderRequest(request *dto.ModifyOr
 	return angelRequest
 }
 
-func (s *AngelOneOrderService) convertToOrderResponse(request *dto.PlaceOrderRequest, angelResponse *dto.AngelOnePlaceOrderResponse) *dto.OrderResponse {
+func (s *AngelOneBroker) convertToOrderResponse(request *dto.PlaceOrderRequest, angelResponse *dto.AngelOnePlaceOrderResponse) *dto.OrderResponse {
 	state := "SENT"
 	if !angelResponse.Status {
 		state = "REJECTED"
@@ -401,7 +401,7 @@ func (s *AngelOneOrderService) convertToOrderResponse(request *dto.PlaceOrderReq
 	}
 }
 
-func (s *AngelOneOrderService) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, angelResponse *dto.AngelOneModifyOrderResponse) *dto.OrderResponse {
+func (s *AngelOneBroker) convertModifyToOrderResponse(request *dto.ModifyOrderRequest, angelResponse *dto.AngelOneModifyOrderResponse) *dto.OrderResponse {
 	state := "MODIFIED"
 	if !angelResponse.Status {
 		state = "MODIFY_REJECTED"
@@ -415,7 +415,7 @@ func (s *AngelOneOrderService) convertModifyToOrderResponse(request *dto.ModifyO
 	}
 }
 
-func (s *AngelOneOrderService) convertCancelToOrderResponse(request *dto.CancelOrderRequest, angelResponse *dto.AngelOneCancelOrderResponse) *dto.OrderResponse {
+func (s *AngelOneBroker) convertCancelToOrderResponse(request *dto.CancelOrderRequest, angelResponse *dto.AngelOneCancelOrderResponse) *dto.OrderResponse {
 	state := "CANCELLED"
 	if !angelResponse.Status {
 		state = "CANCEL_REJECTED"
