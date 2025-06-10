@@ -12,10 +12,11 @@ import (
 
 // Module represents the broker module
 type Module struct {
-	controller          *http.BrokerController
-	dhanOrderService    *service.DhanOrderService
-	zerodhaOrderService *service.ZerodhaOrderService
-	brokerService       *service.BrokerService
+	controller            *http.BrokerController
+	dhanOrderService      *service.DhanOrderService
+	zerodhaOrderService   *service.ZerodhaOrderService
+	sharekhanOrderService *service.SharekhanOrderService
+	brokerService         *service.BrokerService
 }
 
 // ProvideModule provides a wire provider set for the broker module
@@ -49,11 +50,19 @@ func (m *Module) initialize() {
 	zerodhaAPIKey := getEnv("ZERODHA_API_KEY", "")
 	zerodhaAccessToken := getEnv("ZERODHA_ACCESS_TOKEN", "")
 
+	// Get Sharekhan API configuration from environment
+	sharekhanBaseURL := getEnv("SHAREKHAN_API_BASE_URL", "https://api.sharekhan.com")
+	sharekhanAPIKey := getEnv("SHAREKHAN_API_KEY", "")
+	sharekhanAccessToken := getEnv("SHAREKHAN_ACCESS_TOKEN", "")
+
 	// Create Dhan order service
 	m.dhanOrderService = service.NewDhanOrderService(dhanBaseURL, dhanAccessToken)
 
 	// Create Zerodha order service
 	m.zerodhaOrderService = service.NewZerodhaOrderService(zerodhaBaseURL, zerodhaAPIKey, zerodhaAccessToken)
+
+	// Create Sharekhan order service
+	m.sharekhanOrderService = service.NewSharekhanOrderService(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanOrderService)
@@ -81,6 +90,11 @@ func (m *Module) GetDhanOrderService() *service.DhanOrderService {
 // GetZerodhaOrderService returns the Zerodha order service
 func (m *Module) GetZerodhaOrderService() *service.ZerodhaOrderService {
 	return m.zerodhaOrderService
+}
+
+// GetSharekhanOrderService returns the Sharekhan order service
+func (m *Module) GetSharekhanOrderService() *service.SharekhanOrderService {
+	return m.sharekhanOrderService
 }
 
 // GetBrokerService returns the broker service
