@@ -286,14 +286,46 @@ func (s *AngelOneBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrder
 	// Convert common request to AngelOne-specific request
 	angelRequest := s.convertToPlaceOrderRequest(request)
 	
-	// Call the existing AngelOne-specific PlaceOrder method
-	angelResponse, err := s.PlaceAngelOneOrder(ctx, angelRequest)
+	// Call AngelOne API directly
+	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/placeOrder", s.baseURL)
+	
+	jsonData, err := json.Marshal(angelRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+	req.Header.Set("X-UserType", "USER")
+	req.Header.Set("X-SourceID", "WEB")
+	req.Header.Set("X-ClientLocalIP", "127.0.0.1")
+	req.Header.Set("X-ClientPublicIP", "127.0.0.1")
+	req.Header.Set("X-MACAddress", "00:00:00:00:00:00")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-PrivateKey", s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var angelResponse dto.AngelOnePlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&angelResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	if !angelResponse.Status {
+		return nil, fmt.Errorf("API request failed: %s (error code: %s)", angelResponse.Message, angelResponse.ErrorCode)
 	}
 	
 	// Convert AngelOne response to common response
-	return s.convertToOrderResponse(request, angelResponse), nil
+	return s.convertToOrderResponse(request, &angelResponse), nil
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
@@ -301,14 +333,46 @@ func (s *AngelOneBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrd
 	// Convert common request to AngelOne-specific request
 	angelRequest := s.convertToModifyOrderRequest(request)
 	
-	// Call the existing AngelOne-specific ModifyOrder method
-	angelResponse, err := s.ModifyAngelOneOrder(ctx, angelRequest)
+	// Call AngelOne API directly
+	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/modifyOrder", s.baseURL)
+	
+	jsonData, err := json.Marshal(angelRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+	req.Header.Set("X-UserType", "USER")
+	req.Header.Set("X-SourceID", "WEB")
+	req.Header.Set("X-ClientLocalIP", "127.0.0.1")
+	req.Header.Set("X-ClientPublicIP", "127.0.0.1")
+	req.Header.Set("X-MACAddress", "00:00:00:00:00:00")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-PrivateKey", s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var angelResponse dto.AngelOneModifyOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&angelResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	if !angelResponse.Status {
+		return nil, fmt.Errorf("API request failed: %s (error code: %s)", angelResponse.Message, angelResponse.ErrorCode)
 	}
 	
 	// Convert AngelOne response to common response
-	return s.convertModifyToOrderResponse(request, angelResponse), nil
+	return s.convertModifyToOrderResponse(request, &angelResponse), nil
 }
 
 // CancelOrder implements the Broker interface for canceling orders
@@ -319,14 +383,46 @@ func (s *AngelOneBroker) CancelOrder(ctx context.Context, request *dto.CancelOrd
 		Variety: "regular", // Default variety for AngelOne
 	}
 	
-	// Call the existing AngelOne-specific CancelOrder method
-	angelResponse, err := s.CancelAngelOneOrder(ctx, angelRequest)
+	// Call AngelOne API directly
+	url := fmt.Sprintf("%s/rest/secure/angelbroking/order/v1/cancelOrder", s.baseURL)
+	
+	jsonData, err := json.Marshal(angelRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.accessToken))
+	req.Header.Set("X-UserType", "USER")
+	req.Header.Set("X-SourceID", "WEB")
+	req.Header.Set("X-ClientLocalIP", "127.0.0.1")
+	req.Header.Set("X-ClientPublicIP", "127.0.0.1")
+	req.Header.Set("X-MACAddress", "00:00:00:00:00:00")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-PrivateKey", s.apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var angelResponse dto.AngelOneCancelOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&angelResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	if !angelResponse.Status {
+		return nil, fmt.Errorf("API request failed: %s (error code: %s)", angelResponse.Message, angelResponse.ErrorCode)
 	}
 	
 	// Convert AngelOne response to common response
-	return s.convertCancelToOrderResponse(request, angelResponse), nil
+	return s.convertCancelToOrderResponse(request, &angelResponse), nil
 }
 
 // Helper conversion methods

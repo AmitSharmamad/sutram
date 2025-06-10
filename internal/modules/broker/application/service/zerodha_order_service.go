@@ -35,104 +35,6 @@ func NewZerodhaBroker(baseURL, apiKey, accessToken string) *ZerodhaBroker {
 	}
 }
 
-// PlaceZerodhaOrder places a new order through Zerodha Kite API
-func (s *ZerodhaBroker) PlaceZerodhaOrder(ctx context.Context, request *dto.ZerodhaPlaceOrderRequest) (*dto.ZerodhaPlaceOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s", s.baseURL, "regular")
-	
-	// Convert to form data as Zerodha expects form-encoded data
-	formData := s.convertToFormData(request)
-	
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer([]byte(formData)))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("X-Kite-Version", "3")
-	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.ZerodhaPlaceOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// ModifyZerodhaOrder modifies an existing order through Zerodha Kite API
-func (s *ZerodhaBroker) ModifyZerodhaOrder(ctx context.Context, request *dto.ZerodhaModifyOrderRequest) (*dto.ZerodhaModifyOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
-	
-	// Convert to form data as Zerodha expects form-encoded data
-	formData := s.convertModifyToFormData(request)
-	
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer([]byte(formData)))
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("X-Kite-Version", "3")
-	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.ZerodhaModifyOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
-// CancelZerodhaOrder cancels an existing order through Zerodha Kite API
-func (s *ZerodhaBroker) CancelZerodhaOrder(ctx context.Context, request *dto.ZerodhaCancelOrderRequest) (*dto.ZerodhaCancelOrderResponse, error) {
-	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
-	
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("X-Kite-Version", "3")
-	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
-	}
-
-	var response dto.ZerodhaCancelOrderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	return &response, nil
-}
-
 // GetOrders retrieves all orders for the client
 func (s *ZerodhaBroker) GetOrders(ctx context.Context) (*dto.ZerodhaOrderListResponse, error) {
 	url := fmt.Sprintf("%s/orders", s.baseURL)
@@ -350,14 +252,38 @@ func (s *ZerodhaBroker) PlaceOrder(ctx context.Context, request *dto.PlaceOrderR
 	// Convert common request to Zerodha-specific request
 	zerodhaRequest := s.convertToPlaceOrderRequest(request)
 	
-	// Call the existing Zerodha-specific PlaceOrder method
-	zerodhaResponse, err := s.PlaceZerodhaOrder(ctx, zerodhaRequest)
+	// Call Zerodha API directly
+	url := fmt.Sprintf("%s/orders/%s", s.baseURL, "regular")
+	
+	// Convert to form data as Zerodha expects form-encoded data
+	formData := s.convertToFormData(zerodhaRequest)
+	
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer([]byte(formData)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Kite-Version", "3")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var zerodhaResponse dto.ZerodhaPlaceOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&zerodhaResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert Zerodha response to common response
-	return s.convertToOrderResponse(request, zerodhaResponse), nil
+	return s.convertToOrderResponse(request, &zerodhaResponse), nil
 }
 
 // UpdateOrder implements the Broker interface for modifying orders
@@ -365,32 +291,70 @@ func (s *ZerodhaBroker) UpdateOrder(ctx context.Context, request *dto.ModifyOrde
 	// Convert common request to Zerodha-specific request
 	zerodhaRequest := s.convertToModifyOrderRequest(request)
 	
-	// Call the existing Zerodha-specific ModifyOrder method
-	zerodhaResponse, err := s.ModifyZerodhaOrder(ctx, zerodhaRequest)
+	// Call Zerodha API directly
+	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
+	
+	// Convert to form data as Zerodha expects form-encoded data
+	formData := s.convertModifyToFormData(zerodhaRequest)
+	
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer([]byte(formData)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Kite-Version", "3")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var zerodhaResponse dto.ZerodhaModifyOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&zerodhaResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert Zerodha response to common response
-	return s.convertModifyToOrderResponse(request, zerodhaResponse), nil
+	return s.convertModifyToOrderResponse(request, &zerodhaResponse), nil
 }
 
 // CancelOrder implements the Broker interface for canceling orders
 func (s *ZerodhaBroker) CancelOrder(ctx context.Context, request *dto.CancelOrderRequest) (*dto.OrderResponse, error) {
-	// Convert common request to Zerodha-specific request
-	zerodhaRequest := &dto.ZerodhaCancelOrderRequest{
-		OrderID: request.OrderID,
-		Variety: "regular", // Default variety for Zerodha
-	}
+	// Call Zerodha API directly
+	url := fmt.Sprintf("%s/orders/%s/%s", s.baseURL, "regular", request.OrderID)
 	
-	// Call the existing Zerodha-specific CancelOrder method
-	zerodhaResponse, err := s.CancelZerodhaOrder(ctx, zerodhaRequest)
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("X-Kite-Version", "3")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", s.apiKey, s.accessToken))
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+	}
+
+	var zerodhaResponse dto.ZerodhaCancelOrderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&zerodhaResponse); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	
 	// Convert Zerodha response to common response
-	return s.convertCancelToOrderResponse(request, zerodhaResponse), nil
+	return s.convertCancelToOrderResponse(request, &zerodhaResponse), nil
 }
 
 // Helper conversion methods

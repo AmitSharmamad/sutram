@@ -15,9 +15,10 @@ type Module struct {
 	controller           *http.BrokerController
 	dhanBroker     *service.DhanBroker
 	zerodhaBroker  *service.ZerodhaBroker
-	hdfcsecBroker  *service.HDFCSecBroker
-  sharekhanBroker *service.SharekhanBroker
-  angeloneBroker  *service.AngelOneBroker
+	hdfcsecBroker   *service.HDFCSecBroker
+	sharekhanBroker *service.SharekhanBroker
+	angeloneBroker  *service.AngelOneBroker
+	growwBroker     *service.GrowwBroker
 	brokerService        *service.BrokerService
 }
 
@@ -61,12 +62,15 @@ func (m *Module) initialize() {
 	hdfcsecBaseURL := getEnv("HDFCSEC_API_BASE_URL", "https://api.hdfcsec.com/v1")
 	hdfcsecAccessToken := getEnv("HDFCSEC_ACCESS_TOKEN", "")
 
-  // Get Sharekhan API configuration from environment
+	// Get Sharekhan API configuration from environment
 	sharekhanBaseURL := getEnv("SHAREKHAN_API_BASE_URL", "https://api.sharekhan.com")
 	sharekhanAPIKey := getEnv("SHAREKHAN_API_KEY", "")
 	sharekhanAccessToken := getEnv("SHAREKHAN_ACCESS_TOKEN", "")
 
-  
+	// Get Groww API configuration from environment
+	growwBaseURL := getEnv("GROWW_API_BASE_URL", "https://api.groww.in")
+	growwAPIKey := getEnv("GROWW_API_KEY", "")
+	growwAccessToken := getEnv("GROWW_ACCESS_TOKEN", "")
 	// Create Dhan order service
 	m.dhanBroker = service.NewDhanBroker(dhanBaseURL, dhanAccessToken)
 
@@ -76,11 +80,14 @@ func (m *Module) initialize() {
 	// Create AngelOne order service
 	m.angeloneBroker = service.NewAngelOneBroker(angeloneBaseURL, angeloneAPIKey, angeloneAccessToken)
 
-  // Create HDFC Securities order service
+	// Create HDFC Securities order service
 	m.hdfcsecBroker = service.NewHDFCSecBroker(hdfcsecBaseURL, hdfcsecAccessToken)
 
-  // Create Sharekhan order service
+	// Create Sharekhan order service
 	m.sharekhanBroker = service.NewSharekhanBroker(sharekhanBaseURL, sharekhanAPIKey, sharekhanAccessToken)
+
+	// Create Groww order service
+	m.growwBroker = service.NewGrowwBroker(growwBaseURL, growwAPIKey, growwAccessToken)
 
 	// Create broker service (without repository dependencies for now since they're not implemented)
 	// m.brokerService = service.NewBrokerService(brokerRepo, brokerUserRepo, orderRepo, m.dhanBroker)
@@ -123,6 +130,11 @@ func (m *Module) GetHDFCSecBroker() *service.HDFCSecBroker {
 // GetSharekhanBroker returns the Sharekhan order service
 func (m *Module) GetSharekhanBroker() *service.SharekhanBroker {
 	return m.sharekhanBroker
+}
+
+// GetGrowwBroker returns the Groww order service
+func (m *Module) GetGrowwBroker() *service.GrowwBroker {
+	return m.growwBroker
 }
 
 // GetBrokerService returns the broker service
