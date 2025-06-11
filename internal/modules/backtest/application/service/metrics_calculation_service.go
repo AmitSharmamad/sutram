@@ -319,6 +319,7 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 	// Group positions by day and month to calculate returns
 	dailyReturnsMap := make(map[string]float64)
 	monthlyReturnsMap := make(map[string]float64)
+	finalReturns := float64(0.0)
 
 	// Calculate daily and monthly returns based on P&L
 	for _, position := range closedPositions {
@@ -334,6 +335,8 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 
 		// Accumulate monthly returns
 		monthlyReturnsMap[exitMonth] += *position.NetProfitLoss
+
+		finalReturns += *position.NetProfitLoss
 	}
 
 	// Convert maps to sorted arrays
@@ -352,20 +355,23 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 
 	// Calculate annualized return based on monthly returns
 	var annualizedReturn float64
-	if len(monthlyReturns) > 0 {
-		// Calculate total return from monthly data
-		totalReturn := 0.0
-		for _, monthlyReturn := range monthlyReturns {
-			totalReturn += monthlyReturn
-		}
+	// NOTE: For now, annualized return is used to show the total pnl
+	annualizedReturn = finalReturns
 
-		// Calculate average monthly return
-		avgMonthlyReturn := totalReturn / float64(len(monthlyReturns))
+	// if len(monthlyReturns) > 0 {
+	// 	// Calculate total return from monthly data
+	// 	totalReturn := 0.0
+	// 	for _, monthlyReturn := range monthlyReturns {
+	// 		totalReturn += monthlyReturn
+	// 	}
 
-		// Annualized return = average monthly return * 12
-		// This is a simplified calculation - in practice you'd want compound returns
-		annualizedReturn = avgMonthlyReturn * 12
-	}
+	// 	// Calculate average monthly return
+	// 	avgMonthlyReturn := totalReturn / float64(len(monthlyReturns))
+
+	// 	// Annualized return = average monthly return * 12
+	// 	// This is a simplified calculation - in practice you'd want compound returns
+	// 	annualizedReturn = avgMonthlyReturn * 12
+	// }
 
 	return model.ReturnsData{
 		DailyReturns:     dailyReturns,
