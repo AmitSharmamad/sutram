@@ -16,6 +16,7 @@ import (
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyService "algo/internal/modules/strategy/application/service"
 	strategyModel "algo/internal/modules/strategy/domain/model"
+	timeUtil "algo/internal/util/time"
 
 	"github.com/google/uuid"
 )
@@ -52,6 +53,7 @@ type BacktestEngine struct {
 	positionRepo      backtestRepo.PositionRepository
 	runMetricsRepo    backtestRepo.RunMetricsRepository
 	metricsService    MetricsCalculationService
+	marketHoursUtil   *timeUtil.MarketHoursUtil
 }
 
 // We're using instrumentModel.Instrument instead of defining our own struct
@@ -75,6 +77,7 @@ func NewBacktestEngine(
 		positionRepo:      positionRepo,
 		runMetricsRepo:    runMetricsRepo,
 		metricsService:    NewMetricsCalculationService(),
+		marketHoursUtil:   timeUtil.NewMarketHoursUtil(),
 	}
 }
 
@@ -547,7 +550,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 			}
 
 			// Close the position if MIS end-of-day is hit
-			if strategy.TradeType == strategyModel.TradeType("MIS") && e.IsMISEndOfDayHit(currentTimestamp) {
+			if strategy.TradeType == strategyModel.TradeType("MIS") && e.marketHoursUtil.IsMISEndOfDayHit(currentTimestamp, run.InstrumentMaster.Exchange) {
 				// Use the consolidated MIS square-off function
 				if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, currentTimestamp, &positions, &capital) {
 					openPosition = nil
@@ -644,40 +647,6 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		"\n\t\tDuration:", executionDuration.String())
 
 	return positions, metrics
-}
-
-func (e *BacktestEngine) IsMISEndOfDayHit(
-	timestamp time.Time,
-) bool {
-	// NOTE: MIS close is 15 minutes prior to market close
-	exchange := "NSE"
-	endHour := 15
-	endMinute := 15
-
-	if exchange == "MCX" {
-		// MCX has different timings, so we need to adjust accordingly
-		// MCX trading ends at 11:30 PM IST
-		endHour = 23
-		endMinute = 30
-	}
-
-	// Extract the time from the provided timestamp
-	currentTime := timestamp
-
-	// Create a time representing 3:15 PM on the same date
-	eodTime := time.Date(
-		currentTime.Year(),
-		currentTime.Month(),
-		currentTime.Day(),
-		endHour,   // 3 PM (24-hour format)
-		endMinute, // 15 minutes
-		0,         // 0 seconds
-		0,         // 0 nanoseconds
-		currentTime.Location(),
-	)
-
-	// Return true if current time is at or after 3:15 PM
-	return currentTime.Equal(eodTime) || currentTime.After(eodTime)
 }
 
 func (e *BacktestEngine) evaluateEntryCondition(expression string, evalContext *parser.EvaluationContext) bool {
@@ -1154,44 +1123,13 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 		println("Error evaluating entry expression:", err.Error())
 	}
 
-	// Check if the current time is within the entry time window
-	// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
-	canCheckEntryCondition := true
-
-	if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
-		// Extract time of day from the current candle timestamp
-		currentTime := currentTimestamp
-		currentTimeOfDay := time.Date(0, 1, 1,
-			currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
-
-		// Check if we're within the entry time window
-		if strategy.EntryStartTime != nil {
-			// Extract time component from EntryStartTime
-			entryStartTimeOfDay := time.Date(0, 1, 1,
-				strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
-				strategy.EntryStartTime.Second(), 0, time.UTC)
-
-			if currentTimeOfDay.Before(entryStartTimeOfDay) {
-				canCheckEntryCondition = false
-			}
-		}
-
-		if strategy.EntryEndTime != nil {
-			// Extract time component from EntryEndTime
-			entryEndTimeOfDay := time.Date(0, 1, 1,
-				strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
-				strategy.EntryEndTime.Second(), 0, time.UTC)
-
-			if currentTimeOfDay.After(entryEndTimeOfDay) {
-				canCheckEntryCondition = false
-			}
-		}
-	}
+	// Check if the current time is within the entry time window using the centralized function
+	canCheckEntryCondition := e.marketHoursUtil.IsWithinEntryTimeWindow(currentTimestamp, strategy, run.InstrumentMaster.Exchange)
 
 	// Check if MIS square-off time has been reached (3:15 PM IST)
 	// Prevent new MIS entries after this time
 	if strategy.TradeType == strategyModel.TradeType("MIS") {
-		if e.IsMISEndOfDayHit(currentTimestamp) {
+		if e.marketHoursUtil.IsMISEndOfDayHit(currentTimestamp, run.InstrumentMaster.Exchange) {
 			canCheckEntryCondition = false
 		}
 	}
@@ -1326,64 +1264,4 @@ func (e *BacktestEngine) handleMISSquareOff(
 	}
 
 	return true // Position was closed
-}
-
-// getDefaultMarketHours returns the default trading hours for different exchanges
-func (e *BacktestEngine) getDefaultMarketHours(exchange string) (startHour, startMinute, endHour, endMinute int) {
-	switch exchange {
-	case "NSE", "BSE":
-		// Indian equity markets: 9:15 AM to 3:30 PM IST
-		return 9, 15, 15, 30
-	case "MCX":
-		// MCX commodity market: 9:00 AM to 11:30 PM IST
-		return 9, 0, 23, 30
-	case "NCDEX":
-		// NCDEX commodity market: 10:00 AM to 5:00 PM IST
-		return 10, 0, 17, 0
-	default:
-		// Default to NSE timings
-		return 9, 15, 15, 30
-	}
-}
-
-// isWithinEntryTimeWindow validates if the current time is within the entry time window
-func (e *BacktestEngine) isWithinEntryTimeWindow(
-	currentTimestamp time.Time,
-	strategy *strategyDto.StrategyResponse,
-	exchange string,
-) bool {
-	// Extract time of day from the current timestamp
-	currentTimeOfDay := time.Date(0, 1, 1,
-		currentTimestamp.Hour(), currentTimestamp.Minute(), currentTimestamp.Second(), 0, time.UTC)
-
-	var entryStartTime, entryEndTime time.Time
-
-	// Determine entry start time
-	if strategy.EntryStartTime != nil {
-		// Use provided entry start time
-		entryStartTime = time.Date(0, 1, 1,
-			strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
-			strategy.EntryStartTime.Second(), 0, time.UTC)
-	} else {
-		// Use default market start time if not specified
-		startHour, startMinute, _, _ := e.getDefaultMarketHours(exchange)
-		entryStartTime = time.Date(0, 1, 1, startHour, startMinute, 0, 0, time.UTC)
-	}
-
-	// Determine entry end time
-	if strategy.EntryEndTime != nil {
-		// Use provided entry end time
-		entryEndTime = time.Date(0, 1, 1,
-			strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
-			strategy.EntryEndTime.Second(), 0, time.UTC)
-	} else {
-		// Use default market end time if not specified
-		_, _, endHour, endMinute := e.getDefaultMarketHours(exchange)
-		entryEndTime = time.Date(0, 1, 1, endHour, endMinute, 0, 0, time.UTC)
-	}
-
-	// Check if current time is within the entry window
-	// Current time must be >= start time AND <= end time
-	return (currentTimeOfDay.Equal(entryStartTime) || currentTimeOfDay.After(entryStartTime)) &&
-		(currentTimeOfDay.Equal(entryEndTime) || currentTimeOfDay.Before(entryEndTime))
 }

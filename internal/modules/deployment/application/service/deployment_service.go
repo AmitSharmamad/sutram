@@ -790,8 +790,8 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			if strategy.EntryStartTime != nil {
 				// Extract time component from EntryStartTime
 				entryStartTimeOfDay := time.Date(0, 1, 1,
-					strategy.EntryStartTime.Hour(), strategy.EntryStartTime.Minute(),
-					strategy.EntryStartTime.Second(), 0, time.UTC)
+					strategy.EntryStartTime.Hour, strategy.EntryStartTime.Minute,
+					strategy.EntryStartTime.Second, 0, time.UTC)
 
 				if currentTimeOfDay.Before(entryStartTimeOfDay) {
 					canCheckEntryCondition = false
@@ -801,8 +801,8 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			if canCheckEntryCondition && strategy.EntryEndTime != nil {
 				// Extract time component from EntryEndTime
 				entryEndTimeOfDay := time.Date(0, 1, 1,
-					strategy.EntryEndTime.Hour(), strategy.EntryEndTime.Minute(),
-					strategy.EntryEndTime.Second(), 0, time.UTC)
+					strategy.EntryEndTime.Hour, strategy.EntryEndTime.Minute,
+					strategy.EntryEndTime.Second, 0, time.UTC)
 
 				if currentTimeOfDay.After(entryEndTimeOfDay) {
 					canCheckEntryCondition = false
