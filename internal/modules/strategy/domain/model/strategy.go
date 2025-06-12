@@ -80,6 +80,8 @@ type Strategy struct {
 	Capital              float64         `json:"capital" db:"capital"`
 	MaxAllocation        float64         `json:"max_allocation" db:"max_allocation"`
 	MaxTrades            *int            `json:"max_trades,omitempty" db:"max_trades"`
+	Brokerage            *int            `json:"brokerage,omitempty" db:"brokerage"`
+	Slippage             *float64        `json:"slippage,omitempty" db:"slippage"`
 	EntryStartTime       *types.TimeOnly `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly `json:"entry_end_time,omitempty" db:"entry_end_time"`
 	StartDate            *time.Time      `json:"start_date,omitempty" db:"start_date"`
@@ -156,6 +158,8 @@ func (s *Strategy) Update(
 	capital float64,
 	maxAllocation float64,
 	maxTrades *int,
+	brokerage *int,
+	slippage *float64,
 	entryStartTime *types.TimeOnly,
 	entryEndTime *types.TimeOnly,
 	startDate *time.Time,
@@ -181,6 +185,8 @@ func (s *Strategy) Update(
 	s.Capital = capital
 	s.MaxAllocation = maxAllocation
 	s.MaxTrades = maxTrades
+	s.Brokerage = brokerage
+	s.Slippage = slippage
 	s.EntryStartTime = entryStartTime
 	s.EntryEndTime = entryEndTime
 	s.StartDate = startDate

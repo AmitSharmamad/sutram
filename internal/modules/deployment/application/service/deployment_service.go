@@ -649,12 +649,26 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		Instruments:      strategy.Instruments,
 		Qty:              strategy.Qty,
 		MaxAllocation:    strategy.MaxAllocation,
+		MaxTrades:        0,   // Set default value
+		Brokerage:        0,   // Set default value
+		Slippage:         0.0, // Set default value
 		StopLoss:         strategy.StopLoss,
 		StopLossType:     strategy.StopLossType,
 		TargetProfit:     strategy.TargetProfit,
 		TargetProfitType: strategy.TargetProfitType,
 		EntryStartTime:   strategy.EntryStartTime,
 		EntryEndTime:     strategy.EntryEndTime,
+	}
+
+	// Set optional fields if they exist
+	if strategy.MaxTrades != nil {
+		strategyResponse.MaxTrades = *strategy.MaxTrades
+	}
+	if strategy.Brokerage != nil {
+		strategyResponse.Brokerage = *strategy.Brokerage
+	}
+	if strategy.Slippage != nil {
+		strategyResponse.Slippage = *strategy.Slippage
 	}
 
 	// Calculate lookback from strategy expressions (like backtesting engine)
