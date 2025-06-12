@@ -193,6 +193,41 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 	// Create the response
 	var response []Response
 
+	// Calculate total commission and slippage across all runs
+	totalPositionsCount := 0
+	for _, run := range runs {
+		totalPositionsCount += len(run.Positions)
+	}
+
+	// Update TotalCommission and TotalSlippage for each run's metrics
+	for _, run := range runs {
+		if run.RunMetrics != nil {
+			// Calculate commission: number of positions * 2 (entry + exit) * brokerage
+			commission := float64(totalPositionsCount * 2 * strategyResp.Brokerage)
+			run.RunMetrics.TotalCommission = commission
+
+			// Calculate slippage: slippage percentage calculation
+			// Slippage = (slippage_percentage / 100) * total_trade_value
+			totalTradeValue := 0.0
+			for _, position := range run.Positions {
+				if position.EntryPriceOrder != nil {
+					totalTradeValue += *position.EntryPriceOrder * position.PositionSize
+				}
+			}
+			slippage := (strategyResp.Slippage / 100.0) * totalTradeValue
+			run.RunMetrics.TotalSlippage = slippage
+
+			// Subtract commission and slippage from total P&L
+			if run.RunMetrics.TotalReturnPct != 0 {
+				// Convert percentage back to absolute value to subtract costs
+				initialCapital := strategyResp.Capital
+				totalPnL := (run.RunMetrics.TotalReturnPct / 100.0) * initialCapital
+				adjustedPnL := totalPnL - commission - slippage
+				run.RunMetrics.TotalReturnPct = (adjustedPnL / initialCapital) * 100
+			}
+		}
+	}
+
 	// Create a response for each run
 	for _, run := range runs {
 		// Convert the instrument ID to a string for the response
@@ -491,7 +526,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	}
 
 	// Use timestamp array length for the main loop
-	for i := range len(timestamps) {
+	for i := range len(timestamps) - 1 {
 		// Get current timestamp for this iteration
 		currentTimestamp := timestamps[i]
 
