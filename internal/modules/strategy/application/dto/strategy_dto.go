@@ -112,6 +112,8 @@ type CreateStrategyRequest struct {
 	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
 	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
+	Brokerage            *int                 `json:"brokerage" validate:"omitempty,gte=0" db:"brokerage"`
+	Slippage             *float64             `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
 	EntryStartTime       *types.TimeOnly      `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly      `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date" db:"start_date"`
@@ -141,6 +143,8 @@ type UpdateStrategyRequest struct {
 	Capital              *float64             `json:"capital" validate:"omitempty,gte=0" db:"capital"`
 	MaxAllocation        *float64             `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                 `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
+	Brokerage            *int                 `json:"brokerage" validate:"omitempty,gte=0" db:"brokerage"`
+	Slippage             *float64             `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
 	EntryStartTime       *types.TimeOnly      `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly      `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date" db:"start_date"`
@@ -171,6 +175,8 @@ type StrategyResponse struct {
 	Capital              float64              `json:"capital,omitempty" db:"capital"`
 	MaxAllocation        float64              `json:"max_allocation,omitempty" db:"max_allocation"`
 	MaxTrades            int                  `json:"max_trades,omitempty" db:"max_trades"`
+	Brokerage            int                  `json:"brokerage,omitempty" db:"brokerage"`
+	Slippage             float64              `json:"slippage,omitempty" db:"slippage"`
 	EntryStartTime       *types.TimeOnly      `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly      `json:"entry_end_time,omitempty" db:"entry_end_time"`
 	StartDate            *time.Time           `json:"start_date,omitempty" db:"start_date"`
@@ -234,6 +240,14 @@ func FromDomain(strategy *model.Strategy) *StrategyResponse {
 
 	if strategy.MaxTrades != nil {
 		response.MaxTrades = *strategy.MaxTrades
+	}
+
+	if strategy.Brokerage != nil {
+		response.Brokerage = *strategy.Brokerage
+	}
+
+	if strategy.Slippage != nil {
+		response.Slippage = *strategy.Slippage
 	}
 
 	response.EntryStartTime = strategy.EntryStartTime
@@ -316,6 +330,14 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 
 	if req.MaxTrades != nil {
 		strategy.MaxTrades = req.MaxTrades
+	}
+
+	if req.Brokerage != nil {
+		strategy.Brokerage = req.Brokerage
+	}
+
+	if req.Slippage != nil {
+		strategy.Slippage = req.Slippage
 	}
 
 	if req.EntryStartTime != nil {
@@ -410,6 +432,14 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 
 	if req.MaxTrades != nil {
 		strategy.MaxTrades = req.MaxTrades
+	}
+
+	if req.Brokerage != nil {
+		strategy.Brokerage = req.Brokerage
+	}
+
+	if req.Slippage != nil {
+		strategy.Slippage = req.Slippage
 	}
 
 	if req.EntryStartTime != nil {

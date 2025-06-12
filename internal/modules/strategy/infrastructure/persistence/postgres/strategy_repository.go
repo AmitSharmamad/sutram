@@ -41,11 +41,11 @@ func (r *StrategyRepository) Create(ctx context.Context, strategy *model.Strateg
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 
-			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
 		)
 	`
 
@@ -73,6 +73,8 @@ func (r *StrategyRepository) Create(ctx context.Context, strategy *model.Strateg
 		strategy.ExitType,
 		strategy.Capital,
 		strategy.MaxTrades,
+		strategy.Brokerage,
+		strategy.Slippage,
 		strategy.EntryStartTime,
 		strategy.EntryEndTime,
 		strategy.StartDate,
@@ -98,7 +100,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE id = $1
@@ -129,6 +131,8 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&strategy.ExitType,
 		&strategy.Capital,
 		&strategy.MaxTrades,
+		&strategy.Brokerage,
+		&strategy.Slippage,
 		&strategy.EntryStartTime,
 		&strategy.EntryEndTime,
 		&strategy.StartDate,
@@ -171,7 +175,7 @@ func (r *StrategyRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE id IN (%s)
@@ -245,7 +249,7 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE user_id = $1
@@ -286,6 +290,8 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 			&strategy.ExitType,
 			&strategy.Capital,
 			&strategy.MaxTrades,
+			&strategy.Brokerage,
+			&strategy.Slippage,
 			&strategy.EntryStartTime,
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
@@ -335,14 +341,16 @@ func (r *StrategyRepository) Update(ctx context.Context, strategy *model.Strateg
 			exit_type = $17, 
 			capital = $18, 
 			max_trades = $19, 
-			entry_start_time = $20, 
-			entry_end_time = $21, 
-			start_date = $22, 
-			end_date = $23, 
-			updated_at = $24, 
-			is_active = $25,
-			max_allocation = $26
-		WHERE id = $27
+			brokerage = $20,
+			slippage = $21,
+			entry_start_time = $22, 
+			entry_end_time = $23, 
+			start_date = $24, 
+			end_date = $25, 
+			updated_at = $26, 
+			is_active = $27,
+			max_allocation = $28
+		WHERE id = $29
 	`
 
 	result, err := r.db.ExecContext(
@@ -367,6 +375,8 @@ func (r *StrategyRepository) Update(ctx context.Context, strategy *model.Strateg
 		strategy.ExitType,
 		strategy.Capital,
 		strategy.MaxTrades,
+		strategy.Brokerage,
+		strategy.Slippage,
 		strategy.EntryStartTime,
 		strategy.EntryEndTime,
 		strategy.StartDate,
@@ -462,7 +472,7 @@ func (r *StrategyRepository) GetActiveStrategies(ctx context.Context) ([]*model.
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE is_active = true
@@ -503,6 +513,8 @@ func (r *StrategyRepository) GetActiveStrategies(ctx context.Context) ([]*model.
 			&strategy.ExitType,
 			&strategy.Capital,
 			&strategy.MaxTrades,
+			&strategy.Brokerage,
+			&strategy.Slippage,
 			&strategy.EntryStartTime,
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
@@ -534,7 +546,7 @@ func (r *StrategyRepository) GetActiveStrategiesByUserID(ctx context.Context, us
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE user_id = $1 AND is_active = true
@@ -575,6 +587,8 @@ func (r *StrategyRepository) GetActiveStrategiesByUserID(ctx context.Context, us
 			&strategy.ExitType,
 			&strategy.Capital,
 			&strategy.MaxTrades,
+			&strategy.Brokerage,
+			&strategy.Slippage,
 			&strategy.EntryStartTime,
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
@@ -609,7 +623,7 @@ func (r *StrategyRepository) SearchStrategies(ctx context.Context, filters map[s
 			chart_type, chart_timeframe, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
-			exit_type, capital, max_trades, entry_start_time, entry_end_time, 
+			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
 			start_date, end_date, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE 1=1
@@ -705,6 +719,8 @@ func (r *StrategyRepository) SearchStrategies(ctx context.Context, filters map[s
 			&strategy.ExitType,
 			&strategy.Capital,
 			&strategy.MaxTrades,
+			&strategy.Brokerage,
+			&strategy.Slippage,
 			&strategy.EntryStartTime,
 			&strategy.EntryEndTime,
 			&strategy.StartDate,

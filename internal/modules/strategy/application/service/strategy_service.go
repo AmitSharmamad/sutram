@@ -376,6 +376,8 @@ func (s *strategyService) DuplicateStrategy(ctx context.Context, id uuid.UUID, u
 	duplicate.TrailingStopLossType = original.TrailingStopLossType
 	duplicate.ExitType = original.ExitType
 	duplicate.MaxTrades = original.MaxTrades
+	duplicate.Brokerage = original.Brokerage
+	duplicate.Slippage = original.Slippage
 	duplicate.EntryStartTime = original.EntryStartTime
 	duplicate.EntryEndTime = original.EntryEndTime
 	duplicate.StartDate = original.StartDate
@@ -435,6 +437,8 @@ func (s *strategyService) CloneDefaultStrategy(ctx context.Context, defaultStrat
 	clonedStrategy.TrailingStopLossType = defaultStrategy.TrailingStopLossType
 	clonedStrategy.ExitType = defaultStrategy.ExitType
 	clonedStrategy.MaxTrades = defaultStrategy.MaxTrades
+	clonedStrategy.Brokerage = defaultStrategy.Brokerage
+	clonedStrategy.Slippage = defaultStrategy.Slippage
 	clonedStrategy.EntryStartTime = defaultStrategy.EntryStartTime
 	clonedStrategy.EntryEndTime = defaultStrategy.EntryEndTime
 	clonedStrategy.StartDate = defaultStrategy.StartDate
