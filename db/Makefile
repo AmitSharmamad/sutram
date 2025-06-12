@@ -19,7 +19,5 @@ clean:
 	rm -rf db/pg
 
 start:
-	docker-compose down
-	rm -rf db/ch
-	rm -rf db/pg
-	docker-compose up --build
+	docker-compose down -v
+	docker-compose up --build -d

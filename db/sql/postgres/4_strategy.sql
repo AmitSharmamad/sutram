@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS strategy (
     capital DECIMAL(18, 8) NOT NULL,
     max_allocation DECIMAL(18, 8) NOT NULL,
     max_trades INT,
+    brokerage INT,
+    slippage DECIMAL(5, 2),
     entry_start_time TIME,
     entry_end_time TIME,
     start_date DATE,
