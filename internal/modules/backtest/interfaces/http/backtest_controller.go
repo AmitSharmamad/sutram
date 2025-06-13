@@ -119,7 +119,7 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 			// If there's an error, send done event with error message instead of separate error event
 			eventChan <- BacktestEvent{
 				Type: "done",
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"message":   "Backtest failed: " + err.Error(),
 					"error":     true,
 					"timestamp": time.Now(),
@@ -131,7 +131,7 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 		// Send results event
 		eventChan <- BacktestEvent{
 			Type: "results",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"results":   response,
 				"timestamp": time.Now(),
 			},
@@ -140,7 +140,7 @@ func (c *BacktestController) RunBacktest(ctx *gin.Context) {
 		// Send completion event
 		eventChan <- BacktestEvent{
 			Type: "done",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"message":   "Backtest completed successfully",
 				"error":     false,
 				"timestamp": time.Now(),
