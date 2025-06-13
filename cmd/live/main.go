@@ -243,7 +243,7 @@ func initDeploymentService() error {
 
 	// Initialize the deployment service for live trading
 	if err := deploymentSvc.Initialize(appCtx); err != nil {
-		return fmt.Errorf("failed to initialize deployment service: %w", err)
+		panic("something is going wrong with the deployment setup, exiting")
 	}
 
 	// Get active deployments and subscribe to their instruments

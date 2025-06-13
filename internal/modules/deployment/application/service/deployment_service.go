@@ -700,6 +700,70 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	historicalData = append(historicalData, lookbackData...)
 	historicalData = append(historicalData, instrumentData)
 
+	// Pre-calculate indicators like in backtest engine
+	evalContext := parser.NewEvaluationContext(nil)
+	evalContext.Strategy = strategyResponse
+	evalContext.Data = s.toDataContext(historicalData)
+
+	// Extract indicators from both entry and exit expressions
+	entryIndicators, err := parser.ExtractIndicators(strategy.EntryExpression)
+	if err != nil {
+		fmt.Printf("Error extracting indicators from entry expression: %v\n", err)
+		entryIndicators = []parser.IndicatorInfo{}
+	}
+
+	var exitIndicators []parser.IndicatorInfo
+	if strategy.ExitExpression != "" {
+		exitIndicators, err = parser.ExtractIndicators(strategy.ExitExpression)
+		if err != nil {
+			fmt.Printf("Error extracting indicators from exit expression: %v\n", err)
+			exitIndicators = []parser.IndicatorInfo{}
+		}
+	}
+
+	// Add basic OHLCV indicators explicitly
+	basicIndicators := []parser.IndicatorInfo{
+		{Name: "OPEN", Arguments: []any{0.0}},
+		{Name: "HIGH", Arguments: []any{0.0}},
+		{Name: "LOW", Arguments: []any{0.0}},
+		{Name: "CLOSE", Arguments: []any{0.0}},
+		{Name: "VOLUME", Arguments: []any{0.0}},
+	}
+
+	// Combine all indicators (entry + exit + basic)
+	allIndicators := append(basicIndicators, entryIndicators...)
+	allIndicators = append(allIndicators, exitIndicators...)
+
+	// Pre-calculate all indicators into indicator array map
+	indicatorArrayMap := make(map[string][]parser.IndicatorValues)
+	calculatedKeys := make(map[string]bool) // Track calculated indicators to avoid duplicates
+
+	for _, indicator := range allIndicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		if calculator == nil {
+			continue
+		}
+
+		uniqueKey, err := calculator.GenerateIndicatorKey(indicator.Arguments, evalContext)
+		if err != nil {
+			fmt.Printf("Error generating unique key for indicator %s: %v\n", indicator.Name, err)
+			continue
+		}
+
+		// Skip if already calculated
+		if calculatedKeys[uniqueKey] {
+			continue
+		}
+		calculatedKeys[uniqueKey] = true
+
+		// Calculate indicator values using CalculateAll for live trading (single point calculation)
+		// Since we only have current data, we calculate for the current timestamp
+		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp.Add(-24*time.Hour)) // Start from day before
+		indicatorArrayMap[uniqueKey] = indicatorValues
+	}
+
+	currentTimestamp := instrumentData.Timestamp
+
 	// Handle existing position first - check exit conditions
 	if currentPosition != nil {
 		fmt.Printf("Found existing open position %s for deployment %s\n",
@@ -743,8 +807,8 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			// Update the DeploymentWithStrategy's position state
 			deploymentWithStrategy.CurrentPosition = nil
 		} else {
-			// Evaluate normal exit condition using current market data
-			exitSignal, err := s.evaluateExitCondition(strategyResponse, historicalData, currentPosition)
+			// Evaluate normal exit condition using indicator array map
+			exitSignal, err := s.evaluateExitCondition(strategyResponse.ExitExpression, indicatorArrayMap, currentTimestamp)
 			if err != nil {
 				fmt.Printf("Error evaluating exit condition: %v\n", err)
 			} else if exitSignal {
@@ -826,10 +890,11 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 		// Only check entry conditions if we're within the allowed entry time window
 		if canCheckEntryCondition {
-			// Evaluate entry condition
-			dataContext := s.toDataContext(historicalData)
-			entrySignal := s.evaluateEntryCondition(strategyResponse.EntryExpression, dataContext)
-			if entrySignal {
+			// Evaluate entry condition using indicator array map
+			entrySignal, err := s.evaluateEntryCondition(strategyResponse.EntryExpression, indicatorArrayMap, currentTimestamp)
+			if err != nil {
+				fmt.Printf("Error evaluating entry condition: %v\n", err)
+			} else if entrySignal {
 				// Create new position
 				entryPrice := instrumentData.Close
 				entryTime := instrumentData.Timestamp
@@ -966,9 +1031,15 @@ func (s *deploymentService) toDataContext(instruments []*instrumentModel.Instrum
 	return &stockData
 }
 
-// evaluateEntryCondition evaluates entry expression using parser
-func (s *deploymentService) evaluateEntryCondition(expression string, data *instrumentModel.StockData) bool {
-	return parser.Execute(expression, parser.NewEvaluationContext(data))
+// evaluateEntryCondition evaluates entry expression using parser with indicator array map
+func (s *deploymentService) evaluateEntryCondition(
+	expression string,
+	indicatorArrayMap map[string][]parser.IndicatorValues,
+	currentTimestamp time.Time,
+) (bool, error) {
+	return parser.EvaluateIndicatorExpression(
+		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+	)
 }
 
 // calculatePositionSize calculates position size based on strategy settings
@@ -981,17 +1052,19 @@ func (s *deploymentService) calculatePositionSize(strategy *strategyDto.Strategy
 	return 1.0
 }
 
-// evaluateExitCondition evaluates exit expression using parser for current position
-func (s *deploymentService) evaluateExitCondition(strategy *strategyDto.StrategyResponse, historicalData []*instrumentModel.Instrument, currentPosition *model.DeploymentPosition) (bool, error) {
-	if strategy.ExitExpression == "" {
+// evaluateExitCondition evaluates exit expression using parser with indicator array map
+func (s *deploymentService) evaluateExitCondition(
+	expression string,
+	indicatorArrayMap map[string][]parser.IndicatorValues,
+	currentTimestamp time.Time,
+) (bool, error) {
+	if expression == "" {
 		return false, nil
 	}
 
-	// Convert instruments to data context for expression evaluation
-	dataContext := s.toDataContext(historicalData)
-
-	// Execute the exit expression
-	return parser.Execute(strategy.ExitExpression, parser.NewEvaluationContext(dataContext)), nil
+	return parser.EvaluateIndicatorExpression(
+		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+	)
 }
 
 // calculateDeploymentMetrics calculates metrics for a deployment based on its positions
@@ -1198,7 +1271,7 @@ func (s *deploymentService) getMaxLookback(expression string) int64 {
 	// Extract all indicators from the expression
 	indicators, err := parser.ExtractIndicators(expression)
 	if err != nil {
-		fmt.Printf("Error extracting indicators from expression: %v\n", err)
+		println("Error extracting indicators from expression:", err.Error())
 		return 20 // Return a default lookback if there's an error
 	}
 
