@@ -132,6 +132,7 @@ s-migrate
 s-live
 s-client
 main
+live
 
 # data
 # data/historical
