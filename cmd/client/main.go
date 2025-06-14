@@ -15,8 +15,14 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/gorilla/websocket"
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
+
+	"algo/internal/modules/instrument/domain/model"
+	"algo/internal/modules/instrument/domain/repository"
+	"algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
 )
 
 // Feed codes to simulate different types of market data
@@ -74,7 +80,7 @@ type Instrument struct {
 var (
 	// Sample instruments to simulate
 	instruments = []Instrument{
-		{SecurityID: 12018, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 3411, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 	}
 
 	// Map to store active WebSocket connections
@@ -88,6 +94,10 @@ var (
 	// Track current simulation time - will be initialized in main()
 	currentSimulationTime time.Time
 
+	// ClickHouse database connection
+	chDB                 *sqlx.DB
+	instrumentRepository repository.InstrumentRepository
+
 	// WebSocket upgrader configuration
 	wsUpgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -99,10 +109,40 @@ var (
 	}
 )
 
+// initDB initializes the ClickHouse database connection
+func initDB() error {
+	// Get database connection details from environment variables
+	conn := getEnv("CH_URL", "clickhouse://admin:admin@localhost:9000")
+
+	db, err := sqlx.Connect("clickhouse", conn)
+	if err != nil {
+		return fmt.Errorf("error connecting to ClickHouse: %w", err)
+	}
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("error pinging ClickHouse: %w", err)
+	}
+
+	chDB = db
+	log.Println("Connected to ClickHouse database")
+
+	// Initialize instrument repository
+	instrumentRepository = clickhouse.NewInstrumentRepository(chDB)
+
+	return nil
+}
+
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, using defaults")
+	}
+
+	// Initialize ClickHouse database connection
+	if err := initDB(); err != nil {
+		log.Printf("Warning: Failed to connect to ClickHouse: %v", err)
+		log.Println("Will use random data simulation instead of database data")
 	}
 
 	// Initialize simulation time to May 5th, 2025 at 9:15 AM IST
@@ -111,7 +151,7 @@ func main() {
 		log.Printf("Warning: Could not load IST timezone, using UTC: %v", err)
 		istLocation = time.UTC
 	}
-	currentSimulationTime = time.Date(2025, 5, 5, 9, 15, 0, 0, istLocation)
+	currentSimulationTime = time.Date(2025, 5, 5, 9, 30, 0, 0, istLocation)
 
 	// Get port from environment or use default
 	port := getEnv("CLIENT_PORT", "9092")
@@ -236,7 +276,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 
 // startMarketDataSimulation starts the market data simulation in background
 func startMarketDataSimulation(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	// Always use quote feed type
@@ -268,7 +308,7 @@ func startMarketDataSimulation(ctx context.Context) {
 
 			// Check if market is open before sending data
 			if !isMarketOpen(currentSimulationTime) {
-				// Market is closed, move to next market opening
+				// Market is closed, move to next day
 				log.Printf("Market closed at: %s", currentSimulationTime.Format("2006-01-02 15:04:05"))
 				currentSimulationTime = getNextMarketOpen(currentSimulationTime)
 				log.Printf("Moving to next trading session: %s",
@@ -287,8 +327,8 @@ func startMarketDataSimulation(ctx context.Context) {
 
 			// Send data for each instrument
 			for i := range instruments {
-				// Update instrument with random variations
-				updateInstrumentData(&instruments[i])
+				// Update instrument with data from ClickHouse or random data
+				updateInstrumentDataFromDB(&instruments[i])
 
 				// Always use quote feed type
 
@@ -350,50 +390,6 @@ func broadcastMarketData(packet []byte, instrument *Instrument, feedType byte) {
 		log.Printf("Broadcasted %s data for %s (ID: %d) to %d clients: LTP=%.2f, Vol=%d, Time=%s",
 			getFeedTypeName(feedType), instrument.Symbol, instrument.SecurityID,
 			len(clients), instrument.LTP, instrument.Volume, currentSimulationTime.Format("2006-01-02 15:04:05"))
-	}
-}
-
-// updateInstrumentData updates instrument data with realistic random variations
-func updateInstrumentData(instrument *Instrument) {
-	// Generate price movements (±2% max change)
-	priceChange := (rng.Float32() - 0.5) * 0.04 * instrument.LTP
-	newLTP := instrument.LTP + priceChange
-
-	// Ensure positive price
-	if newLTP <= 0 {
-		newLTP = instrument.LTP * 0.99
-	}
-
-	instrument.LTP = newLTP
-
-	// Update high/low if necessary
-	if instrument.LTP > instrument.High {
-		instrument.High = instrument.LTP
-	}
-	if instrument.LTP < instrument.Low {
-		instrument.Low = instrument.LTP
-	}
-
-	// Update close price (same as LTP for live data)
-	instrument.Close = instrument.LTP
-
-	// Update volume (add random amount)
-	volumeIncrease := uint32(rng.Intn(1000) + 100)
-	instrument.Volume += volumeIncrease
-
-	// Update ATP (weighted average)
-	instrument.ATP = (instrument.ATP*0.9 + instrument.LTP*0.1)
-
-	// Update LTQ (random quantity)
-	instrument.LTQ = uint16(rng.Intn(200) + 10)
-
-	// Update OI for derivatives (if applicable)
-	if rng.Float32() < 0.3 { // 30% chance to update OI
-		oiChange := int32(rng.Intn(2000) - 1000)
-		newOI := int32(instrument.OI) + oiChange
-		if newOI >= 0 {
-			instrument.OI = uint32(newOI)
-		}
 	}
 }
 
@@ -525,4 +521,111 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getMarketDataFromDB fetches real market data from ClickHouse for the given timestamp
+func getMarketDataFromDB(securityID int32, timestamp time.Time) (*model.Instrument, error) {
+	if chDB == nil || instrumentRepository == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get the data for the exact timestamp or closest to it
+	// We'll use a small time window (1 minute) around the target timestamp
+	startTime := timestamp.Add(-30 * time.Second)
+	endTime := timestamp.Add(30 * time.Second)
+
+	instruments, err := instrumentRepository.FindByExchangeSecurityIDAndTimeRange(
+		ctx, securityID, startTime, endTime, "1m")
+	if err != nil {
+		return nil, fmt.Errorf("error querying market data: %w", err)
+	}
+
+	if len(instruments) == 0 {
+		return nil, fmt.Errorf("no market data found for timestamp: %s", timestamp.Format("2006-01-02 15:04:05"))
+	}
+
+	// Return the first (closest) match
+	return instruments[0], nil
+}
+
+// updateInstrumentDataFromDB updates instrument data with real data from ClickHouse
+func updateInstrumentDataFromDB(instrument *Instrument) {
+	// Try to get real data from database
+	marketData, err := getMarketDataFromDB(int32(instrument.SecurityID), currentSimulationTime)
+	if err != nil {
+		// If database query fails, log and fall back to random data
+		log.Printf("Failed to get market data from DB for %s: %v. Using random data.", instrument.Symbol, err)
+		updateInstrumentDataRandom(instrument)
+		return
+	}
+
+	// Map database fields to local instrument struct
+	// Use Close price as LTP (Last Traded Price)
+	instrument.LTP = float32(marketData.Close)
+	instrument.Open = float32(marketData.Open)
+	instrument.High = float32(marketData.High)
+	instrument.Low = float32(marketData.Low)
+	instrument.Close = float32(marketData.Close)
+	instrument.Volume = uint32(marketData.Volume)
+
+	// Calculate ATP as average of OHLC
+	instrument.ATP = float32((marketData.Open + marketData.High + marketData.Low + marketData.Close) / 4.0)
+
+	// Simulate missing fields with realistic values
+	instrument.LTQ = uint16(rng.Intn(200) + 10)
+
+	// For OI (Open Interest), simulate based on volume (only for derivatives)
+	if instrument.Symbol != "NIFTY" && instrument.Symbol != "BANKNIFTY" {
+		instrument.OI = uint32(float64(instrument.Volume) * 0.8) // OI is typically less than volume
+	}
+
+	log.Printf("Updated %s with real data: LTP=%.2f, Vol=%d, Time=%s",
+		instrument.Symbol, instrument.LTP, instrument.Volume, currentSimulationTime.Format("2006-01-02 15:04:05"))
+}
+
+// updateInstrumentDataRandom updates instrument data with random variations (fallback method)
+func updateInstrumentDataRandom(instrument *Instrument) {
+	// Generate price movements (±2% max change)
+	priceChange := (rng.Float32() - 0.5) * 0.04 * instrument.LTP
+	newLTP := instrument.LTP + priceChange
+
+	// Ensure positive price
+	if newLTP <= 0 {
+		newLTP = instrument.LTP * 0.99
+	}
+
+	instrument.LTP = newLTP
+
+	// Update high/low if necessary
+	if instrument.LTP > instrument.High {
+		instrument.High = instrument.LTP
+	}
+	if instrument.LTP < instrument.Low {
+		instrument.Low = instrument.LTP
+	}
+
+	// Update close price (same as LTP for live data)
+	instrument.Close = instrument.LTP
+
+	// Update volume (add random amount)
+	volumeIncrease := uint32(rng.Intn(1000) + 100)
+	instrument.Volume += volumeIncrease
+
+	// Update ATP (weighted average)
+	instrument.ATP = (instrument.ATP*0.9 + instrument.LTP*0.1)
+
+	// Update LTQ (random quantity)
+	instrument.LTQ = uint16(rng.Intn(200) + 10)
+
+	// Update OI for derivatives (if applicable)
+	if rng.Float32() < 0.3 { // 30% chance to update OI
+		oiChange := int32(rng.Intn(2000) - 1000)
+		newOI := int32(instrument.OI) + oiChange
+		if newOI >= 0 {
+			instrument.OI = uint32(newOI)
+		}
+	}
 }

@@ -686,11 +686,11 @@ func processMarketDataMessage(message []byte) {
 	// Parse message header
 	feedCode := message[0]
 	// messageLength := binary.LittleEndian.Uint16(message[1:3])
-	exchangeSegment := message[3]
-	securityID := binary.LittleEndian.Uint32(message[4:8])
+	// exchangeSegment := message[3]
+	// securityID := binary.LittleEndian.Uint32(message[4:8])
 
-	log.Printf("Received market data - Code: %d, Exchange: %d, SecurityID: %d",
-		feedCode, exchangeSegment, securityID)
+	// log.Printf("Received market data - Code: %d, Exchange: %d, SecurityID: %d",
+	// 	feedCode, exchangeSegment, securityID)
 
 	// Process message based on feed code
 	switch feedCode {
@@ -719,7 +719,7 @@ func processMarketDataMessage(message []byte) {
 		if err := deploymentSvc.ProcessInstrumentData(appCtx, instrument); err != nil {
 			log.Printf("Error processing instrument data with deployment service: %v", err)
 		} else {
-			log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
+			// log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
 		}
 	}
 
@@ -996,8 +996,8 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 		return
 	}
 
-	log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
-		symbol, securityID, timestampTime.Format(time.RFC3339))
+	// log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
+	// 	symbol, securityID, timestampTime.Format(time.RFC3339))
 }
 
 // toInstrument converts raw market data to an Instrument model
