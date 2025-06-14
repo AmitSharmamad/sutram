@@ -988,9 +988,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 // ProcessInstrumentData processes incoming instrument data and runs the appropriate deployments
 func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error {
 	// Store the data in the database
-	if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
-		return fmt.Errorf("failed to store instrument data: %w", err)
-	}
+	// if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
+	// 	return fmt.Errorf("failed to store instrument data: %w", err)
+	// }
 
 	// Find deployments for this instrument
 	instrumentID := int(instrumentData.ExchangeSecurityID)
@@ -1038,7 +1038,7 @@ func (s *deploymentService) evaluateEntryCondition(
 	currentTimestamp time.Time,
 ) (bool, error) {
 	return parser.EvaluateIndicatorExpression(
-		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+		expression, indicatorArrayMap, currentTimestamp, nil, len(indicatorArrayMap["CLOSE"]) - 1,
 	)
 }
 
@@ -1063,7 +1063,7 @@ func (s *deploymentService) evaluateExitCondition(
 	}
 
 	return parser.EvaluateIndicatorExpression(
-		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+		expression, indicatorArrayMap, currentTimestamp, nil, len(indicatorArrayMap["CLOSE"]) - 1,
 	)
 }
 
