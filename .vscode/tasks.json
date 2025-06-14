@@ -14,6 +14,13 @@
             "command": "go build -gcflags=\"all=-N -l\" -o bin/live cmd/live/main.go",
             "group": "build",
             "problemMatcher": []
+        },
+        {
+            "label": "l-client",
+            "type": "shell",
+            "command": "go build -gcflags=\"all=-N -l\" -o bin/live cmd/client/main.go",
+            "group": "build",
+            "problemMatcher": []
         }
     ]
 }
