@@ -1,0 +1,539 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sutram Trading Platform - Application Services (ECS Services, Task Definitions)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Default: sutram
+    Description: Project name for resource naming
+
+  NetworkingStackName:
+    Type: String
+    Default: sutram-networking
+    Description: Name of the networking stack to import values from
+
+  DataStackName:
+    Type: String
+    Default: sutram-data
+    Description: Name of the data stack to import values from
+
+  AppInfraStackName:
+    Type: String
+    Default: sutram-app-infra
+    Description: Name of the app infrastructure stack to import values from
+
+  WebAppImageTag:
+    Type: String
+    Default: latest
+    Description: Docker image tag for web application
+
+  LiveTradingImageTag:
+    Type: String
+    Default: latest
+    Description: Docker image tag for live trading service
+
+  WebAppDesiredCount:
+    Type: Number
+    Default: 1  # Reduced for cost optimization
+    MinValue: 1
+    MaxValue: 10
+    Description: Desired number of web app tasks
+
+  LiveTradingDesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 1
+
+  MinimalResources:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Use minimal CPU/Memory for cost optimization
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+  UseMinimalResources: !Equals [!Ref MinimalResources, "true"]
+    MaxValue: 3
+    Description: Desired number of live trading tasks
+
+Resources:
+  # Secrets for application configuration
+  DatabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${Environment}/database/credentials"
+      Description: Database connection credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+      KmsKeyId: !ImportValue
+        Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-db-secret"
+        - Key: Environment
+          Value: !Ref Environment
+
+  BrokerAPISecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${Environment}/broker/api-keys"
+      Description: Broker API keys and credentials
+      SecretString: !Sub |
+        {
+          "dhan_access_token": "",
+          "zerodha_api_key": "",
+          "zerodha_access_token": "",
+          "angelone_api_key": "",
+          "angelone_access_token": "",
+          "hdfc_access_token": "",
+          "sharekhan_api_key": "",
+          "sharekhan_access_token": ""
+        }
+      KmsKeyId: !ImportValue
+        Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-broker-secret"
+        - Key: Environment
+          Value: !Ref Environment
+
+  ApplicationSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${ProjectName}/${Environment}/application/secrets"
+      Description: Application secrets (JWT, encryption keys, etc.)
+      GenerateSecretString:
+        SecretStringTemplate: !Sub |
+          {
+            "jwt_secret": "",
+            "encryption_key": "",
+            "google_oauth_client_id": "",
+            "google_oauth_client_secret": ""
+          }
+        GenerateStringKey: 'jwt_secret'
+        PasswordLength: 64
+        ExcludeCharacters: '"@/\'
+      KmsKeyId: !ImportValue
+        Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-app-secret"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Web Application Task Definition - Cost Optimized
+  WebAppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-${Environment}-web-app"
+      Cpu: !If 
+        - UseMinimalResources
+        - 256  # Minimal CPU for dev (0.25 vCPU)
+        - !If [IsProduction, 1024, 512]
+      Memory: !If 
+        - UseMinimalResources  
+        - 512  # Minimal memory for dev (512 MB)
+        - !If [IsProduction, 2048, 1024]
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-TaskExecution-Role-ARN"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Task-Role-ARN"
+      ContainerDefinitions:
+        - Name: web-app
+          Image: !Sub
+            - "${RepositoryURI}:${ImageTag}"
+            - RepositoryURI: !ImportValue
+                Fn::Sub: "${AppInfraStackName}-${Environment}-WebApp-Repository-URI"
+              ImageTag: !Ref WebAppImageTag
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - Name: ENVIRONMENT
+              Value: !Ref Environment
+            - Name: PROJECT_NAME
+              Value: !Ref ProjectName
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: POSTGRES_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-PostgreSQL-Endpoint"
+            - Name: POSTGRES_PORT
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-PostgreSQL-Port"
+            - Name: POSTGRES_DB
+              Value: sutram
+            - Name: REDIS_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-Redis-Endpoint"
+            - Name: REDIS_PORT
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-Redis-Port"
+            - Name: CLICKHOUSE_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-ClickHouse-PrivateIP"
+            - Name: CLICKHOUSE_PORT
+              Value: "9000"
+            - Name: CLICKHOUSE_HTTP_PORT
+              Value: "8123"
+            - Name: CLICKHOUSE_USER
+              Value: admin
+            - Name: CLICKHOUSE_PASSWORD
+              Value: admin
+            - Name: S3_INSTRUMENT_DATA_BUCKET
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-InstrumentData-Bucket"
+            - Name: S3_APP_ASSETS_BUCKET
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-AppAssets-Bucket"
+          Secrets:
+            - Name: POSTGRES_USER
+              ValueFrom: !Sub "${DatabaseSecret}:username::"
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "${DatabaseSecret}:password::"
+            - Name: JWT_SECRET
+              ValueFrom: !Sub "${ApplicationSecret}:jwt_secret::"
+            - Name: ENCRYPTION_KEY
+              ValueFrom: !Sub "${ApplicationSecret}:encryption_key::"
+            - Name: GOOGLE_OAUTH_CLIENT_ID
+              ValueFrom: !Sub "${ApplicationSecret}:google_oauth_client_id::"
+            - Name: GOOGLE_OAUTH_CLIENT_SECRET
+              ValueFrom: !Sub "${ApplicationSecret}:google_oauth_client_secret::"
+            - Name: DHAN_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:dhan_access_token::"
+            - Name: ZERODHA_API_KEY
+              ValueFrom: !Sub "${BrokerAPISecret}:zerodha_api_key::"
+            - Name: ZERODHA_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:zerodha_access_token::"
+            - Name: ANGELONE_API_KEY
+              ValueFrom: !Sub "${BrokerAPISecret}:angelone_api_key::"
+            - Name: ANGELONE_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:angelone_access_token::"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${AppInfraStackName}-${Environment}-WebApp-LogGroup-Name"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - "curl -f http://localhost:8080/health || exit 1"
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-app-task"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Live Trading Task Definition - Cost Optimized
+  LiveTradingTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-${Environment}-live-trading"
+      Cpu: !If 
+        - UseMinimalResources
+        - 256  # Minimal CPU for dev (0.25 vCPU)
+        - !If [IsProduction, 2048, 1024]
+      Memory: !If 
+        - UseMinimalResources
+        - 512  # Minimal memory for dev (512 MB)
+        - !If [IsProduction, 4096, 2048]
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-TaskExecution-Role-ARN"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Task-Role-ARN"
+      ContainerDefinitions:
+        - Name: live-trading
+          Image: !Sub
+            - "${RepositoryURI}:${ImageTag}"
+            - RepositoryURI: !ImportValue
+                Fn::Sub: "${AppInfraStackName}-${Environment}-LiveTrading-Repository-URI"
+              ImageTag: !Ref LiveTradingImageTag
+          PortMappings:
+            - ContainerPort: 8010
+              Protocol: tcp
+          Environment:
+            - Name: ENVIRONMENT
+              Value: !Ref Environment
+            - Name: PROJECT_NAME
+              Value: !Ref ProjectName
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: POSTGRES_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-PostgreSQL-Endpoint"
+            - Name: POSTGRES_PORT
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-PostgreSQL-Port"
+            - Name: POSTGRES_DB
+              Value: sutram
+            - Name: REDIS_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-Redis-Endpoint"
+            - Name: REDIS_PORT
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-Redis-Port"
+            - Name: CLICKHOUSE_HOST
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-ClickHouse-PrivateIP"
+            - Name: CLICKHOUSE_PORT
+              Value: "9000"
+            - Name: CLICKHOUSE_HTTP_PORT
+              Value: "8123"
+            - Name: CLICKHOUSE_USER
+              Value: admin
+            - Name: CLICKHOUSE_PASSWORD
+              Value: admin
+            - Name: S3_INSTRUMENT_DATA_BUCKET
+              Value: !ImportValue
+                Fn::Sub: "${DataStackName}-${Environment}-InstrumentData-Bucket"
+          Secrets:
+            - Name: POSTGRES_USER
+              ValueFrom: !Sub "${DatabaseSecret}:username::"
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "${DatabaseSecret}:password::"
+            - Name: DHAN_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:dhan_access_token::"
+            - Name: ZERODHA_API_KEY
+              ValueFrom: !Sub "${BrokerAPISecret}:zerodha_api_key::"
+            - Name: ZERODHA_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:zerodha_access_token::"
+            - Name: ANGELONE_API_KEY
+              ValueFrom: !Sub "${BrokerAPISecret}:angelone_api_key::"
+            - Name: ANGELONE_ACCESS_TOKEN
+              ValueFrom: !Sub "${BrokerAPISecret}:angelone_access_token::"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${AppInfraStackName}-${Environment}-LiveTrading-LogGroup-Name"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - "curl -f http://localhost:8010/health || exit 1"
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-live-trading-task"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Web Application Service
+  WebAppService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${ProjectName}-${Environment}-web-app"
+      Cluster: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Cluster-Name"
+      TaskDefinition: !Ref WebAppTaskDefinition
+      DesiredCount: !Ref WebAppDesiredCount
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !ImportValue
+              Fn::Sub: "${NetworkingStackName}-${Environment}-ECS-SecurityGroup"
+          Subnets: !Split
+            - ","
+            - !ImportValue
+              Fn::Sub: "${NetworkingStackName}-${Environment}-Private-Subnets"
+          AssignPublicIp: DISABLED
+      LoadBalancers:
+        - TargetGroupArn: !ImportValue
+            Fn::Sub: "${AppInfraStackName}-${Environment}-WebApp-TargetGroup-ARN"
+          ContainerName: web-app
+          ContainerPort: 8080
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      EnableExecuteCommand: !If [IsProduction, false, true]
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-app-service"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Live Trading Service
+  LiveTradingService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${ProjectName}-${Environment}-live-trading"
+      Cluster: !ImportValue
+        Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Cluster-Name"
+      TaskDefinition: !Ref LiveTradingTaskDefinition
+      DesiredCount: !Ref LiveTradingDesiredCount
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !ImportValue
+              Fn::Sub: "${NetworkingStackName}-${Environment}-ECS-SecurityGroup"
+          Subnets: !Split
+            - ","
+            - !ImportValue
+              Fn::Sub: "${NetworkingStackName}-${Environment}-Private-Subnets"
+          AssignPublicIp: DISABLED
+      LoadBalancers:
+        - TargetGroupArn: !ImportValue
+            Fn::Sub: "${AppInfraStackName}-${Environment}-LiveTrading-TargetGroup-ARN"
+          ContainerName: live-trading
+          ContainerPort: 8010
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0  # For critical trading service, ensure no interruption
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      EnableExecuteCommand: !If [IsProduction, false, true]
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-live-trading-service"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Auto Scaling for Web App
+  WebAppAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: !If [IsProduction, 10, 5]
+      MinCapacity: !If [IsProduction, 2, 1]
+      ResourceId: !Sub
+        - "service/${ClusterName}/${ServiceName}"
+        - ClusterName: !ImportValue
+            Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Cluster-Name"
+          ServiceName: !GetAtt WebAppService.Name
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  WebAppAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-${Environment}-web-app-scaling-policy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WebAppAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70.0
+        ScaleOutCooldown: 300
+        ScaleInCooldown: 300
+
+  # CloudWatch Alarms
+  WebAppHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-web-app-high-cpu"
+      AlarmDescription: Web App High CPU Utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ServiceName
+          Value: !GetAtt WebAppService.Name
+        - Name: ClusterName
+          Value: !ImportValue
+            Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Cluster-Name"
+      TreatMissingData: notBreaching
+
+  LiveTradingHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-live-trading-high-cpu"
+      AlarmDescription: Live Trading High CPU Utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/ECS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ServiceName
+          Value: !GetAtt LiveTradingService.Name
+        - Name: ClusterName
+          Value: !ImportValue
+            Fn::Sub: "${AppInfraStackName}-${Environment}-ECS-Cluster-Name"
+      TreatMissingData: notBreaching
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+
+Outputs:
+  WebAppServiceArn:
+    Description: Web App ECS Service ARN
+    Value: !Ref WebAppService
+    Export:
+      Name: !Sub "${AWS::StackName}-WebApp-Service-ARN"
+
+  WebAppServiceName:
+    Description: Web App ECS Service Name
+    Value: !GetAtt WebAppService.Name
+    Export:
+      Name: !Sub "${AWS::StackName}-WebApp-Service-Name"
+
+  LiveTradingServiceArn:
+    Description: Live Trading ECS Service ARN
+    Value: !Ref LiveTradingService
+    Export:
+      Name: !Sub "${AWS::StackName}-LiveTrading-Service-ARN"
+
+  LiveTradingServiceName:
+    Description: Live Trading ECS Service Name
+    Value: !GetAtt LiveTradingService.Name
+    Export:
+      Name: !Sub "${AWS::StackName}-LiveTrading-Service-Name"
+
+  DatabaseSecretArn:
+    Description: Database Secret ARN
+    Value: !Ref DatabaseSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-Database-Secret-ARN"
+
+  BrokerAPISecretArn:
+    Description: Broker API Secret ARN
+    Value: !Ref BrokerAPISecret
+    Export:
+      Name: !Sub "${AWS::StackName}-BrokerAPI-Secret-ARN"
+
+  ApplicationSecretArn:
+    Description: Application Secret ARN
+    Value: !Ref ApplicationSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-Application-Secret-ARN"

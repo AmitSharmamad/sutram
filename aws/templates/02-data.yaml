@@ -1,0 +1,469 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sutram Trading Platform - Data Layer (PostgreSQL, ClickHouse, Redis, S3)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Default: sutram
+    Description: Project name for resource naming
+
+  NetworkingStackName:
+    Type: String
+    Default: sutram-networking
+    Description: Name of the networking stack to import values from
+
+  DatabaseInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues: [db.t3.micro, db.t3.small, db.t3.medium, db.r5.large, db.r5.xlarge]
+    Description: RDS instance class
+
+  ClickHouseInstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium, c5n.large, c5n.xlarge, c5n.2xlarge]
+    Description: EC2 instance type for ClickHouse
+
+  RedisNodeType:
+    Type: String
+    Default: cache.t3.micro
+    AllowedValues: [cache.t3.micro, cache.t3.small, cache.t3.medium, cache.r5.large]
+    Description: ElastiCache Redis node type
+
+  DisableMultiAZ:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Disable Multi-AZ for cost optimization in development
+
+  MinimalStorage:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Use minimal storage sizes for cost optimization
+
+Resources:
+  # S3 Buckets - Cost Optimized
+  InstrumentDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-instrument-data-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256  # Use AES256 instead of KMS to save costs
+      VersioningConfiguration:
+        Status: !If [IsProduction, Enabled, Suspended]
+      LifecycleConfiguration:
+        Rules:
+          - Id: CostOptimization
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 7
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 30
+                StorageClass: GLACIER
+            ExpirationInDays: !If [IsProduction, 365, 90]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-instrument-data"
+        - Key: Environment
+          Value: !Ref Environment
+
+  ApplicationAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-app-assets-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256  # Use AES256 instead of KMS to save costs
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-app-assets"
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackupsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsProduction  # Only create backup bucket for production
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-backups-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+              KMSMasterKeyID: !ImportValue
+                Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: BackupRetention
+            Status: Enabled
+            ExpirationInDays: 365
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-backups"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # RDS Subnet Group
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Sutram databases
+      SubnetIds: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-Database-Subnets"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-db-subnet-group"
+
+  # RDS PostgreSQL - Cost Optimized
+  PostgreSQLDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: !If [IsProduction, Snapshot, Delete]
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-${Environment}-postgres"
+      DBName: sutram
+      Engine: postgres
+      EngineVersion: '15.7'
+      DBInstanceClass: !Ref DatabaseInstanceClass
+      AllocatedStorage: !If [MinimalStorage, 10, 20]  # Minimum 10GB for dev
+      MaxAllocatedStorage: !If [MinimalStorage, 20, 100]
+      StorageType: gp3
+      StorageEncrypted: !If [IsProduction, true, false]  # Disable encryption for dev
+      KmsKeyId: !If 
+        - IsProduction
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+        - !Ref AWS::NoValue
+      MasterUsername: admin
+      ManageMasterUserPassword: !If [IsProduction, true, false]
+      MasterUserSecret: !If
+        - IsProduction
+        - KmsKeyId: !ImportValue
+            Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+        - !Ref AWS::NoValue
+      MasterUserPassword: !If [IsProduction, !Ref AWS::NoValue, "REDACTED_PASSWORD"]  # Fixed password for dev
+      VPCSecurityGroups:
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-Database-SecurityGroup"
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      MultiAZ: !If [DisableMultiAZ, false, !If [IsProduction, true, false]]
+      BackupRetentionPeriod: !If [IsProduction, 7, 0]  # No backups for dev
+      PreferredBackupWindow: !If [IsProduction, "03:00-04:00", !Ref AWS::NoValue]
+      PreferredMaintenanceWindow: "sun:04:00-sun:05:00"
+      DeletionProtection: false  # Always false for easy cleanup
+      EnablePerformanceInsights: false  # Disable to save costs
+      MonitoringInterval: 0  # Disable enhanced monitoring
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-postgres"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Enhanced Monitoring Role for RDS (Production only)
+  RDSEnhancedMonitoringRole:
+    Type: AWS::IAM::Role
+    Condition: IsProduction
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole'
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-rds-monitoring-role"
+
+  # ElastiCache Subnet Group
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnet group for Sutram cache
+      SubnetIds: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-Private-Subnets"
+
+  # ElastiCache Redis - Cost Optimized
+  RedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheClusterId: !Sub "${ProjectName}-${Environment}-redis"
+      Engine: redis
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheNodes: 1
+      Port: 6379
+      VpcSecurityGroupIds:
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-Database-SecurityGroup"
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      PreferredMaintenanceWindow: "sun:03:00-sun:04:00"
+      # Disable automatic backup for cost optimization in dev
+      SnapshotRetentionLimit: !If [IsProduction, 5, 0]
+      NotificationTopicArn: !If [IsProduction, !Ref 'AWS::NoValue', !Ref 'AWS::NoValue']
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-redis"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ClickHouse EC2 Instance
+  ClickHouseKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${ProjectName}-${Environment}-clickhouse-key"
+      KeyType: rsa
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-key"
+
+  ClickHouseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: S3BackupAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "${BackupsBucket}/*"
+                  - !GetAtt BackupsBucket.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-role"
+
+  ClickHouseInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ClickHouseRole
+
+  ClickHouseInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2023
+      InstanceType: !Ref ClickHouseInstanceType
+      KeyName: !Ref ClickHouseKeyPair
+      IamInstanceProfile: !Ref ClickHouseInstanceProfile
+      SecurityGroupIds:
+        - !ImportValue
+          Fn::Sub: "${NetworkingStackName}-${Environment}-Database-SecurityGroup"
+      SubnetId: !Select
+        - 0
+        - !Split
+          - ","
+          - !ImportValue
+            Fn::Sub: "${NetworkingStackName}-${Environment}-Private-Subnets"
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !If [MinimalStorageCondition, 20, 50]  # Reduced for dev
+            Encrypted: !If [IsProduction, true, false]  # No encryption for dev
+            KmsKeyId: !If 
+              - IsProduction
+              - !ImportValue
+                Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+              - !Ref 'AWS::NoValue'
+        - DeviceName: /dev/xvdf
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !If [MinimalStorageCondition, 20, 100]  # Significantly reduced for dev
+            Encrypted: !If [IsProduction, true, false]  # No encryption for dev
+            KmsKeyId: !If 
+              - IsProduction
+              - !ImportValue
+                Fn::Sub: "${NetworkingStackName}-${Environment}-KMS-Key"
+              - !Ref 'AWS::NoValue'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y docker
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          
+          # Format and mount data volume
+          mkfs -t ext4 /dev/xvdf
+          mkdir /var/lib/clickhouse
+          mount /dev/xvdf /var/lib/clickhouse
+          echo '/dev/xvdf /var/lib/clickhouse ext4 defaults,nofail 0 2' >> /etc/fstab
+          
+          # Install CloudWatch agent
+          wget https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+          rpm -U ./amazon-cloudwatch-agent.rpm
+          
+          # Run ClickHouse container
+          docker run -d \
+            --name clickhouse-server \
+            --restart unless-stopped \
+            -p 8123:8123 \
+            -p 9000:9000 \
+            -v /var/lib/clickhouse:/var/lib/clickhouse \
+            -e CLICKHOUSE_USER=admin \
+            -e CLICKHOUSE_PASSWORD=admin \
+            -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+            clickhouse/clickhouse-server:latest
+          
+          # Store connection info in SSM
+          aws ssm put-parameter \
+            --region ${AWS::Region} \
+            --name "/${ProjectName}/${Environment}/clickhouse/endpoint" \
+            --value "$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)" \
+            --type "String" \
+            --overwrite
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Systems Manager Parameters for database connections
+  PostgreSQLEndpointParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/database/postgres/endpoint"
+      Type: String
+      Value: !GetAtt PostgreSQLDB.Endpoint.Address
+      Description: PostgreSQL database endpoint
+
+  PostgreSQLPortParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/database/postgres/port"
+      Type: String
+      Value: !GetAtt PostgreSQLDB.Endpoint.Port
+      Description: PostgreSQL database port
+
+  RedisEndpointParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/redis/endpoint"
+      Type: String
+      Value: !GetAtt RedisCluster.RedisEndpoint.Address
+      Description: Redis cache endpoint
+
+  RedisPortParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/redis/port"
+      Type: String
+      Value: !GetAtt RedisCluster.RedisEndpoint.Port
+      Description: Redis cache port
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+
+Outputs:
+  PostgreSQLEndpoint:
+    Description: PostgreSQL database endpoint
+    Value: !GetAtt PostgreSQLDB.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-PostgreSQL-Endpoint"
+
+  PostgreSQLPort:
+    Description: PostgreSQL database port
+    Value: !GetAtt PostgreSQLDB.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-PostgreSQL-Port"
+
+  PostgreSQLSecretArn:
+    Description: PostgreSQL master user secret ARN
+    Value: !GetAtt PostgreSQLDB.MasterUserSecret.SecretArn
+    Export:
+      Name: !Sub "${AWS::StackName}-PostgreSQL-Secret-ARN"
+
+  RedisEndpoint:
+    Description: Redis cache endpoint
+    Value: !GetAtt RedisCluster.RedisEndpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-Redis-Endpoint"
+
+  RedisPort:
+    Description: Redis cache port
+    Value: !GetAtt RedisCluster.RedisEndpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-Redis-Port"
+
+  ClickHouseInstanceId:
+    Description: ClickHouse EC2 instance ID
+    Value: !Ref ClickHouseInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-InstanceId"
+
+  ClickHousePrivateIP:
+    Description: ClickHouse private IP address
+    Value: !GetAtt ClickHouseInstance.PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-PrivateIP"
+
+  InstrumentDataBucket:
+    Description: S3 bucket for instrument data
+    Value: !Ref InstrumentDataBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-InstrumentData-Bucket"
+
+  ApplicationAssetsBucket:
+    Description: S3 bucket for application assets
+    Value: !Ref ApplicationAssetsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-AppAssets-Bucket"
+
+  BackupsBucket:
+    Description: S3 bucket for backups
+    Value: !Ref BackupsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-Backups-Bucket"
