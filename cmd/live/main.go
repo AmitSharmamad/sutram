@@ -23,11 +23,13 @@ import (
 
 	deploymentModule "algo/internal/modules/deployment"
 	deploymentService "algo/internal/modules/deployment/application/service"
+	deploymentHttp "algo/internal/modules/deployment/interfaces/http"
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
 	strategyModule "algo/internal/modules/strategy"
 	userModule "algo/internal/modules/user"
+	userHttp "algo/internal/modules/user/interfaces/http"
 )
 
 var (
@@ -43,6 +45,10 @@ var (
 	instrumentRepository repository.InstrumentRepository
 	// Deployment service
 	deploymentSvc deploymentService.DeploymentService
+	// Deployment module for accessing event handlers
+	deploymentMod *deploymentModule.Module
+	// User controller for authentication
+	userController *userHttp.UserController
 	// Application context
 	appCtx context.Context
 	// Context cancel function
@@ -140,7 +146,7 @@ func main() {
 	setupAPIRoutes(apiRouter)
 
 	// Get port from environment or use default
-	port := getEnv("WS_PORT", "9091")
+	port := getEnv("WS_PORT", "9099")
 	serverAddr := fmt.Sprintf(":%s", port)
 
 	// Create a server with graceful shutdown
@@ -232,14 +238,17 @@ func initDeploymentService() error {
 
 	// Initialize user module (required for auth, but not used in live trading)
 	userMod := userModule.New()
-	userController := userMod.GetController()
+	userController = userMod.GetController()
 
 	// Initialize deployment module
-	deploymentMod := deploymentModule.New()
-	deploymentMod.Initialize(userController, strategyMod)
+	deploymentModInstance := deploymentModule.New()
+	deploymentModInstance.Initialize(userController, strategyMod)
+
+	// Store the deployment module for WebSocket route setup
+	deploymentMod = deploymentModInstance
 
 	// Get the deployment service from the module
-	deploymentSvc = deploymentMod.GetDeploymentService()
+	deploymentSvc = deploymentModInstance.GetDeploymentService()
 
 	// Initialize the deployment service for live trading
 	if err := deploymentSvc.Initialize(appCtx); err != nil {
@@ -382,6 +391,22 @@ func setupWebSocketRoutes(router *gin.RouterGroup) {
 
 	// Endpoint for instrument subscription
 	router.POST("/subscribe", handleSubscribeInstruments)
+
+	// Add deployment events WebSocket endpoint if deployment module is available
+	if deploymentMod != nil && userController != nil {
+		// Get the event handler from the deployment module
+		eventHandler := deploymentMod.GetEventHandler()
+
+		// Create API router group and register deployment events WebSocket routes
+		apiRouter := router.Group("/api")
+
+		if eventHandler != nil {
+			// Register deployment events WebSocket routes
+			// This will register the /api/deployment/events/ws endpoint
+			deploymentHttp.RegisterWebSocketRoutes(apiRouter, eventHandler, userController)
+			log.Printf("Registered deployment events WebSocket endpoint: /ws/api/deployment/events/ws")
+		}
+	}
 }
 
 // setupAPIRoutes sets up REST API routes for the live data module
@@ -391,6 +416,10 @@ func setupAPIRoutes(router *gin.RouterGroup) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "live",
 			"time":   time.Now().Format(time.RFC3339),
+			"websocket_endpoints": gin.H{
+				"market_data":       "/ws/feed",
+				"deployment_events": "/ws/api/deployment/events/ws",
+			},
 		})
 	})
 

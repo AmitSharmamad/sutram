@@ -217,3 +217,8 @@ func (m *Module) GetMetricsController() *http.DeploymentMetricsController {
 func (m *Module) GetDeploymentService() service.DeploymentService {
 	return m.deploymentService
 }
+
+// GetEventHandler returns the deployment event handler
+func (m *Module) GetEventHandler() *http.DeploymentEventHandler {
+	return m.eventHandler
+}
