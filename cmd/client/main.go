@@ -78,10 +78,13 @@ type Instrument struct {
 }
 
 var (
-	// Sample instruments to simulate
-	instruments = []Instrument{
+	// Sample instruments to simulate (initial state)
+	initialInstruments = []Instrument{
 		{SecurityID: 3411, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 	}
+
+	// Current instruments (working copy that gets modified during simulation)
+	instruments []Instrument
 
 	// Map to store active WebSocket connections
 	clients = make(map[*websocket.Conn]bool)
@@ -90,9 +93,16 @@ var (
 
 	// Random number generator
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 	// Track current simulation time - will be initialized in main()
 	currentSimulationTime time.Time
+	// Initial simulation time (for resets)
+	initialSimulationTime time.Time
+
+	// Channel to signal simulation restart
+	restartSimulationChan = make(chan struct{}, 1)
+
+	// Mutex to protect simulation state
+	simulationMutex sync.Mutex
 
 	// ClickHouse database connection
 	chDB                 *sqlx.DB
@@ -151,7 +161,11 @@ func main() {
 		log.Printf("Warning: Could not load IST timezone, using UTC: %v", err)
 		istLocation = time.UTC
 	}
-	currentSimulationTime = time.Date(2025, 5, 5, 9, 30, 0, 0, istLocation)
+	initialSimulationTime = time.Date(2025, 5, 5, 10, 35, 0, 0, istLocation)
+	currentSimulationTime = initialSimulationTime
+
+	// Initialize instruments with the initial state
+	resetInstruments()
 
 	// Get port from environment or use default
 	port := getEnv("CLIENT_PORT", "9092")
@@ -223,6 +237,9 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 	clientsMutex.Unlock()
 
 	log.Printf("Total connected clients: %d", clientCount)
+
+	// Reset simulation for new client (restart from beginning)
+	resetSimulation()
 
 	// Handle client disconnection
 	defer func() {
@@ -296,6 +313,13 @@ func startMarketDataSimulation(ctx context.Context) {
 		case <-ctx.Done():
 			log.Println("Market data simulation stopped")
 			return
+		case <-restartSimulationChan:
+			// Simulation restart requested
+			if !isMarketOpen(currentSimulationTime) {
+				currentSimulationTime = getNextMarketOpen(currentSimulationTime)
+			}
+			log.Printf("Simulation restarted from: %s", currentSimulationTime.Format("2006-01-02 15:04:05"))
+			continue
 		case <-ticker.C:
 			// Check if there are any connected clients
 			clientsMutex.Lock()
@@ -310,18 +334,23 @@ func startMarketDataSimulation(ctx context.Context) {
 			if !isMarketOpen(currentSimulationTime) {
 				// Market is closed, move to next day
 				log.Printf("Market closed at: %s", currentSimulationTime.Format("2006-01-02 15:04:05"))
+				simulationMutex.Lock()
 				currentSimulationTime = getNextMarketOpen(currentSimulationTime)
+				simulationMutex.Unlock()
 				log.Printf("Moving to next trading session: %s",
 					currentSimulationTime.Format("2006-01-02 15:04:05"))
 				continue
 			}
 
 			// Increment simulation time by 1 minute for each broadcast
+			simulationMutex.Lock()
 			currentSimulationTime = currentSimulationTime.Add(1 * time.Minute)
+			currentTime := currentSimulationTime
+			simulationMutex.Unlock()
 
 			// Check again if we've crossed market close time after incrementing
-			if !isMarketOpen(currentSimulationTime) {
-				log.Printf("Market session ended at: %s", currentSimulationTime.Format("2006-01-02 15:04:05"))
+			if !isMarketOpen(currentTime) {
+				log.Printf("Market session ended at: %s", currentTime.Format("2006-01-02 15:04:05"))
 				continue
 			}
 
@@ -549,6 +578,30 @@ func getMarketDataFromDB(securityID int32, timestamp time.Time) (*model.Instrume
 
 	// Return the first (closest) match
 	return instruments[0], nil
+}
+
+// resetInstruments resets instruments to their initial state
+func resetInstruments() {
+	instruments = make([]Instrument, len(initialInstruments))
+	copy(instruments, initialInstruments)
+	log.Println("Instruments reset to initial state")
+}
+
+// resetSimulation resets the simulation to its initial state
+func resetSimulation() {
+	simulationMutex.Lock()
+	defer simulationMutex.Unlock()
+
+	currentSimulationTime = initialSimulationTime
+	resetInstruments()
+
+	// Send restart signal (non-blocking)
+	select {
+	case restartSimulationChan <- struct{}{}:
+		log.Printf("Simulation reset to initial time: %s", currentSimulationTime.Format("2006-01-02 15:04:05"))
+	default:
+		// Channel is full, restart signal already pending
+	}
 }
 
 // updateInstrumentDataFromDB updates instrument data with real data from ClickHouse
