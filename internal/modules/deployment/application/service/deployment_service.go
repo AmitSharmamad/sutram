@@ -613,6 +613,13 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	deployment := deploymentWithStrategy.Deployment
 	strategy := deploymentWithStrategy.Strategy
 
+	// Check if instrument timestamp matches strategy timeframe
+	if !s.isTimestampAlignedWithTimeframe(instrumentData.Timestamp, string(strategy.ChartTimeframe)) {
+		fmt.Printf("Skipping execution - timestamp %v does not align with strategy timeframe %s\n",
+			instrumentData.Timestamp.Format("15:04:05"), strategy.ChartTimeframe)
+		return nil
+	}
+
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
 		deployment.ID,
@@ -759,7 +766,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 		// Calculate indicator values using CalculateAll for live trading (single point calculation)
 		// Since we only have current data, we calculate for the current timestamp
-		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp.Add(-24*time.Hour)) // Start from day before
+		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp)
 		indicatorArrayMap[uniqueKey] = indicatorValues
 	}
 
@@ -1519,4 +1526,43 @@ func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) b
 	exchange := "NSE"
 
 	return marketHoursUtil.IsMISEndOfDayHit(data.Timestamp, exchange)
+}
+
+// isTimestampAlignedWithTimeframe checks if the given timestamp aligns with the specified timeframe
+func (s *deploymentService) isTimestampAlignedWithTimeframe(timestamp time.Time, timeframe string) bool {
+	minute := timestamp.Minute()
+
+	switch timeframe {
+	case "1m":
+		// 1-minute timeframe: every minute is valid
+		return true
+	case "3m":
+		// 3-minute timeframe: minutes 0, 3, 6, 9, 12, 15, 18, etc.
+		return minute%3 == 0
+	case "5m":
+		// 5-minute timeframe: minutes 0, 5, 10, 15, 20, etc.
+		return minute%5 == 0
+	case "10m":
+		// 10-minute timeframe: minutes 0, 10, 20, 30, 40, 50
+		return minute%10 == 0
+	case "15m":
+		// 15-minute timeframe: minutes 0, 15, 30, 45
+		return minute%15 == 0
+	case "30m":
+		// 30-minute timeframe: minutes 0, 30
+		return minute%30 == 0
+	case "1h":
+		// 1-hour timeframe: minute must be 0
+		return minute == 0
+	case "3h":
+		// 3-hour timeframe: minute must be 0 and hour must be divisible by 3
+		return minute == 0 && timestamp.Hour()%3 == 0
+	case "1d":
+		// 1-day timeframe: must be start of day (usually 9:15 AM for Indian markets)
+		hour := timestamp.Hour()
+		return hour == 9 && minute == 15
+	default:
+		// Unknown timeframe, default to allowing execution
+		return true
+	}
 }
