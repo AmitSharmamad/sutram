@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	strategyModel "algo/internal/modules/strategy/domain/model"
+
 	"github.com/google/uuid"
 )
 
@@ -18,7 +20,7 @@ const (
 
 // DeploymentPosition represents a position for a deployment
 type DeploymentPosition struct {
-	ID           uuid.UUID           `json:"id" db:"id"`
+	ID           uuid.UUID       `json:"id" db:"id"`
 	DeploymentID uuid.UUID       `json:"deployment_id" db:"deployment_id"`
 	InstrumentID int             `json:"instrument_id" db:"instrument_id"`
 	Quantity     float64         `json:"quantity" db:"quantity"`
@@ -31,6 +33,11 @@ type DeploymentPosition struct {
 	Metadata     json.RawMessage `json:"metadata" db:"metadata"`
 	CreatedAt    time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at" db:"updated_at"`
+	// Stop loss and target profit fields for live trading (matching backtest position model)
+	Direction            strategyModel.Direction `json:"direction" db:"direction"`
+	StopLossPrice        *float64                `json:"stop_loss_price" db:"stop_loss_price"`
+	InitialStopLossPrice *float64                `json:"initial_stop_loss_price" db:"initial_stop_loss_price"`
+	TargetProfitPrice    *float64                `json:"target_profit_price" db:"target_profit_price"`
 }
 
 // NewDeploymentPosition creates a new position for a deployment
@@ -40,6 +47,7 @@ func NewDeploymentPosition(
 	quantity float64,
 	entryPrice float64,
 	entryTime time.Time,
+	direction strategyModel.Direction,
 	metadata map[string]interface{},
 ) (*DeploymentPosition, error) {
 	var metadataJSON json.RawMessage
@@ -53,6 +61,7 @@ func NewDeploymentPosition(
 	}
 
 	return &DeploymentPosition{
+		ID:           uuid.New(),
 		DeploymentID: deploymentID,
 		InstrumentID: instrumentID,
 		Quantity:     quantity,
@@ -60,6 +69,7 @@ func NewDeploymentPosition(
 		EntryTime:    entryTime,
 		Status:       PositionOpen,
 		Metadata:     metadataJSON,
+		Direction:    direction,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}, nil
@@ -78,5 +88,26 @@ func (p *DeploymentPosition) ClosePosition(exitPrice float64, exitTime time.Time
 // CancelPosition cancels the position
 func (p *DeploymentPosition) CancelPosition() {
 	p.Status = PositionCanceled
+	p.UpdatedAt = time.Now()
+}
+
+// SetStopLossPrice sets the stop loss price for the position
+func (p *DeploymentPosition) SetStopLossPrice(stopLossPrice float64) {
+	p.StopLossPrice = &stopLossPrice
+	if p.InitialStopLossPrice == nil {
+		p.InitialStopLossPrice = &stopLossPrice
+	}
+	p.UpdatedAt = time.Now()
+}
+
+// SetTargetProfitPrice sets the target profit price for the position
+func (p *DeploymentPosition) SetTargetProfitPrice(targetProfitPrice float64) {
+	p.TargetProfitPrice = &targetProfitPrice
+	p.UpdatedAt = time.Now()
+}
+
+// UpdateStopLossPrice updates the stop loss price (for trailing stops)
+func (p *DeploymentPosition) UpdateStopLossPrice(newStopLossPrice float64) {
+	p.StopLossPrice = &newStopLossPrice
 	p.UpdatedAt = time.Now()
 }

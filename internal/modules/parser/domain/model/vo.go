@@ -187,7 +187,7 @@ func (indicator *VolumeOscillator) GetLookBack(config []any) int64 {
 	// - longPeriod data points for long-term SMA calculation (larger of the two periods)
 	// - Additional buffer for stability (using 2*longPeriod like SliceData)
 	// - Plus any offset
-	return int64(2*longPeriod + offset)
+	return int64(5*longPeriod + offset)
 }
 
 // CalculateAll calculates Volume Oscillator values for all data points

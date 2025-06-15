@@ -23,6 +23,16 @@
             "env": {},
             "args": [],
             "preLaunchTask": "l-build"     // Optional: Automate build
+        },
+        {
+            "name": "Client",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",              // Use prebuilt binary
+            "program": "${workspaceFolder}/bin/client", // Path to your binary
+            "env": {},
+            "args": [],
+            "preLaunchTask": "l-client"     // Optional: Automate build
         }
     ]
 }

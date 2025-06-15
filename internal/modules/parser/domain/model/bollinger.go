@@ -250,5 +250,5 @@ func (indicator *BollingerBands) GetLookBack(config []any) int64 {
 	// - Period data points for SMA and standard deviation calculation
 	// - Additional buffer for stability (using 2*period like SliceData)
 	// - Plus any offset
-	return int64(2*period + offset)
+	return int64(5*period + offset)
 }

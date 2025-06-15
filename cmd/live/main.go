@@ -686,11 +686,11 @@ func processMarketDataMessage(message []byte) {
 	// Parse message header
 	feedCode := message[0]
 	// messageLength := binary.LittleEndian.Uint16(message[1:3])
-	exchangeSegment := message[3]
-	securityID := binary.LittleEndian.Uint32(message[4:8])
+	// exchangeSegment := message[3]
+	// securityID := binary.LittleEndian.Uint32(message[4:8])
 
-	log.Printf("Received market data - Code: %d, Exchange: %d, SecurityID: %d",
-		feedCode, exchangeSegment, securityID)
+	// log.Printf("Received market data - Code: %d, Exchange: %d, SecurityID: %d",
+	// 	feedCode, exchangeSegment, securityID)
 
 	// Process message based on feed code
 	switch feedCode {
@@ -719,7 +719,7 @@ func processMarketDataMessage(message []byte) {
 		if err := deploymentSvc.ProcessInstrumentData(appCtx, instrument); err != nil {
 			log.Printf("Error processing instrument data with deployment service: %v", err)
 		} else {
-			log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
+			// log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
 		}
 	}
 
@@ -773,9 +773,9 @@ func processQuote(data []byte) {
 
 	// Extract basic quote data
 	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	ltq := binary.LittleEndian.Uint16(data[12:14])
+	// ltq := binary.LittleEndian.Uint16(data[12:14])
 	ltt := binary.LittleEndian.Uint32(data[14:18])
-	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
+	// atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
 	volume := binary.LittleEndian.Uint32(data[22:26])
 	// Additional market data fields (logging only)
 	// sellQty := binary.LittleEndian.Uint32(data[26:30])
@@ -810,8 +810,8 @@ func processQuote(data []byte) {
 		close = ltp
 	}
 
-	log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
-		ltp, ltq, ltt, atp, volume, open, high, low, close)
+	// log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
+	// 	ltp, ltq, ltt, atp, volume, open, high, low, close)
 
 	// Extract header information
 	exchangeSegment := data[3]
@@ -996,8 +996,8 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 		return
 	}
 
-	log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
-		symbol, securityID, timestampTime.Format(time.RFC3339))
+	// log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
+	// 	symbol, securityID, timestampTime.Format(time.RFC3339))
 }
 
 // toInstrument converts raw market data to an Instrument model
@@ -1013,12 +1013,24 @@ func toInstrument(data []byte) *model.Instrument {
 		open, high, low, close float64
 		volume                 float64
 		ltp                    float32 // Last traded price
+		ltt                    uint32  // Last trade time
 	)
 
 	// Process based on feed code - most complete data comes from quote/full packets
 	if feedCode == FeedCodeQuote || feedCode == FeedCodeFull {
+		// Extract LTP - at bytes 8-12 for quote/full packets
+		if len(data) >= 12 {
+			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		}
+
+		// Extract LTT (Last Trade Time) - at bytes 14-18 for quote/full packets
+		if len(data) >= 18 {
+			ltt = binary.LittleEndian.Uint32(data[14:18])
+		}
+
+		// Extract volume if available
 		if len(data) >= 26 {
-			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[22:26]))
+			volume = float64(binary.LittleEndian.Uint32(data[22:26]))
 		}
 
 		// Extract OHLC data if available
@@ -1034,15 +1046,14 @@ func toInstrument(data []byte) *model.Instrument {
 				low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
 			}
 		}
-
-		// Extract volume if available
-		if len(data) >= 34 {
-			volume = float64(binary.LittleEndian.Uint32(data[30:34]))
-		}
 	} else if feedCode == FeedCodeTicker {
-		// For ticker packets, we typically just have the LTP
+		// For ticker packets, extract LTP and LTT
+		if len(data) >= 12 {
+			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		}
+		// Extract LTT (Last Trade Time) - at bytes 12-16 for ticker packets
 		if len(data) >= 16 {
-			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[12:16]))
+			ltt = binary.LittleEndian.Uint32(data[12:16])
 		}
 	}
 
@@ -1061,6 +1072,14 @@ func toInstrument(data []byte) *model.Instrument {
 		close = ltpFloat
 	}
 
+	// Convert LTT to time.Time, fallback to current time if LTT is 0
+	var timestamp time.Time
+	if ltt > 0 {
+		timestamp = time.Unix(int64(ltt), 0)
+	} else {
+		timestamp = time.Now()
+	}
+
 	// Create and return the instrument object
 	return &model.Instrument{
 		ExchangeSecurityID: int32(securityID),
@@ -1069,7 +1088,7 @@ func toInstrument(data []byte) *model.Instrument {
 		Low:                low,
 		Close:              close,
 		Volume:             volume,
-		Timestamp:          time.Now(), // Use current time as timestamp
+		Timestamp:          timestamp, // Use LTT from packet
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 	}
