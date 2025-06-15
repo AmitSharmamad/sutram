@@ -96,6 +96,7 @@ type deploymentService struct {
 	instrumentRepo        instrumentRepository.InstrumentRepository
 	engine                *backtestEngine.BacktestEngine
 	instrumentDeployments map[int][]*DeploymentWithStrategy
+	eventPublisher        DeploymentEventPublisher
 }
 
 // NewDeploymentService creates a new deployment service
@@ -107,6 +108,7 @@ func NewDeploymentService(
 	metricsRepo repository.DeploymentMetricsRepository,
 	instrumentRepo instrumentRepository.InstrumentRepository,
 	engine *backtestEngine.BacktestEngine,
+	eventPublisher DeploymentEventPublisher,
 ) DeploymentService {
 	return &deploymentService{
 		deploymentRepo:        deploymentRepo,
@@ -117,6 +119,7 @@ func NewDeploymentService(
 		instrumentRepo:        instrumentRepo,
 		engine:                engine,
 		instrumentDeployments: make(map[int][]*DeploymentWithStrategy),
+		eventPublisher:        eventPublisher,
 	}
 }
 
@@ -629,6 +632,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			"instrument_id":        instrumentData.ExchangeSecurityID,
 		},
 	)
+
 	if err != nil {
 		// Log but continue processing
 		fmt.Printf("Error creating deployment log: %v\n", err)
@@ -691,6 +695,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		string(strategy.ChartTimeframe),
 		int(lookbackFromExpressions),
 	)
+
 	if err != nil {
 		fmt.Printf("Error getting lookback data for instrument %d: %v\n",
 			instrumentData.ExchangeSecurityID, err)
@@ -766,13 +771,23 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 		// Calculate indicator values using CalculateAll for live trading (single point calculation)
 		// Since we only have current data, we calculate for the current timestamp
-		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp)
+		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp.Add(-24*time.Hour))
 		indicatorArrayMap[uniqueKey] = indicatorValues
 	}
 
 	currentTimestamp := instrumentData.Timestamp
 
 	fmt.Printf("Current timestamp: %v\n", currentTimestamp)
+
+	// Publish evaluation started event
+	s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEvaluationStarted, dto.EvaluationStartedData{
+		MarketPrice: instrumentData.Close,
+		Timestamp:   instrumentData.Timestamp,
+		Timeframe:   string(strategy.ChartTimeframe),
+	})
+
+	// Track if any action was taken during this evaluation
+	actionTaken := false
 
 	// Handle existing position first - check exit conditions
 	if currentPosition != nil {
@@ -792,8 +807,27 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
 				fmt.Printf("Error updating closed MIS position: %v\n", err)
 			} else {
+				actionTaken = true
 				fmt.Printf("MIS EOD Square-off: Closed position %s at price %.2f\n",
 					currentPosition.ID, exitPrice)
+
+				// Publish EOD square-off event
+				s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEODSquareOff, dto.PositionClosedData{
+					PositionID: currentPosition.ID.String(),
+					ExitPrice:  exitPrice,
+					ExitTime:   exitTime,
+					ExitReason: "EOD MIS Square-off",
+					PNL: func() float64 {
+						if currentPosition.PNL != nil {
+							return *currentPosition.PNL
+						} else {
+							return 0.0
+						}
+					}(),
+					Duration:   exitTime.Sub(currentPosition.EntryTime).String(),
+					EntryPrice: currentPosition.EntryPrice,
+					Quantity:   currentPosition.Quantity,
+				})
 
 				// Log the position closure
 				logEntry, err := model.NewDeploymentLog(
@@ -857,6 +891,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
 					fmt.Printf("Error updating closed position: %v\n", err)
 				} else {
+					actionTaken = true
 
 					println("----------------------------------------")
 
@@ -864,6 +899,33 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 						currentPosition.ID, exitPrice, exitReason)
 
 					println("----------------------------------------")
+
+					// Publish position closed event
+					eventType := dto.EventTypePositionClosed
+					if stopLossTriggered {
+						eventType = dto.EventTypeStopLossTriggered
+					} else if targetProfitTriggered {
+						eventType = dto.EventTypeTargetProfitTriggered
+					} else {
+						eventType = dto.EventTypeExitSignalDetected
+					}
+
+					s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, eventType, dto.PositionClosedData{
+						PositionID: currentPosition.ID.String(),
+						ExitPrice:  exitPrice,
+						ExitTime:   exitTime,
+						ExitReason: exitReason,
+						PNL: func() float64 {
+							if currentPosition.PNL != nil {
+								return *currentPosition.PNL
+							} else {
+								return 0.0
+							}
+						}(),
+						Duration:   exitTime.Sub(currentPosition.EntryTime).String(),
+						EntryPrice: currentPosition.EntryPrice,
+						Quantity:   currentPosition.Quantity,
+					})
 
 					// Log the position closure
 					logEntry, err := model.NewDeploymentLog(
@@ -935,6 +997,14 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			if err != nil {
 				fmt.Printf("Error evaluating entry condition: %v\n", err)
 			} else if entrySignal {
+				// Publish entry signal detected event
+				s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEntrySignalDetected, dto.SignalDetectedData{
+					MarketPrice: instrumentData.Close,
+					SignalTime:  instrumentData.Timestamp,
+					Expression:  strategyResponse.EntryExpression,
+					SignalValue: true,
+				})
+
 				// Create new position
 				entryPrice := instrumentData.Close
 				entryTime := instrumentData.Timestamp
@@ -961,6 +1031,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					if err := s.positionRepo.Create(ctx, newPosition); err != nil {
 						fmt.Printf("Error saving new position: %v\n", err)
 					} else {
+						actionTaken = true
 						println("----------------------------------------")
 
 						fmt.Printf("Created new position %s at price %.2f with quantity %.2f\n",
@@ -988,6 +1059,17 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 							fmt.Printf("Error updating position with stop loss/target profit: %v\n", err)
 						}
 
+						// Publish position opened event
+						s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypePositionOpened, dto.PositionOpenedData{
+							PositionID:        newPosition.ID.String(),
+							EntryPrice:        entryPrice,
+							Quantity:          quantity,
+							Direction:         string(strategy.PositionType),
+							EntryTime:         entryTime,
+							StopLossPrice:     newPosition.StopLossPrice,
+							TargetProfitPrice: newPosition.TargetProfitPrice,
+						})
+
 						// Log the position creation
 						logEntry, err := model.NewDeploymentLog(
 							deployment.ID,
@@ -1013,6 +1095,25 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			}
 		} else {
 			fmt.Printf("Entry time window check failed for deployment %s - outside allowed entry time\n", deployment.ID)
+
+			// Publish entry window closed event
+			var startTime, endTime *time.Time
+			if strategy.EntryStartTime != nil {
+				t := time.Date(0, 1, 1, strategy.EntryStartTime.Hour, strategy.EntryStartTime.Minute, strategy.EntryStartTime.Second, 0, time.UTC)
+				startTime = &t
+			}
+			if strategy.EntryEndTime != nil {
+				t := time.Date(0, 1, 1, strategy.EntryEndTime.Hour, strategy.EntryEndTime.Minute, strategy.EntryEndTime.Second, 0, time.UTC)
+				endTime = &t
+			}
+
+			s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEntryWindowClosed, dto.TimeWindowEventData{
+				WindowType:   "entry",
+				WindowStatus: "closed",
+				StartTime:    startTime,
+				EndTime:      endTime,
+				CurrentTime:  instrumentData.Timestamp,
+			})
 		}
 	}
 
@@ -1042,6 +1143,21 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				fmt.Printf("Error saving deployment metrics: %v\n", err)
 			}
 		}
+	}
+
+	// If no action was taken, publish a no-signal event
+	if !actionTaken {
+		s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeNoSignal, dto.MarketDataReceivedData{
+			Price:     instrumentData.Close,
+			Volume:    int64(instrumentData.Volume),
+			Timestamp: instrumentData.Timestamp,
+			OHLC: dto.OHLC{
+				Open:  instrumentData.Open,
+				High:  instrumentData.High,
+				Low:   instrumentData.Low,
+				Close: instrumentData.Close,
+			},
+		})
 	}
 
 	// fmt.Printf("Strategy execution completed for deployment %s on instrument %d\n",
@@ -1565,4 +1681,63 @@ func (s *deploymentService) isTimestampAlignedWithTimeframe(timestamp time.Time,
 		// Unknown timeframe, default to allowing execution
 		return true
 	}
+}
+
+// Helper methods for publishing events
+
+// publishEvent publishes a deployment event to WebSocket clients
+func (s *deploymentService) publishEvent(ctx context.Context, deployment *model.Deployment, strategy *strategyModel.Strategy, eventType dto.DeploymentEventType, data interface{}) {
+	if s.eventPublisher == nil {
+		return // Event publisher not configured
+	}
+
+	event := &dto.DeploymentEvent{
+		EventType:    eventType,
+		DeploymentID: deployment.ID,
+		StrategyID:   deployment.StrategyID,
+		InstrumentID: deployment.InstrumentID,
+		Timestamp:    time.Now(),
+		Data:         data,
+		Metadata: dto.EventMetadata{
+			UserID:       deployment.UserID,
+			StrategyName: strategy.Name,
+		},
+	}
+
+	// Publish to the specific user (non-blocking)
+	go func() {
+		if err := s.eventPublisher.PublishEventToUser(ctx, deployment.UserID.String(), event); err != nil {
+			fmt.Printf("Error publishing event to user %s: %v\n", deployment.UserID.String(), err)
+		}
+	}()
+}
+
+// publishEventWithPrice publishes a deployment event with market price information
+func (s *deploymentService) publishEventWithPrice(ctx context.Context, deployment *model.Deployment, strategy *strategyModel.Strategy, instrumentData *instrumentModel.Instrument, eventType dto.DeploymentEventType, data interface{}) {
+	if s.eventPublisher == nil {
+		return // Event publisher not configured
+	}
+
+	marketPrice := instrumentData.Close
+
+	event := &dto.DeploymentEvent{
+		EventType:    eventType,
+		DeploymentID: deployment.ID,
+		StrategyID:   deployment.StrategyID,
+		InstrumentID: deployment.InstrumentID,
+		Timestamp:    time.Now(),
+		Data:         data,
+		Metadata: dto.EventMetadata{
+			UserID:       deployment.UserID,
+			StrategyName: strategy.Name,
+			MarketPrice:  &marketPrice,
+		},
+	}
+
+	// Publish to the specific user (non-blocking)
+	go func() {
+		if err := s.eventPublisher.PublishEventToUser(ctx, deployment.UserID.String(), event); err != nil {
+			fmt.Printf("Error publishing event to user %s: %v\n", deployment.UserID.String(), err)
+		}
+	}()
 }

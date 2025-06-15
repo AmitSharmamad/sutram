@@ -39,6 +39,11 @@ func ProvideDeploymentPositionLogRepository(db *sqlx.DB) repository.DeploymentPo
 	return postgres.NewPgDeploymentPositionLogRepository(db)
 }
 
+// ProvideDeploymentEventPublisher provides a deployment event publisher
+func ProvideDeploymentEventPublisher() service.DeploymentEventPublisher {
+	return http.NewWebSocketEventPublisher()
+}
+
 // ProvideDeploymentService provides a deployment service
 func ProvideDeploymentService(
 	deploymentRepo repository.DeploymentRepository,
@@ -48,6 +53,7 @@ func ProvideDeploymentService(
 	metricsRepo repository.DeploymentMetricsRepository,
 	instrumentRepo instrumentRepository.InstrumentRepository,
 	engine *backtestEngine.BacktestEngine,
+	eventPublisher service.DeploymentEventPublisher,
 ) service.DeploymentService {
 	return service.NewDeploymentService(
 		deploymentRepo,
@@ -57,6 +63,7 @@ func ProvideDeploymentService(
 		metricsRepo,
 		instrumentRepo,
 		engine,
+		eventPublisher,
 	)
 }
 
