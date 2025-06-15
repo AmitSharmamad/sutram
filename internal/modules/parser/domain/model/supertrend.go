@@ -249,7 +249,7 @@ func (indicator *Supertrend) GetLookBack(config []any) int64 {
 	// - 1 additional for true range calculation
 	// - Additional buffer for stability (using 2*period like SliceData)
 	// - Plus any offset
-	return int64(2*period + 1 + offset)
+	return int64(5*period + 1 + offset)
 }
 
 // CalculateAll calculates Supertrend values for all data points
@@ -270,12 +270,10 @@ func (indicator *Supertrend) CalculateAll(
 	stockData := *ctx.Data
 	dataLen := len(stockData)
 
-	// Need enough data for calculation (period + 1 for initial ATR)
 	if dataLen < period+1 {
 		return []IndicatorValues{}
 	}
 
-	// Extract price arrays
 	highs := make([]float64, dataLen)
 	lows := make([]float64, dataLen)
 	closes := make([]float64, dataLen)
@@ -286,20 +284,16 @@ func (indicator *Supertrend) CalculateAll(
 		closes[i] = stockData[i].Close
 	}
 
-	// Step 3: Calculate True Range (TR)
 	tr := make([]float64, dataLen)
 	for i := 1; i < dataLen; i++ {
-		// TR = MAX(High-Low, ABS(High-Previous Close), ABS(Low-Previous Close))
 		hl := highs[i] - lows[i]
 		hc := math.Abs(highs[i] - closes[i-1])
 		lc := math.Abs(lows[i] - closes[i-1])
 		tr[i] = math.Max(hl, math.Max(hc, lc))
 	}
 
-	// Step 4: Calculate ATR
 	atr := make([]float64, dataLen)
 
-	// Initial ATR after period rows (average of TR over period)
 	if period < dataLen {
 		var sumTR float64
 		for i := 1; i <= period; i++ {
@@ -307,71 +301,70 @@ func (indicator *Supertrend) CalculateAll(
 		}
 		atr[period] = sumTR / float64(period)
 
-		// Smoothed ATR for subsequent rows: (ATR * (period-1) + TR) / period
 		for i := period + 1; i < dataLen; i++ {
 			atr[i] = (atr[i-1]*float64(period-1) + tr[i]) / float64(period)
 		}
 	}
 
-	// Step 5: Calculate Basic Upper and Lower Bands
 	upperBand := make([]float64, dataLen)
 	lowerBand := make([]float64, dataLen)
 
 	for i := 0; i < dataLen; i++ {
-		// HL2 = (High + Low) / 2
 		hl2 := (highs[i] + lows[i]) / 2.0
-
-		// Upper Band = HL2 + Multiplier * ATR
-		// Lower Band = HL2 - Multiplier * ATR
 		upperBand[i] = hl2 + multiplier*atr[i]
 		lowerBand[i] = hl2 - multiplier*atr[i]
 	}
 
-	// Step 6 & 7: Initialize Supertrend and calculate for all points
 	supertrend := make([]float64, dataLen)
 	trend := make([]int, dataLen)
 
-	// Initialize at period index
 	if period < dataLen {
-		supertrend[period] = lowerBand[period] // Initial Supertrend as Lower Band
-		trend[period] = 1                      // Assume uptrend initially
+		if closes[period] < upperBand[period] {
+			supertrend[period] = upperBand[period]
+			trend[period] = -1 // Downtrend
+		} else {
+			supertrend[period] = lowerBand[period]
+			trend[period] = 1 // Uptrend
+		}
 	}
 
-	// Step 7 & 8: Calculate Supertrend and Trend for subsequent rows
 	for i := period + 1; i < dataLen; i++ {
-		// Step 7: Calculate Supertrend based on previous trend
-		if trend[i-1] == 1 {
-			// If previous trend was up, Supertrend = MAX(Lower Band, previous Supertrend)
-			supertrend[i] = math.Max(lowerBand[i], supertrend[i-1])
-		} else {
-			// If previous trend was down, Supertrend = MIN(Upper Band, previous Supertrend)
-			supertrend[i] = math.Min(upperBand[i], supertrend[i-1])
+		if closes[i-1] > upperBand[i-1] {
+			upperBand[i] = math.Min(upperBand[i], upperBand[i-1])
+		}
+		if closes[i-1] < lowerBand[i-1] {
+			lowerBand[i] = math.Max(lowerBand[i], lowerBand[i-1])
 		}
 
-		// Step 8: Determine current trend
-		if closes[i] > supertrend[i-1] {
-			trend[i] = 1 // Uptrend
-		} else if closes[i] < supertrend[i-1] {
-			trend[i] = -1 // Downtrend
+		// Immediate band switch on trend flip
+		if closes[i] > supertrend[i-1] && trend[i-1] == -1 {
+			supertrend[i] = lowerBand[i] // Switch to lower band for uptrend
+			trend[i] = 1
+		} else if closes[i] < supertrend[i-1] && trend[i-1] == 1 {
+			supertrend[i] = upperBand[i] // Switch to upper band for downtrend
+			trend[i] = -1
 		} else {
-			trend[i] = trend[i-1] // Continue previous trend
+			// Continue current trend, adjust within same band
+			if trend[i-1] == 1 {
+				supertrend[i] = math.Max(lowerBand[i], supertrend[i-1])
+			} else {
+				supertrend[i] = math.Min(upperBand[i], supertrend[i-1])
+			}
+			trend[i] = trend[i-1]
 		}
 	}
 
-	// Build results starting from period index (when calculation becomes valid)
 	var results []IndicatorValues
 	for i := period; i < dataLen; i++ {
-		// Apply offset if specified
 		adjustedIndex := i + offset
 		if adjustedIndex >= 0 && adjustedIndex < dataLen {
 			results = append(results, IndicatorValues{
 				Timestamp: stockData[adjustedIndex].Timestamp,
-				Value:     util.Round(supertrend[i]),
+				Value:     supertrend[i],
 			})
 		}
 	}
 
-	// Filter results by startDate
 	var filteredResults []IndicatorValues
 	for _, result := range results {
 		if !result.Timestamp.Before(startDate) {

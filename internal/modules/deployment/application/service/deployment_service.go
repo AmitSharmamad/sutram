@@ -18,6 +18,7 @@ import (
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyModel "algo/internal/modules/strategy/domain/model"
 	strategyRepository "algo/internal/modules/strategy/domain/repository"
+	marketHours "algo/internal/util/time"
 
 	"github.com/google/uuid"
 )
@@ -764,10 +765,12 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 	currentTimestamp := instrumentData.Timestamp
 
+	fmt.Printf("Current timestamp: %v\n", currentTimestamp)
+
 	// Handle existing position first - check exit conditions
 	if currentPosition != nil {
-		fmt.Printf("Found existing open position %s for deployment %s\n",
-			currentPosition.ID, deployment.ID)
+		// fmt.Printf("Found existing open position %s for deployment %s\n",
+		// 	currentPosition.ID, deployment.ID)
 
 		// Check for MIS end-of-day square-off first
 		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayHit(instrumentData) {
@@ -807,14 +810,38 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			// Update the DeploymentWithStrategy's position state
 			deploymentWithStrategy.CurrentPosition = nil
 		} else {
+			// Update trailing stop loss BEFORE other checks
+			s.updateStopLossBasedOnTrailing(currentPosition, strategyResponse, instrumentData)
+
+			// Check stop loss and target profit triggers
+			stopLossTriggered := s.isStopLossTriggered(currentPosition, instrumentData)
+			targetProfitTriggered := s.isTargetProfitTriggered(currentPosition, strategyResponse, instrumentData)
+
 			// Evaluate normal exit condition using indicator array map
 			exitSignal, err := s.evaluateExitCondition(strategyResponse.ExitExpression, indicatorArrayMap, currentTimestamp)
 			if err != nil {
 				fmt.Printf("Error evaluating exit condition: %v\n", err)
-			} else if exitSignal {
-				// Close the position
+			}
+
+			// Close position if any exit condition is met
+			if exitSignal || stopLossTriggered || targetProfitTriggered {
 				exitPrice := instrumentData.Close
 				exitTime := instrumentData.Timestamp
+				var exitReason string
+
+				// Determine exit reason
+				if stopLossTriggered {
+					exitReason = "Stop Loss"
+					if currentPosition.InitialStopLossPrice != nil &&
+						currentPosition.StopLossPrice != nil &&
+						*currentPosition.StopLossPrice != *currentPosition.InitialStopLossPrice {
+						exitReason = "Trailing Stop Loss"
+					}
+				} else if targetProfitTriggered {
+					exitReason = "Target Profit"
+				} else {
+					exitReason = "Exit Signal"
+				}
 
 				// Update position with exit details
 				currentPosition.ClosePosition(exitPrice, exitTime)
@@ -823,8 +850,13 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
 					fmt.Printf("Error updating closed position: %v\n", err)
 				} else {
-					fmt.Printf("Closed position %s at price %.2f\n",
-						currentPosition.ID, exitPrice)
+
+					println("----------------------------------------")
+
+					fmt.Printf("Closed position %s at price %.2f (Reason: %s)\n",
+						currentPosition.ID, exitPrice, exitReason)
+
+					println("----------------------------------------")
 
 					// Log the position closure
 					logEntry, err := model.NewDeploymentLog(
@@ -834,6 +866,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 							"position_id": currentPosition.ID,
 							"exit_price":  exitPrice,
 							"exit_time":   exitTime,
+							"exit_reason": exitReason,
 							"pnl":         currentPosition.PNL,
 						},
 					)
@@ -852,7 +885,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 	// If no current position exists, check entry conditions
 	if currentPosition == nil {
-		fmt.Printf("No open position for deployment %s, checking entry conditions\n", deployment.ID)
+		// fmt.Printf("No open position for deployment %s, checking entry conditions\n", deployment.ID)
 
 		// Check if the current time is within the entry time window
 		// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
@@ -906,6 +939,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					quantity,
 					entryPrice,
 					entryTime,
+					strategy.PositionType, // Add the direction from strategy
 					map[string]any{
 						"strategy_id": strategy.ID.String(),
 						"created_by":  "live_trading",
@@ -920,8 +954,32 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					if err := s.positionRepo.Create(ctx, newPosition); err != nil {
 						fmt.Printf("Error saving new position: %v\n", err)
 					} else {
+						println("----------------------------------------")
+
 						fmt.Printf("Created new position %s at price %.2f with quantity %.2f\n",
 							newPosition.ID, entryPrice, quantity)
+
+						println("----------------------------------------")
+
+						// Set stop loss and target profit prices
+						if strategyResponse.StopLoss > 0 {
+							stopLossPrice := s.calculateStopLoss(entryPrice, strategyResponse.StopLoss, strategyResponse.StopLossType, strategy.PositionType)
+							if stopLossPrice != nil {
+								newPosition.SetStopLossPrice(*stopLossPrice)
+							}
+						}
+
+						if strategyResponse.TargetProfit > 0 {
+							targetProfitPrice := s.calculateTargetProfit(entryPrice, strategyResponse.TargetProfit, strategyResponse.TargetProfitType, strategy.PositionType)
+							if targetProfitPrice != nil {
+								newPosition.SetTargetProfitPrice(*targetProfitPrice)
+							}
+						}
+
+						// Update the position in the database with stop loss and target profit
+						if err := s.positionRepo.Update(ctx, newPosition); err != nil {
+							fmt.Printf("Error updating position with stop loss/target profit: %v\n", err)
+						}
 
 						// Log the position creation
 						logEntry, err := model.NewDeploymentLog(
@@ -979,8 +1037,8 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		}
 	}
 
-	fmt.Printf("Strategy execution completed for deployment %s on instrument %d\n",
-		deployment.ID, instrumentData.ExchangeSecurityID)
+	// fmt.Printf("Strategy execution completed for deployment %s on instrument %d\n",
+	// 	deployment.ID, instrumentData.ExchangeSecurityID)
 
 	return nil
 }
@@ -988,9 +1046,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 // ProcessInstrumentData processes incoming instrument data and runs the appropriate deployments
 func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error {
 	// Store the data in the database
-	if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
-		return fmt.Errorf("failed to store instrument data: %w", err)
-	}
+	// if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
+	// 	return fmt.Errorf("failed to store instrument data: %w", err)
+	// }
 
 	// Find deployments for this instrument
 	instrumentID := int(instrumentData.ExchangeSecurityID)
@@ -1038,7 +1096,7 @@ func (s *deploymentService) evaluateEntryCondition(
 	currentTimestamp time.Time,
 ) (bool, error) {
 	return parser.EvaluateIndicatorExpression(
-		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+		expression, indicatorArrayMap, currentTimestamp, nil, len(indicatorArrayMap["CLOSE"])-1,
 	)
 }
 
@@ -1063,7 +1121,7 @@ func (s *deploymentService) evaluateExitCondition(
 	}
 
 	return parser.EvaluateIndicatorExpression(
-		expression, indicatorArrayMap, currentTimestamp, nil, 0,
+		expression, indicatorArrayMap, currentTimestamp, nil, len(indicatorArrayMap["CLOSE"])-1,
 	)
 }
 
@@ -1296,35 +1354,169 @@ func (s *deploymentService) getMaxLookback(expression string) int64 {
 	return maxLookback
 }
 
-// isMISEndOfDayHit checks if the current time is at or after the MIS end-of-day cutoff time
-func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) bool {
-	// NOTE: MIS close is 15 minutes prior to market close
-	exchange := "NSE"
-	endHour := 15
-	endMinute := 15
-
-	if exchange == "MCX" {
-		// MCX has different timings, so we need to adjust accordingly
-		// MCX trading ends at 11:30 PM IST
-		endHour = 23
-		endMinute = 30
+// calculateStopLoss calculates the stop loss price based on entry price and strategy settings
+func (s *deploymentService) calculateStopLoss(
+	entryPrice float64,
+	stopLoss float64,
+	stopLossType strategyModel.ValueType,
+	direction strategyModel.Direction,
+) *float64 {
+	var stopPrice float64
+	if direction == strategyModel.Long {
+		if stopLossType == "PERCENTAGE" {
+			stopPrice = entryPrice * (1 - stopLoss/100)
+		} else {
+			stopPrice = entryPrice - stopLoss
+		}
+	} else { // Short position
+		if stopLossType == "PERCENTAGE" {
+			stopPrice = entryPrice * (1 + stopLoss/100)
+		} else {
+			stopPrice = entryPrice + stopLoss
+		}
 	}
 
-	// Extract the time from the data timestamp
-	currentTime := data.Timestamp
+	stopPrice = math.Round(stopPrice*100) / 100 // Round to 2 decimal places
+	return &stopPrice
+}
 
-	// Create a time representing 3:15 PM on the same date
-	eodTime := time.Date(
-		currentTime.Year(),
-		currentTime.Month(),
-		currentTime.Day(),
-		endHour,   // 3 PM (24-hour format)
-		endMinute, // 15 minutes
-		0,         // 0 seconds
-		0,         // 0 nanoseconds
-		currentTime.Location(),
-	)
+// calculateTargetProfit calculates the target profit price based on entry price and strategy settings
+func (s *deploymentService) calculateTargetProfit(
+	entryPrice float64,
+	targetProfit float64,
+	targetProfitType strategyModel.ValueType,
+	direction strategyModel.Direction,
+) *float64 {
+	var targetPrice float64
+	if direction == strategyModel.Long {
+		if targetProfitType == "PERCENTAGE" {
+			targetPrice = entryPrice * (1 + targetProfit/100)
+		} else {
+			targetPrice = entryPrice + targetProfit
+		}
+	} else { // Short position
+		if targetProfitType == "PERCENTAGE" {
+			targetPrice = entryPrice * (1 - targetProfit/100)
+		} else {
+			targetPrice = entryPrice - targetProfit
+		}
+	}
 
-	// Return true if current time is at or after 3:15 PM
-	return currentTime.Equal(eodTime) || currentTime.After(eodTime)
+	targetPrice = math.Round(targetPrice*100) / 100 // Round to 2 decimal places
+	return &targetPrice
+}
+
+// updateStopLossBasedOnTrailing updates stop loss for trailing stop functionality
+func (s *deploymentService) updateStopLossBasedOnTrailing(
+	position *model.DeploymentPosition,
+	strategy *strategyDto.StrategyResponse,
+	instrument *instrumentModel.Instrument,
+) bool {
+	// Skip if trailing stop loss isn't enabled or position doesn't have a stop loss
+	if strategy.TrailingStopLoss <= 0 || position.StopLossPrice == nil {
+		return false
+	}
+
+	currentPrice := instrument.Close
+	entryPrice := position.EntryPrice
+	currentStopLoss := *position.StopLossPrice
+
+	initialStopDistance := *s.calculateStopLoss(entryPrice, strategy.StopLoss, strategy.StopLossType, position.Direction)
+
+	// Calculate the trailing amount based on type (percentage or absolute)
+	trailingAmount := 0.0
+	if strategy.TrailingStopLossType == "PERCENTAGE" {
+		// For percentage, calculate the equivalent price distance
+		if position.Direction == strategyModel.Long {
+			trailingAmount = entryPrice * (strategy.TrailingStopLoss / 100.0)
+		} else {
+			trailingAmount = entryPrice * (strategy.TrailingStopLoss / 100.0)
+		}
+	} else {
+		// For absolute, use the value directly
+		trailingAmount = strategy.TrailingStopLoss
+	}
+
+	// Handle long position trailing stop
+	if position.Direction == strategyModel.Long {
+		// Calculate how much price has moved above entry
+		priceMovement := currentPrice - entryPrice
+
+		// Only trail if price has moved up enough (entry + trailingAmount)
+		if priceMovement >= trailingAmount {
+			// Calculate new stop loss: current price - initial stop distance
+			unitsJump := math.Floor(priceMovement / trailingAmount)
+			newStopLoss := initialStopDistance + (unitsJump * trailingAmount)
+
+			// Only update stop loss if it's higher (better) than current stop loss
+			// This ensures the stop loss only moves up, never down
+			if newStopLoss > currentStopLoss {
+				position.UpdateStopLossPrice(newStopLoss)
+				return true
+			}
+		}
+	} else { // Handle short position trailing stop
+		// Calculate how much price has moved below entry
+		priceMovement := entryPrice - currentPrice
+
+		// Only trail if price has moved down enough (entry - trailingAmount)
+		if priceMovement >= trailingAmount {
+			// Calculate new stop loss: current price + initial stop distance
+			unitsJump := math.Floor(priceMovement / trailingAmount)
+			newStopLoss := initialStopDistance - (unitsJump * trailingAmount)
+
+			// Only update stop loss if it's lower (better) than current stop loss
+			// This ensures the stop loss only moves down, never up
+			if newStopLoss < currentStopLoss {
+				position.UpdateStopLossPrice(newStopLoss)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isStopLossTriggered checks if stop loss is triggered
+func (s *deploymentService) isStopLossTriggered(
+	position *model.DeploymentPosition,
+	instrument *instrumentModel.Instrument,
+) bool {
+	if position.StopLossPrice == nil {
+		return false
+	}
+
+	if position.Direction == strategyModel.Long {
+		return instrument.Close <= *position.StopLossPrice
+	} else { // Short position
+		return instrument.Close >= *position.StopLossPrice
+	}
+}
+
+// isTargetProfitTriggered checks if target profit is triggered
+func (s *deploymentService) isTargetProfitTriggered(
+	position *model.DeploymentPosition,
+	strategy *strategyDto.StrategyResponse,
+	instrument *instrumentModel.Instrument,
+) bool {
+	if strategy.TargetProfit <= 0 || position.TargetProfitPrice == nil {
+		return false
+	}
+
+	if position.Direction == strategyModel.Long {
+		return instrument.Close >= *position.TargetProfitPrice
+	} else { // Short position
+		return instrument.Close <= *position.TargetProfitPrice
+	}
+}
+
+// isMISEndOfDayHit checks if the current time is at or after the MIS end-of-day cutoff time
+func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) bool {
+	// Use the market hours utility for consistent timing logic
+	marketHoursUtil := marketHours.NewMarketHoursUtil()
+
+	// Extract exchange from the context or use a default
+	// For now, we'll use "NSE" as the default exchange
+	exchange := "NSE"
+
+	return marketHoursUtil.IsMISEndOfDayHit(data.Timestamp, exchange)
 }

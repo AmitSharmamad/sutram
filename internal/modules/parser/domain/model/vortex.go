@@ -194,7 +194,7 @@ func (indicator *Vortex) GetLookBack(config []any) int64 {
 	// - 1 additional for previous values calculation
 	// - Additional buffer for stability (using 2*period like SliceData)
 	// - Plus any offset
-	return int64(2*period + 1 + offset)
+	return int64(5*period + 1 + offset)
 }
 
 // CalculateAll calculates Vortex values for all data points

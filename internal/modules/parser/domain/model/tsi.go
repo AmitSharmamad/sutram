@@ -277,7 +277,7 @@ func (indicator *TSI) GetLookBack(config []any) int64 {
 	// - Plus 1 for price change calculation
 	// - Plus any offset
 	totalPeriod := longPeriod + shortPeriod + signalPeriod
-	return int64(2*totalPeriod + 1 + offset)
+	return int64(5*totalPeriod + 1 + offset)
 }
 
 // CalculateAll calculates TSI values for all data points

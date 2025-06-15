@@ -7,6 +7,7 @@ import (
 
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/domain/model"
+	strategyModel "algo/internal/modules/strategy/domain/model"
 
 	"github.com/google/uuid"
 )
@@ -28,12 +29,14 @@ func (s *deploymentService) CreatePosition(ctx context.Context, req *dto.CreateP
 	}
 
 	// Create the position
+	// TODO: Add direction to CreatePositionRequest DTO to allow specifying Long/Short
 	position, err := model.NewDeploymentPosition(
 		req.DeploymentID,
 		req.InstrumentID,
 		req.Quantity,
 		req.EntryPrice,
 		req.EntryTime,
+		strategyModel.Long, // Default to Long for manual position creation
 		req.Metadata,
 	)
 	if err != nil {
