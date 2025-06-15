@@ -161,7 +161,7 @@ func main() {
 		log.Printf("Warning: Could not load IST timezone, using UTC: %v", err)
 		istLocation = time.UTC
 	}
-	initialSimulationTime = time.Date(2025, 5, 5, 9, 15, 0, 0, istLocation)
+	initialSimulationTime = time.Date(2025, 5, 5, 9, 30, 0, 0, istLocation)
 	currentSimulationTime = initialSimulationTime
 
 	// Initialize instruments with the initial state
@@ -293,7 +293,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 
 // startMarketDataSimulation starts the market data simulation in background
 func startMarketDataSimulation(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	// Always use quote feed type

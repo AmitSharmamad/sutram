@@ -780,11 +780,11 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	fmt.Printf("Current timestamp: %v\n", currentTimestamp)
 
 	// Publish evaluation started event
-	s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEvaluationStarted, dto.EvaluationStartedData{
-		MarketPrice: instrumentData.Close,
-		Timestamp:   instrumentData.Timestamp,
-		Timeframe:   string(strategy.ChartTimeframe),
-	})
+	// s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEvaluationStarted, dto.EvaluationStartedData{
+	// 	MarketPrice: instrumentData.Close,
+	// 	Timestamp:   instrumentData.Timestamp,
+	// 	Timeframe:   string(strategy.ChartTimeframe),
+	// })
 
 	// Track if any action was taken during this evaluation
 	actionTaken := false
