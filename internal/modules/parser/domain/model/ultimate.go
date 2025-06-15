@@ -237,7 +237,7 @@ func (indicator *UltimateOscillator) GetLookBack(config []any) int64 {
 	// - 1 additional for buying pressure and true range calculation
 	// - Additional buffer for stability (using 2*length3 like SliceData)
 	// - Plus any offset
-	return int64(2*length3 + 1 + offset)
+	return int64(5*length3 + 1 + offset)
 }
 
 // CalculateAll calculates Ultimate Oscillator values for all data points

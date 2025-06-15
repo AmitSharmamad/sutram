@@ -250,7 +250,7 @@ func (indicator *MACD) GetLookBack(config []any) int64 {
 	// - Additional data for signal line calculation (signalPeriod)
 	// - Additional buffer for EMA stabilization (using 2*slowPeriod like SliceData)
 	// - Plus any offset
-	return int64(2*slowPeriod + signalPeriod + offset)
+	return int64(5*slowPeriod + signalPeriod + offset)
 }
 
 // CalculateAll calculates MACD values for all data points

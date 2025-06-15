@@ -234,7 +234,7 @@ func (indicator *DMI) GetLookBack(config []any) int64 {
 	// - Another period for ADX calculation from DX values
 	// - Plus any offset
 	// Using the same calculation as GetDataRange: 2*period + 1 + offset
-	return int64(2*period + 1 + offset)
+	return int64(5*period + 1 + offset)
 }
 
 // CalculateAll calculates DMI/ADX values for all data points

@@ -404,5 +404,5 @@ func (indicator *KeltnerChannels) GetLookBack(config []any) int64 {
 	// - Additional buffer for stability (using 2*maxPeriod like SliceData)
 	// - Plus any offset
 	maxPeriod := emaPeriod // ATR uses same period
-	return int64(2*maxPeriod + 1 + offset)
+	return int64(5*maxPeriod + 1 + offset)
 }
