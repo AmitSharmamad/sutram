@@ -230,7 +230,7 @@ func (indicator *MFI) GetLookBack(config []any) int64 {
 	// - 1 additional for typical price comparison
 	// - Additional buffer for stability (using 2*period like SliceData)
 	// - Plus any offset
-	return int64(2*period + 1 + offset)
+	return int64(5*period + 1 + offset)
 }
 
 // CalculateAll calculates MFI values for all data points
