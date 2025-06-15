@@ -29,6 +29,8 @@ type Module struct {
 	userController        *userHttp.UserController
 	strategyModule        *strategyModule.Module
 	deploymentService     service.DeploymentService // Add this field
+	eventPublisher        service.DeploymentEventPublisher
+	eventHandler          *http.DeploymentEventHandler
 }
 
 // ProvideModule provides a wire provider set for the deployment module
@@ -94,6 +96,10 @@ func (m *Module) initializeComponents() {
 	// In a real implementation, we would obtain this from the backtest module
 	var engine *backtestEngine.BacktestEngine = nil
 
+	// Create event publisher
+	eventPublisher := http.NewWebSocketEventPublisher()
+	m.eventPublisher = eventPublisher
+
 	// Create services
 	deploymentService := service.NewDeploymentService(
 		deploymentRepo,
@@ -103,6 +109,7 @@ func (m *Module) initializeComponents() {
 		metricsRepo,
 		instrumentRepository,
 		engine,
+		eventPublisher,
 	)
 
 	// Store the deployment service in the module
@@ -113,6 +120,9 @@ func (m *Module) initializeComponents() {
 	logController := http.NewDeploymentLogController(deploymentService)
 	positionController := http.NewDeploymentPositionController(deploymentService)
 	metricsController := http.NewDeploymentMetricsController(deploymentService)
+
+	// Create event handler
+	m.eventHandler = http.NewDeploymentEventHandler(eventPublisher)
 
 	// Create position log service and controller
 	positionLogService := service.NewDeploymentPositionLogService(positionLogRepo)
@@ -173,6 +183,9 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		metricsRoutes.GET("/:deployment_id/metrics/:date", authMiddleware, m.metricsController.GetMetricsByDate)
 		metricsRoutes.GET("/:deployment_id/metrics/range", authMiddleware, m.metricsController.GetMetricsTimeRange)
 	}
+
+	// Register WebSocket routes for deployment events
+	http.RegisterWebSocketRoutes(router, m.eventHandler, m.userController)
 }
 
 // GetController returns the deployment controller
