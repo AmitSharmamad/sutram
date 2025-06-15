@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS deployment_position (
     exit_time TIMESTAMP,
     pnl DECIMAL,
     status VARCHAR NOT NULL,
+    direction VARCHAR,
+    stop_loss_price DECIMAL,
+    initial_stop_loss_price DECIMAL,
+    target_profit_price DECIMAL,
     metadata JSONB,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
