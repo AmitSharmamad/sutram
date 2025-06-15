@@ -32,10 +32,11 @@ func (r *PgDeploymentPositionRepository) Create(ctx context.Context, position *m
 	query := `
 		INSERT INTO deployment_position (
 			deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price, 
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		)
 		VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 		)
 		RETURNING id
 	`
@@ -53,6 +54,10 @@ func (r *PgDeploymentPositionRepository) Create(ctx context.Context, position *m
 		position.ExitTime,
 		position.PNL,
 		position.Status,
+		position.Direction,
+		position.StopLossPrice,
+		position.InitialStopLossPrice,
+		position.TargetProfitPrice,
 		position.Metadata,
 		position.CreatedAt,
 		position.UpdatedAt,
@@ -71,7 +76,8 @@ func (r *PgDeploymentPositionRepository) GetByID(ctx context.Context, id int64) 
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE id = $1
 	`
@@ -93,7 +99,8 @@ func (r *PgDeploymentPositionRepository) GetByDeploymentID(ctx context.Context, 
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1
 		ORDER BY entry_time DESC
@@ -113,7 +120,8 @@ func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentID(ctx cont
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1 AND status = $2
 		ORDER BY entry_time DESC
@@ -148,7 +156,8 @@ func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentIDs(ctx con
 	query := fmt.Sprintf(`
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id IN (%s) AND status = $%d
 		ORDER BY deployment_id, entry_time DESC
@@ -178,7 +187,8 @@ func (r *PgDeploymentPositionRepository) GetByDeploymentAndInstrument(ctx contex
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, metadata, created_at, updated_at
+			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1 AND instrument_id = $2
 		ORDER BY entry_time DESC
@@ -205,9 +215,13 @@ func (r *PgDeploymentPositionRepository) Update(ctx context.Context, position *m
 			exit_time = $5,
 			pnl = $6,
 			status = $7,
-			metadata = $8,
-			updated_at = $9
-		WHERE id = $10
+			direction = $8,
+			stop_loss_price = $9,
+			initial_stop_loss_price = $10,
+			target_profit_price = $11,
+			metadata = $12,
+			updated_at = $13
+		WHERE id = $14
 	`
 
 	_, err := r.db.ExecContext(
@@ -220,6 +234,10 @@ func (r *PgDeploymentPositionRepository) Update(ctx context.Context, position *m
 		position.ExitTime,
 		position.PNL,
 		position.Status,
+		position.Direction,
+		position.StopLossPrice,
+		position.InitialStopLossPrice,
+		position.TargetProfitPrice,
 		position.Metadata,
 		position.UpdatedAt,
 		position.ID,

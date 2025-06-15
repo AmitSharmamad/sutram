@@ -773,9 +773,9 @@ func processQuote(data []byte) {
 
 	// Extract basic quote data
 	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	ltq := binary.LittleEndian.Uint16(data[12:14])
+	// ltq := binary.LittleEndian.Uint16(data[12:14])
 	ltt := binary.LittleEndian.Uint32(data[14:18])
-	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
+	// atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
 	volume := binary.LittleEndian.Uint32(data[22:26])
 	// Additional market data fields (logging only)
 	// sellQty := binary.LittleEndian.Uint32(data[26:30])
@@ -810,8 +810,8 @@ func processQuote(data []byte) {
 		close = ltp
 	}
 
-	log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
-		ltp, ltq, ltt, atp, volume, open, high, low, close)
+	// log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
+	// 	ltp, ltq, ltt, atp, volume, open, high, low, close)
 
 	// Extract header information
 	exchangeSegment := data[3]
