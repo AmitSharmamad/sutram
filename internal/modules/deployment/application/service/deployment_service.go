@@ -177,7 +177,7 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 	}
 
 	// Return response
-	return &dto.DeploymentResponse{
+	response := &dto.DeploymentResponse{
 		ID:           deployment.ID,
 		UserID:       deployment.UserID,
 		StrategyID:   deployment.StrategyID,
@@ -187,7 +187,15 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 		IsActive:     deployment.IsActive,
 		CreatedAt:    deployment.CreatedAt,
 		UpdatedAt:    deployment.UpdatedAt,
-	}, nil
+	}
+
+	// Get latest metrics for this deployment (should include the initial metrics we just created)
+	latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+	if err == nil && latestMetrics != nil {
+		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+	}
+
+	return response, nil
 }
 
 // GetDeploymentByID retrieves a deployment by its ID
@@ -202,7 +210,7 @@ func (s *deploymentService) GetDeploymentByID(ctx context.Context, id uuid.UUID,
 		return nil, ErrUnauthorized
 	}
 
-	return &dto.DeploymentResponse{
+	response := &dto.DeploymentResponse{
 		ID:           deployment.ID,
 		UserID:       deployment.UserID,
 		StrategyID:   deployment.StrategyID,
@@ -212,7 +220,15 @@ func (s *deploymentService) GetDeploymentByID(ctx context.Context, id uuid.UUID,
 		IsActive:     deployment.IsActive,
 		CreatedAt:    deployment.CreatedAt,
 		UpdatedAt:    deployment.UpdatedAt,
-	}, nil
+	}
+
+	// Get latest metrics for this deployment
+	latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+	if err == nil && latestMetrics != nil {
+		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+	}
+
+	return response, nil
 }
 
 // GetUserDeployments retrieves all deployments for a user
@@ -234,6 +250,12 @@ func (s *deploymentService) GetUserDeployments(ctx context.Context, userID uuid.
 			IsActive:     deployment.IsActive,
 			CreatedAt:    deployment.CreatedAt,
 			UpdatedAt:    deployment.UpdatedAt,
+		}
+
+		// Get latest metrics for this deployment
+		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+		if err == nil && latestMetrics != nil {
+			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 		}
 	}
 
@@ -307,6 +329,12 @@ func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, us
 			CreatedAt:    deployment.CreatedAt,
 			UpdatedAt:    deployment.UpdatedAt,
 		}
+
+		// Get latest metrics for this deployment
+		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+		if err == nil && latestMetrics != nil {
+			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+		}
 	}
 
 	return response, nil
@@ -342,6 +370,12 @@ func (s *deploymentService) GetDeploymentsByStrategyID(ctx context.Context, stra
 			CreatedAt:    deployment.CreatedAt,
 			UpdatedAt:    deployment.UpdatedAt,
 		}
+
+		// Get latest metrics for this deployment
+		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+		if err == nil && latestMetrics != nil {
+			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+		}
 	}
 
 	return response, nil
@@ -368,7 +402,7 @@ func (s *deploymentService) UpdateDeployment(ctx context.Context, req *dto.Updat
 		return nil, fmt.Errorf("%w: %v", ErrDeploymentUpdateFailed, err)
 	}
 
-	return &dto.DeploymentResponse{
+	response := &dto.DeploymentResponse{
 		ID:           deployment.ID,
 		UserID:       deployment.UserID,
 		StrategyID:   deployment.StrategyID,
@@ -378,7 +412,15 @@ func (s *deploymentService) UpdateDeployment(ctx context.Context, req *dto.Updat
 		IsActive:     deployment.IsActive,
 		CreatedAt:    deployment.CreatedAt,
 		UpdatedAt:    deployment.UpdatedAt,
-	}, nil
+	}
+
+	// Get latest metrics for this deployment
+	latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+	if err == nil && latestMetrics != nil {
+		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+	}
+
+	return response, nil
 }
 
 // DeleteDeployment deletes a deployment
@@ -517,6 +559,12 @@ func (s *deploymentService) SearchDeployments(ctx context.Context, filter *dto.D
 			IsActive:     deployment.IsActive,
 			CreatedAt:    deployment.CreatedAt,
 			UpdatedAt:    deployment.UpdatedAt,
+		}
+
+		// Fetch and attach latest metrics
+		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
+		if err == nil && latestMetrics != nil {
+			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 		}
 	}
 
