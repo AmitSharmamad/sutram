@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS deployment_metrics (
     metadata JSONB,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now(),
-    UNIQUE (deployment_id, metric_date)
+    UNIQUE (id, deployment_id)
 );
 
 -- Index for faster lookups
