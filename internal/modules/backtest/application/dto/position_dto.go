@@ -31,9 +31,13 @@ type PositionDTO struct {
 	Direction            Direction     `json:"direction"`
 	EntryPriceSignal     float64       `json:"entry_price_signal"`
 	EntryTimeSignal      time.Time     `json:"entry_time_signal"`
+	EntryPriceOrder      float64       `json:"entry_price_order,omitempty"`
+	EntryTimeOrder       time.Time     `json:"entry_time_order,omitempty"`
 	EntrySignal          string        `json:"entry_signal"`
 	ExitPriceSignal      float64       `json:"exit_price_signal,omitempty"`
 	ExitTimeSignal       time.Time     `json:"exit_time_signal,omitempty"`
+	ExitPriceOrder       float64       `json:"exit_price_order,omitempty"`
+	ExitTimeOrder        time.Time     `json:"exit_time_order,omitempty"`
 	ExitSignal           string        `json:"exit_signal,omitempty"`
 	ExitReason           string        `json:"exit_reason,omitempty"`
 	ProfitLossAbsolute   float64       `json:"profit_loss_absolute,omitempty"`
@@ -61,14 +65,18 @@ type CreatePositionRequest struct {
 
 // EnterPositionRequest represents a request to mark a position as entered
 type EnterPositionRequest struct {
-	EntryFees    float64    `json:"entry_fees"`
-	EntryOrderID *uuid.UUID `json:"entry_order_id"`
+	EntryPriceOrder float64    `json:"entry_price_order" binding:"required"`
+	EntryTimeOrder  time.Time  `json:"entry_time_order" binding:"required"`
+	EntryFees       float64    `json:"entry_fees"`
+	EntryOrderID    *uuid.UUID `json:"entry_order_id"`
 }
 
 // ExitPositionRequest represents a request to mark a position as exited
 type ExitPositionRequest struct {
 	ExitPriceSignal float64    `json:"exit_price_signal" binding:"required"`
 	ExitTimeSignal  time.Time  `json:"exit_time_signal" binding:"required"`
+	ExitPriceOrder  float64    `json:"exit_price_order" binding:"required"`
+	ExitTimeOrder   time.Time  `json:"exit_time_order" binding:"required"`
 	ExitSignal      string     `json:"exit_signal" binding:"required"`
 	ExitReason      string     `json:"exit_reason"`
 	ExitFees        float64    `json:"exit_fees"`

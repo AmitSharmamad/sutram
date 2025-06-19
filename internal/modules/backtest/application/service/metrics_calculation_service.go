@@ -252,8 +252,8 @@ func (s *metricsCalculationService) calculateAvgExposure(positions []*model.Posi
 	exposureCount := 0
 
 	for _, position := range positions {
-		if position.PositionSize > 0 {
-			exposure := position.EntryPriceSignal * position.PositionSize
+		if position.EntryPriceOrder != nil && position.PositionSize > 0 {
+			exposure := *position.EntryPriceOrder * position.PositionSize
 			totalExposure += exposure
 			exposureCount++
 		}
@@ -275,8 +275,8 @@ func (s *metricsCalculationService) calculateAvgTradeDuration(positions []*model
 	count := 0
 
 	for _, position := range positions {
-		if position.ExitTimeSignal != nil {
-			durationSeconds := position.ExitTimeSignal.Sub(position.EntryTimeSignal).Seconds()
+		if position.EntryTimeOrder != nil && position.ExitTimeOrder != nil {
+			durationSeconds := position.ExitTimeOrder.Sub(*position.EntryTimeOrder).Seconds()
 			totalDurationSeconds += durationSeconds
 			count++
 		}
@@ -307,7 +307,7 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 	var closedPositions []*model.Position
 	for _, position := range positions {
 		if position.State == model.Exited && position.NetProfitLoss != nil &&
-			position.ExitTimeSignal != nil {
+			position.EntryTimeOrder != nil && position.ExitTimeOrder != nil {
 			closedPositions = append(closedPositions, position)
 		}
 	}
@@ -323,12 +323,12 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 
 	// Calculate daily and monthly returns based on P&L
 	for _, position := range closedPositions {
-		if position.NetProfitLoss == nil || position.ExitTimeSignal == nil {
+		if position.NetProfitLoss == nil || position.ExitTimeOrder == nil {
 			continue
 		}
 
-		exitDate := position.ExitTimeSignal.Format("2006-01-02")
-		exitMonth := position.ExitTimeSignal.Format("2006-01")
+		exitDate := position.ExitTimeOrder.Format("2006-01-02")
+		exitMonth := position.ExitTimeOrder.Format("2006-01")
 
 		// Accumulate daily returns
 		dailyReturnsMap[exitDate] += *position.NetProfitLoss
@@ -354,8 +354,9 @@ func (s *metricsCalculationService) CalculateReturns(positions []*model.Position
 	}
 
 	// Calculate annualized return based on monthly returns
+	var annualizedReturn float64
 	// NOTE: For now, annualized return is used to show the total pnl
-	annualizedReturn := finalReturns
+	annualizedReturn = finalReturns
 
 	// if len(monthlyReturns) > 0 {
 	// 	// Calculate total return from monthly data
@@ -392,7 +393,7 @@ func (s *metricsCalculationService) CalculateDrawdown(positions []*model.Positio
 	var exitedPositions []*model.Position
 	for _, position := range positions {
 		if position.State == model.Exited && position.NetProfitLoss != nil &&
-			position.ExitTimeSignal != nil {
+			position.ExitTimeOrder != nil {
 			exitedPositions = append(exitedPositions, position)
 		}
 	}
@@ -423,7 +424,7 @@ func (s *metricsCalculationService) CalculateDrawdown(positions []*model.Positio
 			if cumulativeEquity > runningPeak {
 				// If we were in a drawdown period, calculate its duration
 				if drawdownStartTime != nil {
-					currentDrawdownDuration := position.ExitTimeSignal.Sub(*drawdownStartTime).Hours()
+					currentDrawdownDuration := position.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
 					if currentDrawdownDuration > maxDrawdownDuration {
 						maxDrawdownDuration = currentDrawdownDuration
 					}
@@ -435,7 +436,7 @@ func (s *metricsCalculationService) CalculateDrawdown(positions []*model.Positio
 				// We're in a drawdown
 				if drawdownStartTime == nil {
 					// This is the start of a new drawdown period
-					drawdownStartTime = position.ExitTimeSignal
+					drawdownStartTime = position.ExitTimeOrder
 				}
 				// Calculate current drawdown percentage
 				if runningPeak > 0 {
@@ -451,7 +452,7 @@ func (s *metricsCalculationService) CalculateDrawdown(positions []*model.Positio
 	// Handle case where the backtest ends in a drawdown
 	if drawdownStartTime != nil && len(exitedPositions) > 0 {
 		lastPosition := exitedPositions[len(exitedPositions)-1]
-		currentDrawdownDuration := lastPosition.ExitTimeSignal.Sub(*drawdownStartTime).Hours()
+		currentDrawdownDuration := lastPosition.ExitTimeOrder.Sub(*drawdownStartTime).Hours()
 		if currentDrawdownDuration > maxDrawdownDuration {
 			maxDrawdownDuration = currentDrawdownDuration
 		}
@@ -482,7 +483,7 @@ func (s *metricsCalculationService) CalculateCapitalProgression(positions []*mod
 				"position_index":  i + 1,
 				"position_id":     position.ID.String(),
 				"entry_time":      position.EntryTimeSignal,
-				"exit_time":       position.ExitTimeSignal,
+				"exit_time":       position.ExitTimeOrder,
 				"net_profit_loss": *position.NetProfitLoss,
 				"capital_before":  currentCapital - *position.NetProfitLoss,
 				"capital_after":   currentCapital,
@@ -491,12 +492,14 @@ func (s *metricsCalculationService) CalculateCapitalProgression(positions []*mod
 				"position_size":   position.PositionSize,
 			}
 
-			// Add entry price
-			progressionEntry["entry_price"] = position.EntryPriceSignal
+			// Add entry price if available
+			if position.EntryPriceOrder != nil {
+				progressionEntry["entry_price"] = *position.EntryPriceOrder
+			}
 
 			// Add exit price if available
-			if position.ExitPriceSignal != nil {
-				progressionEntry["exit_price"] = *position.ExitPriceSignal
+			if position.ExitPriceOrder != nil {
+				progressionEntry["exit_price"] = *position.ExitPriceOrder
 			}
 
 			// Add exit reason if available
@@ -523,18 +526,18 @@ func (s *metricsCalculationService) sortPositionsByExitTime(positions []*model.P
 	for i := 0; i < n-1; i++ {
 		for j := 0; j < n-i-1; j++ {
 			// Handle nil exit times - put them at the end
-			if sortedPositions[j].ExitTimeSignal == nil {
-				if sortedPositions[j+1].ExitTimeSignal != nil {
+			if sortedPositions[j].ExitTimeOrder == nil {
+				if sortedPositions[j+1].ExitTimeOrder != nil {
 					sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
 				}
 				continue
 			}
-			if sortedPositions[j+1].ExitTimeSignal == nil {
+			if sortedPositions[j+1].ExitTimeOrder == nil {
 				continue
 			}
 
 			// Sort by exit time (ascending)
-			if sortedPositions[j].ExitTimeSignal.After(*sortedPositions[j+1].ExitTimeSignal) {
+			if sortedPositions[j].ExitTimeOrder.After(*sortedPositions[j+1].ExitTimeOrder) {
 				sortedPositions[j], sortedPositions[j+1] = sortedPositions[j+1], sortedPositions[j]
 			}
 		}
