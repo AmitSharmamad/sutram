@@ -491,7 +491,7 @@ func (r *DeploymentRepository) SearchDeployments(ctx context.Context, filters ma
 	`
 
 	// Build dynamic WHERE clause and params based on filters
-	var params []interface{}
+	var params []any
 	paramIndex := 1
 
 	if userID, ok := filters["user_id"]; ok {
