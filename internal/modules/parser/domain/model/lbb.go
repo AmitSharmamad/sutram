@@ -30,7 +30,7 @@ type LowerBollingerBands struct {
 func (indicator *LowerBollingerBands) SliceData(prices Prices) Prices {
 	// We need enough data to calculate Lower Bollinger Bands properly
 	period := int(indicator.period)
-	start := max(0, len(prices)-(indicator.offset+2*period))
+	start := max(0, len(prices)-(indicator.offset+5*period))
 	end := len(prices) - indicator.offset
 
 	if start < 0 || end <= start || end > len(prices) {
@@ -147,7 +147,7 @@ func (indicator *LowerBollingerBands) Calculate(
 	// Calculate Lower Bollinger Band
 	lowerBand := sma - (standardDev * stdDev)
 
-	return util.Round(lowerBand)
+	return lowerBand
 }
 
 func (indicator *LowerBollingerBands) GetDataRange(config map[string]any) int32 {
@@ -222,7 +222,7 @@ func (indicator *LowerBollingerBands) GetLookBack(config []any) int64 {
 	// For Lower Bollinger Bands calculation, we need:
 	// - Period data points adjusted by MA type multiplier
 	// - Plus any offset
-	return int64(period*multiplier + float64(offset))
+	return int64(5*period*multiplier + float64(offset))
 }
 
 // CalculateAll calculates Lower Bollinger Bands values for all data points
@@ -316,7 +316,7 @@ func (indicator *LowerBollingerBands) CalculateAll(
 
 		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     util.Round(lowerBand[i]),
+			Value:     lowerBand[i],
 		})
 	}
 

@@ -309,7 +309,7 @@ func (indicator *Vortex) CalculateAll(
 
 		result = append(result, IndicatorValues{
 			Timestamp: stockData[i].Timestamp,
-			Value:     util.Round(value),
+			Value:     value,
 		})
 	}
 
