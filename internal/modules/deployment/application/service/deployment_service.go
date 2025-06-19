@@ -12,6 +12,7 @@ import (
 	"algo/internal/modules/deployment/application/dto"
 	"algo/internal/modules/deployment/domain/model"
 	"algo/internal/modules/deployment/domain/repository"
+	instrumentDto "algo/internal/modules/instrument/application/dto"
 	instrumentModel "algo/internal/modules/instrument/domain/model"
 	instrumentRepository "algo/internal/modules/instrument/domain/repository"
 	parser "algo/internal/modules/parser/domain/model"
@@ -95,6 +96,7 @@ type deploymentService struct {
 	positionRepo          repository.DeploymentPositionRepository
 	metricsRepo           repository.DeploymentMetricsRepository
 	instrumentRepo        instrumentRepository.InstrumentRepository
+	instrumentMasterRepo  instrumentRepository.InstrumentMasterRepository
 	engine                *backtestEngine.BacktestEngine
 	instrumentDeployments map[int][]*DeploymentWithStrategy
 	eventPublisher        DeploymentEventPublisher
@@ -108,6 +110,7 @@ func NewDeploymentService(
 	positionRepo repository.DeploymentPositionRepository,
 	metricsRepo repository.DeploymentMetricsRepository,
 	instrumentRepo instrumentRepository.InstrumentRepository,
+	instrumentMasterRepo instrumentRepository.InstrumentMasterRepository,
 	engine *backtestEngine.BacktestEngine,
 	eventPublisher DeploymentEventPublisher,
 ) DeploymentService {
@@ -118,6 +121,7 @@ func NewDeploymentService(
 		positionRepo:          positionRepo,
 		metricsRepo:           metricsRepo,
 		instrumentRepo:        instrumentRepo,
+		instrumentMasterRepo:  instrumentMasterRepo,
 		engine:                engine,
 		instrumentDeployments: make(map[int][]*DeploymentWithStrategy),
 		eventPublisher:        eventPublisher,
@@ -195,6 +199,12 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 	}
 
+	// Get instrument master data for this deployment
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	if err == nil && instrumentMaster != nil {
+		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
+	}
+
 	return response, nil
 }
 
@@ -228,6 +238,12 @@ func (s *deploymentService) GetDeploymentByID(ctx context.Context, id uuid.UUID,
 		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 	}
 
+	// Get instrument master data for this deployment
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	if err == nil && instrumentMaster != nil {
+		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
+	}
+
 	return response, nil
 }
 
@@ -257,6 +273,12 @@ func (s *deploymentService) GetUserDeployments(ctx context.Context, userID uuid.
 		if err == nil && latestMetrics != nil {
 			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 		}
+
+		// Get instrument master data for this deployment
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		if err == nil && instrumentMaster != nil {
+			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
+		}
 	}
 
 	return response, nil
@@ -283,6 +305,12 @@ func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, us
 				IsActive:     deployment.IsActive,
 				CreatedAt:    deployment.CreatedAt,
 				UpdatedAt:    deployment.UpdatedAt,
+			}
+
+			// Get instrument master data for this deployment
+			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+			if err == nil && instrumentMaster != nil {
+				response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 			}
 		}
 		return response, nil
@@ -335,6 +363,12 @@ func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, us
 		if err == nil && latestMetrics != nil {
 			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
 		}
+
+		// Get instrument master data for this deployment
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		if err == nil && instrumentMaster != nil {
+			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
+		}
 	}
 
 	return response, nil
@@ -375,6 +409,12 @@ func (s *deploymentService) GetDeploymentsByStrategyID(ctx context.Context, stra
 		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
 		if err == nil && latestMetrics != nil {
 			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+		}
+
+		// Get instrument master data for this deployment
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		if err == nil && instrumentMaster != nil {
+			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
 	}
 
@@ -418,6 +458,12 @@ func (s *deploymentService) UpdateDeployment(ctx context.Context, req *dto.Updat
 	latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
 	if err == nil && latestMetrics != nil {
 		response.LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+	}
+
+	// Get instrument master data for this deployment
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	if err == nil && instrumentMaster != nil {
+		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 	}
 
 	return response, nil
@@ -565,6 +611,12 @@ func (s *deploymentService) SearchDeployments(ctx context.Context, filter *dto.D
 		latestMetrics, err := s.metricsRepo.GetLatestByDeploymentID(ctx, deployment.ID)
 		if err == nil && latestMetrics != nil {
 			response[i].LatestMetrics = dto.ToMetricsResponse(latestMetrics)
+		}
+
+		// Get instrument master data for this deployment
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		if err == nil && instrumentMaster != nil {
+			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
 	}
 
@@ -1271,6 +1323,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	// Calculate and update deployment metrics
 	metrics := s.calculateDeploymentMetrics(ctx, deployment.ID, currentPosition)
 	if metrics != nil {
+		// Get detailed metrics for proper storage
+		totalTrades, winTrades, lossTrades, totalPnL, maxDrawdown, avgWin, avgLoss := s.calculateDeploymentMetricsDetailed(ctx, deployment.ID, currentPosition)
+
 		deploymentMetrics, err := model.NewDeploymentMetrics(
 			deployment.ID,
 			time.Now(),
@@ -1284,12 +1339,36 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				"profit_factor":    metrics.ProfitFactor,
 				"avg_win_size":     metrics.AvgWinSize,
 				"avg_loss_size":    metrics.AvgLossSize,
+				"avg_win":          avgWin,
+				"avg_loss":         avgLoss,
 			},
 		)
 
 		if err != nil {
 			fmt.Printf("Error creating deployment metrics: %v\n", err)
 		} else {
+			// Update the metrics with calculated values
+			deploymentMetrics.UpdateMetrics(
+				totalTrades,
+				winTrades,
+				lossTrades,
+				totalPnL,
+				maxDrawdown,
+			)
+
+			// Set average win/loss directly
+			if avgWin > 0 {
+				deploymentMetrics.AvgWin = &avgWin
+			}
+			if avgLoss < 0 {
+				deploymentMetrics.AvgLoss = &avgLoss
+			}
+
+			// Set ratios if available
+			if metrics.SharpeRatio != 0 {
+				deploymentMetrics.SetRatios(metrics.SharpeRatio, 0.0) // Sortino not calculated yet
+			}
+
 			if err := s.metricsRepo.Create(ctx, deploymentMetrics); err != nil {
 				fmt.Printf("Error saving deployment metrics: %v\n", err)
 			}
@@ -1477,6 +1556,56 @@ func (s *deploymentService) calculateDeploymentMetrics(ctx context.Context, depl
 	return metrics
 }
 
+// calculateDeploymentMetricsDetailed calculates detailed metrics for deployment metrics storage
+func (s *deploymentService) calculateDeploymentMetricsDetailed(ctx context.Context, deploymentID uuid.UUID, currentPosition *model.DeploymentPosition) (totalTrades, winTrades, lossTrades int, totalPnL, maxDrawdown, avgWin, avgLoss float64) {
+	// Get all positions for this deployment to calculate metrics
+	positions, err := s.positionRepo.GetByDeploymentID(ctx, deploymentID)
+	if err != nil {
+		fmt.Printf("Error fetching positions for metrics calculation: %v\n", err)
+		return 0, 0, 0, 0.0, 0.0, 0.0, 0.0
+	}
+
+	totalPnL = 0.0
+	winTrades = 0
+	lossTrades = 0
+	totalTrades = 0
+	maxDrawdown = 0.0
+	totalWinAmount := 0.0
+	totalLossAmount := 0.0
+
+	for _, pos := range positions {
+		if pos.Status == model.PositionClosed && pos.PNL != nil {
+			totalTrades++
+			pnl := *pos.PNL
+			totalPnL += pnl
+
+			if pnl > 0 {
+				winTrades++
+				totalWinAmount += pnl
+			} else if pnl < 0 {
+				lossTrades++
+				totalLossAmount += pnl
+			}
+		}
+	}
+
+	// Calculate average win and loss
+	if winTrades > 0 {
+		avgWin = totalWinAmount / float64(winTrades)
+	}
+	if lossTrades > 0 {
+		avgLoss = totalLossAmount / float64(lossTrades)
+	}
+
+	// TODO: Calculate actual max drawdown based on position history
+	// For now, we'll use a simplified calculation
+	if totalPnL < 0 {
+		maxDrawdown = math.Abs(totalPnL)
+	}
+
+	return totalTrades, winTrades, lossTrades, totalPnL, maxDrawdown, avgWin, avgLoss
+}
+
 // GetDeploymentStatus gets deployment status for specified instruments against a strategy
 func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID uuid.UUID, instrumentIDs []int, userID uuid.UUID) (*dto.DeploymentStatusResponse, error) {
 	// Verify the strategy exists and belongs to the user
@@ -1521,6 +1650,12 @@ func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID 
 				IsActive:     deployment.IsActive,
 				CreatedAt:    deployment.CreatedAt,
 				UpdatedAt:    deployment.UpdatedAt,
+			}
+
+			// Get instrument master data for this deployment
+			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+			if err == nil && instrumentMaster != nil {
+				instrumentStatus.Deployment.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 			}
 
 			// Get position summary for this deployment
@@ -1891,4 +2026,32 @@ func (s *deploymentService) publishEventWithPrice(ctx context.Context, deploymen
 			fmt.Printf("Error publishing event to user %s: %v\n", deployment.UserID.String(), err)
 		}
 	}()
+}
+
+// Helper function to convert instrument master model to DTO
+func instrumentMasterToDTO(master *instrumentModel.InstrumentMaster) *instrumentDto.InstrumentMasterDTO {
+	if master == nil {
+		return nil
+	}
+
+	return &instrumentDto.InstrumentMasterDTO{
+		ExchangeSecurityID: master.ExchangeSecurityID,
+		Exchange:           master.Exchange,
+		Segment:            master.Segment,
+		Symbol:             master.Symbol,
+		Name:               master.Name,
+		StartDate:          master.StartDate,
+		Expiry:             master.Expiry,
+		ExmExchID:          master.ExmExchID,
+		SmstSecurityID:     master.SmstSecurityID,
+		InstrumentName:     master.InstrumentName,
+		TradingSymbol:      master.TradingSymbol,
+		LotUnits:           master.LotUnits,
+		StrikePrice:        master.StrikePrice,
+		OptionType:         master.OptionType,
+		TickSize:           master.TickSize,
+		ExpiryFlag:         master.ExpiryFlag,
+		ExchInstrumentType: master.ExchInstrumentType,
+		SymbolName:         master.SymbolName,
+	}
 }

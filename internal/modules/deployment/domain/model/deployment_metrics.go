@@ -9,7 +9,7 @@ import (
 
 // DeploymentMetrics represents metrics for a deployment
 type DeploymentMetrics struct {
-	ID           uuid.UUID           `json:"id" db:"id"`
+	ID           uuid.UUID       `json:"id" db:"id"`
 	DeploymentID uuid.UUID       `json:"deployment_id" db:"deployment_id"`
 	MetricDate   time.Time       `json:"metric_date" db:"metric_date"`
 	TotalTrades  int             `json:"total_trades" db:"total_trades"`
@@ -31,7 +31,7 @@ type DeploymentMetrics struct {
 func NewDeploymentMetrics(
 	deploymentID uuid.UUID,
 	metricDate time.Time,
-	metadata map[string]interface{},
+	metadata map[string]any,
 ) (*DeploymentMetrics, error) {
 	var metadataJSON json.RawMessage
 	var err error
@@ -75,16 +75,6 @@ func (m *DeploymentMetrics) UpdateMetrics(
 	if totalTrades > 0 {
 		winRate := float64(winTrades) / float64(totalTrades)
 		m.WinRate = &winRate
-	}
-
-	if winTrades > 0 {
-		avgWin := totalPNL / float64(winTrades)
-		m.AvgWin = &avgWin
-	}
-
-	if lossTrades > 0 {
-		avgLoss := totalPNL / float64(lossTrades)
-		m.AvgLoss = &avgLoss
 	}
 
 	m.UpdatedAt = time.Now()
