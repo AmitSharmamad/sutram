@@ -42,9 +42,13 @@ type Position struct {
 	Direction            Direction     `json:"direction" db:"direction"`
 	EntryPriceSignal     float64       `json:"entry_price_signal" db:"entry_price_signal"`
 	EntryTimeSignal      time.Time     `json:"entry_time_signal" db:"entry_time_signal"`
+	EntryPriceOrder      *float64      `json:"entry_price_order,omitempty" db:"entry_price_order"`
+	EntryTimeOrder       *time.Time    `json:"entry_time_order,omitempty" db:"entry_time_order"`
 	EntrySignal          string        `json:"entry_signal" db:"entry_signal"`
 	ExitPriceSignal      *float64      `json:"exit_price_signal,omitempty" db:"exit_price_signal"`
 	ExitTimeSignal       *time.Time    `json:"exit_time_signal,omitempty" db:"exit_time_signal"`
+	ExitPriceOrder       *float64      `json:"exit_price_order,omitempty" db:"exit_price_order"`
+	ExitTimeOrder        *time.Time    `json:"exit_time_order,omitempty" db:"exit_time_order"`
 	ExitSignal           *string       `json:"exit_signal,omitempty" db:"exit_signal"`
 	ExitReason           *string       `json:"exit_reason,omitempty" db:"exit_reason"`
 	ProfitLossAbsolute   *float64      `json:"profit_loss_absolute,omitempty" db:"profit_loss_absolute"`
@@ -88,8 +92,10 @@ func NewPosition(
 }
 
 // Enter sets the position as entered
-func (p *Position) Enter(entryFees float64, entryOrderID *uuid.UUID) {
+func (p *Position) Enter(entryPriceOrder float64, entryTimeOrder time.Time, entryFees float64, entryOrderID *uuid.UUID) {
 	p.State = Entered
+	p.EntryPriceOrder = &entryPriceOrder
+	p.EntryTimeOrder = &entryTimeOrder
 
 	if entryFees > 0 {
 		p.EntryFees = &entryFees
@@ -103,6 +109,8 @@ func (p *Position) Enter(entryFees float64, entryOrderID *uuid.UUID) {
 func (p *Position) Exit(
 	exitPriceSignal float64,
 	exitTimeSignal time.Time,
+	exitPriceOrder float64,
+	exitTimeOrder time.Time,
 	exitSignal string,
 	exitReason string,
 	exitFees float64,
@@ -111,6 +119,8 @@ func (p *Position) Exit(
 	p.State = Exited
 	p.ExitPriceSignal = &exitPriceSignal
 	p.ExitTimeSignal = &exitTimeSignal
+	p.ExitPriceOrder = &exitPriceOrder
+	p.ExitTimeOrder = &exitTimeOrder
 	p.ExitSignal = &exitSignal
 	p.ExitReason = &exitReason
 
@@ -127,12 +137,12 @@ func (p *Position) Exit(
 
 // CalculateProfitLoss calculates profit/loss for the position
 func (p *Position) CalculateProfitLoss() {
-	if p.State != Exited || p.ExitPriceSignal == nil {
+	if p.State != Exited || p.EntryPriceOrder == nil || p.ExitPriceOrder == nil {
 		return
 	}
 
-	entryPrice := p.EntryPriceSignal
-	exitPrice := *p.ExitPriceSignal
+	entryPrice := *p.EntryPriceOrder
+	exitPrice := *p.ExitPriceOrder
 
 	// Calculate absolute P/L
 	var profitLossAbsolute float64

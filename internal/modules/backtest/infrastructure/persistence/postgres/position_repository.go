@@ -31,13 +31,14 @@ func (r *PositionRepository) Create(ctx context.Context, position *model.Positio
 	query := `
 		INSERT INTO position (
 			id, run_id, state, direction, entry_price_signal, entry_time_signal,
-			entry_signal, exit_price_signal, exit_time_signal, exit_signal,
+			entry_price_order, entry_time_order, entry_signal, exit_price_signal,
+			exit_time_signal, exit_price_order, exit_time_order, exit_signal,
 			exit_reason, profit_loss_absolute, profit_loss_percentage, 
 			transaction_cost, entry_fees, exit_fees, net_profit_loss,
 			position_size, entry_order_id, exit_order_id, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-			$15, $16, $17, $18, $19, $20, $21, $22
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 		)
 	`
 
@@ -50,9 +51,13 @@ func (r *PositionRepository) Create(ctx context.Context, position *model.Positio
 		position.Direction,
 		position.EntryPriceSignal,
 		position.EntryTimeSignal,
+		position.EntryPriceOrder,
+		position.EntryTimeOrder,
 		position.EntrySignal,
 		position.ExitPriceSignal,
 		position.ExitTimeSignal,
+		position.ExitPriceOrder,
+		position.ExitTimeOrder,
 		position.ExitSignal,
 		position.ExitReason,
 		position.ProfitLossAbsolute,
@@ -80,7 +85,8 @@ func (r *PositionRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 	query := `
 		SELECT 
 			id, run_id, state, direction, entry_price_signal, entry_time_signal,
-			entry_signal, exit_price_signal, exit_time_signal, exit_signal,
+			entry_price_order, entry_time_order, entry_signal, exit_price_signal,
+			exit_time_signal, exit_price_order, exit_time_order, exit_signal,
 			exit_reason, profit_loss_absolute, profit_loss_percentage, 
 			transaction_cost, entry_fees, exit_fees, net_profit_loss,
 			position_size, entry_order_id, exit_order_id, created_at, updated_at
@@ -98,9 +104,13 @@ func (r *PositionRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&position.Direction,
 		&position.EntryPriceSignal,
 		&position.EntryTimeSignal,
+		&position.EntryPriceOrder,
+		&position.EntryTimeOrder,
 		&position.EntrySignal,
 		&position.ExitPriceSignal,
 		&position.ExitTimeSignal,
+		&position.ExitPriceOrder,
+		&position.ExitTimeOrder,
 		&position.ExitSignal,
 		&position.ExitReason,
 		&position.ProfitLossAbsolute,
@@ -148,7 +158,8 @@ func (r *PositionRepository) GetByRunID(ctx context.Context, runID uuid.UUID) ([
 	query := `
 		SELECT 
 			id, run_id, state, direction, entry_price_signal, entry_time_signal,
-			entry_signal, exit_price_signal, exit_time_signal, exit_signal,
+			entry_price_order, entry_time_order, entry_signal, exit_price_signal,
+			exit_time_signal, exit_price_order, exit_time_order, exit_signal,
 			exit_reason, profit_loss_absolute, profit_loss_percentage, 
 			transaction_cost, entry_fees, exit_fees, net_profit_loss,
 			position_size, entry_order_id, exit_order_id, created_at, updated_at
@@ -175,9 +186,13 @@ func (r *PositionRepository) GetByRunID(ctx context.Context, runID uuid.UUID) ([
 			&position.Direction,
 			&position.EntryPriceSignal,
 			&position.EntryTimeSignal,
+			&position.EntryPriceOrder,
+			&position.EntryTimeOrder,
 			&position.EntrySignal,
 			&position.ExitPriceSignal,
 			&position.ExitTimeSignal,
+			&position.ExitPriceOrder,
+			&position.ExitTimeOrder,
 			&position.ExitSignal,
 			&position.ExitReason,
 			&position.ProfitLossAbsolute,
@@ -231,21 +246,25 @@ func (r *PositionRepository) Update(ctx context.Context, position *model.Positio
 			direction = $3,
 			entry_price_signal = $4,
 			entry_time_signal = $5,
-			entry_signal = $6,
-			exit_price_signal = $7,
-			exit_time_signal = $8,
-			exit_signal = $9,
-			exit_reason = $10,
-			profit_loss_absolute = $11,
-			profit_loss_percentage = $12,
-			transaction_cost = $13,
-			entry_fees = $14,
-			exit_fees = $15,
-			net_profit_loss = $16,
-			position_size = $17,
-			entry_order_id = $18,
-			exit_order_id = $19,
-			updated_at = $20
+			entry_price_order = $6,
+			entry_time_order = $7,
+			entry_signal = $8,
+			exit_price_signal = $9,
+			exit_time_signal = $10,
+			exit_price_order = $11,
+			exit_time_order = $12,
+			exit_signal = $13,
+			exit_reason = $14,
+			profit_loss_absolute = $15,
+			profit_loss_percentage = $16,
+			transaction_cost = $17,
+			entry_fees = $18,
+			exit_fees = $19,
+			net_profit_loss = $20,
+			position_size = $21,
+			entry_order_id = $22,
+			exit_order_id = $23,
+			updated_at = $24
 		WHERE id = $1
 	`
 
@@ -257,9 +276,13 @@ func (r *PositionRepository) Update(ctx context.Context, position *model.Positio
 		position.Direction,
 		position.EntryPriceSignal,
 		position.EntryTimeSignal,
+		position.EntryPriceOrder,
+		position.EntryTimeOrder,
 		position.EntrySignal,
 		position.ExitPriceSignal,
 		position.ExitTimeSignal,
+		position.ExitPriceOrder,
+		position.ExitTimeOrder,
 		position.ExitSignal,
 		position.ExitReason,
 		position.ProfitLossAbsolute,
@@ -327,13 +350,14 @@ func (r *PositionRepository) BulkCreate(ctx context.Context, positions []*model.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO position (
 			id, run_id, state, direction, entry_price_signal, entry_time_signal,
-			entry_signal, exit_price_signal, exit_time_signal, exit_signal,
+			entry_price_order, entry_time_order, entry_signal, exit_price_signal,
+			exit_time_signal, exit_price_order, exit_time_order, exit_signal,
 			exit_reason, profit_loss_absolute, profit_loss_percentage, 
 			transaction_cost, entry_fees, exit_fees, net_profit_loss,
 			position_size, entry_order_id, exit_order_id, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-			$15, $16, $17, $18, $19, $20, $21, $22
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 		)
 	`)
 	if err != nil {
@@ -351,9 +375,13 @@ func (r *PositionRepository) BulkCreate(ctx context.Context, positions []*model.
 			position.Direction,
 			position.EntryPriceSignal,
 			position.EntryTimeSignal,
+			position.EntryPriceOrder,
+			position.EntryTimeOrder,
 			position.EntrySignal,
 			position.ExitPriceSignal,
 			position.ExitTimeSignal,
+			position.ExitPriceOrder,
+			position.ExitTimeOrder,
 			position.ExitSignal,
 			position.ExitReason,
 			position.ProfitLossAbsolute,
