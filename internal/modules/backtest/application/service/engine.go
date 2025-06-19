@@ -210,9 +210,7 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 			// Slippage = (slippage_percentage / 100) * total_trade_value
 			totalTradeValue := 0.0
 			for _, position := range run.Positions {
-				if position.EntryPriceOrder != nil {
-					totalTradeValue += *position.EntryPriceOrder * position.PositionSize
-				}
+				totalTradeValue += position.EntryPriceSignal * position.PositionSize
 			}
 			slippage := (strategyResp.Slippage / 100.0) * totalTradeValue
 			run.RunMetrics.TotalSlippage = slippage
@@ -614,15 +612,12 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			// Calculate fees
 			exitFees := 0.0
-			exitOrderPrice := lastClosePrice // Use close price from indicator
 
 			// Close the position with "EOD MIS Square-off" as the reason
 			exitReason := string(model.ExitReasonMISSquareOff) // Special reason for MIS end-of-day square-off
 
 			openPosition.Exit(
 				lastClosePrice,
-				lastTimestamp,
-				exitOrderPrice,
 				lastTimestamp,
 				"",         // No exit expression for auto square-offs
 				exitReason, // Use our defined exit reason
@@ -752,12 +747,12 @@ func (e *BacktestEngine) updateStopLossBasedOnTrailing(
 	instrument *instrumentModel.Instrument,
 ) bool {
 	// Skip if trailing stop loss isn't enabled or position doesn't have a stop loss
-	if strategy.TrailingStopLoss <= 0 || position.StopLossPrice == nil || position.EntryPriceOrder == nil {
+	if strategy.TrailingStopLoss <= 0 || position.StopLossPrice == nil {
 		return false
 	}
 
 	currentPrice := instrument.Close
-	entryPrice := *position.EntryPriceOrder
+	entryPrice := position.EntryPriceSignal
 	currentStopLoss := *position.StopLossPrice
 
 	initialStopDistance := *e.calculateStopLoss(entryPrice, strategy.StopLoss, strategy.StopLossType, strategy.PositionType)
@@ -820,10 +815,6 @@ func (e *BacktestEngine) isStopLossTriggered(
 	position *model.Position,
 	instrument *instrumentModel.Instrument,
 ) bool {
-	if position.EntryPriceOrder == nil {
-		return false
-	}
-
 	if position.Direction == model.Long {
 		return instrument.Close <= *position.StopLossPrice
 	} else { // Short position
@@ -833,7 +824,7 @@ func (e *BacktestEngine) isStopLossTriggered(
 
 // isTargetProfitTriggered checks if target profit is triggered
 func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strategy *strategyDto.StrategyResponse, instrument *instrumentModel.Instrument) bool {
-	if strategy.TargetProfit <= 0 || position.EntryPriceOrder == nil {
+	if strategy.TargetProfit <= 0 {
 		return false
 	}
 
@@ -1116,8 +1107,6 @@ func (e *BacktestEngine) processExitConditions(
 		openPosition.Exit(
 			exitPrice,
 			currentTimestamp,
-			exitPrice,
-			currentTimestamp,
 			strategy.ExitExpression,
 			exitReason,
 			exitFees,
@@ -1211,10 +1200,10 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 		// Simulate order execution
 		entryPrice := currentClosePrice
 		entryFees := 0.0
-		newPosition.Enter(entryPrice, currentTimestamp, entryFees, nil)
+		newPosition.Enter(entryFees, nil)
 
 		newPosition.StopLossPrice = e.calculateStopLoss(
-			*newPosition.EntryPriceOrder,
+			newPosition.EntryPriceSignal,
 			strategy.StopLoss,
 			strategy.StopLossType,
 			strategy.PositionType,
@@ -1228,7 +1217,7 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 		}
 
 		newPosition.TargetProfitPrice = e.calculateTargetProfit(
-			*newPosition.EntryPriceOrder,
+			newPosition.EntryPriceSignal,
 			strategy.TargetProfit,
 			strategy.TargetProfitType,
 			strategy.PositionType,
@@ -1275,14 +1264,11 @@ func (e *BacktestEngine) handleMISSquareOff(
 
 	// Calculate fees and exit details
 	exitFees := 0.0
-	exitOrderPrice := closePrice
 	exitReason := string(model.ExitReasonMISSquareOff)
 
 	// Close the position
 	openPosition.Exit(
 		closePrice,
-		currentTimestamp,
-		exitOrderPrice,
 		currentTimestamp,
 		"", // No exit expression for auto square-offs
 		exitReason,

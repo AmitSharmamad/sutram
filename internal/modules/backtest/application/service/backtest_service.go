@@ -459,8 +459,6 @@ func (s *backtestService) EnterPosition(ctx context.Context, id uuid.UUID, req *
 
 	// Update position
 	position.Enter(
-		req.EntryPriceOrder,
-		req.EntryTimeOrder,
 		req.EntryFees,
 		req.EntryOrderID,
 	)
@@ -486,8 +484,6 @@ func (s *backtestService) ExitPosition(ctx context.Context, id uuid.UUID, req *d
 	position.Exit(
 		req.ExitPriceSignal,
 		req.ExitTimeSignal,
-		req.ExitPriceOrder,
-		req.ExitTimeOrder,
 		req.ExitSignal,
 		req.ExitReason,
 		req.ExitFees,
@@ -680,28 +676,12 @@ func (s *backtestService) positionToDTO(position *model.Position) *dto.PositionD
 	}
 
 	// Handle nullable fields
-	if position.EntryPriceOrder != nil {
-		positionDTO.EntryPriceOrder = *position.EntryPriceOrder
-	}
-
-	if position.EntryTimeOrder != nil {
-		positionDTO.EntryTimeOrder = *position.EntryTimeOrder
-	}
-
 	if position.ExitPriceSignal != nil {
 		positionDTO.ExitPriceSignal = *position.ExitPriceSignal
 	}
 
 	if position.ExitTimeSignal != nil {
 		positionDTO.ExitTimeSignal = *position.ExitTimeSignal
-	}
-
-	if position.ExitPriceOrder != nil {
-		positionDTO.ExitPriceOrder = *position.ExitPriceOrder
-	}
-
-	if position.ExitTimeOrder != nil {
-		positionDTO.ExitTimeOrder = *position.ExitTimeOrder
 	}
 
 	if position.ExitSignal != nil {

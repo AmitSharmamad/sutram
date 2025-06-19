@@ -38,14 +38,10 @@ CREATE TABLE IF NOT EXISTS position (
     -- Entry Details
     entry_price_signal DECIMAL(18, 8) NOT NULL,
     entry_time_signal TIMESTAMP NOT NULL,
-    entry_price_order DECIMAL(18, 8),
-    entry_time_order TIMESTAMP,
     entry_signal VARCHAR NOT NULL,
     -- Exit Details
     exit_price_signal DECIMAL(18, 8),
     exit_time_signal TIMESTAMP,
-    exit_price_order DECIMAL(18, 8),
-    exit_time_order TIMESTAMP,
     exit_signal VARCHAR,
     exit_reason VARCHAR,
     -- Profit/Loss Details
