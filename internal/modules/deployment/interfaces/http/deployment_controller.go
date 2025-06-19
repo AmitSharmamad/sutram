@@ -145,7 +145,31 @@ func (c *DeploymentController) GetUserDeployments(ctx *gin.Context) {
 		return
 	}
 
-	deployments, err := c.deploymentService.GetUserDeployments(ctx, userID)
+	// Check for status filter
+	status := ctx.Query("status")
+	var filter *dto.DeploymentFilter
+	if status != "" {
+		if status != "waiting" && status != "entered" {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "Invalid status filter. Use 'waiting' or 'entered'",
+			})
+			return
+		}
+		filter = &dto.DeploymentFilter{
+			Status: &status,
+		}
+	}
+
+	var deployments []*dto.DeploymentResponse
+	var err error
+
+	if filter != nil {
+		deployments, err = c.deploymentService.GetUserDeploymentsWithFilter(ctx, userID, filter)
+	} else {
+		deployments, err = c.deploymentService.GetUserDeployments(ctx, userID)
+	}
+
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -542,6 +566,17 @@ func (c *DeploymentController) SearchDeployments(ctx *gin.Context) {
 
 	if name := ctx.Query("name"); name != "" {
 		filter.Name = &name
+	}
+
+	if status := ctx.Query("status"); status != "" {
+		if status != "waiting" && status != "entered" {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"message": "Invalid status filter. Use 'waiting' or 'entered'",
+			})
+			return
+		}
+		filter.Status = &status
 	}
 
 	// Get user ID from context (set by auth middleware)

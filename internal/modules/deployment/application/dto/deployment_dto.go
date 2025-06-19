@@ -41,6 +41,7 @@ type DeploymentFilter struct {
 	InstrumentID *int       `json:"instrument_id,omitempty"`
 	IsActive     *bool      `json:"is_active,omitempty"`
 	Name         *string    `json:"name,omitempty"`
+	Status       *string    `json:"status,omitempty"` // "waiting" or "entered"
 }
 
 // DeploymentStatusResponse represents the status of deployments for specific instruments against a strategy

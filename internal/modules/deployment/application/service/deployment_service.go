@@ -48,6 +48,7 @@ type DeploymentService interface {
 	CreateDeployment(ctx context.Context, req *dto.CreateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
 	GetDeploymentByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentResponse, error)
 	GetUserDeployments(ctx context.Context, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
+	GetUserDeploymentsWithFilter(ctx context.Context, userID uuid.UUID, filter *dto.DeploymentFilter) ([]*dto.DeploymentResponse, error)
 	GetDeploymentsByStrategyID(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
 	GetDeploymentStatus(ctx context.Context, strategyID uuid.UUID, instrumentIDs []int, userID uuid.UUID) (*dto.DeploymentStatusResponse, error)
 	UpdateDeployment(ctx context.Context, req *dto.UpdateDeploymentRequest, userID uuid.UUID) (*dto.DeploymentResponse, error)
@@ -239,6 +240,78 @@ func (s *deploymentService) GetUserDeployments(ctx context.Context, userID uuid.
 	return response, nil
 }
 
+// GetUserDeploymentsWithFilter retrieves deployments for a user with optional status filtering
+func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, userID uuid.UUID, filter *dto.DeploymentFilter) ([]*dto.DeploymentResponse, error) {
+	deployments, err := s.deploymentRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user deployments: %w", err)
+	}
+
+	// If no status filter is specified, return all deployments
+	if filter == nil || filter.Status == nil {
+		response := make([]*dto.DeploymentResponse, len(deployments))
+		for i, deployment := range deployments {
+			response[i] = &dto.DeploymentResponse{
+				ID:           deployment.ID,
+				UserID:       deployment.UserID,
+				StrategyID:   deployment.StrategyID,
+				InstrumentID: deployment.InstrumentID,
+				Name:         deployment.Name,
+				Description:  deployment.Description,
+				IsActive:     deployment.IsActive,
+				CreatedAt:    deployment.CreatedAt,
+				UpdatedAt:    deployment.UpdatedAt,
+			}
+		}
+		return response, nil
+	}
+
+	// Filter deployments based on position status
+	var filteredDeployments []*model.Deployment
+
+	for _, deployment := range deployments {
+		// Get open positions for this deployment
+		openPositions, err := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, deployment.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get positions for deployment %s: %w", deployment.ID, err)
+		}
+
+		hasOpenPosition := len(openPositions) > 0
+
+		// Apply status filter
+		switch *filter.Status {
+		case "waiting":
+			// Include deployments with no open positions (waiting to enter)
+			if !hasOpenPosition {
+				filteredDeployments = append(filteredDeployments, deployment)
+			}
+		case "entered":
+			// Include deployments with open positions (already entered)
+			if hasOpenPosition {
+				filteredDeployments = append(filteredDeployments, deployment)
+			}
+		}
+	}
+
+	// Convert to response DTOs
+	response := make([]*dto.DeploymentResponse, len(filteredDeployments))
+	for i, deployment := range filteredDeployments {
+		response[i] = &dto.DeploymentResponse{
+			ID:           deployment.ID,
+			UserID:       deployment.UserID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Name:         deployment.Name,
+			Description:  deployment.Description,
+			IsActive:     deployment.IsActive,
+			CreatedAt:    deployment.CreatedAt,
+			UpdatedAt:    deployment.UpdatedAt,
+		}
+	}
+
+	return response, nil
+}
+
 // GetDeploymentsByStrategyID retrieves all deployments for a strategy
 func (s *deploymentService) GetDeploymentsByStrategyID(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error) {
 	// Verify the strategy exists and belongs to the user
@@ -374,7 +447,7 @@ func (s *deploymentService) DeactivateDeployment(ctx context.Context, id uuid.UU
 // SearchDeployments searches deployments with filter criteria
 func (s *deploymentService) SearchDeployments(ctx context.Context, filter *dto.DeploymentFilter, userID uuid.UUID) ([]*dto.DeploymentResponse, error) {
 	// Build filters map
-	filters := make(map[string]interface{})
+	filters := make(map[string]any)
 
 	// Always filter by user ID for security
 	filters["user_id"] = userID
@@ -401,9 +474,39 @@ func (s *deploymentService) SearchDeployments(ctx context.Context, filter *dto.D
 		return nil, fmt.Errorf("failed to search deployments: %w", err)
 	}
 
+	// If status filter is specified, filter by position status
+	var filteredDeployments []*model.Deployment
+	if filter.Status != nil {
+		for _, deployment := range deployments {
+			// Get open positions for this deployment
+			openPositions, err := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, deployment.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get positions for deployment %s: %w", deployment.ID, err)
+			}
+
+			hasOpenPosition := len(openPositions) > 0
+
+			// Apply status filter
+			switch *filter.Status {
+			case "waiting":
+				// Include deployments with no open positions (waiting to enter)
+				if !hasOpenPosition {
+					filteredDeployments = append(filteredDeployments, deployment)
+				}
+			case "entered":
+				// Include deployments with open positions (already entered)
+				if hasOpenPosition {
+					filteredDeployments = append(filteredDeployments, deployment)
+				}
+			}
+		}
+	} else {
+		filteredDeployments = deployments
+	}
+
 	// Map to response
-	response := make([]*dto.DeploymentResponse, len(deployments))
-	for i, deployment := range deployments {
+	response := make([]*dto.DeploymentResponse, len(filteredDeployments))
+	for i, deployment := range filteredDeployments {
 		response[i] = &dto.DeploymentResponse{
 			ID:           deployment.ID,
 			UserID:       deployment.UserID,
