@@ -289,7 +289,7 @@ func subscribeToActiveDeploymentInstruments() error {
 		// For now, we'll assume these are NSE instruments
 		// In a real implementation, you might want to store exchange information in deployments
 		instruments = append(instruments, InstrumentInfo{
-			ExchangeSegment: "NSE", // Default to NSE, can be made configurable
+			ExchangeSegment: "NSE_EQ", // Default to NSE, can be made configurable
 			SecurityId:      fmt.Sprintf("%d", instrumentID),
 		})
 	}

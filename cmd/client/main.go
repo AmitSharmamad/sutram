@@ -80,7 +80,7 @@ type Instrument struct {
 var (
 	// Sample instruments to simulate (initial state)
 	initialInstruments = []Instrument{
-		{SecurityID: 3411, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 12018, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 	}
 
 	// Current instruments (working copy that gets modified during simulation)
@@ -293,7 +293,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 
 // startMarketDataSimulation starts the market data simulation in background
 func startMarketDataSimulation(ctx context.Context) {
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	// Always use quote feed type
