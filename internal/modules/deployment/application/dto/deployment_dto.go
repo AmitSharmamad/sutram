@@ -3,6 +3,8 @@ package dto
 import (
 	"time"
 
+	instrumentDto "algo/internal/modules/instrument/application/dto"
+
 	"github.com/google/uuid"
 )
 
@@ -23,16 +25,17 @@ type UpdateDeploymentRequest struct {
 
 // DeploymentResponse represents the response for a deployment
 type DeploymentResponse struct {
-	ID            uuid.UUID        `json:"id"`
-	UserID        uuid.UUID        `json:"user_id"`
-	StrategyID    uuid.UUID        `json:"strategy_id"`
-	InstrumentID  int              `json:"instrument_id"`
-	Name          string           `json:"name"`
-	Description   string           `json:"description"`
-	IsActive      bool             `json:"is_active"`
-	CreatedAt     time.Time        `json:"created_at"`
-	UpdatedAt     time.Time        `json:"updated_at"`
-	LatestMetrics *MetricsResponse `json:"metrics,omitempty"`
+	ID               uuid.UUID                          `json:"id"`
+	UserID           uuid.UUID                          `json:"user_id"`
+	StrategyID       uuid.UUID                          `json:"strategy_id"`
+	InstrumentID     int                                `json:"instrument_id"`
+	Name             string                             `json:"name"`
+	Description      string                             `json:"description"`
+	IsActive         bool                               `json:"is_active"`
+	CreatedAt        time.Time                          `json:"created_at"`
+	UpdatedAt        time.Time                          `json:"updated_at"`
+	LatestMetrics    *MetricsResponse                   `json:"metrics,omitempty"`
+	InstrumentMaster *instrumentDto.InstrumentMasterDTO `json:"instrument_master,omitempty"`
 }
 
 // DeploymentFilter represents the filter criteria for searching deployments

@@ -80,6 +80,11 @@ type Instrument struct {
 var (
 	// Sample instruments to simulate (initial state)
 	initialInstruments = []Instrument{
+		{SecurityID: 3411, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 2029, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 14366, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 1491, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 11915, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 		{SecurityID: 12018, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 	}
 
@@ -161,7 +166,7 @@ func main() {
 		log.Printf("Warning: Could not load IST timezone, using UTC: %v", err)
 		istLocation = time.UTC
 	}
-	initialSimulationTime = time.Date(2025, 5, 5, 9, 30, 0, 0, istLocation)
+	initialSimulationTime = time.Date(2025, 5, 5, 9, 15, 0, 0, istLocation)
 	currentSimulationTime = initialSimulationTime
 
 	// Initialize instruments with the initial state
