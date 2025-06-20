@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"algo/internal/modules/deployment/domain/model"
+	strategyModel "algo/internal/modules/strategy/domain/model"
 
 	"github.com/google/uuid"
 )
@@ -27,19 +28,20 @@ type ClosePositionRequest struct {
 
 // PositionResponse is the response for a deployment position
 type PositionResponse struct {
-	ID           uuid.UUID                `json:"id"`
-	DeploymentID uuid.UUID            `json:"deployment_id"`
-	InstrumentID int                  `json:"instrument_id"`
-	Quantity     float64              `json:"quantity"`
-	EntryPrice   float64              `json:"entry_price"`
-	EntryTime    time.Time            `json:"entry_time"`
-	ExitPrice    *float64             `json:"exit_price,omitempty"`
-	ExitTime     *time.Time           `json:"exit_time,omitempty"`
-	PNL          *float64             `json:"pnl,omitempty"`
-	Status       model.PositionStatus `json:"status"`
-	Metadata     json.RawMessage      `json:"metadata,omitempty"`
-	CreatedAt    time.Time            `json:"created_at"`
-	UpdatedAt    time.Time            `json:"updated_at"`
+	ID           uuid.UUID               `json:"id"`
+	DeploymentID uuid.UUID               `json:"deployment_id"`
+	InstrumentID int                     `json:"instrument_id"`
+	Quantity     float64                 `json:"quantity"`
+	Direction    strategyModel.Direction `json:"direction"`
+	EntryPrice   float64                 `json:"entry_price"`
+	EntryTime    time.Time               `json:"entry_time"`
+	ExitPrice    *float64                `json:"exit_price,omitempty"`
+	ExitTime     *time.Time              `json:"exit_time,omitempty"`
+	PNL          *float64                `json:"pnl,omitempty"`
+	Status       model.PositionStatus    `json:"status"`
+	Metadata     json.RawMessage         `json:"metadata,omitempty"`
+	CreatedAt    time.Time               `json:"created_at"`
+	UpdatedAt    time.Time               `json:"updated_at"`
 }
 
 // ToPositionResponse converts a model.DeploymentPosition to dto.PositionResponse
@@ -49,6 +51,7 @@ func ToPositionResponse(position *model.DeploymentPosition) *PositionResponse {
 		DeploymentID: position.DeploymentID,
 		InstrumentID: position.InstrumentID,
 		Quantity:     position.Quantity,
+		Direction:    position.Direction,
 		EntryPrice:   position.EntryPrice,
 		EntryTime:    position.EntryTime,
 		ExitPrice:    position.ExitPrice,

@@ -18,7 +18,8 @@ import (
 type Module struct {
 	db             *sql.DB
 	controller     *http.MarketplaceController
-	userController interface{}
+	userController any
+	sellerService  *service.SellerService
 }
 
 // ProvideModule provides a wire provider set for the marketplace module
@@ -67,6 +68,9 @@ func (m *Module) initialize() {
 	transactionService := service.NewTransactionService(transactionRepo)
 	sellerService := service.NewSellerService(listingRepo, subscriptionRepo, transactionRepo)
 
+	// Store the seller service
+	m.sellerService = sellerService
+
 	// Create controller
 	m.controller = http.NewMarketplaceController(
 		listingService,
@@ -99,4 +103,9 @@ func (m *Module) GetController() *http.MarketplaceController {
 // SetUserController sets the user controller for auth middleware
 func (m *Module) SetUserController(userController interface{}) {
 	m.userController = userController
+}
+
+// GetSellerService returns the seller service
+func (m *Module) GetSellerService() *service.SellerService {
+	return m.sellerService
 }

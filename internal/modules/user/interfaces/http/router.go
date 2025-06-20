@@ -25,6 +25,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 		auth.GET("/profile", controller.GetProfile)
 		auth.PUT("/profile", controller.UpdateProfile)
 		auth.POST("/change-password", controller.ChangePassword)
+		auth.GET("/dashboard/statistics", controller.GetDashboardStatistics)
 
 		// Get user roles (can be own roles or admin access)
 		auth.GET("/:id/roles", controller.GetUserRoles)

@@ -22,6 +22,7 @@ type Module struct {
 	userController   interface{}
 	strategyModule   *strategyModule.Module
 	instrumentModule *instrumentModule.Module
+	backtestService  service.BacktestService
 }
 
 // ProvideModule provides a wire provider set for the backtest module
@@ -82,6 +83,9 @@ func (m *Module) initialize() {
 		runMetricsRepo,
 	)
 
+	// Store the service
+	m.backtestService = backtestService
+
 	// Get strategy service
 	strategyService := m.strategyModule.GetStrategyService()
 
@@ -125,4 +129,9 @@ func (m *Module) GetController() *backtestHttp.BacktestController {
 // SetUserController sets the user controller for auth middleware
 func (m *Module) SetUserController(userController interface{}) {
 	m.userController = userController
+}
+
+// GetBacktestService returns the backtest service
+func (m *Module) GetBacktestService() service.BacktestService {
+	return m.backtestService
 }
