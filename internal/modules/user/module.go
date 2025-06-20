@@ -17,9 +17,10 @@ import (
 
 // Module represents the user module
 type Module struct {
-	db         *sql.DB
-	jwtSecret  string
-	controller *http.UserController
+	db               *sql.DB
+	jwtSecret        string
+	controller       *http.UserController
+	dashboardService *service.DashboardService
 }
 
 // ProvideModule provides a wire provider set for the user module
@@ -74,8 +75,8 @@ func (m *Module) initialize() {
 	jwtService := auth.NewJWTService(m.jwtSecret, 24*time.Hour) // 24-hour token validity
 	authService := service.NewAuthService(userService, jwtService)
 
-	// Create controller
-	m.controller = http.NewUserController(authService, userService)
+	// Create controller (dashboard service will be set later)
+	m.controller = http.NewUserController(authService, userService, nil)
 }
 
 // RegisterRoutes registers the user module routes with the given router
@@ -86,4 +87,13 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 // GetController returns the user controller
 func (m *Module) GetController() *http.UserController {
 	return m.controller
+}
+
+// SetDashboardService sets the dashboard service and updates the controller
+func (m *Module) SetDashboardService(dashboardService *service.DashboardService) {
+	m.dashboardService = dashboardService
+	// Recreate the controller with the dashboard service
+	authService := m.controller.GetAuthService()
+	userService := m.controller.GetUserService()
+	m.controller = http.NewUserController(authService, userService, dashboardService)
 }
