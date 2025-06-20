@@ -18,6 +18,7 @@ import (
 	"algo/internal/modules/oauth"
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
+	userService "algo/internal/modules/user/application/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -148,7 +149,6 @@ func loggingMiddleware() gin.HandlerFunc {
 func initializeModules(router *gin.RouterGroup) {
 	// Initialize user module first as other modules depend on its controllers for auth
 	userModule := user.New()
-	userModule.RegisterRoutes(router)
 
 	// Get the user controller to pass to other modules for auth
 	userController := userModule.GetController()
@@ -188,6 +188,19 @@ func initializeModules(router *gin.RouterGroup) {
 	oauthModule := oauth.New()
 	oauthModule.Initialize(userController)
 	oauthModule.RegisterRoutes(router)
+
+	// Create and set dashboard service after all modules are initialized but before user routes
+	dashboardService := userService.NewDashboardService(
+		deploymentModule.GetDeploymentService(),
+		strategyModule.GetStrategyService(),
+		backtestModule.GetBacktestService(),
+		marketplaceModule.GetSellerService(),
+		communityModule.GetUserService(),
+	)
+	userModule.SetDashboardService(dashboardService)
+
+	// Register user routes after dashboard service is set
+	userModule.RegisterRoutes(router)
 
 	// Additional modules will be initialized here
 }
