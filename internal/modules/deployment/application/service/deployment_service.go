@@ -820,11 +820,11 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	strategy := deploymentWithStrategy.Strategy
 
 	// Check if instrument timestamp matches strategy timeframe
-	if !s.isTimestampAlignedWithTimeframe(instrumentData.Timestamp, string(strategy.ChartTimeframe)) {
-		fmt.Printf("Skipping execution - timestamp %v does not align with strategy timeframe %s\n",
-			instrumentData.Timestamp.Format("15:04:05"), strategy.ChartTimeframe)
-		return nil
-	}
+	// if !s.isTimestampAlignedWithTimeframe(instrumentData.Timestamp, string(strategy.ChartTimeframe)) {
+	// 	fmt.Printf("Skipping execution - timestamp %v does not align with strategy timeframe %s\n",
+	// 		instrumentData.Timestamp.Format("15:04:05"), strategy.ChartTimeframe)
+	// 	return nil
+	// }
 
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
@@ -1403,9 +1403,9 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 // ProcessInstrumentData processes incoming instrument data and runs the appropriate deployments
 func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error {
 	// Store the data in the database
-	// if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
-	// 	return fmt.Errorf("failed to store instrument data: %w", err)
-	// }
+	if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
+		return fmt.Errorf("failed to store instrument data: %w", err)
+	}
 
 	// Find deployments for this instrument
 	instrumentID := int(instrumentData.ExchangeSecurityID)
