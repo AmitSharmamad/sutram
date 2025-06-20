@@ -975,6 +975,10 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		// Calculate indicator values using CalculateAll for live trading (single point calculation)
 		// Since we only have current data, we calculate for the current timestamp
 		indicatorValues := calculator.CalculateAll(indicator.Arguments, evalContext, instrumentData.Timestamp.Add(-24*time.Hour))
+		// Slice only the last 2 values from the indicator values array
+		if len(indicatorValues) >= 2 {
+			indicatorValues = indicatorValues[len(indicatorValues)-2:]
+		}
 		indicatorArrayMap[uniqueKey] = indicatorValues
 	}
 
