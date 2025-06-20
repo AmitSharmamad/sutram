@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -31,6 +33,50 @@ import (
 	userModule "algo/internal/modules/user"
 	userHttp "algo/internal/modules/user/interfaces/http"
 )
+
+// JWT payload structure for basic validation
+type JWTPayload struct {
+	Exp          int64  `json:"exp"`
+	Iss          string `json:"iss"`
+	DhanClientId string `json:"dhanClientId"`
+}
+
+// validateJWTToken performs basic JWT token validation
+func validateJWTToken(token string) error {
+	// Split the JWT token
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return fmt.Errorf("invalid JWT token format")
+	}
+
+	// Decode the payload (second part)
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return fmt.Errorf("failed to decode JWT payload: %v", err)
+	}
+
+	// Parse the payload
+	var jwtPayload JWTPayload
+	if err := json.Unmarshal(payload, &jwtPayload); err != nil {
+		return fmt.Errorf("failed to parse JWT payload: %v", err)
+	}
+
+	// Check if token is expired
+	now := time.Now().Unix()
+	if jwtPayload.Exp < now {
+		return fmt.Errorf("JWT token has expired. Expiry: %d, Current: %d", jwtPayload.Exp, now)
+	}
+
+	// Check issuer
+	if jwtPayload.Iss != "dhan" {
+		return fmt.Errorf("invalid JWT issuer: %s", jwtPayload.Iss)
+	}
+
+	log.Printf("JWT token is valid. Expires at: %s", time.Unix(jwtPayload.Exp, 0).Format(time.RFC3339))
+	log.Printf("Dhan Client ID in token: %s", jwtPayload.DhanClientId)
+
+	return nil
+}
 
 var (
 	// Map to store active WebSocket connections
@@ -544,15 +590,61 @@ func connectToUpstreamWebSocket() {
 	wsToken := getEnv("WS_TOKEN", "")
 	clientID := getEnv("WS_CLIENT_ID", "")
 
-	// Construct full WebSocket URL with parameters
+	// Validate required parameters
+	if wsToken == "" {
+		log.Printf("Error: WS_TOKEN is not set in environment variables")
+		time.Sleep(10 * time.Second)
+		go connectToUpstreamWebSocket()
+		return
+	}
+
+	if clientID == "" {
+		log.Printf("Error: WS_CLIENT_ID is not set in environment variables")
+		time.Sleep(10 * time.Second)
+		go connectToUpstreamWebSocket()
+		return
+	}
+
+	// Validate JWT token
+	if err := validateJWTToken(wsToken); err != nil {
+		log.Printf("JWT Token validation failed: %v", err)
+		log.Printf("Please update your WS_TOKEN with a valid Dhan access token")
+		time.Sleep(30 * time.Second) // Wait longer for token issues
+		go connectToUpstreamWebSocket()
+		return
+	}
+
+	// Construct full WebSocket URL with parameters according to Dhan documentation:
+	// wss://api-feed.dhan.co?version=2&token=eyxxxxx&clientId=100xxxxxxx&authType=2
 	fullWSURL := fmt.Sprintf("%s?version=2&token=%s&clientId=%s&authType=2", wsURL, wsToken, clientID)
 
 	log.Printf("Connecting to upstream WebSocket: %s", wsURL)
+	log.Printf("Using Client ID: %s", clientID)
+	log.Printf("Token length: %d characters", len(wsToken))
+	log.Printf("Full WebSocket URL: %s?version=2&token=%s...&clientId=%s&authType=2",
+		wsURL, wsToken[:20], clientID) // Only show first 20 chars of token for security
+
+	// Create request headers for better debugging
+	headers := make(map[string][]string)
+	headers["User-Agent"] = []string{"Sutram-Live-Feed/1.0"}
 
 	// Connect to the upstream WebSocket server
-	conn, _, err := wsDialer.Dial(fullWSURL, nil)
+	conn, resp, err := wsDialer.Dial(fullWSURL, headers)
 	if err != nil {
 		log.Printf("Error connecting to upstream WebSocket: %v", err)
+		if resp != nil {
+			log.Printf("HTTP Response Status: %s", resp.Status)
+			log.Printf("HTTP Response Headers: %v", resp.Header)
+			// Try to read response body for more details
+			if resp.Body != nil {
+				body := make([]byte, 1024)
+				n, _ := resp.Body.Read(body)
+				if n > 0 {
+					log.Printf("Response Body: %s", string(body[:n]))
+				}
+				resp.Body.Close()
+			}
+		}
 		// Retry connection after a delay
 		time.Sleep(5 * time.Second)
 		go connectToUpstreamWebSocket()
@@ -762,17 +854,17 @@ func processTicker(data []byte) {
 		return
 	}
 
-	// Extract data from ticker packet
-	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	ltt := binary.LittleEndian.Uint32(data[12:16])
-
-	log.Printf("Ticker: LTP: %.2f, LTT: %d", ltp, ltt)
+	// Extract data from ticker packet according to Dhan documentation
+	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12])) // Last Traded Price
+	ltt := binary.LittleEndian.Uint32(data[12:16])                      // Last Trade Time
 
 	// Extract header information
 	exchangeSegment := data[3]
 	securityID := binary.LittleEndian.Uint32(data[4:8])
 
-	// For ticker data, we don't have open/high/low values, so use LTP for all
+	log.Printf("Ticker: Security ID: %d, Exchange: %d, LTP: %.2f, LTT: %d",
+		securityID, exchangeSegment, ltp, ltt)
+
 	// Get symbol from the map of subscribed instruments
 	var symbol string
 	for key := range subscribedInstruments {
@@ -800,29 +892,22 @@ func processQuote(data []byte) {
 		return
 	}
 
-	// Extract basic quote data
-	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	// ltq := binary.LittleEndian.Uint16(data[12:14])
-	ltt := binary.LittleEndian.Uint32(data[14:18])
-	// atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
-	volume := binary.LittleEndian.Uint32(data[22:26])
-	// Additional market data fields (logging only)
-	// sellQty := binary.LittleEndian.Uint32(data[26:30])
-	// buyQty := binary.LittleEndian.Uint32(data[30:34])
+	// Extract basic quote data according to Dhan documentation
+	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))  // Latest Traded Price
+	ltq := binary.LittleEndian.Uint16(data[12:14])                       // Last Traded Quantity
+	ltt := binary.LittleEndian.Uint32(data[14:18])                       // Last Trade Time (LTT)
+	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22])) // Average Trade Price (ATP)
+	volume := binary.LittleEndian.Uint32(data[22:26])                    // Volume
+	// sellQty := binary.LittleEndian.Uint32(data[26:30])               // Total Sell Quantity
+	// buyQty := binary.LittleEndian.Uint32(data[30:34])                // Total Buy Quantity
 
-	// Extract OHLC data if available (indexes based on documentation)
+	// Extract OHLC data according to documentation
 	var open, high, low, close float32
 	if len(data) >= 50 {
-		open = math.Float32frombits(binary.LittleEndian.Uint32(data[34:38]))
-		if len(data) >= 54 {
-			close = math.Float32frombits(binary.LittleEndian.Uint32(data[38:42]))
-		}
-		if len(data) >= 46 {
-			high = math.Float32frombits(binary.LittleEndian.Uint32(data[42:46]))
-		}
-		if len(data) >= 50 {
-			low = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))
-		}
+		open = math.Float32frombits(binary.LittleEndian.Uint32(data[34:38]))  // Day Open Value
+		close = math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])) // Day Close Value
+		high = math.Float32frombits(binary.LittleEndian.Uint32(data[42:46]))  // Day High Value
+		low = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))   // Day Low Value
 	}
 
 	// If any value is 0, use ltp as fallback
@@ -839,8 +924,8 @@ func processQuote(data []byte) {
 		close = ltp
 	}
 
-	// log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
-	// 	ltp, ltq, ltt, atp, volume, open, high, low, close)
+	log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
+		ltp, ltq, ltt, atp, volume, open, high, low, close)
 
 	// Extract header information
 	exchangeSegment := data[3]
@@ -873,10 +958,14 @@ func processOpenInterest(data []byte) {
 		return
 	}
 
-	// Extract OI data
-	oi := binary.LittleEndian.Uint32(data[8:12])
+	// Extract OI data according to Dhan documentation
+	oi := binary.LittleEndian.Uint32(data[8:12]) // Open Interest of the contract
 
-	log.Printf("OI: %d", oi)
+	// Extract header information
+	exchangeSegment := data[3]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
+
+	log.Printf("OI: Security ID: %d, Exchange: %d, Open Interest: %d", securityID, exchangeSegment, oi)
 }
 
 // processPrevClose handles previous day close packet data
@@ -885,34 +974,47 @@ func processPrevClose(data []byte) {
 		return
 	}
 
-	// Extract prev close data
-	prevClose := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	prevOI := binary.LittleEndian.Uint32(data[12:16])
+	// Extract prev close data according to Dhan documentation
+	prevClose := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12])) // Previous day closing price
+	prevOI := binary.LittleEndian.Uint32(data[12:16])                         // Open Interest - previous day
 
-	log.Printf("Prev Close: %.2f, Prev OI: %d", prevClose, prevOI)
+	// Extract header information
+	exchangeSegment := data[3]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
+
+	log.Printf("Prev Close: Security ID: %d, Exchange: %d, Prev Close: %.2f, Prev OI: %d",
+		securityID, exchangeSegment, prevClose, prevOI)
 }
 
 // processFullPacket handles full market data packet
 func processFullPacket(data []byte) {
-	if len(data) < 63 {
+	if len(data) < 163 {
 		return
 	}
 
-	// Extract key data from full packet
-	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
-	ltq := binary.LittleEndian.Uint16(data[12:14])
-	ltt := binary.LittleEndian.Uint32(data[14:18])
-	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22]))
-	volume := binary.LittleEndian.Uint32(data[22:26])
+	// Extract key data from full packet according to Dhan documentation
+	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))  // Latest Traded Price
+	ltq := binary.LittleEndian.Uint16(data[12:14])                       // Last Traded Quantity
+	ltt := binary.LittleEndian.Uint32(data[14:18])                       // Last Trade Time (LTT)
+	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22])) // Average Trade Price (ATP)
+	volume := binary.LittleEndian.Uint32(data[22:26])                    // Volume
+	// sellQty := binary.LittleEndian.Uint32(data[26:30])               // Total Sell Quantity
+	// buyQty := binary.LittleEndian.Uint32(data[30:34])                // Total Buy Quantity
+	// oi := binary.LittleEndian.Uint32(data[34:38])                    // Open Interest
+	// highOI := binary.LittleEndian.Uint32(data[38:42])                // Highest Open Interest
+	// lowOI := binary.LittleEndian.Uint32(data[42:46])                 // Lowest Open Interest
 
-	// Extract OHLC data
+	// Extract OHLC data according to documentation
 	var open, high, low, close float32
 	if len(data) >= 63 {
-		open = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))
-		close = math.Float32frombits(binary.LittleEndian.Uint32(data[50:54]))
-		high = math.Float32frombits(binary.LittleEndian.Uint32(data[54:58]))
-		low = math.Float32frombits(binary.LittleEndian.Uint32(data[58:62]))
+		open = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))  // Day Open Value
+		close = math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])) // Day Close Value
+		high = math.Float32frombits(binary.LittleEndian.Uint32(data[54:58]))  // Day High Value
+		low = math.Float32frombits(binary.LittleEndian.Uint32(data[58:62]))   // Day Low Value
 	}
+
+	// Market Depth data starts at byte 62 (5 packets of 20 bytes each)
+	// We're not processing market depth for now, but it's available in data[62:162]
 
 	// If any value is 0, use ltp as fallback
 	if open == 0 {
@@ -1045,42 +1147,50 @@ func toInstrument(data []byte) *model.Instrument {
 		ltt                    uint32  // Last trade time
 	)
 
-	// Process based on feed code - most complete data comes from quote/full packets
-	if feedCode == FeedCodeQuote || feedCode == FeedCodeFull {
-		// Extract LTP - at bytes 8-12 for quote/full packets
+	// Process based on feed code according to Dhan documentation
+	if feedCode == FeedCodeQuote {
+		// Quote packet structure
 		if len(data) >= 12 {
 			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
 		}
-
-		// Extract LTT (Last Trade Time) - at bytes 14-18 for quote/full packets
 		if len(data) >= 18 {
 			ltt = binary.LittleEndian.Uint32(data[14:18])
 		}
-
-		// Extract volume if available
 		if len(data) >= 26 {
 			volume = float64(binary.LittleEndian.Uint32(data[22:26]))
 		}
 
-		// Extract OHLC data if available
+		// Extract OHLC data from quote packet
 		if len(data) >= 50 {
 			open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[34:38])))
-			if len(data) >= 54 {
-				close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])))
-			}
-			if len(data) >= 46 {
-				high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[42:46])))
-			}
-			if len(data) >= 50 {
-				low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
-			}
+			close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])))
+			high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[42:46])))
+			low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
 		}
-	} else if feedCode == FeedCodeTicker {
-		// For ticker packets, extract LTP and LTT
+	} else if feedCode == FeedCodeFull {
+		// Full packet structure
 		if len(data) >= 12 {
 			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
 		}
-		// Extract LTT (Last Trade Time) - at bytes 12-16 for ticker packets
+		if len(data) >= 18 {
+			ltt = binary.LittleEndian.Uint32(data[14:18])
+		}
+		if len(data) >= 26 {
+			volume = float64(binary.LittleEndian.Uint32(data[22:26]))
+		}
+
+		// Extract OHLC data from full packet
+		if len(data) >= 63 {
+			open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
+			close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])))
+			high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[54:58])))
+			low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[58:62])))
+		}
+	} else if feedCode == FeedCodeTicker {
+		// Ticker packet structure
+		if len(data) >= 12 {
+			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		}
 		if len(data) >= 16 {
 			ltt = binary.LittleEndian.Uint32(data[12:16])
 		}
