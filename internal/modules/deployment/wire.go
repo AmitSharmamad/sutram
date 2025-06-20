@@ -52,6 +52,7 @@ func ProvideDeploymentService(
 	positionRepo repository.DeploymentPositionRepository,
 	metricsRepo repository.DeploymentMetricsRepository,
 	instrumentRepo instrumentRepository.InstrumentRepository,
+	instrumentMasterRepo instrumentRepository.InstrumentMasterRepository,
 	engine *backtestEngine.BacktestEngine,
 	eventPublisher service.DeploymentEventPublisher,
 ) service.DeploymentService {
@@ -62,6 +63,7 @@ func ProvideDeploymentService(
 		positionRepo,
 		metricsRepo,
 		instrumentRepo,
+		instrumentMasterRepo,
 		engine,
 		eventPublisher,
 	)

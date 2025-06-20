@@ -19,6 +19,7 @@ type Module struct {
 	db             *sql.DB
 	controller     *http.CommunityController
 	userController interface{}
+	userService    *service.UserService
 }
 
 // ProvideModule provides a wire provider set for the community module
@@ -72,6 +73,9 @@ func (m *Module) initialize() {
 	pollService := service.NewPollService(pollRepo, topicRepo)
 	badgeService := service.NewBadgeService(badgeRepo, userReputationRepo)
 
+	// Store the user service
+	m.userService = userService
+
 	// Create controller
 	m.controller = http.NewCommunityController(
 		topicService,
@@ -106,4 +110,9 @@ func (m *Module) GetController() *http.CommunityController {
 // SetUserController sets the user controller for auth middleware
 func (m *Module) SetUserController(userController interface{}) {
 	m.userController = userController
+}
+
+// GetUserService returns the community user service
+func (m *Module) GetUserService() *service.UserService {
+	return m.userService
 }

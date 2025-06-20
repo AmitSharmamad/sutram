@@ -91,6 +91,7 @@ func (m *Module) initializeComponents() {
 		// In a real app, you would handle this better
 	}
 	instrumentRepository := instrumentRepo.NewInstrumentRepository(chDB)
+	instrumentMasterRepository := instrumentRepo.NewInstrumentMasterRepository(chDB)
 
 	// For now, create a nil backtest engine
 	// In a real implementation, we would obtain this from the backtest module
@@ -108,6 +109,7 @@ func (m *Module) initializeComponents() {
 		positionRepo,
 		metricsRepo,
 		instrumentRepository,
+		instrumentMasterRepository,
 		engine,
 		eventPublisher,
 	)

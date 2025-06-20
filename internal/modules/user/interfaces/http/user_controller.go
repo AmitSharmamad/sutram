@@ -14,15 +14,17 @@ import (
 
 // UserController handles user-related HTTP requests
 type UserController struct {
-	authService *service.AuthService
-	userService *service.UserService
+	authService      *service.AuthService
+	userService      *service.UserService
+	dashboardService *service.DashboardService
 }
 
 // NewUserController creates a new user controller
-func NewUserController(authService *service.AuthService, userService *service.UserService) *UserController {
+func NewUserController(authService *service.AuthService, userService *service.UserService, dashboardService *service.DashboardService) *UserController {
 	return &UserController{
-		authService: authService,
-		userService: userService,
+		authService:      authService,
+		userService:      userService,
+		dashboardService: dashboardService,
 	}
 }
 
@@ -851,12 +853,50 @@ func modelToDTO(user *model.User) *dto.UserDTO {
 	}
 }
 
+// GetAuthService returns the auth service
+func (c *UserController) GetAuthService() *service.AuthService {
+	return c.authService
+}
+
 // GetUserService returns the user service
 func (c *UserController) GetUserService() *service.UserService {
 	return c.userService
 }
 
-// GetAuthService returns the auth service
-func (c *UserController) GetAuthService() *service.AuthService {
-	return c.authService
+// GetDashboardStatistics returns comprehensive dashboard statistics for the authenticated user
+func (c *UserController) GetDashboardStatistics(ctx *gin.Context) {
+	// Get the token from header
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "No token provided",
+		})
+		return
+	}
+
+	// Get the user from token
+	user, err := c.authService.GetUserFromToken(ctx.Request.Context(), tokenString)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid token: " + err.Error(),
+		})
+		return
+	}
+
+	// Get dashboard statistics
+	statistics, err := c.dashboardService.GetDashboardStatistics(ctx.Request.Context(), user.ID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to fetch dashboard statistics: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    statistics,
+	})
 }
