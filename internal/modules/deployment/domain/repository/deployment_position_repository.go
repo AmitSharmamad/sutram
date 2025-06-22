@@ -33,7 +33,7 @@ type DeploymentPositionRepository interface {
 	Update(ctx context.Context, position *model.DeploymentPosition) error
 
 	// ClosePosition updates a position with exit details
-	ClosePosition(ctx context.Context, id int64, exitPrice float64, exitTime time.Time) error
+	ClosePosition(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, exitReason string) error
 
 	// CancelPosition marks a position as canceled
 	CancelPosition(ctx context.Context, id int64) error

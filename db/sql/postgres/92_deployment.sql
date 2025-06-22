@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS deployment_position (
     entry_time TIMESTAMP NOT NULL,
     exit_price DECIMAL,
     exit_time TIMESTAMP,
+    exit_reason VARCHAR,
     pnl DECIMAL,
     status VARCHAR NOT NULL,
     direction VARCHAR,
