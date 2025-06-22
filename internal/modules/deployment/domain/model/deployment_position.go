@@ -18,6 +18,18 @@ const (
 	PositionCanceled PositionStatus = "CANCELED"
 )
 
+// ExitReason defines the reason for exiting a position (matching backtest constants)
+type ExitReason string
+
+const (
+	ExitReasonSignal           ExitReason = "Exit signal"
+	ExitReasonStopLoss         ExitReason = "Stop loss"
+	ExitReasonTrailingStopLoss ExitReason = "Trailing Stop loss"
+	ExitReasonTargetProfit     ExitReason = "Target profit"
+	ExitReasonMISSquareOff     ExitReason = "EOD Square-off"
+	ExitReasonTimeout          ExitReason = "Timeout"
+)
+
 // DeploymentPosition represents a position for a deployment
 type DeploymentPosition struct {
 	ID           uuid.UUID       `json:"id" db:"id"`
@@ -28,6 +40,7 @@ type DeploymentPosition struct {
 	EntryTime    time.Time       `json:"entry_time" db:"entry_time"`
 	ExitPrice    *float64        `json:"exit_price" db:"exit_price"`
 	ExitTime     *time.Time      `json:"exit_time" db:"exit_time"`
+	ExitReason   *string         `json:"exit_reason" db:"exit_reason"`
 	PNL          *float64        `json:"pnl" db:"pnl"`
 	Status       PositionStatus  `json:"status" db:"status"`
 	Metadata     json.RawMessage `json:"metadata" db:"metadata"`
@@ -76,9 +89,10 @@ func NewDeploymentPosition(
 }
 
 // ClosePosition closes the position with the exit details
-func (p *DeploymentPosition) ClosePosition(exitPrice float64, exitTime time.Time) {
+func (p *DeploymentPosition) ClosePosition(exitPrice float64, exitTime time.Time, exitReason string) {
 	p.ExitPrice = &exitPrice
 	p.ExitTime = &exitTime
+	p.ExitReason = &exitReason
 	pnl := (exitPrice - p.EntryPrice) * p.Quantity
 	p.PNL = &pnl
 	p.Status = PositionClosed
@@ -109,5 +123,11 @@ func (p *DeploymentPosition) SetTargetProfitPrice(targetProfitPrice float64) {
 // UpdateStopLossPrice updates the stop loss price (for trailing stops)
 func (p *DeploymentPosition) UpdateStopLossPrice(newStopLossPrice float64) {
 	p.StopLossPrice = &newStopLossPrice
+	p.UpdatedAt = time.Now()
+}
+
+// SetExitReason sets the exit reason for the position
+func (p *DeploymentPosition) SetExitReason(exitReason string) {
+	p.ExitReason = &exitReason
 	p.UpdatedAt = time.Now()
 }

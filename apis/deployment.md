@@ -580,6 +580,7 @@ curl -X GET "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c1
       "entry_time": "2025-05-23T10:45:30Z",
       "exit_price": 45200.75,
       "exit_time": "2025-05-23T14:20:15Z",
+      "exit_reason": "TAKE_PROFIT",
       "pnl": 60.075,
       "status": "CLOSED",
       "metadata": {},
@@ -681,7 +682,8 @@ curl -X PUT "http://localhost:8080/api/deployment/positions/456/close" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "exit_price": 45500.75,
-    "exit_time": "2025-05-23T18:45:30Z"
+    "exit_time": "2025-05-23T18:45:30Z",
+    "exit_reason": "TAKE_PROFIT"
   }'
 ```
 
@@ -693,7 +695,8 @@ curl -X PUT "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c1
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "exit_price": 45500.75,
-    "exit_time": "2025-05-23T18:45:30Z"
+    "exit_time": "2025-05-23T18:45:30Z",
+    "exit_reason": "TAKE_PROFIT"
   }'
 ```
 
@@ -710,6 +713,7 @@ curl -X PUT "http://localhost:8080/api/deployment/a7f12e54-6b9d-4b8e-9a2c-89d4c1
     "entry_time": "2025-05-23T15:30:45Z",
     "exit_price": 45500.75,
     "exit_time": "2025-05-23T18:45:30Z",
+    "exit_reason": "TAKE_PROFIT",
     "pnl": 125.0625,
     "status": "CLOSED",
     "metadata": {},

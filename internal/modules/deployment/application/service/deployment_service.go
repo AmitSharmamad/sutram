@@ -72,6 +72,13 @@ type DeploymentService interface {
 	GetPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
 	GetOpenPositionsByDeployment(ctx context.Context, deploymentID uuid.UUID, userID uuid.UUID) ([]*dto.PositionResponse, error)
 	ClosePosition(ctx context.Context, id int64, req *dto.ClosePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
+	// Additional position closing methods with specific exit reasons
+	ClosePositionWithReason(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, exitReason string, userID uuid.UUID) (*dto.PositionResponse, error)
+	ClosePositionWithStopLoss(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
+	ClosePositionWithTakeProfit(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
+	ClosePositionWithTimeout(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
+	ClosePositionWithStrategy(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
+	UpdatePositionExitReason(ctx context.Context, id int64, exitReason string, userID uuid.UUID) error
 	CancelPosition(ctx context.Context, id int64, userID uuid.UUID) error
 
 	// Deployment metrics operations
@@ -1008,7 +1015,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			exitTime := instrumentData.Timestamp
 
 			// Update position with exit details
-			currentPosition.ClosePosition(exitPrice, exitTime)
+			currentPosition.ClosePosition(exitPrice, exitTime, string(model.ExitReasonMISSquareOff))
 
 			// Persist the position update
 			if err := s.positionRepo.Update(ctx, currentPosition); err != nil {
@@ -1023,7 +1030,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					PositionID: currentPosition.ID.String(),
 					ExitPrice:  exitPrice,
 					ExitTime:   exitTime,
-					ExitReason: "EOD MIS Square-off",
+					ExitReason: string(model.ExitReasonMISSquareOff),
 					PNL: func() float64 {
 						if currentPosition.PNL != nil {
 							return *currentPosition.PNL
@@ -1044,7 +1051,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 						"position_id": currentPosition.ID,
 						"exit_price":  exitPrice,
 						"exit_time":   exitTime,
-						"exit_reason": "EOD MIS Square-off",
+						"exit_reason": string(model.ExitReasonMISSquareOff),
 						"pnl":         currentPosition.PNL,
 					},
 				)
@@ -1079,20 +1086,20 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 				// Determine exit reason
 				if stopLossTriggered {
-					exitReason = "Stop Loss"
+					exitReason = string(model.ExitReasonStopLoss)
 					if currentPosition.InitialStopLossPrice != nil &&
 						currentPosition.StopLossPrice != nil &&
 						*currentPosition.StopLossPrice != *currentPosition.InitialStopLossPrice {
-						exitReason = "Trailing Stop Loss"
+						exitReason = string(model.ExitReasonTrailingStopLoss)
 					}
 				} else if targetProfitTriggered {
-					exitReason = "Target Profit"
+					exitReason = string(model.ExitReasonTargetProfit)
 				} else {
-					exitReason = "Exit Signal"
+					exitReason = string(model.ExitReasonSignal)
 				}
 
 				// Update position with exit details
-				currentPosition.ClosePosition(exitPrice, exitTime)
+				currentPosition.ClosePosition(exitPrice, exitTime, exitReason)
 
 				// Persist the position update
 				if err := s.positionRepo.Update(ctx, currentPosition); err != nil {

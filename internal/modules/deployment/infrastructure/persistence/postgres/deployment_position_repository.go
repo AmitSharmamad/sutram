@@ -32,11 +32,11 @@ func (r *PgDeploymentPositionRepository) Create(ctx context.Context, position *m
 	query := `
 		INSERT INTO deployment_position (
 			deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price, 
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price, 
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		)
 		VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 		)
 		RETURNING id
 	`
@@ -52,6 +52,7 @@ func (r *PgDeploymentPositionRepository) Create(ctx context.Context, position *m
 		position.EntryTime,
 		position.ExitPrice,
 		position.ExitTime,
+		position.ExitReason,
 		position.PNL,
 		position.Status,
 		position.Direction,
@@ -76,7 +77,7 @@ func (r *PgDeploymentPositionRepository) GetByID(ctx context.Context, id int64) 
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price,
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE id = $1
@@ -99,7 +100,7 @@ func (r *PgDeploymentPositionRepository) GetByDeploymentID(ctx context.Context, 
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price,
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1
@@ -120,7 +121,7 @@ func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentID(ctx cont
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price,
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1 AND status = $2
@@ -156,7 +157,7 @@ func (r *PgDeploymentPositionRepository) GetOpenPositionsByDeploymentIDs(ctx con
 	query := fmt.Sprintf(`
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price,
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id IN (%s) AND status = $%d
@@ -187,7 +188,7 @@ func (r *PgDeploymentPositionRepository) GetByDeploymentAndInstrument(ctx contex
 	query := `
 		SELECT 
 			id, deployment_id, instrument_id, quantity, entry_price, entry_time,
-			exit_price, exit_time, pnl, status, direction, stop_loss_price,
+			exit_price, exit_time, exit_reason, pnl, status, direction, stop_loss_price,
 			initial_stop_loss_price, target_profit_price, metadata, created_at, updated_at
 		FROM deployment_position
 		WHERE deployment_id = $1 AND instrument_id = $2
@@ -213,15 +214,16 @@ func (r *PgDeploymentPositionRepository) Update(ctx context.Context, position *m
 			entry_time = $3,
 			exit_price = $4,
 			exit_time = $5,
-			pnl = $6,
-			status = $7,
-			direction = $8,
-			stop_loss_price = $9,
-			initial_stop_loss_price = $10,
-			target_profit_price = $11,
-			metadata = $12,
-			updated_at = $13
-		WHERE id = $14
+			exit_reason = $6,
+			pnl = $7,
+			status = $8,
+			direction = $9,
+			stop_loss_price = $10,
+			initial_stop_loss_price = $11,
+			target_profit_price = $12,
+			metadata = $13,
+			updated_at = $14
+		WHERE id = $15
 	`
 
 	_, err := r.db.ExecContext(
@@ -232,6 +234,7 @@ func (r *PgDeploymentPositionRepository) Update(ctx context.Context, position *m
 		position.EntryTime,
 		position.ExitPrice,
 		position.ExitTime,
+		position.ExitReason,
 		position.PNL,
 		position.Status,
 		position.Direction,
@@ -251,7 +254,7 @@ func (r *PgDeploymentPositionRepository) Update(ctx context.Context, position *m
 }
 
 // ClosePosition updates a position with exit details
-func (r *PgDeploymentPositionRepository) ClosePosition(ctx context.Context, id int64, exitPrice float64, exitTime time.Time) error {
+func (r *PgDeploymentPositionRepository) ClosePosition(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, exitReason string) error {
 	// First retrieve the position to calculate PnL
 	position, err := r.GetByID(ctx, id)
 	if err != nil {
@@ -262,7 +265,7 @@ func (r *PgDeploymentPositionRepository) ClosePosition(ctx context.Context, id i
 		return errors.New("position not found")
 	}
 
-	position.ClosePosition(exitPrice, exitTime)
+	position.ClosePosition(exitPrice, exitTime, exitReason)
 
 	return r.Update(ctx, position)
 }
