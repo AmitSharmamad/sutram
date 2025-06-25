@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 
 	deploymentModule "algo/internal/modules/deployment"
 	deploymentService "algo/internal/modules/deployment/application/service"
@@ -116,53 +117,53 @@ func getActiveDeploymentsByTimeframe(ctx context.Context, deploymentSvc deployme
 }
 
 // timeframeToCron converts a timeframe string to a cron expression
+// Returns cron expressions that align to absolute times (e.g., 9:15:00, 9:16:00 for 1m)
+// Format: second minute hour day month weekday
 func timeframeToCron(timeframe string) string {
 	switch timeframe {
 	case "1m":
-		return "@every 1m"
+		return "0 * * * * *" // Every minute at :00 seconds
 	case "5m":
-		return "@every 5m"
+		return "0 */5 * * * *" // Every 5 minutes at :00 seconds (e.g., 9:15:00, 9:20:00)
 	case "15m":
-		return "@every 15m"
+		return "0 */15 * * * *" // Every 15 minutes at :00 seconds (e.g., 9:15:00, 9:30:00)
 	case "1h":
-		return "@every 1h"
+		return "0 0 * * * *" // Every hour at :00 minutes :00 seconds (e.g., 9:00:00, 10:00:00)
 	default:
-		return "@every 1m"
+		return "0 * * * * *" // Default to every minute
 	}
 }
 
-// scheduleDeployments runs deployments on the given cron schedule
+// scheduleDeployments runs deployments on the given cron schedule using proper cron expressions
 func scheduleDeployments(ctx context.Context, cronExpr string, deployments []*deploymentService.DeploymentWithStrategy, svc deploymentService.DeploymentService) {
-	dur, err := parseCronToDuration(cronExpr)
+	c := cron.New(cron.WithSeconds()) // Enable seconds field for more precise timing
+
+	// Add job for each deployment set
+	_, err := c.AddFunc(cronExpr, func() {
+		currentTimestamp := time.Now()
+		log.Printf("Running %d deployments at %v", len(deployments), currentTimestamp)
+
+		for _, dep := range deployments {
+			go func(d *deploymentService.DeploymentWithStrategy) {
+				if err := svc.RunWithTimestamp(ctx, d, currentTimestamp); err != nil {
+					log.Printf("Deployment %v run error: %v", d.Deployment.ID, err)
+				}
+			}(dep)
+		}
+	})
+
 	if err != nil {
-		log.Printf("Invalid cron expression %s: %v", cronExpr, err)
+		log.Printf("Failed to add cron job with expression %s: %v", cronExpr, err)
 		return
 	}
-	ticker := time.NewTicker(dur)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			currentTimestamp := time.Now()
-			for _, dep := range deployments {
-				go func(d *deploymentService.DeploymentWithStrategy) {
-					if err := svc.RunWithTimestamp(ctx, d, currentTimestamp); err != nil {
-						log.Printf("Deployment %v run error: %v", d.Deployment.ID, err)
-					}
-				}(dep)
-			}
-		}
-	}
-}
 
-// parseCronToDuration parses @every cron expressions to time.Duration
-func parseCronToDuration(cronExpr string) (time.Duration, error) {
-	if len(cronExpr) > 7 && cronExpr[:6] == "@every" {
-		return time.ParseDuration(cronExpr[7:])
-	}
-	return 0, fmt.Errorf("unsupported cron expression: %s", cronExpr)
+	log.Printf("Started cron scheduler with expression: %s", cronExpr)
+	c.Start()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	log.Printf("Stopping cron scheduler")
+	c.Stop()
 }
 
 // startWebSocketServer starts the HTTP server with WebSocket support for deployment events
@@ -185,13 +186,18 @@ func startWebSocketServer(deploymentMod *deploymentModule.Module, userController
 	// Register deployment module routes (including WebSocket routes)
 	deploymentMod.RegisterRoutes(apiRouter)
 
+	// Setup WebSocket routes with /ws prefix for compatibility
+	wsRouter := router.Group("/ws")
+	wsApiRouter := wsRouter.Group("/api")
+	deploymentMod.RegisterRoutes(wsApiRouter)
+
 	// Add status endpoint
 	apiRouter.GET("/deployment/status", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "running",
 			"time":   time.Now().Format(time.RFC3339),
 			"websocket_endpoints": gin.H{
-				"deployment_events": "/api/deployment/events/ws",
+				"deployment_events": "/ws/api/deployment/events/ws",
 			},
 		})
 	})
