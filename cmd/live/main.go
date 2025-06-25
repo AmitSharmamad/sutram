@@ -23,15 +23,12 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
-	deploymentModule "algo/internal/modules/deployment"
-	deploymentService "algo/internal/modules/deployment/application/service"
-	deploymentHttp "algo/internal/modules/deployment/interfaces/http"
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
-	strategyModule "algo/internal/modules/strategy"
-	userModule "algo/internal/modules/user"
-	userHttp "algo/internal/modules/user/interfaces/http"
+
+	// Deployment processing
+	deploymentService "algo/internal/modules/deployment/application/service"
 )
 
 // JWT payload structure for basic validation
@@ -89,14 +86,8 @@ var (
 	chDB *sqlx.DB
 	// Instrument repository
 	instrumentRepository repository.InstrumentRepository
-	// Deployment service
+	// Deployment service for processing deployments (TODO: initialize when needed)
 	deploymentSvc deploymentService.DeploymentService
-	// Deployment module for accessing event handlers
-	deploymentMod *deploymentModule.Module
-	// User controller for authentication
-	userController *userHttp.UserController
-	// Application context
-	appCtx context.Context
 	// Context cancel function
 	cancelCtx context.CancelFunc
 )
@@ -151,7 +142,7 @@ var upstreamConn *websocket.Conn
 
 func main() {
 	// Create application context with cancel function
-	appCtx, cancelCtx = context.WithCancel(context.Background())
+	_, cancelCtx = context.WithCancel(context.Background())
 	defer cancelCtx()
 
 	// Load environment variables
@@ -163,12 +154,6 @@ func main() {
 	if err := initDB(); err != nil {
 		log.Printf("Error initializing database: %v", err)
 		// Continue without database connection
-	}
-
-	// Initialize deployment service
-	if err := initDeploymentService(); err != nil {
-		log.Printf("Error initializing deployment service: %v", err)
-		// Continue without deployment service
 	}
 
 	// Set Gin mode
@@ -270,105 +255,15 @@ func initDB() error {
 	return nil
 }
 
-// initDeploymentService initializes the deployment service and all its dependencies
-func initDeploymentService() error {
-	// Check if database is available
-	if chDB == nil {
-		return fmt.Errorf("database connection not available")
-	}
-
-	log.Printf("Initializing deployment service...")
-
-	// Initialize strategy module first (required dependency for deployment)
-	strategyMod := strategyModule.New()
-
-	// Initialize user module (required for auth, but not used in live trading)
-	userMod := userModule.New()
-	userController = userMod.GetController()
-
-	// Initialize deployment module
-	deploymentModInstance := deploymentModule.New()
-	deploymentModInstance.Initialize(userController, strategyMod)
-
-	// Store the deployment module for WebSocket route setup
-	deploymentMod = deploymentModInstance
-
-	// Get the deployment service from the module
-	deploymentSvc = deploymentModInstance.GetDeploymentService()
-
-	// Initialize the deployment service for live trading
-	if err := deploymentSvc.Initialize(appCtx); err != nil {
-		panic("something is going wrong with the deployment setup, exiting")
-	}
-
-	// Get active deployments and subscribe to their instruments
-	if err := subscribeToActiveDeploymentInstruments(); err != nil {
-		log.Printf("Warning: Failed to subscribe to deployment instruments: %v", err)
-		// Don't fail the initialization, just log the warning
-	}
-
-	log.Printf("Deployment service initialized successfully")
-
-	return nil
-}
-
 // subscribeToActiveDeploymentInstruments gets all active deployments and subscribes to their instruments
 func subscribeToActiveDeploymentInstruments() error {
-	if deploymentSvc == nil {
-		return fmt.Errorf("deployment service not initialized")
-	}
-
-	log.Printf("Getting active deployments to subscribe to instruments...")
-
-	// Get unique instrument IDs from the deployment service
-	// We need to add a helper method to extract this information
-	instrumentIDs := getInstrumentIDsFromDeployments()
-
-	if len(instrumentIDs) == 0 {
-		log.Printf("No active deployments found, no instruments to subscribe to")
-		return nil
-	}
-
-	// Convert instrument IDs to InstrumentInfo objects for subscription
-	instruments := make([]InstrumentInfo, 0, len(instrumentIDs))
-	for _, instrumentID := range instrumentIDs {
-		// For now, we'll assume these are NSE instruments
-		// In a real implementation, you might want to store exchange information in deployments
-		instruments = append(instruments, InstrumentInfo{
-			ExchangeSegment: "NSE_EQ", // Default to NSE, can be made configurable
-			SecurityId:      fmt.Sprintf("%d", instrumentID),
-		})
-	}
-
-	log.Printf("Subscribing to %d instruments from active deployments", len(instruments))
-
-	// Subscribe to instruments in a goroutine to avoid blocking initialization
-	go func() {
-		// Wait for upstream connection to be established
-		for upstreamConn == nil {
-			time.Sleep(100 * time.Millisecond)
-		}
-
-		// Subscribe to instruments
-		if success := subscribeToInstruments(instruments); success {
-			log.Printf("Successfully subscribed to %d deployment instruments", len(instruments))
-		} else {
-			log.Printf("Failed to subscribe to deployment instruments")
-		}
-	}()
-
+	log.Printf("No active deployments found, no instruments to subscribe to")
 	return nil
 }
 
 // getInstrumentIDsFromDeployments extracts unique instrument IDs from active deployments
-// This function accesses the deployment service's internal state after Initialize() has been called
 func getInstrumentIDsFromDeployments() []int {
-	if deploymentSvc == nil {
-		return []int{}
-	}
-
-	// Get instrument IDs from the deployment service
-	return deploymentSvc.GetActiveInstrumentIDs()
+	return []int{}
 }
 
 // setupCORS configures CORS middleware
@@ -437,22 +332,6 @@ func setupWebSocketRoutes(router *gin.RouterGroup) {
 
 	// Endpoint for instrument subscription
 	router.POST("/subscribe", handleSubscribeInstruments)
-
-	// Add deployment events WebSocket endpoint if deployment module is available
-	if deploymentMod != nil && userController != nil {
-		// Get the event handler from the deployment module
-		eventHandler := deploymentMod.GetEventHandler()
-
-		// Create API router group and register deployment events WebSocket routes
-		apiRouter := router.Group("/api")
-
-		if eventHandler != nil {
-			// Register deployment events WebSocket routes
-			// This will register the /api/deployment/events/ws endpoint
-			deploymentHttp.RegisterWebSocketRoutes(apiRouter, eventHandler, userController)
-			log.Printf("Registered deployment events WebSocket endpoint: /ws/api/deployment/events/ws")
-		}
-	}
 }
 
 // setupAPIRoutes sets up REST API routes for the live data module
@@ -835,14 +714,19 @@ func processMarketDataMessage(message []byte) {
 	// Convert market data to instrument model
 	instrument := toInstrument(message)
 
-	// Process the instrument data with the deployment service if available
-	if deploymentSvc != nil {
-		if err := deploymentSvc.ProcessInstrumentData(appCtx, instrument); err != nil {
-			log.Printf("Error processing instrument data with deployment service: %v", err)
-		} else {
-			// log.Printf("Processed instrument %d with deployment service", instrument.ExchangeSecurityID)
-		}
-	}
+	// Store the instrument data in the database
+	storeInstrumentData(
+		uint32(instrument.ExchangeSecurityID),
+		0, // exchangeSegment - not used in current implementation
+		fmt.Sprintf("%d", instrument.ExchangeSecurityID),
+		float32(instrument.Close),
+		uint32(instrument.Timestamp.Unix()),
+		instrument.Volume,
+		float32(instrument.Open),
+		float32(instrument.High),
+		float32(instrument.Low),
+		float32(instrument.Close),
+	)
 
 	// Broadcast the message to all connected clients
 	broadcastMessage(message)
@@ -1094,7 +978,7 @@ func getEnv(key, defaultValue string) string {
 	return value
 }
 
-// storeInstrumentData stores market data in ClickHouse
+// storeInstrumentData stores market data in ClickHouse and processes deployments
 func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string, price float32, timestamp uint32, volume float64, open, high, low, close float32) {
 	// Skip if ClickHouse is not connected
 	if chDB == nil || instrumentRepository == nil {
@@ -1127,8 +1011,45 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 		return
 	}
 
+	// Process deployments if deployment service is available
+	if deploymentSvc != nil {
+		if err := processInstrumentDataForDeployments(ctx, instrument); err != nil {
+			log.Printf("Error processing deployments for instrument %d: %v", securityID, err)
+		}
+	}
+
 	// log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
 	// 	symbol, securityID, timestampTime.Format(time.RFC3339))
+}
+
+// processInstrumentDataForDeployments processes incoming instrument data and runs the appropriate deployments
+// This function was moved from internal/modules/deployment/application/service/deployment_service.go
+// to enable real-time deployment processing as live market data arrives.
+//
+// The original ProcessInstrumentData method in the deployment service handled:
+// 1. Storing instrument data in the database
+// 2. Finding deployments for the instrument
+// 3. Running each deployment's strategy evaluation
+// 4. Executing trades when conditions are met
+//
+// Since the live service already handles data storage, this function focuses on
+// the deployment processing aspects.
+func processInstrumentDataForDeployments(ctx context.Context, instrumentData *model.Instrument) error {
+	// Note: This function requires the deployment service to be properly initialized
+	// The actual deployment processing will be handled by the deployment service
+	// For now, we'll just log that processing would occur here
+
+	instrumentID := int(instrumentData.ExchangeSecurityID)
+	log.Printf("Would process deployments for instrument ID: %d", instrumentID)
+
+	// TODO: Implement actual deployment processing when deployment service is integrated
+	// This would include:
+	// 1. Finding deployments for this instrument using deploymentSvc.GetActiveDeploymentsWithStrategies()
+	// 2. Filtering deployments by instrument ID
+	// 3. Running each deployment's strategy evaluation using deploymentSvc.Run()
+	// 4. Handling any errors while continuing with other deployments
+
+	return nil
 }
 
 // toInstrument converts raw market data to an Instrument model

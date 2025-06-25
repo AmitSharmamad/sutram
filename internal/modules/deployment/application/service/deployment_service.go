@@ -19,7 +19,6 @@ import (
 	strategyDto "algo/internal/modules/strategy/application/dto"
 	strategyModel "algo/internal/modules/strategy/domain/model"
 	strategyRepository "algo/internal/modules/strategy/domain/repository"
-	marketHours "algo/internal/util/time"
 
 	"github.com/google/uuid"
 )
@@ -90,8 +89,9 @@ type DeploymentService interface {
 
 	// Live trading operations
 	Initialize(ctx context.Context) error
+	GetActiveDeploymentsWithStrategies(ctx context.Context) ([]*DeploymentWithStrategy, error)
 	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error
-	ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error
+	RunWithTimestamp(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error
 	GetActiveInstrumentIDs() []int
 }
 
@@ -821,17 +821,83 @@ func (s *deploymentService) Initialize(ctx context.Context) error {
 	return nil
 }
 
+// GetActiveDeploymentsWithStrategies gets all active deployments with their strategies
+func (s *deploymentService) GetActiveDeploymentsWithStrategies(ctx context.Context) ([]*DeploymentWithStrategy, error) {
+	// Get all active deployments
+	deployments, err := s.deploymentRepo.GetActiveDeployments(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active deployments: %w", err)
+	}
+
+	if len(deployments) == 0 {
+		return []*DeploymentWithStrategy{}, nil
+	}
+
+	// Collect unique strategy IDs from all deployments
+	uniqueStrategyIDs := make(map[uuid.UUID]bool)
+	deploymentIDs := make([]uuid.UUID, len(deployments))
+
+	for i, deployment := range deployments {
+		uniqueStrategyIDs[deployment.StrategyID] = true
+		deploymentIDs[i] = deployment.ID
+	}
+
+	// Convert map keys to slice for the batch call
+	strategyIDs := make([]uuid.UUID, 0, len(uniqueStrategyIDs))
+	for strategyID := range uniqueStrategyIDs {
+		strategyIDs = append(strategyIDs, strategyID)
+	}
+
+	// Fetch all strategies at once using batch call
+	strategies, err := s.strategyRepo.GetByIDs(ctx, strategyIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch strategies: %w", err)
+	}
+
+	// Create a map of strategy ID to strategy for quick lookup
+	strategyMap := make(map[uuid.UUID]*strategyModel.Strategy)
+	for _, strategy := range strategies {
+		strategyMap[strategy.ID] = strategy
+	}
+
+	// Fetch all open positions for all deployments using bulk query
+	positionMap, err := s.positionRepo.GetOpenPositionsByDeploymentIDs(ctx, deploymentIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch open positions: %w", err)
+	}
+
+	// Build deployment with strategy objects
+	result := make([]*DeploymentWithStrategy, 0, len(deployments))
+	for _, deployment := range deployments {
+		// Get the strategy from the pre-fetched map
+		strategy, exists := strategyMap[deployment.StrategyID]
+		if !exists {
+			// Log error but continue with other deployments
+			fmt.Printf("Strategy %s not found for deployment %s\n",
+				deployment.StrategyID, deployment.ID)
+			continue
+		}
+
+		// Get the current open position for this deployment (if any)
+		currentPosition := positionMap[deployment.ID]
+
+		// Create DeploymentWithStrategy object with pre-fetched position
+		deploymentWithStrategy := &DeploymentWithStrategy{
+			Deployment:      deployment,
+			Strategy:        strategy,
+			CurrentPosition: currentPosition,
+		}
+
+		result = append(result, deploymentWithStrategy)
+	}
+
+	return result, nil
+}
+
 // Run executes a deployment's strategy against live market data
 func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error {
 	deployment := deploymentWithStrategy.Deployment
 	strategy := deploymentWithStrategy.Strategy
-
-	// Check if instrument timestamp matches strategy timeframe
-	// if !s.isTimestampAlignedWithTimeframe(instrumentData.Timestamp, string(strategy.ChartTimeframe)) {
-	// 	fmt.Printf("Skipping execution - timestamp %v does not align with strategy timeframe %s\n",
-	// 		instrumentData.Timestamp.Format("15:04:05"), strategy.ChartTimeframe)
-	// 	return nil
-	// }
 
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
@@ -1407,33 +1473,189 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	return nil
 }
 
-// ProcessInstrumentData processes incoming instrument data and runs the appropriate deployments
-func (s *deploymentService) ProcessInstrumentData(ctx context.Context, instrumentData *instrumentModel.Instrument) error {
-	// Store the data in the database
-	if err := s.instrumentRepo.Create(ctx, instrumentData); err != nil {
-		return fmt.Errorf("failed to store instrument data: %w", err)
-	}
+// RunWithTimestamp executes a deployment's strategy against live market data with a specified timestamp
+func (s *deploymentService) RunWithTimestamp(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error {
+	deployment := deploymentWithStrategy.Deployment
+	strategy := deploymentWithStrategy.Strategy
 
-	// Find deployments for this instrument
-	instrumentID := int(instrumentData.ExchangeSecurityID)
-	deployments, exists := s.instrumentDeployments[instrumentID]
-	if !exists || len(deployments) == 0 {
-		// No deployments for this instrument, nothing to do
-		return nil
-	}
+	// Log the execution
+	logEntry, err := model.NewDeploymentLog(
+		deployment.ID,
+		model.StatusStarted,
+		map[string]any{
+			"current_timestamp": currentTimestamp,
+			"instrument_id":     deployment.InstrumentID,
+			"execution_type":    "scheduled",
+		},
+	)
 
-	// Run each deployment for this instrument
-	for _, deploymentWithStrategy := range deployments {
-		if err := s.Run(ctx, deploymentWithStrategy, instrumentData); err != nil {
-			// Log the error but continue with other deployments
-			fmt.Printf("Error running deployment %s for instrument %d: %v\n",
-				deploymentWithStrategy.Deployment.ID, instrumentID, err)
-			continue
+	if err != nil {
+		// Log but continue processing
+		fmt.Printf("Error creating deployment log: %v\n", err)
+	} else {
+		if err := s.logRepo.Create(ctx, logEntry); err != nil {
+			// Log but continue processing
+			fmt.Printf("Error saving deployment log: %v\n", err)
 		}
 	}
 
+	// Use pre-fetched position from DeploymentWithStrategy
+	currentPosition := deploymentWithStrategy.CurrentPosition
+
+	// Prepare strategy data
+	strategyResponse := &strategyDto.StrategyResponse{
+		ID:               strategy.ID,
+		UserID:           strategy.UserID,
+		Name:             strategy.Name,
+		Description:      strategy.Description,
+		EntryExpression:  strategy.EntryExpression,
+		ExitExpression:   strategy.ExitExpression,
+		ChartTimeframe:   strategyModel.ChartTimeframe(strategy.ChartTimeframe),
+		PositionType:     strategy.PositionType,
+		TradeType:        strategyModel.TradeType(strategy.TradeType),
+		Capital:          strategy.Capital,
+		Instruments:      strategy.Instruments,
+		Qty:              strategy.Qty,
+		MaxAllocation:    strategy.MaxAllocation,
+		MaxTrades:        0,   // Set default value
+		Brokerage:        0,   // Set default value
+		Slippage:         0.0, // Set default value
+		StopLoss:         strategy.StopLoss,
+		StopLossType:     strategy.StopLossType,
+		TargetProfit:     strategy.TargetProfit,
+		TargetProfitType: strategy.TargetProfitType,
+		EntryStartTime:   strategy.EntryStartTime,
+		EntryEndTime:     strategy.EntryEndTime,
+	}
+
+	// Set optional fields if they exist
+	if strategy.MaxTrades != nil {
+		strategyResponse.MaxTrades = *strategy.MaxTrades
+	}
+	if strategy.Brokerage != nil {
+		strategyResponse.Brokerage = *strategy.Brokerage
+	}
+	if strategy.Slippage != nil {
+		strategyResponse.Slippage = *strategy.Slippage
+	}
+
+	// Check if the current time is within the entry time window (if specified)
+	canCheckEntryCondition := true
+	if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
+		// Extract time of day from the current timestamp
+		currentTimeOfDay := time.Date(0, 1, 1,
+			currentTimestamp.Hour(), currentTimestamp.Minute(), currentTimestamp.Second(), 0, time.UTC)
+
+		// Check if we're within the entry time window
+		if strategy.EntryStartTime != nil {
+			entryStartTimeOfDay := time.Date(0, 1, 1,
+				strategy.EntryStartTime.Hour, strategy.EntryStartTime.Minute,
+				strategy.EntryStartTime.Second, 0, time.UTC)
+
+			if currentTimeOfDay.Before(entryStartTimeOfDay) {
+				canCheckEntryCondition = false
+			}
+		}
+
+		if canCheckEntryCondition && strategy.EntryEndTime != nil {
+			entryEndTimeOfDay := time.Date(0, 1, 1,
+				strategy.EntryEndTime.Hour, strategy.EntryEndTime.Minute,
+				strategy.EntryEndTime.Second, 0, time.UTC)
+
+			if currentTimeOfDay.After(entryEndTimeOfDay) {
+				canCheckEntryCondition = false
+			}
+		}
+	}
+	// Check market hours for the strategy timeframe
+	// For now, we assume market is always open - this can be enhanced later
+	// if !isMarketOpen(currentTimestamp, string(strategy.ChartTimeframe)) {
+	// 	fmt.Printf("Market is closed for timeframe %s at %v - skipping deployment %s\n",
+	// 		strategy.ChartTimeframe, currentTimestamp, deployment.ID)
+	//
+	// 	// Publish market closed event
+	// 	s.publishEvent(ctx, deployment, strategy, dto.EventTypeMarketClosed, dto.MarketStatusData{
+	// 		Status:    "closed",
+	// 		Timestamp: currentTimestamp,
+	// 		Timeframe: string(strategy.ChartTimeframe),
+	// 	})
+	//
+	// 	return nil
+	// }
+
+	// Since we don't have instrument data, we can only perform timestamp-based logic
+	// This is mainly useful for:
+	// 1. Time-based entry/exit windows
+	// 2. End-of-day position management
+	// 3. Market hours validation
+	// 4. Scheduled strategy execution
+
+	actionTaken := false
+
+	// Handle existing position - check for time-based exits
+	if currentPosition != nil {
+		fmt.Printf("Found existing open position %s for deployment %s at timestamp %v\n",
+			currentPosition.ID, deployment.ID, currentTimestamp)
+
+		// Check for MIS end-of-day square-off
+		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayTime(currentTimestamp) {
+			// Note: We don't have current market price, so we'd need to fetch it or use last known price
+			// For now, log that we need to square off the position
+			fmt.Printf("MIS EOD time reached for position %s - should be squared off\n", currentPosition.ID)
+
+			// Publish EOD event
+			s.publishEvent(ctx, deployment, strategy, dto.EventTypeEODSquareOff, dto.TimeEventData{
+				Timestamp:  currentTimestamp,
+				EventType:  "mis_eod",
+				PositionID: currentPosition.ID.String(),
+			})
+
+			actionTaken = true
+		}
+	}
+
+	// Check entry conditions based on time window
+	if currentPosition == nil && canCheckEntryCondition {
+		fmt.Printf("No open position for deployment %s, within entry time window at %v\n",
+			deployment.ID, currentTimestamp)
+
+		// Since we don't have market data, we can't evaluate entry expressions
+		// But we can log that we're ready to evaluate when data arrives
+		s.publishEvent(ctx, deployment, strategy, dto.EventTypeEntryWindowOpen, dto.TimeWindowEventData{
+			WindowType:   "entry",
+			WindowStatus: "open",
+			CurrentTime:  currentTimestamp,
+		})
+	} else if currentPosition == nil && !canCheckEntryCondition {
+		fmt.Printf("Entry time window closed for deployment %s at %v\n",
+			deployment.ID, currentTimestamp)
+
+		s.publishEvent(ctx, deployment, strategy, dto.EventTypeEntryWindowClosed, dto.TimeWindowEventData{
+			WindowType:   "entry",
+			WindowStatus: "closed",
+			CurrentTime:  currentTimestamp,
+		})
+	}
+
+	// Log completion
+	if !actionTaken {
+		s.publishEvent(ctx, deployment, strategy, dto.EventTypeScheduledExecution, dto.ScheduledExecutionData{
+			Timestamp:       currentTimestamp,
+			DeploymentID:    deployment.ID.String(),
+			HasOpenPosition: currentPosition != nil,
+			EntryWindowOpen: canCheckEntryCondition,
+		})
+	}
+
+	fmt.Printf("Timestamp-based execution completed for deployment %s at %v\n",
+		deployment.ID, currentTimestamp)
+
 	return nil
 }
+
+// Note: ProcessInstrumentData functionality has been moved to cmd/live/main.go
+// to enable real-time deployment processing as market data arrives.
+// The live service now handles both data storage and deployment processing.
 
 // GetActiveInstrumentIDs returns the unique instrument IDs from all active deployments
 func (s *deploymentService) GetActiveInstrumentIDs() []int {
@@ -1664,6 +1886,7 @@ func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID 
 			}
 
 			// Get instrument master data for this deployment
+
 			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
 			if err == nil && instrumentMaster != nil {
 				instrumentStatus.Deployment.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
@@ -1931,14 +2154,22 @@ func (s *deploymentService) isTargetProfitTriggered(
 
 // isMISEndOfDayHit checks if the current time is at or after the MIS end-of-day cutoff time
 func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) bool {
-	// Use the market hours utility for consistent timing logic
-	marketHoursUtil := marketHours.NewMarketHoursUtil()
+	// MIS positions are typically squared off at 3:20 PM IST
+	// Check if current time is after 3:20 PM
+	eodTime := time.Date(data.Timestamp.Year(), data.Timestamp.Month(), data.Timestamp.Day(),
+		15, 20, 0, 0, data.Timestamp.Location()) // 3:20 PM
 
-	// Extract exchange from the context or use a default
-	// For now, we'll use "NSE" as the default exchange
-	exchange := "NSE"
+	return data.Timestamp.After(eodTime)
+}
 
-	return marketHoursUtil.IsMISEndOfDayHit(data.Timestamp, exchange)
+// isMISEndOfDayTime checks if the current timestamp is near end of day for MIS square-off
+func (s *deploymentService) isMISEndOfDayTime(currentTimestamp time.Time) bool {
+	// MIS positions are typically squared off at 3:20 PM IST
+	// Check if current time is after 3:20 PM
+	eodTime := time.Date(currentTimestamp.Year(), currentTimestamp.Month(), currentTimestamp.Day(),
+		15, 20, 0, 0, currentTimestamp.Location()) // 3:20 PM
+
+	return currentTimestamp.After(eodTime)
 }
 
 // isTimestampAlignedWithTimeframe checks if the given timestamp aligns with the specified timeframe

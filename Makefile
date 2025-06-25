@@ -1,4 +1,4 @@
-.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live
+.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live deployment
 
 # Clean build artifacts
 clean:
@@ -77,6 +77,14 @@ migrate:
 	@go build -o bin/migrate cmd/migrate/main.go
 	@echo "Running the data migration tool..."
 	@./bin/migrate
+
+# ---------------------------------------------------------- #
+
+deployment:
+	@echo "Building the deployment tool..."
+	@go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
+	@echo "Running the deployment tool..."
+	@./bin/deployment
 
 # ---------------------------------------------------------- #
 
