@@ -15,13 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3"
 
 	deploymentModule "algo/internal/modules/deployment"
 	deploymentService "algo/internal/modules/deployment/application/service"
 	strategyModule "algo/internal/modules/strategy"
 	userModule "algo/internal/modules/user"
-	userHttp "algo/internal/modules/user/interfaces/http"
 )
 
 func main() {
@@ -53,7 +51,7 @@ func main() {
 	}
 
 	// Start WebSocket server for deployment events
-	go startWebSocketServer(deploymentMod, userController)
+	go startWebSocketServer(deploymentMod)
 
 	// Get active deployments and group them by timeframe
 	deploymentsByTimeframe, err := getActiveDeploymentsByTimeframe(ctx, deploymentSvc)
@@ -61,11 +59,8 @@ func main() {
 		log.Fatalf("Failed to get active deployments: %v", err)
 	}
 
-	for timeframe, deployments := range deploymentsByTimeframe {
-		cronExpr := timeframeToCron(timeframe)
-		go scheduleDeployments(ctx, cronExpr, deployments, deploymentSvc)
-		log.Printf("Scheduled %d deployments for timeframe %s with cron %s", len(deployments), timeframe, cronExpr)
-	}
+	// Start custom scheduler for simulated time progression
+	go startSimulatedTimeScheduler(ctx, deploymentsByTimeframe, deploymentSvc)
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
@@ -116,58 +111,74 @@ func getActiveDeploymentsByTimeframe(ctx context.Context, deploymentSvc deployme
 	return deploymentsByTimeframe, nil
 }
 
-// timeframeToCron converts a timeframe string to a cron expression
-// Returns cron expressions that align to absolute times (e.g., 9:15:00, 9:16:00 for 1m)
-// Format: second minute hour day month weekday
-func timeframeToCron(timeframe string) string {
-	switch timeframe {
-	case "1m":
-		return "0 * * * * *" // Every minute at :00 seconds
-	case "5m":
-		return "0 */5 * * * *" // Every 5 minutes at :00 seconds (e.g., 9:15:00, 9:20:00)
-	case "15m":
-		return "0 */15 * * * *" // Every 15 minutes at :00 seconds (e.g., 9:15:00, 9:30:00)
-	case "1h":
-		return "0 0 * * * *" // Every hour at :00 minutes :00 seconds (e.g., 9:00:00, 10:00:00)
-	default:
-		return "0 * * * * *" // Default to every minute
+// startSimulatedTimeScheduler runs deployments with simulated time progression
+// Starts from May 5, 2025 9:15:00 and increments by 1 minute every second
+// Runs from 9:15:00 to 15:30:00 (3:30 PM) each day, then moves to next day
+func startSimulatedTimeScheduler(ctx context.Context, deploymentsByTimeframe map[string][]*deploymentService.DeploymentWithStrategy, svc deploymentService.DeploymentService) {
+	// Start date: May 5, 2025 at 9:15:00 IST
+	startDate := time.Date(2025, 5, 5, 9, 15, 0, 0, time.Local)
+	currentTimestamp := startDate
+
+	// Market hours: 9:15:00 to 15:30:00 (3:30 PM)
+	marketStartHour, marketStartMinute := 9, 15
+	marketEndHour, marketEndMinute := 15, 30
+
+	ticker := time.NewTicker(1 * time.Second) // Execute every second
+	defer ticker.Stop()
+
+	log.Printf("Starting simulated time scheduler from %v", startDate)
+	log.Printf("Market hours: %02d:%02d to %02d:%02d", marketStartHour, marketStartMinute, marketEndHour, marketEndMinute)
+
+	// Collect all deployments from all timeframes
+	var allDeployments []*deploymentService.DeploymentWithStrategy
+	for _, deployments := range deploymentsByTimeframe {
+		allDeployments = append(allDeployments, deployments...)
 	}
-}
 
-// scheduleDeployments runs deployments on the given cron schedule using proper cron expressions
-func scheduleDeployments(ctx context.Context, cronExpr string, deployments []*deploymentService.DeploymentWithStrategy, svc deploymentService.DeploymentService) {
-	c := cron.New(cron.WithSeconds()) // Enable seconds field for more precise timing
+	log.Printf("Total deployments to run: %d", len(allDeployments))
 
-	// Add job for each deployment set
-	_, err := c.AddFunc(cronExpr, func() {
-		currentTimestamp := time.Now()
-		log.Printf("Running %d deployments at %v", len(deployments), currentTimestamp)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Simulated time scheduler stopped")
+			return
+		case <-ticker.C:
+			// Check if current time is within market hours
+			currentHour := currentTimestamp.Hour()
+			currentMinute := currentTimestamp.Minute()
 
-		for _, dep := range deployments {
-			go func(d *deploymentService.DeploymentWithStrategy) {
-				if err := svc.RunWithTimestamp(ctx, d, currentTimestamp); err != nil {
-					log.Printf("Deployment %v run error: %v", d.Deployment.ID, err)
+			// Check if we're within market hours
+			marketStart := marketStartHour*60 + marketStartMinute
+			marketEnd := marketEndHour*60 + marketEndMinute
+			currentMinutes := currentHour*60 + currentMinute
+
+			if currentMinutes >= marketStart && currentMinutes <= marketEnd {
+				// Run deployments for current timestamp
+				log.Printf("Running %d deployments at simulated time %v", len(allDeployments), currentTimestamp)
+
+				for _, dep := range allDeployments {
+					go func(d *deploymentService.DeploymentWithStrategy, timestamp time.Time) {
+						if err := svc.Run(ctx, d, timestamp); err != nil {
+							log.Printf("Deployment %v run error at %v: %v", d.Deployment.ID, timestamp, err)
+						}
+					}(dep, currentTimestamp)
 				}
-			}(dep)
+
+				// Increment timestamp by 1 minute
+				currentTimestamp = currentTimestamp.Add(1 * time.Minute)
+			} else {
+				// Market is closed, move to next day at market start time
+				nextDay := currentTimestamp.AddDate(0, 0, 1)
+				currentTimestamp = time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
+					marketStartHour, marketStartMinute, 0, 0, nextDay.Location())
+				log.Printf("Market closed, moving to next day: %v", currentTimestamp)
+			}
 		}
-	})
-
-	if err != nil {
-		log.Printf("Failed to add cron job with expression %s: %v", cronExpr, err)
-		return
 	}
-
-	log.Printf("Started cron scheduler with expression: %s", cronExpr)
-	c.Start()
-
-	// Wait for context cancellation
-	<-ctx.Done()
-	log.Printf("Stopping cron scheduler")
-	c.Stop()
 }
 
 // startWebSocketServer starts the HTTP server with WebSocket support for deployment events
-func startWebSocketServer(deploymentMod *deploymentModule.Module, userController *userHttp.UserController) {
+func startWebSocketServer(deploymentMod *deploymentModule.Module) {
 	// Set Gin mode
 	gin.SetMode(getEnv("GIN_MODE", "debug"))
 
