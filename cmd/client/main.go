@@ -298,7 +298,7 @@ func handleSubscriptionRequest(conn *websocket.Conn, message []byte) {
 
 // startMarketDataSimulation starts the market data simulation in background
 func startMarketDataSimulation(ctx context.Context) {
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	// Always use quote feed type
