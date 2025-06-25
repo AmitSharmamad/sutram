@@ -23,7 +23,7 @@
             "problemMatcher": []
         },
         {
-            "label": "d-build",
+            "label": "l-deployment",
             "type": "shell",
             "command": "go build -gcflags=\"all=-N -l\" -o bin/deployment cmd/deployment/main.go",
             "group": "build",
