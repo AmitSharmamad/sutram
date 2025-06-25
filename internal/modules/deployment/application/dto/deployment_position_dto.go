@@ -22,8 +22,9 @@ type CreatePositionRequest struct {
 
 // ClosePositionRequest is the request for closing a position
 type ClosePositionRequest struct {
-	ExitPrice float64   `json:"exit_price" validate:"required,gt=0"`
-	ExitTime  time.Time `json:"exit_time" validate:"required"`
+	ExitPrice  float64   `json:"exit_price" validate:"required,gt=0"`
+	ExitTime   time.Time `json:"exit_time" validate:"required"`
+	ExitReason string    `json:"exit_reason,omitempty"`
 }
 
 // PositionResponse is the response for a deployment position
@@ -37,6 +38,7 @@ type PositionResponse struct {
 	EntryTime    time.Time               `json:"entry_time"`
 	ExitPrice    *float64                `json:"exit_price,omitempty"`
 	ExitTime     *time.Time              `json:"exit_time,omitempty"`
+	ExitReason   *string                 `json:"exit_reason,omitempty"`
 	PNL          *float64                `json:"pnl,omitempty"`
 	Status       model.PositionStatus    `json:"status"`
 	Metadata     json.RawMessage         `json:"metadata,omitempty"`
@@ -56,6 +58,7 @@ func ToPositionResponse(position *model.DeploymentPosition) *PositionResponse {
 		EntryTime:    position.EntryTime,
 		ExitPrice:    position.ExitPrice,
 		ExitTime:     position.ExitTime,
+		ExitReason:   position.ExitReason,
 		PNL:          position.PNL,
 		Status:       position.Status,
 		Metadata:     position.Metadata,

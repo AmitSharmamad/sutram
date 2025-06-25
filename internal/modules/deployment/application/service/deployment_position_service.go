@@ -182,19 +182,27 @@ func (s *deploymentService) ClosePosition(ctx context.Context, id int64, req *dt
 	// Handle nil request
 	var exitPrice float64
 	var exitTime time.Time
+	var exitReason string
 
 	if req != nil {
 		exitPrice = req.ExitPrice
 		exitTime = req.ExitTime
+		exitReason = req.ExitReason
 	} else {
 		// Default values if request is nil
 		exitTime = time.Now()
 		// Use entry price as exit price (fallback)
 		exitPrice = position.EntryPrice
+		exitReason = "MANUAL"
+	}
+
+	// Set default exit reason if not provided
+	if exitReason == "" {
+		exitReason = "MANUAL"
 	}
 
 	// Close the position
-	if err := s.positionRepo.ClosePosition(ctx, id, exitPrice, exitTime); err != nil {
+	if err := s.positionRepo.ClosePosition(ctx, id, exitPrice, exitTime, exitReason); err != nil {
 		return nil, fmt.Errorf("failed to close position: %w", err)
 	}
 
@@ -284,6 +292,73 @@ func (s *deploymentService) CancelPosition(ctx context.Context, id int64, userID
 		if err := s.logRepo.Create(ctx, log); err != nil {
 			fmt.Printf("Error saving position cancel log: %v\n", err)
 		}
+	}
+
+	return nil
+}
+
+// ClosePositionWithReason closes a position with a specific exit reason
+func (s *deploymentService) ClosePositionWithReason(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, exitReason string, userID uuid.UUID) (*dto.PositionResponse, error) {
+	req := &dto.ClosePositionRequest{
+		ExitPrice:  exitPrice,
+		ExitTime:   exitTime,
+		ExitReason: exitReason,
+	}
+	return s.ClosePosition(ctx, id, req, userID)
+}
+
+// ClosePositionWithStopLoss closes a position due to stop loss trigger
+func (s *deploymentService) ClosePositionWithStopLoss(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error) {
+	return s.ClosePositionWithReason(ctx, id, exitPrice, exitTime, string(model.ExitReasonStopLoss), userID)
+}
+
+// ClosePositionWithTakeProfit closes a position due to take profit trigger
+func (s *deploymentService) ClosePositionWithTakeProfit(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error) {
+	return s.ClosePositionWithReason(ctx, id, exitPrice, exitTime, string(model.ExitReasonTargetProfit), userID)
+}
+
+// ClosePositionWithTimeout closes a position due to timeout
+func (s *deploymentService) ClosePositionWithTimeout(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error) {
+	return s.ClosePositionWithReason(ctx, id, exitPrice, exitTime, string(model.ExitReasonTimeout), userID)
+}
+
+// ClosePositionWithStrategy closes a position due to strategy signal
+func (s *deploymentService) ClosePositionWithStrategy(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error) {
+	return s.ClosePositionWithReason(ctx, id, exitPrice, exitTime, string(model.ExitReasonSignal), userID)
+}
+
+// UpdatePositionExitReason updates the exit reason of a position without closing it
+func (s *deploymentService) UpdatePositionExitReason(ctx context.Context, id int64, exitReason string, userID uuid.UUID) error {
+	// Get the position
+	position, err := s.positionRepo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to get position: %w", err)
+	}
+
+	if position == nil {
+		return fmt.Errorf("position not found")
+	}
+
+	// Verify the deployment belongs to the user
+	deployment, err := s.deploymentRepo.GetByID(ctx, position.DeploymentID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDeploymentNotFound, err)
+	}
+
+	if deployment == nil {
+		return ErrDeploymentNotFound
+	}
+
+	if deployment.UserID != userID {
+		return ErrUnauthorized
+	}
+
+	// Update the exit reason
+	position.SetExitReason(exitReason)
+
+	// Save the updated position
+	if err := s.positionRepo.Update(ctx, position); err != nil {
+		return fmt.Errorf("failed to update position: %w", err)
 	}
 
 	return nil
