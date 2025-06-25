@@ -30,7 +30,10 @@ const (
 	// Deployment status events
 	EventTypeDeploymentError    DeploymentEventType = "deployment_error"
 	EventTypeEntryWindowClosed  DeploymentEventType = "entry_window_closed"
+	EventTypeEntryWindowOpen    DeploymentEventType = "entry_window_open"
 	EventTypeMarketDataReceived DeploymentEventType = "market_data_received"
+	EventTypeMarketClosed       DeploymentEventType = "market_closed"
+	EventTypeScheduledExecution DeploymentEventType = "scheduled_execution"
 )
 
 // DeploymentEvent represents a real-time deployment event
@@ -139,4 +142,26 @@ type TimeWindowEventData struct {
 	StartTime    *time.Time `json:"start_time,omitempty"`
 	EndTime      *time.Time `json:"end_time,omitempty"`
 	CurrentTime  time.Time  `json:"current_time"`
+}
+
+// MarketStatusData contains data for market status events
+type MarketStatusData struct {
+	Status    string    `json:"status"` // "open", "closed"
+	Timestamp time.Time `json:"timestamp"`
+	Timeframe string    `json:"timeframe"`
+}
+
+// TimeEventData contains data for time-based events
+type TimeEventData struct {
+	Timestamp  time.Time `json:"timestamp"`
+	EventType  string    `json:"event_type"` // "mis_eod", etc.
+	PositionID string    `json:"position_id,omitempty"`
+}
+
+// ScheduledExecutionData contains data for scheduled execution events
+type ScheduledExecutionData struct {
+	Timestamp       time.Time `json:"timestamp"`
+	DeploymentID    string    `json:"deployment_id"`
+	HasOpenPosition bool      `json:"has_open_position"`
+	EntryWindowOpen bool      `json:"entry_window_open"`
 }
