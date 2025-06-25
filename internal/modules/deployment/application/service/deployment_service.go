@@ -1170,7 +1170,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				exitTime := instrumentData.Timestamp
 				var exitReason string
 
-				// Determine exit reason
+				// Determine exit reason and exit price
 				if stopLossTriggered {
 					exitReason = string(model.ExitReasonStopLoss)
 					if currentPosition.InitialStopLossPrice != nil &&
@@ -1178,8 +1178,10 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 						*currentPosition.StopLossPrice != *currentPosition.InitialStopLossPrice {
 						exitReason = string(model.ExitReasonTrailingStopLoss)
 					}
+					exitPrice = *currentPosition.StopLossPrice
 				} else if targetProfitTriggered {
 					exitReason = string(model.ExitReasonTargetProfit)
+					exitPrice = *currentPosition.TargetProfitPrice
 				} else {
 					exitReason = string(model.ExitReasonSignal)
 				}
