@@ -270,6 +270,8 @@ func startCronScheduler(ctx context.Context, deploymentsByTimeframe map[string][
 
 		_, err := c.AddFunc(cronExpression, func() {
 			currentTime := time.Now()
+			// Reduce 1 second to normalize the timestamp (cron runs with 1-second delay)
+			normalizedTime := currentTime.Add(-1 * time.Second)
 
 			// Check if current time is within market hours using config
 			if !isMarketHoursWithConfig(currentTime, config) {
@@ -277,15 +279,15 @@ func startCronScheduler(ctx context.Context, deploymentsByTimeframe map[string][
 				return
 			}
 
-			log.Printf("Running %d deployments for timeframe %s at actual time %v",
-				len(deploymentsCopy), timeframeCopy, currentTime)
+			log.Printf("Running %d deployments for timeframe %s at actual time %v (normalized: %v)",
+				len(deploymentsCopy), timeframeCopy, currentTime, normalizedTime)
 
 			for _, dep := range deploymentsCopy {
 				go func(d *deploymentService.DeploymentWithStrategy, timestamp time.Time) {
 					if err := svc.Run(ctx, d, timestamp, nil); err != nil {
 						log.Printf("Deployment %v run error at %v: %v", d.Deployment.ID, timestamp, err)
 					}
-				}(dep, currentTime)
+				}(dep, normalizedTime)
 			}
 		})
 
