@@ -1,8 +1,6 @@
 module algo
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.23.2
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.34.0
@@ -42,6 +40,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/markcheno/go-talib v0.0.0-20250114000313-ec55a20c902f // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

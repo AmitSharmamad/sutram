@@ -270,6 +270,8 @@ func startCronScheduler(ctx context.Context, deploymentsByTimeframe map[string][
 
 		_, err := c.AddFunc(cronExpression, func() {
 			currentTime := time.Now()
+			// Reduce 1 second to normalize the timestamp (cron runs with 1-second delay)
+			normalizedTime := currentTime.Add(-1 * time.Second)
 
 			// Check if current time is within market hours using config
 			if !isMarketHoursWithConfig(currentTime, config) {
@@ -277,15 +279,15 @@ func startCronScheduler(ctx context.Context, deploymentsByTimeframe map[string][
 				return
 			}
 
-			log.Printf("Running %d deployments for timeframe %s at actual time %v",
-				len(deploymentsCopy), timeframeCopy, currentTime)
+			log.Printf("Running %d deployments for timeframe %s at actual time %v (normalized: %v)",
+				len(deploymentsCopy), timeframeCopy, currentTime, normalizedTime)
 
 			for _, dep := range deploymentsCopy {
 				go func(d *deploymentService.DeploymentWithStrategy, timestamp time.Time) {
 					if err := svc.Run(ctx, d, timestamp, nil); err != nil {
 						log.Printf("Deployment %v run error at %v: %v", d.Deployment.ID, timestamp, err)
 					}
-				}(dep, currentTime)
+				}(dep, normalizedTime)
 			}
 		})
 
@@ -323,33 +325,33 @@ func getCronExpressionForTimeframe(timeframe string, config *SchedulerConfig) st
 
 	switch timeframe {
 	case "1m":
-		// Every minute during market hours (configurable hours, Mon-Fri)
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 1, startHour, endHour)
+		// Every minute during market hours (configurable hours, Mon-Fri) with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 1, startHour, endHour)
 	case "3m":
-		// Every 3 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 3, startHour, endHour)
+		// Every 3 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 3, startHour, endHour)
 	case "5m":
-		// Every 5 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 5, startHour, endHour)
+		// Every 5 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 5, startHour, endHour)
 	case "10m":
-		// Every 10 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 10, startHour, endHour)
+		// Every 10 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 10, startHour, endHour)
 	case "15m":
-		// Every 15 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 15, startHour, endHour)
+		// Every 15 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 15, startHour, endHour)
 	case "30m":
-		// Every 30 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 30, startHour, endHour)
+		// Every 30 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 30, startHour, endHour)
 	case "1h":
-		// Every hour during market hours
-		return fmt.Sprintf("0 %d-%d * * 1-5", startHour, endHour)
+		// Every hour during market hours with 1 second delay
+		return fmt.Sprintf("1 0 %d-%d * * 1-5", startHour, endHour)
 	case "1d":
-		// Once per day at market open
-		return fmt.Sprintf("%d %d * * 1-5", startMin, startHour)
+		// Once per day at market open with 1 second delay
+		return fmt.Sprintf("1 %d %d * * 1-5", startMin, startHour)
 	default:
-		// Default to every minute for unknown timeframes
+		// Default to every minute for unknown timeframes with 1 second delay
 		log.Printf("Unknown timeframe %s, defaulting to 1-minute interval", timeframe)
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 1, startHour, endHour)
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 1, startHour, endHour)
 	}
 }
 
