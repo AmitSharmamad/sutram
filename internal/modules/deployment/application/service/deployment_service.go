@@ -85,7 +85,8 @@ type DeploymentService interface {
 	// Live trading operations
 	Initialize(ctx context.Context) error
 	GetActiveDeploymentsWithStrategies(ctx context.Context) ([]*DeploymentWithStrategy, error)
-	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error
+	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time, instrumentData *instrumentModel.Instrument) error
+
 	GetActiveInstrumentIDs() []int
 }
 
@@ -888,49 +889,113 @@ func (s *deploymentService) GetActiveDeploymentsWithStrategies(ctx context.Conte
 	return result, nil
 }
 
-// Run executes a deployment's strategy for a given timestamp
-func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error {
+// Run executes a deployment's strategy for a given timestamp with optional instrument data
+// If instrumentData is nil, it will be fetched from the database
+func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time, instrumentData *instrumentModel.Instrument) error {
 	deployment := deploymentWithStrategy.Deployment
 	strategy := deploymentWithStrategy.Strategy
 
-	// Fetch the instrument data around the given timestamp
-	// We'll get data for a small time window around the timestamp to find the closest data point
-	timeWindow := 1 * time.Minute // Adjust this based on your data frequency
-	startTime := currentTimestamp.Add(-timeWindow)
-	endTime := currentTimestamp.Add(timeWindow)
+	// If no instrument data provided, fetch it from database (similar to engine.go pattern)
+	if instrumentData == nil {
+		// Calculate lookback from strategy expressions
+		lookbackFromExpressions := s.getLookBackFromExpressions(&strategyDto.StrategyResponse{
+			EntryExpression: strategy.EntryExpression,
+			ExitExpression:  strategy.ExitExpression,
+		})
 
-	instrumentDataList, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(
-		ctx,
-		int32(deployment.InstrumentID),
-		startTime,
-		endTime,
-		string(strategy.ChartTimeframe),
-	)
+		// Get lookback data (historical data before current timestamp)
+		lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
+			ctx,
+			int32(deployment.InstrumentID),
+			currentTimestamp,
+			string(strategy.ChartTimeframe),
+			int(lookbackFromExpressions),
+		)
 
-	if err != nil {
-		return fmt.Errorf("failed to fetch instrument data for timestamp %v: %w", currentTimestamp, err)
-	}
-
-	if len(instrumentDataList) == 0 {
-		return fmt.Errorf("no instrument data found for instrument %d around timestamp %v", deployment.InstrumentID, currentTimestamp)
-	}
-
-	// Find the closest data point to our target timestamp
-	var instrumentData *instrumentModel.Instrument
-	minDiff := time.Duration(math.MaxInt64)
-
-	for _, data := range instrumentDataList {
-		diff := data.Timestamp.Sub(currentTimestamp)
-		if diff < 0 {
-			diff = -diff
+		if err != nil {
+			fmt.Printf("Error getting lookback data for instrument %d: %v\n",
+				deployment.InstrumentID, err)
+			// Continue with empty lookback if error (following engine.go pattern)
+			lookbackData = []*instrumentModel.Instrument{}
 		}
-		if diff < minDiff {
-			minDiff = diff
-			instrumentData = data
+
+		// Get current data point using minimal time window
+		timeWindow := 1 * time.Second
+		startTime := currentTimestamp.Add(-timeWindow)
+		endTime := currentTimestamp.Add(timeWindow)
+
+		instrumentDataList, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(
+			ctx,
+			int32(deployment.InstrumentID),
+			startTime,
+			endTime,
+			string(strategy.ChartTimeframe),
+		)
+
+		if err != nil {
+			return fmt.Errorf("failed to fetch instrument data for timestamp %v: %w", currentTimestamp, err)
 		}
+
+		if len(instrumentDataList) == 0 {
+			return fmt.Errorf("no instrument data found for instrument %d at timestamp %v", deployment.InstrumentID, currentTimestamp)
+		}
+
+		// Use the first data point (should be the closest to our timestamp)
+		instrumentData = instrumentDataList[0]
+
+		// Reverse lookback data since it comes in descending order (newest first)
+		// This follows the exact pattern from engine.go
+		for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+			lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+		}
+
+		// Store the combined data for indicator calculations
+		// Combine lookback data with current data (following engine.go pattern)
+		// Create slice with exact capacity needed
+		historicalData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+1)
+		historicalData = append(historicalData, lookbackData...)
+		historicalData = append(historicalData, instrumentData)
+
+		// Use the combined historical data for indicator calculations
+		_ = historicalData // Will be used in indicator calculation below
+	} else {
+		// Validate that the instrument data matches the deployment
+		if int(instrumentData.ExchangeSecurityID) != deployment.InstrumentID {
+			return fmt.Errorf("instrument data mismatch: expected %d, got %d", deployment.InstrumentID, instrumentData.ExchangeSecurityID)
+		}
+
+		// When instrument data is provided (live trading), fetch lookback data for indicator calculations
+		lookbackFromExpressions := s.getLookBackFromExpressions(&strategyDto.StrategyResponse{
+			EntryExpression: strategy.EntryExpression,
+			ExitExpression:  strategy.ExitExpression,
+		})
+
+		// Get lookback data (historical data before current timestamp)
+		lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
+			ctx,
+			int32(deployment.InstrumentID),
+			instrumentData.Timestamp,
+			string(strategy.ChartTimeframe),
+			int(lookbackFromExpressions),
+		)
+
+		if err != nil {
+			fmt.Printf("Error getting lookback data for instrument %d: %v\n",
+				instrumentData.ExchangeSecurityID, err)
+			// Continue with empty lookback if error (following engine.go pattern)
+			lookbackData = []*instrumentModel.Instrument{}
+		}
+
+		// Reverse lookback data since it comes in descending order (newest first)
+		// This follows the exact pattern from engine.go
+		for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+			lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+		}
+
+		// The lookback data will be combined with current data later in the method
+		// for indicator calculations
 	}
 
-	// Original Run implementation starts here
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
 		deployment.ID,
@@ -991,11 +1056,12 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		strategyResponse.Slippage = *strategy.Slippage
 	}
 
-	// Calculate lookback from strategy expressions (like backtesting engine)
+	// Use the historical data that was already prepared at the beginning of the method
+	// Find the historicalData variable that was created earlier
+	// Since we moved the data fetching to the beginning, we need to reference it here
 	lookbackFromExpressions := s.getLookBackFromExpressions(strategyResponse)
 
-	// Fetch historical data with proper lookback period using the same method as backtesting
-	// Get lookback data (historical data before current timestamp)
+	// Get lookback data (historical data before current timestamp) - following engine.go pattern
 	lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
 		ctx,
 		instrumentData.ExchangeSecurityID,
@@ -1007,21 +1073,23 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	if err != nil {
 		fmt.Printf("Error getting lookback data for instrument %d: %v\n",
 			instrumentData.ExchangeSecurityID, err)
-		// Use current data point only as fallback
+		// Continue with empty lookback if error (following engine.go pattern)
 		lookbackData = []*instrumentModel.Instrument{}
 	}
 
 	// Reverse lookback data since it comes in descending order (newest first)
+	// This follows the exact pattern from engine.go
 	for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
 		lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
 	}
 
-	// Combine lookback data with current data (lookback data first, then current data)
+	// Combine lookback data with current data (following engine.go pattern)
 	historicalData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+1)
 	historicalData = append(historicalData, lookbackData...)
 	historicalData = append(historicalData, instrumentData)
 
-	// Pre-calculate indicators like in backtest engine
+	// Pre-calculate indicators following engine.go pattern
+	// This approach is more efficient than recalculating indicators for each evaluation
 	evalContext := parser.NewEvaluationContext(nil)
 	evalContext.Strategy = strategyResponse
 	evalContext.Data = s.toDataContext(historicalData)
