@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/markcheno/go-talib"
 )
 
 type EMA struct {
@@ -100,49 +102,16 @@ func (indicator *EMA) Calculate(
 		return 0.0
 	}
 	currentTimestamp := (*ctx.Data)[dataLen-1].Timestamp.Unix()
-	// timeFrame := ctx.Strategy.ChartTimeframe
 
-	// Try to get previous EMA value from Results
-	if prevValue, exists := getPreviousValueFromResults(ctx, indicatorKey, currentTimestamp-3600); exists {
-		if prevEMA, ok := prevValue.(float64); ok {
-			// Calculate multiplier (alpha)
-			multiplier := 2.0 / float64(period+1)
+	// Use go-talib EMA calculation
+	emaValues := talib.Ema(prices, period)
 
-			// Use the most recent price for EMA calculation
-			currentPrice := prices[len(prices)-1]
-
-			// Calculate EMA using previous value: EMA = prevEMA + multiplier * (currentPrice - prevEMA)
-			ema := prevEMA + multiplier*(currentPrice-prevEMA)
-
-			// Store the result for future calculations
-			insertValueToResults(ctx, indicatorKey, currentTimestamp, ema)
-
-			return util.Round(ema)
-		}
+	if len(emaValues) == 0 {
+		return 0.0
 	}
 
-	// If no previous value exists, calculate from scratch
-	// Calculate multiplier (alpha)
-	multiplier := 2.0 / float64(period+1)
-
-	// Calculate initial SMA for the first EMA value
-	var sma float64
-	for i := 0; i < period; i++ {
-		sma += prices[i]
-	}
-	sma /= float64(period)
-
-	// Calculate EMA recursively
-	// Start with the initial SMA value
-	ema := sma
-
-	// Only process remaining data points after the initial period
-	for i := period; i < len(prices); i++ {
-		// EMA formula: EMA(today) = (Price(today) * multiplier) + (EMA(yesterday) * (1 - multiplier))
-		// Alternative form: EMA = Price * multiplier + EMA * (1 - multiplier)
-		// Simplified: EMA = EMA + multiplier * (Price - EMA)
-		ema = ema + multiplier*(prices[i]-ema)
-	}
+	// Get the last EMA value
+	ema := emaValues[len(emaValues)-1]
 
 	// Store the result for future calculations
 	insertValueToResults(ctx, indicatorKey, currentTimestamp, ema)
@@ -200,57 +169,41 @@ func (indicator *EMA) CalculateAll(
 	prices := GetPrices(stockData, field)
 
 	// We need at least enough data to calculate initial EMA
-	// For EMA, we typically need at least 2*period data points for proper calculation
-	minDataPoints := 5*period + offset
+	minDataPoints := period + offset
 	if len(stockData) < minDataPoints {
 		return []IndicatorValues{}
 	}
 
-	// Calculate multiplier (alpha)
-	multiplier := 2.0 / float64(period+1)
+	// Use go-talib EMA calculation
+	emaValues := talib.Ema(prices, period)
 
-	// Calculate initial SMA for the first EMA value
-	startIndex := period + offset
-	var sma float64
-	smaStart := startIndex - period - offset
-	smaEnd := startIndex - offset
-
-	for i := smaStart; i < smaEnd; i++ {
-		sma += prices[i]
+	if len(emaValues) == 0 {
+		return []IndicatorValues{}
 	}
-	sma /= float64(period)
-
-	// Start with the initial SMA value as the first EMA
-	ema := sma
 
 	var filteredResults []IndicatorValues
 
-	// Calculate EMA for each data point
-	for i := startIndex; i < len(stockData); i++ {
-		// For the first point, use the SMA calculated above
-		if i == startIndex {
-			if !stockData[i].Timestamp.Before(startDate) {
-				filteredResults = append(filteredResults, IndicatorValues{
-					Timestamp: stockData[i].Timestamp,
-					Value:     util.Round(ema),
-				})
-			}
+	// Calculate the starting index accounting for the NaN values that talib returns
+	// talib.Ema returns NaN for the first (period-1) values
+	startIndex := period - 1 + offset
+
+	// Process each EMA value and match it with the corresponding timestamp
+	for i, emaValue := range emaValues {
+		dataIndex := i + offset
+
+		// Skip if we don't have enough data or if the value is NaN
+		if dataIndex >= len(stockData) || emaValue != emaValue { // NaN check
 			continue
 		}
 
-		// Calculate EMA using the previous EMA and current price
-		currentPrice := prices[i-offset]
-		ema = ema + multiplier*(currentPrice-ema)
-
-		if !stockData[i].Timestamp.Before(startDate) {
+		// Only include values from startDate onwards
+		if !stockData[dataIndex].Timestamp.Before(startDate) && dataIndex >= startIndex {
 			filteredResults = append(filteredResults, IndicatorValues{
-				Timestamp: stockData[i].Timestamp,
-				Value:     util.Round(ema),
+				Timestamp: stockData[dataIndex].Timestamp,
+				Value:     util.Round(emaValue),
 			})
 		}
 	}
-
-	// values := append(createIndicatorValues(startIndex), filteredResults...)
 
 	return filteredResults
 }
