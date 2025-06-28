@@ -232,7 +232,7 @@ func startSimulatedTimeScheduler(ctx context.Context, deploymentsByTimeframe map
 
 				for _, dep := range allDeployments {
 					go func(d *deploymentService.DeploymentWithStrategy, timestamp time.Time) {
-						if err := svc.Run(ctx, d, timestamp); err != nil {
+						if err := svc.Run(ctx, d, timestamp, nil); err != nil {
 							log.Printf("Deployment %v run error at %v: %v", d.Deployment.ID, timestamp, err)
 						}
 					}(dep, currentTimestamp)
@@ -282,7 +282,7 @@ func startCronScheduler(ctx context.Context, deploymentsByTimeframe map[string][
 
 			for _, dep := range deploymentsCopy {
 				go func(d *deploymentService.DeploymentWithStrategy, timestamp time.Time) {
-					if err := svc.Run(ctx, d, timestamp); err != nil {
+					if err := svc.Run(ctx, d, timestamp, nil); err != nil {
 						log.Printf("Deployment %v run error at %v: %v", d.Deployment.ID, timestamp, err)
 					}
 				}(dep, currentTime)
