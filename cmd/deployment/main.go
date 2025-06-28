@@ -323,33 +323,33 @@ func getCronExpressionForTimeframe(timeframe string, config *SchedulerConfig) st
 
 	switch timeframe {
 	case "1m":
-		// Every minute during market hours (configurable hours, Mon-Fri)
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 1, startHour, endHour)
+		// Every minute during market hours (configurable hours, Mon-Fri) with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 1, startHour, endHour)
 	case "3m":
-		// Every 3 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 3, startHour, endHour)
+		// Every 3 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 3, startHour, endHour)
 	case "5m":
-		// Every 5 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 5, startHour, endHour)
+		// Every 5 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 5, startHour, endHour)
 	case "10m":
-		// Every 10 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 10, startHour, endHour)
+		// Every 10 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 10, startHour, endHour)
 	case "15m":
-		// Every 15 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 15, startHour, endHour)
+		// Every 15 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 15, startHour, endHour)
 	case "30m":
-		// Every 30 minutes during market hours
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 30, startHour, endHour)
+		// Every 30 minutes during market hours with 1 second delay
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 30, startHour, endHour)
 	case "1h":
-		// Every hour during market hours
-		return fmt.Sprintf("0 %d-%d * * 1-5", startHour, endHour)
+		// Every hour during market hours with 1 second delay
+		return fmt.Sprintf("1 0 %d-%d * * 1-5", startHour, endHour)
 	case "1d":
-		// Once per day at market open
-		return fmt.Sprintf("%d %d * * 1-5", startMin, startHour)
+		// Once per day at market open with 1 second delay
+		return fmt.Sprintf("1 %d %d * * 1-5", startMin, startHour)
 	default:
-		// Default to every minute for unknown timeframes
+		// Default to every minute for unknown timeframes with 1 second delay
 		log.Printf("Unknown timeframe %s, defaulting to 1-minute interval", timeframe)
-		return fmt.Sprintf("*/%d %d-%d * * 1-5", 1, startHour, endHour)
+		return fmt.Sprintf("1 */%d %d-%d * * 1-5", 1, startHour, endHour)
 	}
 }
 
