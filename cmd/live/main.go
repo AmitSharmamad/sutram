@@ -28,7 +28,10 @@ import (
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
 
 	// Deployment processing
+	deploymentModule "algo/internal/modules/deployment"
 	deploymentService "algo/internal/modules/deployment/application/service"
+	strategyModule "algo/internal/modules/strategy"
+	userModule "algo/internal/modules/user"
 )
 
 // JWT payload structure for basic validation
@@ -88,8 +91,11 @@ var (
 	instrumentRepository repository.InstrumentRepository
 	// Deployment service for processing deployments (TODO: initialize when needed)
 	deploymentSvc deploymentService.DeploymentService
-	// Context cancel function
+	// Application context and cancel function
+	appCtx    context.Context
 	cancelCtx context.CancelFunc
+	// IST timezone location for timestamp conversion
+	istLocation *time.Location
 )
 
 // Constants for request and feed codes
@@ -142,8 +148,15 @@ var upstreamConn *websocket.Conn
 
 func main() {
 	// Create application context with cancel function
-	_, cancelCtx = context.WithCancel(context.Background())
+	appCtx, cancelCtx = context.WithCancel(context.Background())
 	defer cancelCtx()
+
+	// Initialize IST timezone location
+	var err error
+	istLocation, err = time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		log.Fatalf("Failed to load IST timezone: %v", err)
+	}
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
@@ -154,6 +167,12 @@ func main() {
 	if err := initDB(); err != nil {
 		log.Printf("Error initializing database: %v", err)
 		// Continue without database connection
+	}
+
+	// Initialize deployment service for automatic subscription
+	if err := initDeploymentService(); err != nil {
+		log.Printf("Error initializing deployment service: %v", err)
+		// Continue without deployment service
 	}
 
 	// Set Gin mode
@@ -188,6 +207,9 @@ func main() {
 
 	// Connect to upstream WebSocket server
 	go connectToUpstreamWebSocket()
+
+	// Start periodic subscription refresh for deployment instruments
+	go startPeriodicSubscriptionRefresh()
 
 	// Start the server in a goroutine
 	go func() {
@@ -249,21 +271,143 @@ func initDB() error {
 	chDB = db
 	log.Println("Connected to ClickHouse database")
 
+	// Test table schema
+	var tableExists int
+	err = db.QueryRow("SELECT 1 FROM system.tables WHERE database = 'sutram' AND name = 'instrument'").Scan(&tableExists)
+	if err != nil {
+		log.Printf("Warning: Could not verify instrument table exists: %v", err)
+	} else {
+		log.Println("Verified instrument table exists in ClickHouse")
+
+		// Test table structure
+		rows, err := db.Query("DESCRIBE sutram.instrument")
+		if err != nil {
+			log.Printf("Warning: Could not describe instrument table: %v", err)
+		} else {
+			log.Println("Instrument table schema:")
+			for rows.Next() {
+				var name, typeStr, defaultValue, comment string
+				if err := rows.Scan(&name, &typeStr, &defaultValue, &comment); err == nil {
+					log.Printf("  %s: %s", name, typeStr)
+				}
+			}
+			rows.Close()
+		}
+	}
+
 	// Initialize instrument repository
 	instrumentRepository = instrumentRepo.NewInstrumentRepository(chDB)
 
 	return nil
 }
 
+// initDeploymentService initializes the deployment service for automatic subscription
+func initDeploymentService() error {
+	// Initialize user and strategy modules
+	strategyMod := strategyModule.New()
+	userMod := userModule.New()
+	userController := userMod.GetController()
+
+	// Initialize deployment module
+	deploymentMod := deploymentModule.New()
+	deploymentMod.Initialize(userController, strategyMod)
+	deploymentSvc = deploymentMod.GetDeploymentService()
+
+	// Initialize the deployment service
+	ctx := context.Background()
+	if err := deploymentSvc.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize deployment service: %w", err)
+	}
+
+	log.Println("Deployment service initialized successfully")
+	return nil
+}
+
 // subscribeToActiveDeploymentInstruments gets all active deployments and subscribes to their instruments
 func subscribeToActiveDeploymentInstruments() error {
-	log.Printf("No active deployments found, no instruments to subscribe to")
+	if deploymentSvc == nil {
+		log.Printf("Deployment service not initialized, skipping automatic subscription")
+		return nil
+	}
+
+	ctx := context.Background()
+
+	// Get all active deployments with their strategies
+	activeDeployments, err := deploymentSvc.GetActiveDeploymentsWithStrategies(ctx)
+	if err != nil {
+		log.Printf("Error getting active deployments: %v", err)
+		return err
+	}
+
+	if len(activeDeployments) == 0 {
+		log.Printf("No active deployments found, no instruments to subscribe to")
+		return nil
+	}
+
+	// Extract unique instrument IDs from deployments
+	instrumentIDsMap := make(map[int]bool)
+	for _, deployment := range activeDeployments {
+		instrumentIDsMap[deployment.Deployment.InstrumentID] = true
+	}
+
+	// Convert to slice
+	instrumentIDs := make([]int, 0, len(instrumentIDsMap))
+	for id := range instrumentIDsMap {
+		instrumentIDs = append(instrumentIDs, id)
+	}
+
+	// Convert instrument IDs to InstrumentInfo format required by Dhan API
+	instruments := make([]InstrumentInfo, len(instrumentIDs))
+	for i, id := range instrumentIDs {
+		instruments[i] = InstrumentInfo{
+			ExchangeSegment: "NSE_EQ", // Default to NSE Equity, you may want to make this configurable
+			SecurityId:      fmt.Sprintf("%d", id),
+		}
+	}
+
+	log.Printf("Found %d active deployments with %d unique instruments to subscribe to",
+		len(activeDeployments), len(instruments))
+
+	// Subscribe to the instruments
+	if len(instruments) > 0 {
+		success := subscribeToInstruments(instruments)
+		if !success {
+			return fmt.Errorf("failed to subscribe to deployment instruments")
+		}
+		log.Printf("Successfully subscribed to %d instruments from active deployments", len(instruments))
+	}
+
 	return nil
 }
 
 // getInstrumentIDsFromDeployments extracts unique instrument IDs from active deployments
 func getInstrumentIDsFromDeployments() []int {
-	return []int{}
+	if deploymentSvc == nil {
+		return []int{}
+	}
+
+	ctx := context.Background()
+
+	// Get all active deployments with their strategies
+	activeDeployments, err := deploymentSvc.GetActiveDeploymentsWithStrategies(ctx)
+	if err != nil {
+		log.Printf("Error getting active deployments: %v", err)
+		return []int{}
+	}
+
+	// Extract unique instrument IDs
+	instrumentIDsMap := make(map[int]bool)
+	for _, deployment := range activeDeployments {
+		instrumentIDsMap[deployment.Deployment.InstrumentID] = true
+	}
+
+	// Convert to slice
+	instrumentIDs := make([]int, 0, len(instrumentIDsMap))
+	for id := range instrumentIDsMap {
+		instrumentIDs = append(instrumentIDs, id)
+	}
+
+	return instrumentIDs
 }
 
 // setupCORS configures CORS middleware
@@ -338,12 +482,24 @@ func setupWebSocketRoutes(router *gin.RouterGroup) {
 func setupAPIRoutes(router *gin.RouterGroup) {
 	// Endpoint for status check
 	router.GET("/status", func(c *gin.Context) {
+		subscribedCount := len(subscribedInstruments)
+		deploymentInstruments := getInstrumentIDsFromDeployments()
+
 		c.JSON(http.StatusOK, gin.H{
 			"status": "live",
 			"time":   time.Now().Format(time.RFC3339),
 			"websocket_endpoints": gin.H{
 				"market_data":       "/ws/feed",
 				"deployment_events": "/ws/api/deployment/events/ws",
+			},
+			"subscriptions": gin.H{
+				"total_subscribed_instruments": subscribedCount,
+				"deployment_instruments":       len(deploymentInstruments),
+				"deployment_instrument_ids":    deploymentInstruments,
+				"upstream_connected":           upstreamConn != nil,
+			},
+			"deployment_service": gin.H{
+				"initialized": deploymentSvc != nil,
 			},
 		})
 	})
@@ -378,6 +534,24 @@ func setupAPIRoutes(router *gin.RouterGroup) {
 				"message": "Failed to subscribe to instruments",
 			})
 		}
+	})
+
+	// Endpoint to manually refresh deployment subscriptions
+	router.POST("/refresh-subscriptions", func(c *gin.Context) {
+		if err := subscribeToActiveDeploymentInstruments(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":  "error",
+				"message": "Failed to refresh subscriptions",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "Subscriptions refreshed successfully",
+			"count":   len(getInstrumentIDsFromDeployments()),
+		})
 	})
 }
 
@@ -556,6 +730,11 @@ func connectToUpstreamWebSocket() {
 	// Re-subscribe to any existing instruments after reconnection
 	resubscribeToInstruments()
 
+	// Subscribe to instruments from active deployments
+	if err := subscribeToActiveDeploymentInstruments(); err != nil {
+		log.Printf("Error subscribing to deployment instruments: %v", err)
+	}
+
 	// Listen for messages from the upstream WebSocket
 	for {
 		_, message, err := conn.ReadMessage()
@@ -566,6 +745,25 @@ func connectToUpstreamWebSocket() {
 
 		// Process binary message from upstream server
 		processMarketDataMessage(message)
+	}
+}
+
+// startPeriodicSubscriptionRefresh periodically checks for new deployments and subscribes to their instruments
+func startPeriodicSubscriptionRefresh() {
+	ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			log.Printf("Performing periodic subscription refresh...")
+			if err := subscribeToActiveDeploymentInstruments(); err != nil {
+				log.Printf("Error during periodic subscription refresh: %v", err)
+			}
+		case <-appCtx.Done():
+			log.Printf("Stopping periodic subscription refresh")
+			return
+		}
 	}
 }
 
@@ -679,7 +877,7 @@ func resubscribeToInstruments() {
 func processMarketDataMessage(message []byte) {
 	// Ensure we have at least header size data (8 bytes)
 	if len(message) < 8 {
-		log.Printf("Received invalid message: too short")
+		log.Printf("Received invalid message: too short (%d bytes)", len(message))
 		return
 	}
 
@@ -688,9 +886,6 @@ func processMarketDataMessage(message []byte) {
 	// messageLength := binary.LittleEndian.Uint16(message[1:3])
 	// exchangeSegment := message[3]
 	// securityID := binary.LittleEndian.Uint32(message[4:8])
-
-	// log.Printf("Received market data - Code: %d, Exchange: %d, SecurityID: %d",
-	// 	feedCode, exchangeSegment, securityID)
 
 	// Process message based on feed code
 	switch feedCode {
@@ -709,24 +904,26 @@ func processMarketDataMessage(message []byte) {
 	default:
 		// Unknown feed code
 		log.Printf("Received unknown feed code: %d", feedCode)
+		return
 	}
 
-	// Convert market data to instrument model
+	// Convert market data to instrument model for additional processing if needed
 	instrument := toInstrument(message)
+	if instrument == nil {
+		log.Printf("Failed to convert message to instrument model")
+		return
+	}
 
-	// Store the instrument data in the database
-	storeInstrumentData(
-		uint32(instrument.ExchangeSecurityID),
-		0, // exchangeSegment - not used in current implementation
-		fmt.Sprintf("%d", instrument.ExchangeSecurityID),
-		float32(instrument.Close),
-		uint32(instrument.Timestamp.Unix()),
-		instrument.Volume,
-		float32(instrument.Open),
-		float32(instrument.High),
-		float32(instrument.Low),
-		float32(instrument.Close),
-	)
+	// Store the instrument data in the database (already handled in individual processors)
+	// But we can use this for deployment processing
+	if deploymentSvc != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := processInstrumentDataForDeployments(ctx, instrument); err != nil {
+			log.Printf("Error processing deployments for instrument %d: %v", instrument.ExchangeSecurityID, err)
+		}
+	}
 
 	// Broadcast the message to all connected clients
 	broadcastMessage(message)
@@ -735,16 +932,28 @@ func processMarketDataMessage(message []byte) {
 // processTicker handles ticker packet data
 func processTicker(data []byte) {
 	if len(data) < 16 {
+		log.Printf("Ticker packet too short: %d bytes", len(data))
 		return
 	}
+
+	// Extract header information
+	exchangeSegment := data[3]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
 
 	// Extract data from ticker packet according to Dhan documentation
 	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12])) // Last Traded Price
 	ltt := binary.LittleEndian.Uint32(data[12:16])                      // Last Trade Time
 
-	// Extract header information
-	exchangeSegment := data[3]
-	securityID := binary.LittleEndian.Uint32(data[4:8])
+	// Validate extracted data
+	if ltp <= 0 {
+		log.Printf("Invalid LTP for security %d: %.2f", securityID, ltp)
+		return
+	}
+
+	if ltt == 0 {
+		log.Printf("Invalid timestamp for security %d, using current time", securityID)
+		ltt = uint32(time.Now().Unix())
+	}
 
 	log.Printf("Ticker: Security ID: %d, Exchange: %d, LTP: %.2f, LTT: %d",
 		securityID, exchangeSegment, ltp, ltt)
@@ -773,8 +982,13 @@ func processTicker(data []byte) {
 // processQuote handles quote packet data
 func processQuote(data []byte) {
 	if len(data) < 50 {
+		log.Printf("Quote packet too short: %d bytes, expected at least 50", len(data))
 		return
 	}
+
+	// Extract header information
+	exchangeSegment := data[3]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
 
 	// Extract basic quote data according to Dhan documentation
 	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))  // Latest Traded Price
@@ -782,38 +996,46 @@ func processQuote(data []byte) {
 	ltt := binary.LittleEndian.Uint32(data[14:18])                       // Last Trade Time (LTT)
 	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22])) // Average Trade Price (ATP)
 	volume := binary.LittleEndian.Uint32(data[22:26])                    // Volume
-	// sellQty := binary.LittleEndian.Uint32(data[26:30])               // Total Sell Quantity
-	// buyQty := binary.LittleEndian.Uint32(data[30:34])                // Total Buy Quantity
 
 	// Extract OHLC data according to documentation
-	var open, high, low, close float32
-	if len(data) >= 50 {
-		open = math.Float32frombits(binary.LittleEndian.Uint32(data[34:38]))  // Day Open Value
-		close = math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])) // Day Close Value
-		high = math.Float32frombits(binary.LittleEndian.Uint32(data[42:46]))  // Day High Value
-		low = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))   // Day Low Value
+	open := math.Float32frombits(binary.LittleEndian.Uint32(data[34:38]))  // Day Open Value
+	close := math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])) // Day Close Value
+	high := math.Float32frombits(binary.LittleEndian.Uint32(data[42:46]))  // Day High Value
+	low := math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))   // Day Low Value
+
+	// Validate extracted data
+	if ltp <= 0 {
+		log.Printf("Invalid LTP for security %d: %.2f", securityID, ltp)
+		return
 	}
 
-	// If any value is 0, use ltp as fallback
-	if open == 0 {
+	if ltt == 0 {
+		log.Printf("Invalid timestamp for security %d, using current time", securityID)
+		ltt = uint32(time.Now().Unix())
+	}
+
+	// If any OHLC value is 0 or invalid, use ltp as fallback
+	if open <= 0 {
 		open = ltp
 	}
-	if high == 0 {
+	if high <= 0 {
 		high = ltp
 	}
-	if low == 0 {
+	if low <= 0 {
 		low = ltp
 	}
-	if close == 0 {
+	if close <= 0 {
 		close = ltp
 	}
 
-	log.Printf("Quote: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
-		ltp, ltq, ltt, atp, volume, open, high, low, close)
+	// Validate OHLC relationships
+	if high < low {
+		log.Printf("Invalid OHLC data for security %d: high %.2f < low %.2f, using LTP", securityID, high, low)
+		open, high, low, close = ltp, ltp, ltp, ltp
+	}
 
-	// Extract header information
-	exchangeSegment := data[3]
-	securityID := binary.LittleEndian.Uint32(data[4:8])
+	log.Printf("Quote: Security ID: %d, LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
+		securityID, ltp, ltq, ltt, atp, volume, open, high, low, close)
 
 	// Get symbol from the map of subscribed instruments
 	var symbol string
@@ -872,9 +1094,14 @@ func processPrevClose(data []byte) {
 
 // processFullPacket handles full market data packet
 func processFullPacket(data []byte) {
-	if len(data) < 163 {
+	if len(data) < 63 {
+		log.Printf("Full packet too short: %d bytes, expected at least 63", len(data))
 		return
 	}
+
+	// Extract header information
+	exchangeSegment := data[3]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
 
 	// Extract key data from full packet according to Dhan documentation
 	ltp := math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))  // Latest Traded Price
@@ -882,44 +1109,46 @@ func processFullPacket(data []byte) {
 	ltt := binary.LittleEndian.Uint32(data[14:18])                       // Last Trade Time (LTT)
 	atp := math.Float32frombits(binary.LittleEndian.Uint32(data[18:22])) // Average Trade Price (ATP)
 	volume := binary.LittleEndian.Uint32(data[22:26])                    // Volume
-	// sellQty := binary.LittleEndian.Uint32(data[26:30])               // Total Sell Quantity
-	// buyQty := binary.LittleEndian.Uint32(data[30:34])                // Total Buy Quantity
-	// oi := binary.LittleEndian.Uint32(data[34:38])                    // Open Interest
-	// highOI := binary.LittleEndian.Uint32(data[38:42])                // Highest Open Interest
-	// lowOI := binary.LittleEndian.Uint32(data[42:46])                 // Lowest Open Interest
 
 	// Extract OHLC data according to documentation
-	var open, high, low, close float32
-	if len(data) >= 63 {
-		open = math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))  // Day Open Value
-		close = math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])) // Day Close Value
-		high = math.Float32frombits(binary.LittleEndian.Uint32(data[54:58]))  // Day High Value
-		low = math.Float32frombits(binary.LittleEndian.Uint32(data[58:62]))   // Day Low Value
+	open := math.Float32frombits(binary.LittleEndian.Uint32(data[46:50]))  // Day Open Value
+	close := math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])) // Day Close Value
+	high := math.Float32frombits(binary.LittleEndian.Uint32(data[54:58]))  // Day High Value
+	low := math.Float32frombits(binary.LittleEndian.Uint32(data[58:62]))   // Day Low Value
+
+	// Validate extracted data
+	if ltp <= 0 {
+		log.Printf("Invalid LTP for security %d: %.2f", securityID, ltp)
+		return
 	}
 
-	// Market Depth data starts at byte 62 (5 packets of 20 bytes each)
-	// We're not processing market depth for now, but it's available in data[62:162]
+	if ltt == 0 {
+		log.Printf("Invalid timestamp for security %d, using current time", securityID)
+		ltt = uint32(time.Now().Unix())
+	}
 
-	// If any value is 0, use ltp as fallback
-	if open == 0 {
+	// If any OHLC value is 0 or invalid, use ltp as fallback
+	if open <= 0 {
 		open = ltp
 	}
-	if high == 0 {
+	if high <= 0 {
 		high = ltp
 	}
-	if low == 0 {
+	if low <= 0 {
 		low = ltp
 	}
-	if close == 0 {
+	if close <= 0 {
 		close = ltp
 	}
 
-	log.Printf("Full Packet: LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
-		ltp, ltq, ltt, atp, volume, open, high, low, close)
+	// Validate OHLC relationships
+	if high < low {
+		log.Printf("Invalid OHLC data for security %d: high %.2f < low %.2f, using LTP", securityID, high, low)
+		open, high, low, close = ltp, ltp, ltp, ltp
+	}
 
-	// Extract header information
-	exchangeSegment := data[3]
-	securityID := binary.LittleEndian.Uint32(data[4:8])
+	log.Printf("Full Packet: Security ID: %d, LTP: %.2f, LTQ: %d, LTT: %d, ATP: %.2f, Vol: %d, O: %.2f, H: %.2f, L: %.2f, C: %.2f",
+		securityID, ltp, ltq, ltt, atp, volume, open, high, low, close)
 
 	// Get symbol from the map of subscribed instruments
 	var symbol string
@@ -987,19 +1216,65 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 	}
 
 	// Convert timestamp from Unix to time.Time
-	timestampTime := time.Unix(int64(timestamp), 0)
+	// The LTT (Last Trade Time) from Dhan API is Unix timestamp in UTC
+	// Format it consistently with migrate.go approach
+	var timestampTime time.Time
+	if timestamp > 0 {
+		// Parse and format timestamp using the requested format
+		// The timestamp from Dhan API is in UTC, so we convert it directly
+		utcTime := time.Unix(int64(timestamp), 0).UTC()
+		t := utcTime.Format("2006-01-02 15:04:05")
+		parsedTime, err := time.Parse("2006-01-02 15:04:05", t)
+		if err != nil {
+			log.Printf("Error parsing formatted timestamp: %v, using raw Unix timestamp", err)
+			timestampTime = time.Unix(int64(timestamp), 0).UTC()
+		} else {
+			// Keep the parsed time in UTC as that's what the API provides
+			timestampTime = parsedTime.UTC()
+		}
+		// Convert to IST for storage and logging
+		timestampTime = timestampTime.In(istLocation)
+	} else {
+		// Use current time in IST if timestamp is invalid
+		timestampTime = time.Now().In(istLocation)
+	}
 
-	// Create instrument model
+	// Validate OHLC data consistency
+	openFloat := float64(open)
+	highFloat := float64(high)
+	lowFloat := float64(low)
+	closeFloat := float64(close)
+
+	// Ensure high is the highest and low is the lowest
+	if highFloat < lowFloat {
+		log.Printf("Warning: Invalid OHLC data for security %d: high %.2f < low %.2f, swapping values", securityID, highFloat, lowFloat)
+		highFloat, lowFloat = lowFloat, highFloat
+	}
+	if openFloat > highFloat {
+		highFloat = openFloat
+	}
+	if openFloat < lowFloat {
+		lowFloat = openFloat
+	}
+	if closeFloat > highFloat {
+		highFloat = closeFloat
+	}
+	if closeFloat < lowFloat {
+		lowFloat = closeFloat
+	}
+
+	// Create instrument model with validated data (consistent timezone handling)
+	now := time.Now().In(istLocation)
 	instrument := &model.Instrument{
 		ExchangeSecurityID: int32(securityID),
-		Open:               float64(open),
-		High:               float64(high),
-		Low:                float64(low),
-		Close:              float64(close),
+		Open:               openFloat,
+		High:               highFloat,
+		Low:                lowFloat,
+		Close:              closeFloat,
 		Volume:             volume,
 		Timestamp:          timestampTime,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 
 	// Store in ClickHouse
@@ -1007,7 +1282,9 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 	defer cancel()
 
 	if err := instrumentRepository.Create(ctx, instrument); err != nil {
-		log.Printf("Error storing instrument data: %v", err)
+		log.Printf("Error storing instrument data for security %d: %v", securityID, err)
+		log.Printf("Failed data - Exchange: %d, Symbol: %s, OHLCV: %.2f/%.2f/%.2f/%.2f/%.2f, Time: %s",
+			exchangeSegment, symbol, openFloat, highFloat, lowFloat, closeFloat, volume, timestampTime.Format(time.RFC3339))
 		return
 	}
 
@@ -1018,8 +1295,10 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 		}
 	}
 
-	// log.Printf("Stored ticker data for %s (ExchangeSecurityID: %d) at %s",
-	// 	symbol, securityID, timestampTime.Format(time.RFC3339))
+	// Log successful storage (only for debugging, can be disabled in production)
+	// Display the original UTC time from the API (before IST conversion)
+	log.Printf("Successfully stored data for %s (SecurityID: %d): LTP=%.2f, Vol=%.0f at %s",
+		symbol, securityID, closeFloat, volume, timestampTime.UTC().Format("15:04:05"))
 }
 
 // processInstrumentDataForDeployments processes incoming instrument data and runs the appropriate deployments
@@ -1035,31 +1314,56 @@ func storeInstrumentData(securityID uint32, exchangeSegment byte, symbol string,
 // Since the live service already handles data storage, this function focuses on
 // the deployment processing aspects.
 func processInstrumentDataForDeployments(ctx context.Context, instrumentData *model.Instrument) error {
-	// Note: This function requires the deployment service to be properly initialized
-	// The actual deployment processing will be handled by the deployment service
-	// For now, we'll just log that processing would occur here
+	// Skip if deployment service is not initialized
+	if deploymentSvc == nil {
+		return nil
+	}
 
 	instrumentID := int(instrumentData.ExchangeSecurityID)
-	log.Printf("Would process deployments for instrument ID: %d", instrumentID)
 
-	// TODO: Implement actual deployment processing when deployment service is integrated
-	// This would include:
-	// 1. Finding deployments for this instrument using deploymentSvc.GetActiveDeploymentsWithStrategies()
-	// 2. Filtering deployments by instrument ID
-	// 3. Running each deployment's strategy evaluation using deploymentSvc.Run()
-	// 4. Handling any errors while continuing with other deployments
+	// Get all active deployments with strategies
+	activeDeployments, err := deploymentSvc.GetActiveDeploymentsWithStrategies(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active deployments: %w", err)
+	}
+
+	// Filter deployments for this specific instrument
+	var relevantDeployments []*deploymentService.DeploymentWithStrategy
+	for _, deployment := range activeDeployments {
+		if deployment.Deployment.InstrumentID == instrumentID {
+			relevantDeployments = append(relevantDeployments, deployment)
+		}
+	}
+
+	if len(relevantDeployments) == 0 {
+		// No deployments for this instrument, skip processing
+		return nil
+	}
+
+	// // Process each relevant deployment
+	// currentTimestamp := instrumentData.Timestamp
+	// for _, deploymentWithStrategy := range relevantDeployments {
+	// 	if err := deploymentSvc.Run(ctx, deploymentWithStrategy, currentTimestamp); err != nil {
+	// 		log.Printf("Error running deployment %s for instrument %d: %v",
+	// 			deploymentWithStrategy.Deployment.ID, instrumentID, err)
+	// 		// Continue processing other deployments even if one fails
+	// 	}
+	// }
 
 	return nil
 }
 
 // toInstrument converts raw market data to an Instrument model
 func toInstrument(data []byte) *model.Instrument {
-	// Extract header information
-	// exchangeSegment := data[3] - not used currently
-	securityID := binary.LittleEndian.Uint32(data[4:8])
+	// Validate minimum data length
+	if len(data) < 8 {
+		log.Printf("Invalid data length: %d bytes", len(data))
+		return nil
+	}
 
-	// Extract market data based on the feed type
+	// Extract header information
 	feedCode := data[0]
+	securityID := binary.LittleEndian.Uint32(data[4:8])
 
 	var (
 		open, high, low, close float64
@@ -1069,78 +1373,109 @@ func toInstrument(data []byte) *model.Instrument {
 	)
 
 	// Process based on feed code according to Dhan documentation
-	if feedCode == FeedCodeQuote {
+	switch feedCode {
+	case FeedCodeQuote:
 		// Quote packet structure
-		if len(data) >= 12 {
-			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		if len(data) < 50 {
+			log.Printf("Quote packet too short: %d bytes", len(data))
+			return nil
 		}
-		if len(data) >= 18 {
-			ltt = binary.LittleEndian.Uint32(data[14:18])
-		}
-		if len(data) >= 26 {
-			volume = float64(binary.LittleEndian.Uint32(data[22:26]))
-		}
+
+		ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		ltt = binary.LittleEndian.Uint32(data[14:18])
+		volume = float64(binary.LittleEndian.Uint32(data[22:26]))
 
 		// Extract OHLC data from quote packet
-		if len(data) >= 50 {
-			open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[34:38])))
-			close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])))
-			high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[42:46])))
-			low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
-		}
-	} else if feedCode == FeedCodeFull {
+		open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[34:38])))
+		close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[38:42])))
+		high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[42:46])))
+		low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
+
+	case FeedCodeFull:
 		// Full packet structure
-		if len(data) >= 12 {
-			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		if len(data) < 63 {
+			log.Printf("Full packet too short: %d bytes", len(data))
+			return nil
 		}
-		if len(data) >= 18 {
-			ltt = binary.LittleEndian.Uint32(data[14:18])
-		}
-		if len(data) >= 26 {
-			volume = float64(binary.LittleEndian.Uint32(data[22:26]))
-		}
+
+		ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		ltt = binary.LittleEndian.Uint32(data[14:18])
+		volume = float64(binary.LittleEndian.Uint32(data[22:26]))
 
 		// Extract OHLC data from full packet
-		if len(data) >= 63 {
-			open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
-			close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])))
-			high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[54:58])))
-			low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[58:62])))
-		}
-	} else if feedCode == FeedCodeTicker {
+		open = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[46:50])))
+		close = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[50:54])))
+		high = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[54:58])))
+		low = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[58:62])))
+
+	case FeedCodeTicker:
 		// Ticker packet structure
-		if len(data) >= 12 {
-			ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		if len(data) < 16 {
+			log.Printf("Ticker packet too short: %d bytes", len(data))
+			return nil
 		}
-		if len(data) >= 16 {
-			ltt = binary.LittleEndian.Uint32(data[12:16])
-		}
+
+		ltp = math.Float32frombits(binary.LittleEndian.Uint32(data[8:12]))
+		ltt = binary.LittleEndian.Uint32(data[12:16])
+		// Volume is not available in ticker packets
+		volume = 0
+
+	default:
+		log.Printf("Unsupported feed code: %d", feedCode)
+		return nil
 	}
 
-	// If any value is 0, use ltp as fallback
+	// Validate extracted data
+	if ltp <= 0 {
+		log.Printf("Invalid LTP for security %d: %.2f", securityID, ltp)
+		return nil
+	}
+
+	// If any OHLC value is 0 or invalid, use ltp as fallback
 	ltpFloat := float64(ltp)
-	if open == 0 {
+	if open <= 0 {
 		open = ltpFloat
 	}
-	if high == 0 {
+	if high <= 0 {
 		high = ltpFloat
 	}
-	if low == 0 {
+	if low <= 0 {
 		low = ltpFloat
 	}
-	if close == 0 {
+	if close <= 0 {
 		close = ltpFloat
 	}
 
-	// Convert LTT to time.Time, fallback to current time if LTT is 0
-	var timestamp time.Time
-	if ltt > 0 {
-		timestamp = time.Unix(int64(ltt), 0)
-	} else {
-		timestamp = time.Now()
+	// Validate OHLC relationships
+	if high < low {
+		log.Printf("Invalid OHLC data for security %d: high %.2f < low %.2f, using LTP", securityID, high, low)
+		open, high, low, close = ltpFloat, ltpFloat, ltpFloat, ltpFloat
 	}
 
-	// Create and return the instrument object
+	// Convert LTT to time.Time (consistent with migrate.go approach)
+	var timestamp time.Time
+	if ltt > 0 {
+		// Parse and format timestamp using the requested format
+		// The timestamp from Dhan API is in UTC, so we convert it directly
+		utcTime := time.Unix(int64(ltt), 0).UTC()
+		t := utcTime.Format("2006-01-02 15:04:05")
+		parsedTime, err := time.Parse("2006-01-02 15:04:05", t)
+		if err != nil {
+			log.Printf("Error parsing formatted timestamp: %v, using raw Unix timestamp", err)
+			timestamp = time.Unix(int64(ltt), 0).UTC()
+		} else {
+			// Keep the parsed time in UTC as that's what the API provides
+			timestamp = parsedTime.UTC()
+		}
+		// Convert to IST for storage and logging
+		timestamp = timestamp.In(istLocation)
+	} else {
+		// Use current time in IST if timestamp is invalid
+		timestamp = time.Now().In(istLocation)
+	}
+
+	// Create and return the instrument object (consistent timezone handling)
+	now := time.Now().In(istLocation)
 	return &model.Instrument{
 		ExchangeSecurityID: int32(securityID),
 		Open:               open,
@@ -1148,8 +1483,8 @@ func toInstrument(data []byte) *model.Instrument {
 		Low:                low,
 		Close:              close,
 		Volume:             volume,
-		Timestamp:          timestamp, // Use LTT from packet
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
+		Timestamp:          timestamp,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 }
