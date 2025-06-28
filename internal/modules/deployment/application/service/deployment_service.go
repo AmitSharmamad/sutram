@@ -73,11 +73,6 @@ type DeploymentService interface {
 	ClosePosition(ctx context.Context, id int64, req *dto.ClosePositionRequest, userID uuid.UUID) (*dto.PositionResponse, error)
 	// Additional position closing methods with specific exit reasons
 	ClosePositionWithReason(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, exitReason string, userID uuid.UUID) (*dto.PositionResponse, error)
-	ClosePositionWithStopLoss(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
-	ClosePositionWithTakeProfit(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
-	ClosePositionWithTimeout(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
-	ClosePositionWithStrategy(ctx context.Context, id int64, exitPrice float64, exitTime time.Time, userID uuid.UUID) (*dto.PositionResponse, error)
-	UpdatePositionExitReason(ctx context.Context, id int64, exitReason string, userID uuid.UUID) error
 	CancelPosition(ctx context.Context, id int64, userID uuid.UUID) error
 
 	// Deployment metrics operations
@@ -90,8 +85,8 @@ type DeploymentService interface {
 	// Live trading operations
 	Initialize(ctx context.Context) error
 	GetActiveDeploymentsWithStrategies(ctx context.Context) ([]*DeploymentWithStrategy, error)
-	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error
-	RunWithTimestamp(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error
+	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time, instrumentData *instrumentModel.Instrument) error
+
 	GetActiveInstrumentIDs() []int
 }
 
@@ -894,10 +889,112 @@ func (s *deploymentService) GetActiveDeploymentsWithStrategies(ctx context.Conte
 	return result, nil
 }
 
-// Run executes a deployment's strategy against live market data
-func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, instrumentData *instrumentModel.Instrument) error {
+// Run executes a deployment's strategy for a given timestamp with optional instrument data
+// If instrumentData is nil, it will be fetched from the database
+func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time, instrumentData *instrumentModel.Instrument) error {
 	deployment := deploymentWithStrategy.Deployment
 	strategy := deploymentWithStrategy.Strategy
+
+	// If no instrument data provided, fetch it from database (similar to engine.go pattern)
+	if instrumentData == nil {
+		// Calculate lookback from strategy expressions
+		lookbackFromExpressions := s.getLookBackFromExpressions(&strategyDto.StrategyResponse{
+			EntryExpression: strategy.EntryExpression,
+			ExitExpression:  strategy.ExitExpression,
+		})
+
+		// Get lookback data (historical data before current timestamp)
+		lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
+			ctx,
+			int32(deployment.InstrumentID),
+			currentTimestamp,
+			string(strategy.ChartTimeframe),
+			int(lookbackFromExpressions),
+		)
+
+		if err != nil {
+			fmt.Printf("Error getting lookback data for instrument %d: %v\n",
+				deployment.InstrumentID, err)
+			// Continue with empty lookback if error (following engine.go pattern)
+			lookbackData = []*instrumentModel.Instrument{}
+		}
+
+		// Get current data point using minimal time window
+		timeWindow := 1 * time.Second
+		startTime := currentTimestamp.Add(-timeWindow)
+		endTime := currentTimestamp.Add(timeWindow)
+
+		instrumentDataList, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimeRange(
+			ctx,
+			int32(deployment.InstrumentID),
+			startTime,
+			endTime,
+			string(strategy.ChartTimeframe),
+		)
+
+		if err != nil {
+			return fmt.Errorf("failed to fetch instrument data for timestamp %v: %w", currentTimestamp, err)
+		}
+
+		if len(instrumentDataList) == 0 {
+			return fmt.Errorf("no instrument data found for instrument %d at timestamp %v", deployment.InstrumentID, currentTimestamp)
+		}
+
+		// Use the first data point (should be the closest to our timestamp)
+		instrumentData = instrumentDataList[0]
+
+		// Reverse lookback data since it comes in descending order (newest first)
+		// This follows the exact pattern from engine.go
+		for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+			lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+		}
+
+		// Store the combined data for indicator calculations
+		// Combine lookback data with current data (following engine.go pattern)
+		// Create slice with exact capacity needed
+		historicalData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+1)
+		historicalData = append(historicalData, lookbackData...)
+		historicalData = append(historicalData, instrumentData)
+
+		// Use the combined historical data for indicator calculations
+		_ = historicalData // Will be used in indicator calculation below
+	} else {
+		// Validate that the instrument data matches the deployment
+		if int(instrumentData.ExchangeSecurityID) != deployment.InstrumentID {
+			return fmt.Errorf("instrument data mismatch: expected %d, got %d", deployment.InstrumentID, instrumentData.ExchangeSecurityID)
+		}
+
+		// When instrument data is provided (live trading), fetch lookback data for indicator calculations
+		lookbackFromExpressions := s.getLookBackFromExpressions(&strategyDto.StrategyResponse{
+			EntryExpression: strategy.EntryExpression,
+			ExitExpression:  strategy.ExitExpression,
+		})
+
+		// Get lookback data (historical data before current timestamp)
+		lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
+			ctx,
+			int32(deployment.InstrumentID),
+			instrumentData.Timestamp,
+			string(strategy.ChartTimeframe),
+			int(lookbackFromExpressions),
+		)
+
+		if err != nil {
+			fmt.Printf("Error getting lookback data for instrument %d: %v\n",
+				instrumentData.ExchangeSecurityID, err)
+			// Continue with empty lookback if error (following engine.go pattern)
+			lookbackData = []*instrumentModel.Instrument{}
+		}
+
+		// Reverse lookback data since it comes in descending order (newest first)
+		// This follows the exact pattern from engine.go
+		for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
+			lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
+		}
+
+		// The lookback data will be combined with current data later in the method
+		// for indicator calculations
+	}
 
 	// Log the execution
 	logEntry, err := model.NewDeploymentLog(
@@ -959,11 +1056,12 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		strategyResponse.Slippage = *strategy.Slippage
 	}
 
-	// Calculate lookback from strategy expressions (like backtesting engine)
+	// Use the historical data that was already prepared at the beginning of the method
+	// Find the historicalData variable that was created earlier
+	// Since we moved the data fetching to the beginning, we need to reference it here
 	lookbackFromExpressions := s.getLookBackFromExpressions(strategyResponse)
 
-	// Fetch historical data with proper lookback period using the same method as backtesting
-	// Get lookback data (historical data before current timestamp)
+	// Get lookback data (historical data before current timestamp) - following engine.go pattern
 	lookbackData, err := s.instrumentRepo.FindByExchangeSecurityIDWithLookback(
 		ctx,
 		instrumentData.ExchangeSecurityID,
@@ -975,21 +1073,23 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	if err != nil {
 		fmt.Printf("Error getting lookback data for instrument %d: %v\n",
 			instrumentData.ExchangeSecurityID, err)
-		// Use current data point only as fallback
+		// Continue with empty lookback if error (following engine.go pattern)
 		lookbackData = []*instrumentModel.Instrument{}
 	}
 
 	// Reverse lookback data since it comes in descending order (newest first)
+	// This follows the exact pattern from engine.go
 	for i, j := 0, len(lookbackData)-1; i < j; i, j = i+1, j-1 {
 		lookbackData[i], lookbackData[j] = lookbackData[j], lookbackData[i]
 	}
 
-	// Combine lookback data with current data (lookback data first, then current data)
+	// Combine lookback data with current data (following engine.go pattern)
 	historicalData := make([]*instrumentModel.Instrument, 0, len(lookbackData)+1)
 	historicalData = append(historicalData, lookbackData...)
 	historicalData = append(historicalData, instrumentData)
 
-	// Pre-calculate indicators like in backtest engine
+	// Pre-calculate indicators following engine.go pattern
+	// This approach is more efficient than recalculating indicators for each evaluation
 	evalContext := parser.NewEvaluationContext(nil)
 	evalContext.Strategy = strategyResponse
 	evalContext.Data = s.toDataContext(historicalData)
@@ -1055,25 +1155,13 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		indicatorArrayMap[uniqueKey] = indicatorValues
 	}
 
-	currentTimestamp := instrumentData.Timestamp
-
-	fmt.Printf("Current timestamp: %v\n", currentTimestamp)
-
-	// Publish evaluation started event
-	// s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypeEvaluationStarted, dto.EvaluationStartedData{
-	// 	MarketPrice: instrumentData.Close,
-	// 	Timestamp:   instrumentData.Timestamp,
-	// 	Timeframe:   string(strategy.ChartTimeframe),
-	// })
+	fmt.Printf("Current timestamp: %v\n", instrumentData.Timestamp)
 
 	// Track if any action was taken during this evaluation
 	actionTaken := false
 
 	// Handle existing position first - check exit conditions
 	if currentPosition != nil {
-		// fmt.Printf("Found existing open position %s for deployment %s\n",
-		// 	currentPosition.ID, deployment.ID)
-
 		// Check for MIS end-of-day square-off first
 		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayHit(instrumentData) {
 			// Force close the MIS position at end of day
@@ -1139,7 +1227,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			targetProfitTriggered := s.isTargetProfitTriggered(currentPosition, strategyResponse, instrumentData)
 
 			// Evaluate normal exit condition using indicator array map
-			exitSignal, err := s.evaluateExitCondition(strategyResponse.ExitExpression, indicatorArrayMap, currentTimestamp)
+			exitSignal, err := s.evaluateExitCondition(strategyResponse.ExitExpression, indicatorArrayMap, instrumentData.Timestamp)
 			if err != nil {
 				fmt.Printf("Error evaluating exit condition: %v\n", err)
 			}
@@ -1150,7 +1238,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				exitTime := instrumentData.Timestamp
 				var exitReason string
 
-				// Determine exit reason
+				// Determine exit reason and exit price
 				if stopLossTriggered {
 					exitReason = string(model.ExitReasonStopLoss)
 					if currentPosition.InitialStopLossPrice != nil &&
@@ -1158,8 +1246,10 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 						*currentPosition.StopLossPrice != *currentPosition.InitialStopLossPrice {
 						exitReason = string(model.ExitReasonTrailingStopLoss)
 					}
+					exitPrice = *currentPosition.StopLossPrice
 				} else if targetProfitTriggered {
 					exitReason = string(model.ExitReasonTargetProfit)
+					exitPrice = *currentPosition.TargetProfitPrice
 				} else {
 					exitReason = string(model.ExitReasonSignal)
 				}
@@ -1234,10 +1324,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 	// If no current position exists, check entry conditions
 	if currentPosition == nil {
-		// fmt.Printf("No open position for deployment %s, checking entry conditions\n", deployment.ID)
-
 		// Check if the current time is within the entry time window
-		// If EntryStartTime or EntryEndTime is specified, we only look for entries within that window
 		canCheckEntryCondition := true
 
 		if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
@@ -1273,7 +1360,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 		// Only check entry conditions if we're within the allowed entry time window
 		if canCheckEntryCondition {
 			// Evaluate entry condition using indicator array map
-			entrySignal, err := s.evaluateEntryCondition(strategyResponse.EntryExpression, indicatorArrayMap, currentTimestamp)
+			entrySignal, err := s.evaluateEntryCondition(strategyResponse.EntryExpression, indicatorArrayMap, instrumentData.Timestamp)
 			if err != nil {
 				fmt.Printf("Error evaluating entry condition: %v\n", err)
 			} else if entrySignal {
@@ -1296,7 +1383,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					quantity,
 					entryPrice,
 					entryTime,
-					strategy.PositionType, // Add the direction from strategy
+					strategy.PositionType,
 					map[string]any{
 						"strategy_id": strategy.ID.String(),
 						"created_by":  "live_trading",
@@ -1466,189 +1553,6 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 			},
 		})
 	}
-
-	// fmt.Printf("Strategy execution completed for deployment %s on instrument %d\n",
-	// 	deployment.ID, instrumentData.ExchangeSecurityID)
-
-	return nil
-}
-
-// RunWithTimestamp executes a deployment's strategy against live market data with a specified timestamp
-func (s *deploymentService) RunWithTimestamp(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time) error {
-	deployment := deploymentWithStrategy.Deployment
-	strategy := deploymentWithStrategy.Strategy
-
-	// Log the execution
-	logEntry, err := model.NewDeploymentLog(
-		deployment.ID,
-		model.StatusStarted,
-		map[string]any{
-			"current_timestamp": currentTimestamp,
-			"instrument_id":     deployment.InstrumentID,
-			"execution_type":    "scheduled",
-		},
-	)
-
-	if err != nil {
-		// Log but continue processing
-		fmt.Printf("Error creating deployment log: %v\n", err)
-	} else {
-		if err := s.logRepo.Create(ctx, logEntry); err != nil {
-			// Log but continue processing
-			fmt.Printf("Error saving deployment log: %v\n", err)
-		}
-	}
-
-	// Use pre-fetched position from DeploymentWithStrategy
-	currentPosition := deploymentWithStrategy.CurrentPosition
-
-	// Prepare strategy data
-	strategyResponse := &strategyDto.StrategyResponse{
-		ID:               strategy.ID,
-		UserID:           strategy.UserID,
-		Name:             strategy.Name,
-		Description:      strategy.Description,
-		EntryExpression:  strategy.EntryExpression,
-		ExitExpression:   strategy.ExitExpression,
-		ChartTimeframe:   strategyModel.ChartTimeframe(strategy.ChartTimeframe),
-		PositionType:     strategy.PositionType,
-		TradeType:        strategyModel.TradeType(strategy.TradeType),
-		Capital:          strategy.Capital,
-		Instruments:      strategy.Instruments,
-		Qty:              strategy.Qty,
-		MaxAllocation:    strategy.MaxAllocation,
-		MaxTrades:        0,   // Set default value
-		Brokerage:        0,   // Set default value
-		Slippage:         0.0, // Set default value
-		StopLoss:         strategy.StopLoss,
-		StopLossType:     strategy.StopLossType,
-		TargetProfit:     strategy.TargetProfit,
-		TargetProfitType: strategy.TargetProfitType,
-		EntryStartTime:   strategy.EntryStartTime,
-		EntryEndTime:     strategy.EntryEndTime,
-	}
-
-	// Set optional fields if they exist
-	if strategy.MaxTrades != nil {
-		strategyResponse.MaxTrades = *strategy.MaxTrades
-	}
-	if strategy.Brokerage != nil {
-		strategyResponse.Brokerage = *strategy.Brokerage
-	}
-	if strategy.Slippage != nil {
-		strategyResponse.Slippage = *strategy.Slippage
-	}
-
-	// Check if the current time is within the entry time window (if specified)
-	canCheckEntryCondition := true
-	if strategy.EntryStartTime != nil || strategy.EntryEndTime != nil {
-		// Extract time of day from the current timestamp
-		currentTimeOfDay := time.Date(0, 1, 1,
-			currentTimestamp.Hour(), currentTimestamp.Minute(), currentTimestamp.Second(), 0, time.UTC)
-
-		// Check if we're within the entry time window
-		if strategy.EntryStartTime != nil {
-			entryStartTimeOfDay := time.Date(0, 1, 1,
-				strategy.EntryStartTime.Hour, strategy.EntryStartTime.Minute,
-				strategy.EntryStartTime.Second, 0, time.UTC)
-
-			if currentTimeOfDay.Before(entryStartTimeOfDay) {
-				canCheckEntryCondition = false
-			}
-		}
-
-		if canCheckEntryCondition && strategy.EntryEndTime != nil {
-			entryEndTimeOfDay := time.Date(0, 1, 1,
-				strategy.EntryEndTime.Hour, strategy.EntryEndTime.Minute,
-				strategy.EntryEndTime.Second, 0, time.UTC)
-
-			if currentTimeOfDay.After(entryEndTimeOfDay) {
-				canCheckEntryCondition = false
-			}
-		}
-	}
-	// Check market hours for the strategy timeframe
-	// For now, we assume market is always open - this can be enhanced later
-	// if !isMarketOpen(currentTimestamp, string(strategy.ChartTimeframe)) {
-	// 	fmt.Printf("Market is closed for timeframe %s at %v - skipping deployment %s\n",
-	// 		strategy.ChartTimeframe, currentTimestamp, deployment.ID)
-	//
-	// 	// Publish market closed event
-	// 	s.publishEvent(ctx, deployment, strategy, dto.EventTypeMarketClosed, dto.MarketStatusData{
-	// 		Status:    "closed",
-	// 		Timestamp: currentTimestamp,
-	// 		Timeframe: string(strategy.ChartTimeframe),
-	// 	})
-	//
-	// 	return nil
-	// }
-
-	// Since we don't have instrument data, we can only perform timestamp-based logic
-	// This is mainly useful for:
-	// 1. Time-based entry/exit windows
-	// 2. End-of-day position management
-	// 3. Market hours validation
-	// 4. Scheduled strategy execution
-
-	actionTaken := false
-
-	// Handle existing position - check for time-based exits
-	if currentPosition != nil {
-		fmt.Printf("Found existing open position %s for deployment %s at timestamp %v\n",
-			currentPosition.ID, deployment.ID, currentTimestamp)
-
-		// Check for MIS end-of-day square-off
-		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayTime(currentTimestamp) {
-			// Note: We don't have current market price, so we'd need to fetch it or use last known price
-			// For now, log that we need to square off the position
-			fmt.Printf("MIS EOD time reached for position %s - should be squared off\n", currentPosition.ID)
-
-			// Publish EOD event
-			s.publishEvent(ctx, deployment, strategy, dto.EventTypeEODSquareOff, dto.TimeEventData{
-				Timestamp:  currentTimestamp,
-				EventType:  "mis_eod",
-				PositionID: currentPosition.ID.String(),
-			})
-
-			actionTaken = true
-		}
-	}
-
-	// Check entry conditions based on time window
-	if currentPosition == nil && canCheckEntryCondition {
-		fmt.Printf("No open position for deployment %s, within entry time window at %v\n",
-			deployment.ID, currentTimestamp)
-
-		// Since we don't have market data, we can't evaluate entry expressions
-		// But we can log that we're ready to evaluate when data arrives
-		s.publishEvent(ctx, deployment, strategy, dto.EventTypeEntryWindowOpen, dto.TimeWindowEventData{
-			WindowType:   "entry",
-			WindowStatus: "open",
-			CurrentTime:  currentTimestamp,
-		})
-	} else if currentPosition == nil && !canCheckEntryCondition {
-		fmt.Printf("Entry time window closed for deployment %s at %v\n",
-			deployment.ID, currentTimestamp)
-
-		s.publishEvent(ctx, deployment, strategy, dto.EventTypeEntryWindowClosed, dto.TimeWindowEventData{
-			WindowType:   "entry",
-			WindowStatus: "closed",
-			CurrentTime:  currentTimestamp,
-		})
-	}
-
-	// Log completion
-	if !actionTaken {
-		s.publishEvent(ctx, deployment, strategy, dto.EventTypeScheduledExecution, dto.ScheduledExecutionData{
-			Timestamp:       currentTimestamp,
-			DeploymentID:    deployment.ID.String(),
-			HasOpenPosition: currentPosition != nil,
-			EntryWindowOpen: canCheckEntryCondition,
-		})
-	}
-
-	fmt.Printf("Timestamp-based execution completed for deployment %s at %v\n",
-		deployment.ID, currentTimestamp)
 
 	return nil
 }
@@ -2160,55 +2064,6 @@ func (s *deploymentService) isMISEndOfDayHit(data *instrumentModel.Instrument) b
 		15, 20, 0, 0, data.Timestamp.Location()) // 3:20 PM
 
 	return data.Timestamp.After(eodTime)
-}
-
-// isMISEndOfDayTime checks if the current timestamp is near end of day for MIS square-off
-func (s *deploymentService) isMISEndOfDayTime(currentTimestamp time.Time) bool {
-	// MIS positions are typically squared off at 3:20 PM IST
-	// Check if current time is after 3:20 PM
-	eodTime := time.Date(currentTimestamp.Year(), currentTimestamp.Month(), currentTimestamp.Day(),
-		15, 20, 0, 0, currentTimestamp.Location()) // 3:20 PM
-
-	return currentTimestamp.After(eodTime)
-}
-
-// isTimestampAlignedWithTimeframe checks if the given timestamp aligns with the specified timeframe
-func (s *deploymentService) isTimestampAlignedWithTimeframe(timestamp time.Time, timeframe string) bool {
-	minute := timestamp.Minute()
-
-	switch timeframe {
-	case "1m":
-		// 1-minute timeframe: every minute is valid
-		return true
-	case "3m":
-		// 3-minute timeframe: minutes 0, 3, 6, 9, 12, 15, 18, etc.
-		return minute%3 == 0
-	case "5m":
-		// 5-minute timeframe: minutes 0, 5, 10, 15, 20, etc.
-		return minute%5 == 0
-	case "10m":
-		// 10-minute timeframe: minutes 0, 10, 20, 30, 40, 50
-		return minute%10 == 0
-	case "15m":
-		// 15-minute timeframe: minutes 0, 15, 30, 45
-		return minute%15 == 0
-	case "30m":
-		// 30-minute timeframe: minutes 0, 30
-		return minute%30 == 0
-	case "1h":
-		// 1-hour timeframe: minute must be 0
-		return minute == 0
-	case "3h":
-		// 3-hour timeframe: minute must be 0 and hour must be divisible by 3
-		return minute == 0 && timestamp.Hour()%3 == 0
-	case "1d":
-		// 1-day timeframe: must be start of day (usually 9:15 AM for Indian markets)
-		hour := timestamp.Hour()
-		return hour == 9 && minute == 15
-	default:
-		// Unknown timeframe, default to allowing execution
-		return true
-	}
 }
 
 // Helper methods for publishing events

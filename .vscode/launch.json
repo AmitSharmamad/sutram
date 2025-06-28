@@ -25,6 +25,16 @@
             "preLaunchTask": "l-build"     // Optional: Automate build
         },
         {
+            "name": "Deployment",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",              // Use prebuilt binary
+            "program": "${workspaceFolder}/bin/deployment", // Path to your binary
+            "env": {},
+            "args": [],
+            "preLaunchTask": "l-deployment"     // Optional: Automate build
+        },
+        {
             "name": "Client",
             "type": "go",
             "request": "launch",

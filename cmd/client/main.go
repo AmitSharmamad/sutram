@@ -568,8 +568,9 @@ func getMarketDataFromDB(securityID int32, timestamp time.Time) (*model.Instrume
 
 	// Get the data for the exact timestamp or closest to it
 	// We'll use a small time window (1 minute) around the target timestamp
-	startTime := timestamp.Add(-30 * time.Second)
-	endTime := timestamp.Add(30 * time.Second)
+	// Convert IST times to UTC since database stores timestamps in UTC
+	startTime := timestamp.Add(-30 * time.Second).UTC()
+	endTime := timestamp.Add(30 * time.Second).UTC()
 
 	instruments, err := instrumentRepository.FindByExchangeSecurityIDAndTimeRange(
 		ctx, securityID, startTime, endTime, "1m")
