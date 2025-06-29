@@ -1300,3 +1300,8 @@ func (e *BacktestEngine) handleMISSquareOff(
 
 	return true // Position was closed
 }
+
+// GetInstrumentService returns the instrumentService
+func (e *BacktestEngine) GetInstrumentService() *instrumentService.InstrumentService {
+	return e.instrumentService
+}
