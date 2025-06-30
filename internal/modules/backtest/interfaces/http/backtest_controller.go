@@ -481,6 +481,58 @@ func calculateIndicatorsForExport(open, high, low, close, volume []float64) (res
 	result.Data["Atr"] = atr
 	result.Order = append(result.Order, "Atr")
 
+	// Average Directional Movement Index (ADX)
+	adx := talib.Adx(high, low, close, 14)
+	result.Data["Adx"] = adx
+	result.Order = append(result.Order, "Adx")
+
+	// Aroon
+	aroonDown, aroonUp := talib.Aroon(high, low, 14)
+	result.Data["AroonDown"] = aroonDown
+	result.Data["AroonUp"] = aroonUp
+	result.Order = append(result.Order, "AroonDown", "AroonUp")
+
+	// Aroon Oscillator
+	aroonOsc := talib.AroonOsc(high, low, 14)
+	result.Data["AroonOsc"] = aroonOsc
+	result.Order = append(result.Order, "AroonOsc")
+
+	// Directional Movement Index (DX)
+	dx := talib.Dx(high, low, close, 14)
+	result.Data["Dx"] = dx
+	result.Order = append(result.Order, "Dx")
+
+	// Kaufman's Adaptive Moving Average (KAMA)
+	kama := talib.Kama(close, 30)
+	result.Data["Kama"] = kama
+	result.Order = append(result.Order, "Kama")
+
+	// MESA Adaptive Moving Average (MAMA)
+	mama, fama := talib.Mama(close, 0.5, 0.05)
+	result.Data["Mama"] = mama
+	result.Data["Fama"] = fama
+	result.Order = append(result.Order, "Mama", "Fama")
+
+	// Minus Directional Indicator (-DI)
+	minusDI := talib.MinusDI(high, low, close, 14)
+	result.Data["MinusDI"] = minusDI
+	result.Order = append(result.Order, "MinusDI")
+
+	// Minus Directional Movement (-DM)
+	minusDM := talib.MinusDM(high, low, 14)
+	result.Data["MinusDM"] = minusDM
+	result.Order = append(result.Order, "MinusDM")
+
+	// Plus Directional Indicator (+DI)
+	plusDI := talib.PlusDI(high, low, close, 14)
+	result.Data["PlusDI"] = plusDI
+	result.Order = append(result.Order, "PlusDI")
+
+	// Plus Directional Movement (+DM)
+	plusDM := talib.PlusDM(high, low, 14)
+	result.Data["PlusDM"] = plusDM
+	result.Order = append(result.Order, "PlusDM")
+
 	// Average Price
 	avgPrice := talib.AvgPrice(open, high, low, close)
 	result.Data["AvgPrice"] = avgPrice
