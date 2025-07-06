@@ -14,8 +14,9 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 	// Public routes (no authentication required)
 	router.POST("/register", controller.Register)
 	router.POST("/login", controller.Login)
-	router.POST("/logout", controller.Logout)  // Add logout endpoint to clear token cookie
-	router.GET("/user/me", controller.CheckMe) // Public endpoint to check login status
+	router.POST("/logout", controller.Logout)         // Add logout endpoint to clear token cookie
+	router.GET("/user/me", controller.CheckMe)        // Public endpoint to check login status
+	router.POST("/waitlist", controller.JoinWaitlist) // Public endpoint to join waitlist
 
 	// Authenticated routes
 	auth := router.Group("/user")
@@ -41,5 +42,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 		admin.GET("/roles", controller.GetAllRoles)
 		admin.PUT("/:id/activate", controller.ActivateUser)
 		admin.PUT("/:id/deactivate", controller.DeactivateUser)
+		admin.GET("/waitlist", controller.GetAllWaitlistEntries)
+		admin.GET("/waitlist/count", controller.GetWaitlistCount)
 	}
 }

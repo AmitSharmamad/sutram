@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/markcheno/go-talib"
 )
 
 type SMA struct {
@@ -74,16 +76,16 @@ func (indicator *SMA) Calculate(
 		return 0.0
 	}
 
-	// Calculate SMA
-	var sum float64
-	start := len(prices) - period - offset
-	end := len(prices) - offset
+	// Use go-talib SMA calculation
+	smaValues := talib.Sma(prices, period)
 
-	for i := start; i < end; i++ {
-		sum += prices[i]
+	// Get the value at the correct offset position
+	targetIndex := len(smaValues) - 1 - offset
+	if targetIndex < 0 || targetIndex >= len(smaValues) {
+		return 0.0
 	}
 
-	return util.Round(sum / float64(period))
+	return util.Round(smaValues[targetIndex])
 }
 
 func (indicator *SMA) GetDataRange(config map[string]any) int32 {
@@ -142,31 +144,35 @@ func (indicator *SMA) CalculateAll(
 	// Get prices for the entire dataset
 	prices := GetPrices(stockData, field)
 
+	// Use go-talib SMA calculation for all values
+	smaValues := talib.Sma(prices, period)
+
 	var filteredResults []IndicatorValues
 
-	// Calculate SMA for each data point where we have enough historical data
-	for i := period + offset; i < len(stockData); i++ {
-		// Calculate SMA for current position
-		var sum float64
-		start := i - period - offset
-		end := i - offset
-
-		for j := start; j < end; j++ {
-			sum += prices[j]
+	// Process SMA values and apply offset
+	for i := 0; i < len(smaValues); i++ {
+		// Skip NaN values (initial values where SMA can't be calculated)
+		if smaValues[i] != smaValues[i] { // NaN check
+			continue
 		}
 
-		smaValue := util.Round(sum / float64(period))
+		// Calculate the corresponding data index considering offset
+		dataIndex := i + offset
+		if dataIndex >= len(stockData) {
+			break
+		}
 
 		// Only include values from startDate onwards
-		if !stockData[i].Timestamp.Before(startDate) {
+		if !stockData[dataIndex].Timestamp.Before(startDate) {
 			filteredResults = append(filteredResults, IndicatorValues{
-				Timestamp: stockData[i].Timestamp,
-				Value:     smaValue,
+				Timestamp: stockData[dataIndex].Timestamp,
+				Value:     smaValues[i],
 			})
 		}
 	}
 
-	values := append(createIndicatorValues(period+offset), filteredResults...)
+	// values := append(createIndicatorValues(period+offset), filteredResults...)
+	values := filteredResults
 
 	return values
 }

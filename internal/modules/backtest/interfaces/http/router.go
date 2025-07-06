@@ -29,5 +29,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 		backtestAuth.GET("/export", controller.ExportToExcel)
 		// Add indicator export endpoint
 		backtestAuth.GET("/export/indicators", controller.ExportIndicatorsToExcel)
+		// Add new endpoint for OHLCV + indicators Excel export
+		backtestAuth.GET("/export/ohlcv-indicators", controller.ExportOHLCVIndicatorsToExcel)
 	}
 }

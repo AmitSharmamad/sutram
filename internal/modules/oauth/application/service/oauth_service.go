@@ -55,6 +55,27 @@ func NewOAuthService(
 	return service
 }
 
+// isEmailWhitelisted checks if an email is in the whitelist
+func (s *OAuthService) isEmailWhitelisted(email string) bool {
+	// Whitelist of allowed emails
+	allowedEmails := []string{
+		"amitsharmamad@gmail.com",
+		"Narendra.polisetty09@gmail.com",
+		"kkmarella@gmail.com",
+		"ajitsharma6329@gmail.com",
+		"koushikmarella@gmail.com",
+	}
+
+	// Check if the email is in the whitelist
+	for _, allowedEmail := range allowedEmails {
+		if strings.EqualFold(email, allowedEmail) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cleanupExpiredStates periodically removes expired state tokens
 func (s *OAuthService) cleanupExpiredStates() {
 	ticker := time.NewTicker(10 * time.Minute)
@@ -141,6 +162,11 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 	oauthResp, err := provider.GetUserInfo(timeoutCtx, code)
 	if err != nil {
 		return nil, "", err
+	}
+
+	// Check if the email is whitelisted
+	if !s.isEmailWhitelisted(oauthResp.Email) {
+		return nil, "", fmt.Errorf("email %s is not authorized for this application", oauthResp.Email)
 	}
 
 	// Get provider ID
