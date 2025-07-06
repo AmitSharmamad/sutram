@@ -489,6 +489,25 @@ func (s *deploymentService) DeleteDeployment(ctx context.Context, id uuid.UUID, 
 		return fmt.Errorf("%w: %v", ErrDeploymentDeleteFailed, err)
 	}
 
+	// Decrement deployment usage count since we deleted a deployment
+	// This is done asynchronously to not block the main operation
+	go func() {
+		// backgroundCtx := context.Background()
+		// metadata := map[string]interface{}{
+		// 	"deployment_id": id.String(),
+		// 	"action":        "deployment_deleted",
+		// 	"timestamp":     time.Now().UTC(),
+		// }
+
+		// Note: We would need access to usage limit service here
+		// This should be injected as a dependency in the deployment service
+		// For now, we'll add a comment that this needs to be implemented
+		// TODO: Inject usage limit service and call DecrementUsage here
+		// usageLimitService.DecrementUsage(backgroundCtx, userID, entity.DeploymentCount, metadata)
+
+		fmt.Printf("TODO: Decrement deployment usage for user %s after deleting deployment %s\n", userID, id)
+	}()
+
 	return nil
 }
 

@@ -105,3 +105,9 @@ git:
 	cd ~/workspace/mukham
 	sudo lsof -i :3000 -t | xargs sudo kill -9
 	git pull --rebase
+
+
+# ---------------------------------------------------------- #
+
+db:
+	make -C db all
