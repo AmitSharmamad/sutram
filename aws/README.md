@@ -59,7 +59,6 @@ aws/
 ├── README.md                   # This file
 ├── config/                     # Environment configurations
 │   ├── dev.env                # Development environment
-│   ├── staging.env            # Staging environment
 │   └── prod.env               # Production environment
 ├── scripts/                    # Deployment scripts
 │   └── deploy.sh              # Main deployment functions
@@ -86,7 +85,6 @@ aws/
 ```bash
 # Edit config files and add your AWS Account ID
 vim config/dev.env
-vim config/staging.env
 vim config/prod.env
 ```
 
@@ -107,7 +105,6 @@ make deploy-all ENV=dev
 | Command | Description |
 |---------|-------------|
 | `make deploy-all ENV=dev` | Deploy all stacks to development |
-| `make deploy-all ENV=staging` | Deploy all stacks to staging |
 | `make deploy-all ENV=prod` | Deploy all stacks to production |
 | `make quick-deploy ENV=dev` | Deploy everything + upload data |
 
@@ -153,7 +150,6 @@ make deploy-all ENV=dev
 Each environment has its own configuration file in the `config/` directory:
 
 - **`dev.env`**: Development environment (minimal resources)
-- **`staging.env`**: Staging environment (moderate resources)  
 - **`prod.env`**: Production environment (high availability, larger instances)
 
 ### Key Configuration Options
@@ -301,14 +297,14 @@ jobs:
       - name: Deploy infrastructure
         run: |
           cd aws
-          make deploy-all ENV=staging
+          make deploy-all ENV=prod
           
       - name: Build and push images
         run: |
           cd aws
-          make build-images ENV=staging
-          make push-images ENV=staging
-          make update-services ENV=staging
+          make build-images ENV=prod
+          make push-images ENV=prod
+          make update-services ENV=prod
 ```
 
 ## 💰 Cost Estimation

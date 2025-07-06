@@ -1,0 +1,310 @@
+name: Health Check and Monitoring
+
+on:
+  schedule:
+    # Run every 30 minutes during trading hours (9:00 AM to 6:00 PM IST)
+    - cron: '*/30 3,4,5,6,7,8,9,10,11,12 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      check_type:
+        description: 'Type of check to perform'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - services
+          - database
+          - costs
+          - security
+
+jobs:
+  health-check:
+    name: Health Check Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Check ECS Services
+        id: ecs-check
+        run: |
+          ENV=${{ matrix.environment }}
+          echo "Checking ECS services for environment: $ENV"
+          
+          # Check web app service
+          WEB_STATUS=$(aws ecs describe-services \
+            --cluster sutram-${ENV}-cluster \
+            --services sutram-${ENV}-web-app \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          # Check live trading service
+          LIVE_STATUS=$(aws ecs describe-services \
+            --cluster sutram-${ENV}-cluster \
+            --services sutram-${ENV}-live-trading \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "web_status=$WEB_STATUS" >> $GITHUB_OUTPUT
+          echo "live_status=$LIVE_STATUS" >> $GITHUB_OUTPUT
+          
+          # Check running tasks
+          WEB_RUNNING=$(aws ecs describe-services \
+            --cluster sutram-${ENV}-cluster \
+            --services sutram-${ENV}-web-app \
+            --query 'services[0].runningCount' \
+            --output text 2>/dev/null || echo "0")
+          
+          LIVE_RUNNING=$(aws ecs describe-services \
+            --cluster sutram-${ENV}-cluster \
+            --services sutram-${ENV}-live-trading \
+            --query 'services[0].runningCount' \
+            --output text 2>/dev/null || echo "0")
+          
+          echo "web_running=$WEB_RUNNING" >> $GITHUB_OUTPUT
+          echo "live_running=$LIVE_RUNNING" >> $GITHUB_OUTPUT
+          
+          echo "Environment: $ENV"
+          echo "Web App Status: $WEB_STATUS (Running: $WEB_RUNNING)"
+          echo "Live Trading Status: $LIVE_STATUS (Running: $LIVE_RUNNING)"
+
+      - name: Check Database Health
+        id: db-check
+        run: |
+          ENV=${{ matrix.environment }}
+          echo "Checking database health for environment: $ENV"
+          
+          # Check RDS instance
+          DB_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier sutram-${ENV}-postgres \
+            --query 'DBInstances[0].DBInstanceStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "db_status=$DB_STATUS" >> $GITHUB_OUTPUT
+          echo "Database Status: $DB_STATUS"
+          
+          # Check Redis if exists
+          REDIS_STATUS=$(aws elasticache describe-cache-clusters \
+            --cache-cluster-id sutram-${ENV}-redis \
+            --query 'CacheClusters[0].CacheClusterStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          echo "redis_status=$REDIS_STATUS" >> $GITHUB_OUTPUT
+          echo "Redis Status: $REDIS_STATUS"
+
+      - name: Check Application Endpoints
+        id: endpoint-check
+        run: |
+          ENV=${{ matrix.environment }}
+          echo "Checking application endpoints for environment: $ENV"
+          
+          # Get ALB DNS name
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names sutram-${ENV}-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+          
+          if [ "$ALB_DNS" != "NOT_FOUND" ]; then
+            # Check health endpoint
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$ALB_DNS/health" || echo "000")
+            echo "http_status=$HTTP_STATUS" >> $GITHUB_OUTPUT
+            echo "Health endpoint status: $HTTP_STATUS"
+            
+            # Check WebSocket endpoint
+            WS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" "http://$ALB_DNS/ws" || echo "000")
+            echo "ws_status=$WS_CHECK" >> $GITHUB_OUTPUT
+            echo "WebSocket endpoint status: $WS_CHECK"
+          else
+            echo "http_status=000" >> $GITHUB_OUTPUT
+            echo "ws_status=000" >> $GITHUB_OUTPUT
+            echo "Load balancer not found"
+          fi
+
+      - name: Generate Health Report
+        run: |
+          ENV=${{ matrix.environment }}
+          echo "## Health Report for $ENV Environment" >> health-report.md
+          echo "**Timestamp:** $(date)" >> health-report.md
+          echo "" >> health-report.md
+          
+          # Service Status
+          echo "### Service Status" >> health-report.md
+          echo "| Service | Status | Running Tasks |" >> health-report.md
+          echo "|---------|---------|---------------|" >> health-report.md
+          echo "| Web App | ${{ steps.ecs-check.outputs.web_status }} | ${{ steps.ecs-check.outputs.web_running }} |" >> health-report.md
+          echo "| Live Trading | ${{ steps.ecs-check.outputs.live_status }} | ${{ steps.ecs-check.outputs.live_running }} |" >> health-report.md
+          echo "" >> health-report.md
+          
+          # Database Status
+          echo "### Database Status" >> health-report.md
+          echo "| Database | Status |" >> health-report.md
+          echo "|----------|---------|" >> health-report.md
+          echo "| PostgreSQL | ${{ steps.db-check.outputs.db_status }} |" >> health-report.md
+          echo "| Redis | ${{ steps.db-check.outputs.redis_status }} |" >> health-report.md
+          echo "" >> health-report.md
+          
+          # Endpoint Status
+          echo "### Endpoint Status" >> health-report.md
+          echo "| Endpoint | Status |" >> health-report.md
+          echo "|----------|---------|" >> health-report.md
+          echo "| Health Check | ${{ steps.endpoint-check.outputs.http_status }} |" >> health-report.md
+          echo "| WebSocket | ${{ steps.endpoint-check.outputs.ws_status }} |" >> health-report.md
+          
+          # Upload as artifact
+          echo "health-report-${ENV}.md" >> $GITHUB_ENV
+
+      - name: Upload Health Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-report-${{ matrix.environment }}
+          path: health-report.md
+          retention-days: 7
+
+  cost-monitoring:
+    name: Monitor Costs
+    runs-on: ubuntu-latest
+    if: github.event.schedule || github.event.inputs.check_type == 'costs' || github.event.inputs.check_type == 'all'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Get Cost and Usage
+        run: |
+          # Get costs for the last 7 days
+          START_DATE=$(date -d '7 days ago' +%Y-%m-%d)
+          END_DATE=$(date +%Y-%m-%d)
+          
+          echo "Getting costs from $START_DATE to $END_DATE"
+          
+          # Get total costs
+          TOTAL_COST=$(aws ce get-cost-and-usage \
+            --time-period Start=$START_DATE,End=$END_DATE \
+            --granularity DAILY \
+            --metrics BlendedCost \
+            --query 'ResultsByTime[*].Total.BlendedCost.Amount' \
+            --output text | tr '\t' '\n' | awk '{sum += $1} END {print sum}')
+          
+          echo "Total cost for last 7 days: \$${TOTAL_COST}"
+          
+          # Get costs by service
+          aws ce get-cost-and-usage \
+            --time-period Start=$START_DATE,End=$END_DATE \
+            --granularity DAILY \
+            --metrics BlendedCost \
+            --group-by Type=DIMENSION,Key=SERVICE \
+            --query 'ResultsByTime[*].Groups[*].[Keys[0],Metrics.BlendedCost.Amount]' \
+            --output table
+          
+          # Check if cost exceeds threshold
+          COST_THRESHOLD=100
+          if (( $(echo "$TOTAL_COST > $COST_THRESHOLD" | bc -l) )); then
+            echo "::warning::Cost threshold exceeded: \$${TOTAL_COST} > \$${COST_THRESHOLD}"
+            echo "cost_alert=true" >> $GITHUB_ENV
+          else
+            echo "cost_alert=false" >> $GITHUB_ENV
+          fi
+
+      - name: Generate Cost Report
+        run: |
+          cd aws
+          make cost-optimization-report || echo "Cost optimization report not available"
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.check_type == 'security' || github.event.inputs.check_type == 'all')
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Check Security Groups
+        run: |
+          echo "Checking security groups for overly permissive rules..."
+          
+          # Find security groups with 0.0.0.0/0 access
+          aws ec2 describe-security-groups \
+            --query 'SecurityGroups[?IpPermissions[?IpRanges[?CidrIp==`0.0.0.0/0`]]].[GroupId,GroupName,IpPermissions[?IpRanges[?CidrIp==`0.0.0.0/0`]]]' \
+            --output table
+
+      - name: Check IAM Policies
+        run: |
+          echo "Checking for overly permissive IAM policies..."
+          
+          # List policies with full access
+          aws iam list-policies \
+            --query 'Policies[?contains(PolicyName, `FullAccess`)].[PolicyName,Arn]' \
+            --output table
+
+      - name: Check SSL/TLS Certificates
+        run: |
+          echo "Checking SSL certificate expiration..."
+          
+          # Check ACM certificates
+          aws acm list-certificates \
+            --query 'CertificateSummaryList[*].[DomainName,Status]' \
+            --output table
+
+  alert-on-issues:
+    name: Alert on Issues
+    runs-on: ubuntu-latest
+    needs: [health-check, cost-monitoring]
+    if: always()
+    steps:
+      - name: Check for service failures
+        run: |
+          # This would typically integrate with your alerting system
+          # For example, Slack, PagerDuty, or email notifications
+          
+          if [ "${{ needs.health-check.result }}" == "failure" ]; then
+            echo "::error::Health check failed - services may be down"
+            # Send alert to monitoring system
+          fi
+          
+          if [ "${{ needs.cost-monitoring.result }}" == "failure" ]; then
+            echo "::error::Cost monitoring failed"
+            # Send alert to monitoring system
+          fi
+          
+          # Check if cost threshold was exceeded
+          if [ "${{ needs.cost-monitoring.outputs.cost_alert }}" == "true" ]; then
+            echo "::warning::Cost threshold exceeded - review AWS usage"
+            # Send cost alert
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Monitoring Summary"
+          echo "- Health Check: ${{ needs.health-check.result }}"
+          echo "- Cost Monitoring: ${{ needs.cost-monitoring.result }}"
+          echo "- Timestamp: $(date)"
+          
+          # In a real scenario, you would send this to your monitoring dashboard
+          # or notification system (Slack, Discord, email, etc.)
