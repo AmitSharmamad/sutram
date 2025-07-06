@@ -66,17 +66,26 @@ func New() *Module {
 
 // initialize sets up the user module
 func (m *Module) initialize() {
+	// Get sqlx connection for waitlist repository
+	sqlxDB, err := infraRepo.ProvidePostgresSQLXDB()
+	if err != nil {
+		panic(err) // In a real app, handle this more gracefully
+	}
+
 	// Create repositories
 	userRepo := postgres.NewUserRepository(m.db)
 	roleRepo := postgres.NewRoleRepository(m.db)
+	waitlistRepo := postgres.NewWaitlistRepository(sqlxDB)
 
 	// Create services
 	userService := service.NewUserService(userRepo, roleRepo)
+	waitlistService := service.NewWaitlistService(waitlistRepo)
 	jwtService := auth.NewJWTService(m.jwtSecret, 24*time.Hour) // 24-hour token validity
 	authService := service.NewAuthService(userService, jwtService)
 
 	// Create controller (dashboard service will be set later)
 	m.controller = http.NewUserController(authService, userService, nil)
+	m.controller.SetWaitlistService(waitlistService)
 }
 
 // RegisterRoutes registers the user module routes with the given router
@@ -95,5 +104,17 @@ func (m *Module) SetDashboardService(dashboardService *service.DashboardService)
 	// Recreate the controller with the dashboard service
 	authService := m.controller.GetAuthService()
 	userService := m.controller.GetUserService()
+
+	// Get sqlx connection for waitlist repository
+	sqlxDB, err := infraRepo.ProvidePostgresSQLXDB()
+	if err != nil {
+		panic(err) // In a real app, handle this more gracefully
+	}
+
+	// Recreate waitlist service
+	waitlistRepo := postgres.NewWaitlistRepository(sqlxDB)
+	waitlistService := service.NewWaitlistService(waitlistRepo)
+
 	m.controller = http.NewUserController(authService, userService, dashboardService)
+	m.controller.SetWaitlistService(waitlistService)
 }
