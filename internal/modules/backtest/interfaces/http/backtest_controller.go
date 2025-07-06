@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/markcheno/go-talib"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -322,6 +323,334 @@ func (c *BacktestController) ExportIndicatorsToExcel(ctx *gin.Context) {
 		})
 		return
 	}
+}
+
+// ExportOHLCVIndicatorsToExcel handles exporting OHLCV data and all indicators to Excel for a given instrument
+func (c *BacktestController) ExportOHLCVIndicatorsToExcel(ctx *gin.Context) {
+	instrumentIDStr := ctx.Query("instrument_id")
+	if instrumentIDStr == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "instrument_id query parameter is required"})
+		return
+	}
+
+	// New: Parse timeframe, fromDate, toDate
+	timeframe := ctx.DefaultQuery("timeframe", "1d")
+	fromDateStr := ctx.Query("fromDate")
+	toDateStr := ctx.Query("toDate")
+
+	// Parse instrument ID
+	var instrumentID int32
+	_, err := fmt.Sscanf(instrumentIDStr, "%d", &instrumentID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid instrument_id format"})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	_, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Access instrumentService via type assertion
+	engine, ok := c.engineService.(*service.BacktestEngine)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Engine service type assertion failed"})
+		return
+	}
+
+	// Parse fromDate and toDate, fallback to defaults if not provided
+	var start, end time.Time
+	if fromDateStr != "" {
+		start, err = time.Parse("2006-01-02", fromDateStr)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid fromDate format, expected YYYY-MM-DD"})
+			return
+		}
+	} else {
+		end = time.Now()
+		start = end.AddDate(-1, 0, 0)
+	}
+	if toDateStr != "" {
+		end, err = time.Parse("2006-01-02", toDateStr)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid toDate format, expected YYYY-MM-DD"})
+			return
+		}
+	} else if fromDateStr != "" {
+		end = time.Now()
+	}
+
+	instruments, err := engine.GetInstrumentService().GetInstrumentsByTimeRange(ctx, instrumentID, start, end, timeframe)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch OHLCV data: " + err.Error()})
+		return
+	}
+
+	if len(instruments) == 0 {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "No OHLCV data found for instrument"})
+		return
+	}
+
+	// Prepare slices for indicators
+	var open, high, low, close, volume []float64
+	var timestamps []string
+	for _, inst := range instruments {
+		open = append(open, inst.Open)
+		high = append(high, inst.High)
+		low = append(low, inst.Low)
+		close = append(close, inst.Close)
+		volume = append(volume, inst.Volume)
+		timestamps = append(timestamps, inst.Timestamp.Format("2006-01-02 15:04:05"))
+	}
+
+	// Calculate all indicators using runIndicators and collect results
+	indicatorResults := calculateIndicatorsForExport(open, high, low, close, volume)
+
+	excelFile := excelize.NewFile()
+	sheet := "OHLCV+Indicators"
+	excelFile.SetSheetName("Sheet1", sheet)
+
+	// Prepare headers: OHLCV + all indicator names
+	headers := []string{"Timestamp", "Open", "High", "Low", "Close", "Volume"}
+	for _, name := range indicatorResults.Order {
+		headers = append(headers, name)
+	}
+	for i, h := range headers {
+		col, _ := excelize.ColumnNumberToName(i + 1)
+		excelFile.SetCellValue(sheet, fmt.Sprintf("%s1", col), h)
+	}
+
+	// Write data rows
+	rowCount := len(open)
+	for i := 0; i < rowCount; i++ {
+		row := i + 2
+		// Always write timestamp and OHLCV
+		excelFile.SetCellValue(sheet, fmt.Sprintf("A%d", row), timestamps[i])
+		excelFile.SetCellValue(sheet, fmt.Sprintf("B%d", row), open[i])
+		excelFile.SetCellValue(sheet, fmt.Sprintf("C%d", row), high[i])
+		excelFile.SetCellValue(sheet, fmt.Sprintf("D%d", row), low[i])
+		excelFile.SetCellValue(sheet, fmt.Sprintf("E%d", row), close[i])
+		excelFile.SetCellValue(sheet, fmt.Sprintf("F%d", row), volume[i])
+		// Write indicator columns, fill with empty if out of range
+		for j, name := range indicatorResults.Order {
+			col, _ := excelize.ColumnNumberToName(j + 7) // G=7, H=8, ...
+			var val interface{} = ""
+			if vals, ok := indicatorResults.Data[name]; ok && i < len(vals) {
+				val = vals[i]
+			}
+			excelFile.SetCellValue(sheet, fmt.Sprintf("%s%d", col, row), val)
+		}
+	}
+
+	filename := fmt.Sprintf("ohlcv_indicators_%d_%s.xlsx", instrumentID, time.Now().Format("20060102_150405"))
+	ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	if err := excelFile.Write(ctx.Writer); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write Excel file: " + err.Error()})
+		return
+	}
+}
+
+// calculateIndicatorsForExport runs all indicators from runIndicators and returns a map of indicator name to values, and the order of columns
+func calculateIndicatorsForExport(open, high, low, close, volume []float64) (result struct {
+	Data  map[string][]float64
+	Order []string
+}) {
+	result.Data = make(map[string][]float64)
+	result.Order = []string{}
+
+	// Chaikin A/D Line
+	ad := talib.Ad(high, low, close, volume)
+	result.Data["Ad"] = ad
+	result.Order = append(result.Order, "Ad")
+
+	// Chaikin A/D Oscillator
+	adosc := talib.AdOsc(high, low, close, volume, 3, 10)
+	result.Data["AdOsc"] = adosc
+	result.Order = append(result.Order, "AdOsc")
+
+	// Absolute Price Oscillator
+	apo := talib.Apo(close, 12, 26, talib.SMA)
+	result.Data["Apo"] = apo
+	result.Order = append(result.Order, "Apo")
+
+	// Average True Range
+	atr := talib.Atr(high, low, close, 14)
+	result.Data["Atr"] = atr
+	result.Order = append(result.Order, "Atr")
+
+	// Average Directional Movement Index (ADX)
+	adx := talib.Adx(high, low, close, 14)
+	result.Data["Adx"] = adx
+	result.Order = append(result.Order, "Adx")
+
+	// Aroon
+	aroonDown, aroonUp := talib.Aroon(high, low, 14)
+	result.Data["AroonDown"] = aroonDown
+	result.Data["AroonUp"] = aroonUp
+	result.Order = append(result.Order, "AroonDown", "AroonUp")
+
+	// Aroon Oscillator
+	aroonOsc := talib.AroonOsc(high, low, 14)
+	result.Data["AroonOsc"] = aroonOsc
+	result.Order = append(result.Order, "AroonOsc")
+
+	// Directional Movement Index (DX)
+	dx := talib.Dx(high, low, close, 14)
+	result.Data["Dx"] = dx
+	result.Order = append(result.Order, "Dx")
+
+	// Kaufman's Adaptive Moving Average (KAMA)
+	kama := talib.Kama(close, 30)
+	result.Data["Kama"] = kama
+	result.Order = append(result.Order, "Kama")
+
+	// MESA Adaptive Moving Average (MAMA)
+	mama, fama := talib.Mama(close, 0.5, 0.05)
+	result.Data["Mama"] = mama
+	result.Data["Fama"] = fama
+	result.Order = append(result.Order, "Mama", "Fama")
+
+	// Minus Directional Indicator (-DI)
+	minusDI := talib.MinusDI(high, low, close, 14)
+	result.Data["MinusDI"] = minusDI
+	result.Order = append(result.Order, "MinusDI")
+
+	// Minus Directional Movement (-DM)
+	minusDM := talib.MinusDM(high, low, 14)
+	result.Data["MinusDM"] = minusDM
+	result.Order = append(result.Order, "MinusDM")
+
+	// Plus Directional Indicator (+DI)
+	plusDI := talib.PlusDI(high, low, close, 14)
+	result.Data["PlusDI"] = plusDI
+	result.Order = append(result.Order, "PlusDI")
+
+	// Plus Directional Movement (+DM)
+	plusDM := talib.PlusDM(high, low, 14)
+	result.Data["PlusDM"] = plusDM
+	result.Order = append(result.Order, "PlusDM")
+
+	// Average Price
+	avgPrice := talib.AvgPrice(open, high, low, close)
+	result.Data["AvgPrice"] = avgPrice
+	result.Order = append(result.Order, "AvgPrice")
+
+	// Bollinger Bands
+	upper, middle, lower := talib.BBands(close, 20, 2.0, 2.0, talib.SMA)
+	result.Data["BBandsUpper"] = upper
+	result.Order = append(result.Order, "BBandsUpper")
+	result.Data["BBandsMiddle"] = middle
+	result.Order = append(result.Order, "BBandsMiddle")
+	result.Data["BBandsLower"] = lower
+	result.Order = append(result.Order, "BBandsLower")
+
+	// Beta Coefficient
+	beta := talib.Beta(high, low, 5)
+	result.Data["Beta"] = beta
+	result.Order = append(result.Order, "Beta")
+
+	// Commodity Channel Index
+	cci := talib.Cci(high, low, close, 14)
+	result.Data["Cci"] = cci
+	result.Order = append(result.Order, "Cci")
+
+	// Chande Momentum Oscillator
+	cmo := talib.Cmo(close, 14)
+	result.Data["Cmo"] = cmo
+	result.Order = append(result.Order, "Cmo")
+
+	// Double Exponential Moving Average
+	dema := talib.Dema(close, 30)
+	result.Data["Dema"] = dema
+	result.Order = append(result.Order, "Dema")
+
+	// Exponential Moving Average
+	ema := talib.Ema(close, 30)
+	result.Data["Ema"] = ema
+	result.Order = append(result.Order, "Ema")
+
+	// Moving Average
+	ma := talib.Ma(close, 30, talib.SMA)
+	result.Data["Ma"] = ma
+	result.Order = append(result.Order, "Ma")
+
+	// MACD
+	macd, signal, hist := talib.Macd(close, 12, 26, 9)
+	result.Data["Macd"] = macd
+	result.Order = append(result.Order, "Macd")
+	result.Data["MacdSignal"] = signal
+	result.Order = append(result.Order, "MacdSignal")
+	result.Data["MacdHist"] = hist
+	result.Order = append(result.Order, "MacdHist")
+
+	// Momentum
+	mom := talib.Mom(close, 10)
+	result.Data["Mom"] = mom
+	result.Order = append(result.Order, "Mom")
+
+	// On Balance Volume
+	obv := talib.Obv(close, volume)
+	result.Data["Obv"] = obv
+	result.Order = append(result.Order, "Obv")
+
+	// Percentage Price Oscillator
+	ppo := talib.Ppo(close, 12, 26, talib.SMA)
+	result.Data["Ppo"] = ppo
+	result.Order = append(result.Order, "Ppo")
+
+	// Rate of Change
+	roc := talib.Roc(close, 10)
+	result.Data["Roc"] = roc
+	result.Order = append(result.Order, "Roc")
+
+	// Relative Strength Index
+	rsi := talib.Rsi(close, 14)
+	result.Data["Rsi"] = rsi
+	result.Order = append(result.Order, "Rsi")
+
+	// Simple Moving Average
+	sma := talib.Sma(close, 30)
+	result.Data["Sma"] = sma
+	result.Order = append(result.Order, "Sma")
+
+	// Standard Deviation
+	stdDev := talib.StdDev(close, 5, 1.0)
+	result.Data["StdDev"] = stdDev
+	result.Order = append(result.Order, "StdDev")
+
+	// Stochastic
+	k, d := talib.Stoch(high, low, close, 5, 3, talib.SMA, 3, talib.SMA)
+	result.Data["StochK"] = k
+	result.Order = append(result.Order, "StochK")
+	result.Data["StochD"] = d
+	result.Order = append(result.Order, "StochD")
+
+	// Stochastic RSI
+	stochRsiK, stochRsiD := talib.StochRsi(close, 14, 5, 3, talib.SMA)
+	result.Data["StochRsiK"] = stochRsiK
+	result.Order = append(result.Order, "StochRsiK")
+	result.Data["StochRsiD"] = stochRsiD
+	result.Order = append(result.Order, "StochRsiD")
+
+	// Triple Exponential Moving Average
+	tema := talib.Tema(close, 30)
+	result.Data["Tema"] = tema
+	result.Order = append(result.Order, "Tema")
+
+	// Williams' %R
+	willR := talib.WillR(high, low, close, 14)
+	result.Data["WillR"] = willR
+	result.Order = append(result.Order, "WillR")
+
+	// Weighted Moving Average
+	wma := talib.Wma(close, 30)
+	result.Data["Wma"] = wma
+	result.Order = append(result.Order, "Wma")
+
+	return
 }
 
 // generateExcelFile creates an Excel file from backtest data

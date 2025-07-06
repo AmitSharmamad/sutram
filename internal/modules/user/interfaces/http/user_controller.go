@@ -17,6 +17,7 @@ type UserController struct {
 	authService      *service.AuthService
 	userService      *service.UserService
 	dashboardService *service.DashboardService
+	waitlistService  *service.WaitlistService
 }
 
 // NewUserController creates a new user controller
@@ -25,6 +26,7 @@ func NewUserController(authService *service.AuthService, userService *service.Us
 		authService:      authService,
 		userService:      userService,
 		dashboardService: dashboardService,
+		waitlistService:  nil, // Will be set via SetWaitlistService
 	}
 }
 
@@ -898,5 +900,144 @@ func (c *UserController) GetDashboardStatistics(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
 		Data:    statistics,
+	})
+}
+
+// SetWaitlistService sets the waitlist service
+func (c *UserController) SetWaitlistService(waitlistService *service.WaitlistService) {
+	c.waitlistService = waitlistService
+}
+
+// JoinWaitlist handles joining the waitlist
+func (c *UserController) JoinWaitlist(ctx *gin.Context) {
+	var req dto.JoinWaitlistRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	// Join waitlist
+	waitlist, err := c.waitlistService.JoinWaitlist(ctx.Request.Context(), req.Email)
+	if err != nil {
+		if err == service.ErrEmailAlreadyInWaitlist {
+			ctx.JSON(http.StatusConflict, dto.ApiResponse{
+				Success: false,
+				Error:   "Email already in waitlist",
+			})
+			return
+		}
+		if err == service.ErrInvalidEmail {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid email format",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to join waitlist: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, dto.ApiResponse{
+		Success: true,
+		Message: "Successfully joined waitlist",
+		Data:    dto.ToWaitlistResponse(waitlist),
+	})
+}
+
+// GetWaitlistCount returns the total number of waitlist entries (admin only)
+func (c *UserController) GetWaitlistCount(ctx *gin.Context) {
+	// Get the token from header
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "No token provided",
+		})
+		return
+	}
+
+	// Check if user has admin role
+	hasAdminRole, err := c.authService.HasRole(tokenString, "admin")
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid token: " + err.Error(),
+		})
+		return
+	}
+
+	if !hasAdminRole {
+		ctx.JSON(http.StatusForbidden, dto.ApiResponse{
+			Success: false,
+			Error:   "Permission denied: Admin role required",
+		})
+		return
+	}
+
+	// Get waitlist count
+	count, err := c.waitlistService.GetWaitlistCount(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get waitlist count: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    dto.WaitlistCountResponse{Count: count},
+	})
+}
+
+// GetAllWaitlistEntries returns all waitlist entries (admin only)
+func (c *UserController) GetAllWaitlistEntries(ctx *gin.Context) {
+	// Get the token from header
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "No token provided",
+		})
+		return
+	}
+
+	// Check if user has admin role
+	hasAdminRole, err := c.authService.HasRole(tokenString, "admin")
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid token: " + err.Error(),
+		})
+		return
+	}
+
+	if !hasAdminRole {
+		ctx.JSON(http.StatusForbidden, dto.ApiResponse{
+			Success: false,
+			Error:   "Permission denied: Admin role required",
+		})
+		return
+	}
+
+	// Get all waitlist entries
+	entries, err := c.waitlistService.GetAllWaitlistEntries(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get waitlist entries: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    dto.ToWaitlistResponses(entries),
 	})
 }
