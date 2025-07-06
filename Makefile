@@ -1,4 +1,4 @@
-.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live deployment
+.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live deployment web live
 
 # Clean build artifacts
 clean:
@@ -47,8 +47,10 @@ all-down:
 # ---------------------------------------------------------- #
 
 web:
+	@echo "Generating wire dependencies..."
+	@wire cmd/web/wire.go
 	@echo "Building the web application..."
-	@go build -gcflags="all=-N -l" -o bin/web cmd/web/main.go
+	@go build -gcflags="all=-N -l" -o bin/web cmd/web/wire_gen.go cmd/web/main.go
 	@echo "Running the web application..."
 	@./bin/web
 
