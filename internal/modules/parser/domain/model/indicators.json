@@ -702,5 +702,34 @@
     "config": [
       { "name": "offset", "type": "number", "default": 0 }
     ]
+  },
+  "STOCHRSIK": {
+    "name": "STOCHRSIK",
+    "label": "Stochastic RSI %K",
+    "description": "Stochastic RSI %K combines RSI and Stochastic oscillator concepts, measuring RSI's position within its own high-low range over a specific period.",
+    "type": "momentum",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "rsiPeriod", "type": "number", "default": 14 },
+      { "name": "stochPeriod", "type": "number", "default": 14 },
+      { "name": "smoothK", "type": "number", "default": 3 },
+      { "name": "maType", "type": "string", "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"], "default": "SIMPLE" },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "STOCHRSID": {
+    "name": "STOCHRSID",
+    "label": "Stochastic RSI %D",
+    "description": "Stochastic RSI %D is a smoothed version of Stochastic RSI %K, providing a signal line for trend confirmation and crossover strategies.",
+    "type": "momentum",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "rsiPeriod", "type": "number", "default": 14 },
+      { "name": "stochPeriod", "type": "number", "default": 14 },
+      { "name": "smoothK", "type": "number", "default": 3 },
+      { "name": "smoothD", "type": "number", "default": 3 },
+      { "name": "maType", "type": "string", "enum": ["SIMPLE", "EXPONENTIAL", "WEIGHTED", "TRIPLE", "TRIANGULAR", "DOUBLE", "HULL", "MESA", "VARIABLE", "KAUFMAN", "VIDYA"], "default": "SIMPLE" },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
   }
 }
