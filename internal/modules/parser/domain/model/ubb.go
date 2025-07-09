@@ -3,9 +3,10 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
-	"math"
 	"strings"
 	"time"
+
+	"github.com/markcheno/go-talib"
 )
 
 // UpperBollingerBands represents the Upper Bollinger Bands indicator
@@ -115,28 +116,18 @@ func (indicator *UpperBollingerBands) Calculate(
 		return 0.0
 	}
 
-	// Calculate Moving Average using utility function based on maType
-	maValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), int(period))
-	if len(maValues) == 0 {
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
+
+	// Use go-talib BBands function
+	upperBand, _, _ := talib.BBands(prices, int(period), standardDev, standardDev, talibMAType)
+
+	if len(upperBand) == 0 {
 		return 0.0
 	}
 
-	// Get the latest moving average value
-	sma := maValues[len(maValues)-1]
-
-	// Calculate standard deviation
-	var variance float64
-	periodInt := int(period)
-	for i := len(prices) - periodInt; i < len(prices); i++ {
-		diff := prices[i] - sma
-		variance += diff * diff
-	}
-	stdDev := math.Sqrt(variance / period)
-
-	// Calculate Upper Bollinger Band
-	upperBand := sma + (standardDev * stdDev)
-
-	return util.Round(upperBand)
+	// Return the last calculated value
+	return util.Round(upperBand[len(upperBand)-1])
 }
 
 func (indicator *UpperBollingerBands) GetDataRange(config map[string]any) int32 {
@@ -261,35 +252,13 @@ func (indicator *UpperBollingerBands) CalculateAll(
 		}
 	}
 
-	// Step 1: Calculate Moving Average using utility function based on maType
-	smaValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), periodInt)
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
 
-	// Create full-length array with proper positioning
-	sma := make([]float64, len(stockData))
-	startIdx := periodInt - 1
-	for i, val := range smaValues {
-		if startIdx+i < len(sma) {
-			sma[startIdx+i] = val
-		}
-	}
+	// Use go-talib BBands function
+	upperBand, _, _ := talib.BBands(prices, periodInt, standardDev, standardDev, talibMAType)
 
-	// Step 2: Calculate Standard Deviation and Upper Bollinger Bands
-	upperBand := make([]float64, len(stockData))
-
-	for i := periodInt - 1; i < len(stockData); i++ {
-		// Calculate standard deviation for this period
-		var variance float64
-		for j := i - periodInt + 1; j <= i; j++ {
-			diff := prices[j] - sma[i]
-			variance += diff * diff
-		}
-		stdDev := math.Sqrt(variance / period)
-
-		// Calculate Upper Bollinger Band = SMA + (standardDev × σ)
-		upperBand[i] = sma[i] + (standardDev * stdDev)
-	}
-
-	// Step 3: Build results starting from valid calculation points
+	// Build results starting from valid calculation points
 	var result []IndicatorValues
 
 	for i := periodInt - 1; i < len(stockData); i++ {
@@ -303,10 +272,13 @@ func (indicator *UpperBollingerBands) CalculateAll(
 			continue
 		}
 
-		result = append(result, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     util.Round(upperBand[i]),
-		})
+		// Make sure we have valid data from talib
+		if i-periodInt+1 >= 0 && i-periodInt+1 < len(upperBand) {
+			result = append(result, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(upperBand[i-periodInt+1]),
+			})
+		}
 	}
 
 	return result
