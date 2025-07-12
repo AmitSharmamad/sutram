@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/markcheno/go-talib"
 )
 
 // MiddleBollingerBands represents the Middle Bollinger Bands indicator
@@ -114,17 +116,18 @@ func (indicator *MiddleBollingerBands) Calculate(
 		return 0.0
 	}
 
-	// Calculate Moving Average using utility function based on maType
-	maValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), int(period))
-	if len(maValues) == 0 {
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
+
+	// Use go-talib BBands function
+	_, middleBand, _ := talib.BBands(prices, int(period), standardDev, standardDev, talibMAType)
+
+	if len(middleBand) == 0 {
 		return 0.0
 	}
 
-	// Get the latest moving average value
-	sma := maValues[len(maValues)-1]
-
-	// Middle Bollinger Band is just the moving average (SMA/EMA/etc.)
-	return util.Round(sma)
+	// Return the last calculated value (middle band is the moving average)
+	return util.Round(middleBand[len(middleBand)-1])
 }
 
 func (indicator *MiddleBollingerBands) GetDataRange(config map[string]any) int32 {
@@ -249,19 +252,13 @@ func (indicator *MiddleBollingerBands) CalculateAll(
 		}
 	}
 
-	// Step 1: Calculate Moving Average using utility function based on maType
-	smaValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), periodInt)
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
 
-	// Create full-length array with proper positioning
-	sma := make([]float64, len(stockData))
-	startIdx := periodInt - 1
-	for i, val := range smaValues {
-		if startIdx+i < len(sma) {
-			sma[startIdx+i] = val
-		}
-	}
+	// Use go-talib BBands function
+	_, middleBand, _ := talib.BBands(prices, periodInt, standardDev, standardDev, talibMAType)
 
-	// Step 2: Build results starting from valid calculation points
+	// Build results starting from valid calculation points
 	var result []IndicatorValues
 
 	for i := periodInt - 1; i < len(stockData); i++ {
@@ -275,10 +272,13 @@ func (indicator *MiddleBollingerBands) CalculateAll(
 			continue
 		}
 
-		result = append(result, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     util.Round(sma[i]),
-		})
+		// Make sure we have valid data from talib
+		if i-periodInt+1 >= 0 && i-periodInt+1 < len(middleBand) {
+			result = append(result, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(middleBand[i-periodInt+1]),
+			})
+		}
 	}
 
 	return result

@@ -3,6 +3,8 @@ package math
 import (
 	"math"
 	"strings"
+
+	"github.com/markcheno/go-talib"
 )
 
 // MovingAverageTypes contains all the supported moving average types
@@ -18,6 +20,35 @@ var MovingAverageTypes = []string{
 	"VARIABLE",
 	"KAUFMAN",
 	"VIDYA",
+}
+
+// ConvertMATypeToTalib converts string MA type to go-talib MaType enum
+// Used by Bollinger Bands and other indicators that use go-talib functions
+func ConvertMATypeToTalib(maType string) talib.MaType {
+	switch strings.ToUpper(maType) {
+	case "EXPONENTIAL":
+		return talib.EMA
+	case "WEIGHTED":
+		return talib.WMA
+	case "TRIPLE":
+		return talib.TEMA
+	case "TRIANGULAR":
+		return talib.TRIMA
+	case "DOUBLE":
+		return talib.DEMA
+	case "KAUFMAN":
+		return talib.KAMA
+	case "MESA":
+		// MESA is a special case - BBands doesn't support it directly
+		// Fall back to EMA for now
+		return talib.EMA
+	case "HULL", "VARIABLE", "VIDYA":
+		// These MA types are not available in go-talib BBands
+		// Fall back to SMA for compatibility
+		return talib.SMA
+	default: // "SIMPLE"
+		return talib.SMA
+	}
 }
 
 // CalculateMovingAverage calculates the moving average of a given type for the provided data

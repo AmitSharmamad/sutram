@@ -555,5 +555,152 @@
         "default": 0
       }
     ]
+  },
+  "WMA": {
+    "name": "WMA",
+    "label": "Weighted Moving Average",
+    "description": "WMA assigns more weight to recent prices, making it more responsive to new information than a simple moving average.",
+    "type": "trend",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 20 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "TEMA": {
+    "name": "TEMA",
+    "label": "Triple Exponential Moving Average",
+    "description": "TEMA is a moving average that reduces lag by combining single, double, and triple EMAs.",
+    "type": "trend",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 20 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "MOM": {
+    "name": "MOM",
+    "label": "Momentum",
+    "description": "Momentum measures the rate of change in price, indicating the speed of price movements.",
+    "type": "momentum",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 10 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "ROC": {
+    "name": "ROC",
+    "label": "Rate of Change",
+    "description": "ROC measures the percentage change in price between the current price and the price a certain number of periods ago.",
+    "type": "momentum",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 10 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "RSI": {
+    "name": "RSI",
+    "label": "Relative Strength Index",
+    "description": "RSI measures the speed and change of price movements, identifying overbought or oversold conditions.",
+    "type": "momentum",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "CCI": {
+    "name": "CCI",
+    "label": "Commodity Channel Index",
+    "description": "CCI measures the variation of price from its statistical mean, identifying cyclical trends.",
+    "type": "momentum",
+    "config": [
+      { "name": "period", "type": "number", "default": 20 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "MINUSDI": {
+    "name": "MINUSDI",
+    "label": "Minus Directional Indicator",
+    "description": "MinusDI measures the presence of a downtrend by comparing prior lows to current lows.",
+    "type": "trend",
+    "config": [
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "PLUSDI": {
+    "name": "PLUSDI",
+    "label": "Plus Directional Indicator",
+    "description": "PlusDI measures the presence of an uptrend by comparing prior highs to current highs.",
+    "type": "trend",
+    "config": [
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "MAMA": {
+    "name": "MAMA",
+    "label": "MESA Adaptive Moving Average",
+    "description": "MAMA adapts to price movement using the MESA algorithm, providing fast and slow lines for trend analysis.",
+    "type": "trend",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "fastLimit", "type": "number", "default": 0.5 },
+      { "name": "slowLimit", "type": "number", "default": 0.05 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "WILLR": {
+    "name": "WILLR",
+    "label": "Williams %R",
+    "description": "Williams %R is a momentum indicator that measures overbought and oversold levels, similar to the stochastic oscillator.",
+    "type": "momentum",
+    "config": [
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "DEMA": {
+    "name": "DEMA",
+    "label": "Double Exponential Moving Average",
+    "description": "DEMA is a moving average that places more weight on recent data, reducing lag compared to traditional EMAs.",
+    "type": "trend",
+    "config": [
+      { "name": "field", "type": "string", "enum": ["CLOSE", "OPEN", "HIGH", "LOW"], "default": "CLOSE" },
+      { "name": "period", "type": "number", "default": 20 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "ADX": {
+    "name": "ADX",
+    "label": "Average Directional Index",
+    "description": "The ADX measures trend strength by quantifying the strength of a price movement, regardless of direction.",
+    "type": "trend",
+    "config": [
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "ATR": {
+    "name": "ATR",
+    "label": "Average True Range",
+    "description": "ATR measures market volatility by decomposing the entire range of an asset price for that period.",
+    "type": "volatility",
+    "config": [
+      { "name": "period", "type": "number", "default": 14 },
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
+  },
+  "AVGPRICE": {
+    "name": "AVGPRICE",
+    "label": "Average Price",
+    "description": "The average price is calculated as the mean of high, low, open, and close prices for a period.",
+    "type": "price",
+    "config": [
+      { "name": "offset", "type": "number", "default": 0 }
+    ]
   }
 }
