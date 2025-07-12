@@ -196,7 +196,10 @@ func main() {
 	setupAPIRoutes(apiRouter)
 
 	// Get port from environment or use default
-	port := getEnv("WS_PORT", "9099")
+	port := getEnv("LIVE_WEBSOCKET_PORT", "")
+	if port == "" {
+		log.Fatal("LIVE_WEBSOCKET_PORT environment variable is required")
+	}
 	serverAddr := fmt.Sprintf(":%s", port)
 
 	// Create a server with graceful shutdown

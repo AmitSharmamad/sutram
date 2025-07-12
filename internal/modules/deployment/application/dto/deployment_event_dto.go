@@ -28,6 +28,7 @@ const (
 	EventTypeEODSquareOff          DeploymentEventType = "eod_square_off"
 
 	// Deployment status events
+	EventTypeDeploymentCreated  DeploymentEventType = "deployment.created"
 	EventTypeDeploymentError    DeploymentEventType = "deployment_error"
 	EventTypeEntryWindowClosed  DeploymentEventType = "entry_window_closed"
 	EventTypeEntryWindowOpen    DeploymentEventType = "entry_window_open"
@@ -164,4 +165,15 @@ type ScheduledExecutionData struct {
 	DeploymentID    string    `json:"deployment_id"`
 	HasOpenPosition bool      `json:"has_open_position"`
 	EntryWindowOpen bool      `json:"entry_window_open"`
+}
+
+// DeploymentCreatedData contains data for deployment created events
+type DeploymentCreatedData struct {
+	DeploymentID uuid.UUID `json:"deployment_id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	StrategyName string    `json:"strategy_name"`
+	Timeframe    string    `json:"timeframe"`
+	IsActive     bool      `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
 }

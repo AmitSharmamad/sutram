@@ -50,7 +50,10 @@ func main() {
 	initializeModules(apiRouter)
 
 	// Get port from environment or use default
-	port := getEnv("PORT", "9090")
+	port := getEnv("WEB_HTTP_PORT", "")
+	if port == "" {
+		log.Fatal("WEB_HTTP_PORT environment variable is required")
+	}
 	serverAddr := fmt.Sprintf(":%s", port)
 
 	// Create a server with graceful shutdown
