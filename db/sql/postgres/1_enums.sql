@@ -33,3 +33,16 @@ CREATE TYPE permission_type AS ENUM (
     -- Community permissions
     'create_topic', 'moderate_content'
 );
+
+-- Enum for usage limit types
+CREATE TYPE usage_limit_type AS ENUM (
+    'backtest_per_month',
+    'deployment_count',
+    'live_trades_per_day',
+    'api_calls_per_hour'
+);
+
+-- Enum for reset period types
+CREATE TYPE reset_period_type AS ENUM (
+    'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'
+);
