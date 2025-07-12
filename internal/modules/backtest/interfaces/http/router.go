@@ -2,13 +2,14 @@ package http
 
 import (
 	"algo/internal/infra/http/middleware"
+	"algo/internal/modules/user/application/service"
 	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes registers the backtest module routes
-func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, userController *userHttp.UserController) {
+func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, userController *userHttp.UserController, usageLimitService service.UsageLimitService) {
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
 
@@ -23,8 +24,8 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 	backtestAuth := router.Group("/backtest")
 	backtestAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
-		// Add run backtest endpoint
-		backtestAuth.POST("/run", controller.RunBacktest)
+		// Add run backtest endpoint with usage limit middleware
+		backtestAuth.POST("/run", middleware.BacktestLimitMiddleware(usageLimitService), controller.RunBacktest)
 		// Add Excel export endpoint
 		backtestAuth.GET("/export", controller.ExportToExcel)
 		// Add indicator export endpoint

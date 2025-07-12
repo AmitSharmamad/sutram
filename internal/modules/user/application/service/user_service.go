@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"algo/internal/domain/entity"
+	domainRepo "algo/internal/domain/repository"
 	"algo/internal/modules/user/domain/model"
 	"algo/internal/modules/user/domain/repository"
 
@@ -24,15 +26,24 @@ var (
 
 // UserService handles user-related business logic
 type UserService struct {
-	userRepo repository.UserRepository
-	roleRepo repository.RoleRepository
+	userRepo       repository.UserRepository
+	roleRepo       repository.RoleRepository
+	usageLimitRepo domainRepo.UsageLimitRepository
+	usageLogRepo   domainRepo.UsageLogRepository
 }
 
 // NewUserService creates a new user service
-func NewUserService(userRepo repository.UserRepository, roleRepo repository.RoleRepository) *UserService {
+func NewUserService(
+	userRepo repository.UserRepository,
+	roleRepo repository.RoleRepository,
+	usageLimitRepo domainRepo.UsageLimitRepository,
+	usageLogRepo domainRepo.UsageLogRepository,
+) *UserService {
 	return &UserService{
-		userRepo: userRepo,
-		roleRepo: roleRepo,
+		userRepo:       userRepo,
+		roleRepo:       roleRepo,
+		usageLimitRepo: usageLimitRepo,
+		usageLogRepo:   usageLogRepo,
 	}
 }
 
@@ -106,6 +117,12 @@ func (s *UserService) Register(ctx context.Context, name, username, email, phone
 
 		// Add the role to the user object
 		user.Roles = []model.Role{*freeRole}
+
+		// Create default usage limits for the new user
+		if err := s.createDefaultUsageLimits(ctx, user.ID, "free_user"); err != nil {
+			// Log error but don't fail user creation
+			fmt.Printf("Error creating default usage limits for user %s: %v\n", user.ID, err)
+		}
 	}
 
 	return user, nil
@@ -415,4 +432,81 @@ func (s *UserService) GetAllRoles(ctx context.Context) ([]model.Role, error) {
 		return nil, fmt.Errorf("error getting all roles: %w", err)
 	}
 	return roles, nil
+}
+
+// createDefaultUsageLimits creates default usage limits for a new user based on their role
+func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.UUID, roleName string) error {
+	// Define default limits based on role
+	var backtestLimit, deploymentLimit, liveTradesLimit int
+
+	switch roleName {
+	case "admin":
+		backtestLimit = 999999
+		deploymentLimit = 999999
+		liveTradesLimit = 999999
+	case "paid_user":
+		backtestLimit = 100
+		deploymentLimit = 20
+		liveTradesLimit = 500
+	case "free_user":
+		backtestLimit = 10
+		deploymentLimit = 3
+		liveTradesLimit = 50
+	default:
+		backtestLimit = 5
+		deploymentLimit = 1
+		liveTradesLimit = 10
+	}
+
+	now := time.Now()
+
+	// Create backtest limit
+	backtestUsageLimit := &entity.UsageLimit{
+		UserID:       userID,
+		LimitType:    entity.BacktestPerMonth,
+		LimitValue:   backtestLimit,
+		CurrentUsage: 0,
+		ResetPeriod:  entity.Monthly,
+		LastResetAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.usageLimitRepo.Create(ctx, backtestUsageLimit); err != nil {
+		return fmt.Errorf("failed to create backtest limit: %w", err)
+	}
+
+	// Create deployment limit
+	deploymentUsageLimit := &entity.UsageLimit{
+		UserID:       userID,
+		LimitType:    entity.DeploymentCount,
+		LimitValue:   deploymentLimit,
+		CurrentUsage: 0,
+		ResetPeriod:  entity.Never,
+		LastResetAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.usageLimitRepo.Create(ctx, deploymentUsageLimit); err != nil {
+		return fmt.Errorf("failed to create deployment limit: %w", err)
+	}
+
+	// Create live trades limit
+	liveTradesUsageLimit := &entity.UsageLimit{
+		UserID:       userID,
+		LimitType:    entity.LiveTradesPerDay,
+		LimitValue:   liveTradesLimit,
+		CurrentUsage: 0,
+		ResetPeriod:  entity.Daily,
+		LastResetAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.usageLimitRepo.Create(ctx, liveTradesUsageLimit); err != nil {
+		return fmt.Errorf("failed to create live trades limit: %w", err)
+	}
+
+	return nil
 }
