@@ -173,7 +173,10 @@ func main() {
 	resetInstruments()
 
 	// Get port from environment or use default
-	port := getEnv("CLIENT_PORT", "9092")
+	port := getEnv("CLIENT_PORT", "")
+	if port == "" {
+		log.Fatal("CLIENT_PORT environment variable is required")
+	}
 	serverAddr := fmt.Sprintf(":%s", port)
 
 	log.Printf("Starting market data simulator server...")

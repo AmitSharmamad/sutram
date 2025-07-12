@@ -3,9 +3,10 @@ package parser
 import (
 	util "algo/internal/util/math"
 	"fmt"
-	"math"
 	"strings"
 	"time"
+
+	"github.com/markcheno/go-talib"
 )
 
 // MovingAverageType represents the type of moving average to use
@@ -126,28 +127,18 @@ func (indicator *LowerBollingerBands) Calculate(
 		return 0.0
 	}
 
-	// Calculate Moving Average using utility function based on maType
-	maValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), int(period))
-	if len(maValues) == 0 {
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
+
+	// Use go-talib BBands function
+	_, _, lowerBand := talib.BBands(prices, int(period), standardDev, standardDev, talibMAType)
+
+	if len(lowerBand) == 0 {
 		return 0.0
 	}
 
-	// Get the latest moving average value
-	sma := maValues[len(maValues)-1]
-
-	// Calculate standard deviation
-	var variance float64
-	periodInt := int(period)
-	for i := len(prices) - periodInt; i < len(prices); i++ {
-		diff := prices[i] - sma
-		variance += diff * diff
-	}
-	stdDev := math.Sqrt(variance / period)
-
-	// Calculate Lower Bollinger Band
-	lowerBand := sma - (standardDev * stdDev)
-
-	return lowerBand
+	// Return the last calculated value
+	return util.Round(lowerBand[len(lowerBand)-1])
 }
 
 func (indicator *LowerBollingerBands) GetDataRange(config map[string]any) int32 {
@@ -272,35 +263,13 @@ func (indicator *LowerBollingerBands) CalculateAll(
 		}
 	}
 
-	// Step 1: Calculate Moving Average using utility function based on maType
-	smaValues := util.CalculateMovingAverage(prices, strings.ToUpper(maType), periodInt)
+	// Convert maType string to talib MAType using utility function
+	talibMAType := util.ConvertMATypeToTalib(maType)
 
-	// Create full-length array with proper positioning
-	sma := make([]float64, len(stockData))
-	startIdx := periodInt - 1
-	for i, val := range smaValues {
-		if startIdx+i < len(sma) {
-			sma[startIdx+i] = val
-		}
-	}
+	// Use go-talib BBands function
+	_, _, lowerBand := talib.BBands(prices, periodInt, standardDev, standardDev, talibMAType)
 
-	// Step 2: Calculate Standard Deviation and Lower Bollinger Bands
-	lowerBand := make([]float64, len(stockData))
-
-	for i := periodInt - 1; i < len(stockData); i++ {
-		// Calculate standard deviation for this period
-		var variance float64
-		for j := i - periodInt + 1; j <= i; j++ {
-			diff := prices[j] - sma[i]
-			variance += diff * diff
-		}
-		stdDev := math.Sqrt(variance / period)
-
-		// Calculate Lower Bollinger Band = SMA - (standardDev × σ)
-		lowerBand[i] = sma[i] - (standardDev * stdDev)
-	}
-
-	// Step 3: Build results starting from valid calculation points
+	// Build results starting from valid calculation points
 	var result []IndicatorValues
 
 	for i := periodInt - 1; i < len(stockData); i++ {
@@ -314,10 +283,13 @@ func (indicator *LowerBollingerBands) CalculateAll(
 			continue
 		}
 
-		result = append(result, IndicatorValues{
-			Timestamp: stockData[i].Timestamp,
-			Value:     lowerBand[i],
-		})
+		// Make sure we have valid data from talib
+		if i-periodInt+1 >= 0 && i-periodInt+1 < len(lowerBand) {
+			result = append(result, IndicatorValues{
+				Timestamp: stockData[i].Timestamp,
+				Value:     util.Round(lowerBand[i-periodInt+1]),
+			})
+		}
 	}
 
 	return result

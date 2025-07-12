@@ -37,6 +37,20 @@ func NewFactory() *IndicatorFactory {
 	factory.indicators["TSI"] = &TSI{}
 	factory.indicators["VO"] = &VolumeOscillator{}
 	factory.indicators["UO"] = &UltimateOscillator{}
+	factory.indicators["ADX"] = &Adx{}
+	factory.indicators["ATR"] = &Atr{}
+	factory.indicators["AVGPRICE"] = &AvgPrice{}
+	factory.indicators["CCI"] = &Cci{}
+	factory.indicators["DEMA"] = &Dema{}
+	factory.indicators["MAMA"] = &Mama{}
+	factory.indicators["MINUSDI"] = &MinusDI{}
+	factory.indicators["MOM"] = &Mom{}
+	factory.indicators["PLUSDI"] = &PlusDI{}
+	factory.indicators["ROC"] = &Roc{}
+	factory.indicators["RSI"] = &Rsi{}
+	factory.indicators["TEMA"] = &Tema{}
+	factory.indicators["WILLR"] = &WillR{}
+	factory.indicators["WMA"] = &Wma{}
 
 	// Utility Indicator
 	factory.indicators["Number"] = &IndNumber{}

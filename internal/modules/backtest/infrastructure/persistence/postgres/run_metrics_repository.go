@@ -8,6 +8,7 @@ import (
 
 	"algo/internal/modules/backtest/domain/model"
 	"algo/internal/modules/backtest/domain/repository"
+	mathUtil "algo/internal/util/math"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -25,8 +26,103 @@ func NewRunMetricsRepository(db *sql.DB) repository.RunMetricsRepository {
 	}
 }
 
+// clampDecimal10_4 clamps a float64 to fit in DECIMAL(10, 4) database column
+func clampDecimal10_4(value float64) float64 {
+	return mathUtil.ClampFloat(value, -999999.9999, 999999.9999)
+}
+
+// clampDecimal18_8 clamps a float64 to fit in DECIMAL(18, 8) database column
+func clampDecimal18_8(value float64) float64 {
+	return mathUtil.ClampFloat(value, -9999999999.99999999, 9999999999.99999999)
+}
+
+// clampDecimal10_4Array clamps all values in a float64 slice to fit in DECIMAL(10, 4) database column
+func clampDecimal10_4Array(values []float64) []float64 {
+	if values == nil {
+		return nil
+	}
+	result := make([]float64, len(values))
+	for i, val := range values {
+		result[i] = clampDecimal10_4(val)
+	}
+	return result
+}
+
+// clampMetrics applies clamping to all metrics fields to prevent database precision errors
+func (r *RunMetricsRepository) clampMetrics(metrics *model.RunMetrics) {
+	// Clamp DECIMAL(10, 4) fields
+	metrics.TotalReturnPct = clampDecimal10_4(metrics.TotalReturnPct)
+	metrics.AnnualizedReturn = clampDecimal10_4(metrics.AnnualizedReturn)
+	if metrics.RiskAdjustedReturn != nil {
+		clamped := clampDecimal10_4(*metrics.RiskAdjustedReturn)
+		metrics.RiskAdjustedReturn = &clamped
+	}
+
+	// Clamp arrays
+	metrics.DailyReturns = clampDecimal10_4Array(metrics.DailyReturns)
+	metrics.MonthlyReturns = clampDecimal10_4Array(metrics.MonthlyReturns)
+
+	// Clamp more DECIMAL(10, 4) fields
+	metrics.SharpeRatio = clampDecimal10_4(metrics.SharpeRatio)
+	metrics.SortinoRatio = clampDecimal10_4(metrics.SortinoRatio)
+	metrics.MaxDrawdown = clampDecimal10_4(metrics.MaxDrawdown)
+	metrics.MaxDrawdownDuration = clampDecimal10_4(metrics.MaxDrawdownDuration)
+	if metrics.ValueAtRisk != nil {
+		clamped := clampDecimal10_4(*metrics.ValueAtRisk)
+		metrics.ValueAtRisk = &clamped
+	}
+	metrics.StdDeviation = clampDecimal10_4(metrics.StdDeviation)
+	if metrics.DownsideDeviation != nil {
+		clamped := clampDecimal10_4(*metrics.DownsideDeviation)
+		metrics.DownsideDeviation = &clamped
+	}
+
+	// Clamp trade metrics
+	metrics.WinRate = clampDecimal10_4(metrics.WinRate)
+	if metrics.AvgTradeDuration != nil {
+		clamped := clampDecimal10_4(*metrics.AvgTradeDuration)
+		metrics.AvgTradeDuration = &clamped
+	}
+	if metrics.ProfitFactor != nil {
+		clamped := clampDecimal10_4(*metrics.ProfitFactor)
+		metrics.ProfitFactor = &clamped
+	}
+	if metrics.PositionTurnover != nil {
+		clamped := clampDecimal10_4(*metrics.PositionTurnover)
+		metrics.PositionTurnover = &clamped
+	}
+	metrics.TransactionCostsPct = clampDecimal10_4(metrics.TransactionCostsPct)
+
+	// Clamp DECIMAL(18, 8) fields
+	if metrics.AvgWinSize != nil {
+		clamped := clampDecimal18_8(*metrics.AvgWinSize)
+		metrics.AvgWinSize = &clamped
+	}
+	if metrics.AvgLossSize != nil {
+		clamped := clampDecimal18_8(*metrics.AvgLossSize)
+		metrics.AvgLossSize = &clamped
+	}
+	if metrics.AvgPositionSize != nil {
+		clamped := clampDecimal18_8(*metrics.AvgPositionSize)
+		metrics.AvgPositionSize = &clamped
+	}
+	if metrics.MaxPositionSize != nil {
+		clamped := clampDecimal18_8(*metrics.MaxPositionSize)
+		metrics.MaxPositionSize = &clamped
+	}
+	if metrics.AvgExposure != nil {
+		clamped := clampDecimal18_8(*metrics.AvgExposure)
+		metrics.AvgExposure = &clamped
+	}
+	metrics.TotalCommission = clampDecimal18_8(metrics.TotalCommission)
+	metrics.TotalSlippage = clampDecimal18_8(metrics.TotalSlippage)
+}
+
 // Create saves new run metrics in the database
 func (r *RunMetricsRepository) Create(ctx context.Context, metrics *model.RunMetrics) error {
+	// Apply clamping to prevent database precision errors
+	r.clampMetrics(metrics)
+
 	query := `
 		INSERT INTO run_metrics (
 			id, run_id, total_return_pct, annualized_return, risk_adjusted_return,
@@ -151,6 +247,9 @@ func (r *RunMetricsRepository) GetByRunID(ctx context.Context, runID uuid.UUID) 
 
 // Update updates existing run metrics in the database
 func (r *RunMetricsRepository) Update(ctx context.Context, metrics *model.RunMetrics) error {
+	// Apply clamping to prevent database precision errors
+	r.clampMetrics(metrics)
+
 	query := `
 		UPDATE run_metrics
 		SET 
@@ -289,6 +388,9 @@ func (r *RunMetricsRepository) BulkCreate(ctx context.Context, metrics []*model.
 
 	// Execute for each metric
 	for _, metric := range metrics {
+		// Apply clamping to prevent database precision errors
+		r.clampMetrics(metric)
+
 		_, err := stmt.ExecContext(
 			ctx,
 			metric.ID,

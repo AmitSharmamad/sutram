@@ -4,7 +4,7 @@
 .PHONY: help init validate deploy-all deploy-networking deploy-data deploy-app-infra deploy-app-services deploy-cdn
 .PHONY: delete-all delete-networking delete-data delete-app-infra delete-app-services delete-cdn
 .PHONY: status outputs clean validate-all update-services build-images push-images
-.PHONY: deploy-dev deploy-staging deploy-prod delete-dev delete-staging delete-prod
+.PHONY: deploy-dev deploy-prod delete-dev delete-prod
 .PHONY: show-costs scale-up scale-down stop-services start-services cost-optimization-report
 
 # Default environment
@@ -34,12 +34,11 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Environment Options:$(NC)"
 	@echo "  ENV=dev      Deploy to development environment"
-	@echo "  ENV=staging  Deploy to staging environment" 
 	@echo "  ENV=prod     Deploy to production environment"
 	@echo ""
 	@echo "$(GREEN)Examples:$(NC)"
 	@echo "  make deploy-all ENV=dev"
-	@echo "  make delete-all ENV=staging"
+	@echo "  make delete-all ENV=prod"
 	@echo "  make status ENV=prod"
 
 init: ## Initialize AWS CLI and validate configuration
@@ -119,17 +118,11 @@ delete-all: ## Delete all stacks in reverse order
 deploy-dev: ## Deploy all stacks to development environment
 	@make deploy-all ENV=dev
 
-deploy-staging: ## Deploy all stacks to staging environment
-	@make deploy-all ENV=staging
-
 deploy-prod: ## Deploy all stacks to production environment
 	@make deploy-all ENV=prod
 
 delete-dev: ## Delete all stacks from development environment
 	@make delete-all ENV=dev
-
-delete-staging: ## Delete all stacks from staging environment
-	@make delete-all ENV=staging
 
 delete-prod: ## Delete all stacks from production environment
 	@make delete-all ENV=prod
@@ -282,7 +275,7 @@ cost-optimization-report: ## Generate cost optimization report
 	@echo "$(BLUE)Generating cost optimization report...$(NC)"
 	@echo "See COST_OPTIMIZATION.md for detailed cost breakdown and savings strategies"
 	@echo "Current environment: $(ENV)"
-	@echo "Estimated monthly cost: $(if $(filter dev,$(ENV)),~$$78 (71% savings),$(if $(filter staging,$(ENV)),~$$150,~$$300))"
+	@echo "Estimated monthly cost: $(if $(filter dev,$(ENV)),~$$78 (71% savings),~$$300)"
 
 # Default target
 .DEFAULT_GOAL := help
