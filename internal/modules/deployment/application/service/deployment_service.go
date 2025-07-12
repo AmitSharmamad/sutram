@@ -207,6 +207,48 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 	}
 
+	// Publish deployment.created event
+	if s.eventPublisher != nil {
+		// Get strategy name for the event
+		strategyName := ""
+		if strategy != nil {
+			strategyName = strategy.Name
+		}
+
+		// Get timeframe from strategy
+		timeframe := ""
+		if strategy != nil {
+			timeframe = string(strategy.ChartTimeframe)
+		}
+
+		event := &dto.DeploymentEvent{
+			EventType:    dto.EventTypeDeploymentCreated,
+			DeploymentID: deployment.ID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Timestamp:    time.Now(),
+			Data: &dto.DeploymentCreatedData{
+				DeploymentID: deployment.ID,
+				Name:         deployment.Name,
+				Description:  deployment.Description,
+				StrategyName: strategyName,
+				Timeframe:    timeframe,
+				IsActive:     deployment.IsActive,
+				CreatedAt:    deployment.CreatedAt,
+			},
+			Metadata: dto.EventMetadata{
+				UserID:       deployment.UserID,
+				StrategyName: strategyName,
+			},
+		}
+
+		// Publish the event to all subscribed clients
+		if err := s.eventPublisher.PublishEvent(ctx, event); err != nil {
+			// Log the error but don't fail the deployment creation
+			fmt.Printf("Error publishing deployment.created event: %v\n", err)
+		}
+	}
+
 	return response, nil
 }
 
