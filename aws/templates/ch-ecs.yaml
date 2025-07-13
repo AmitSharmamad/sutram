@@ -1,0 +1,342 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sutram Trading Platform - ClickHouse Database (ECS)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Default: sutram
+    Description: Project name for resource naming
+
+  InfraStackName:
+    Type: String
+    Description: Name of the infrastructure stack to import values from
+
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Docker image tag to deploy
+
+  TaskCpu:
+    Type: String
+    Default: "512"
+    AllowedValues: ["256", "512", "1024", "2048", "4096"]
+    Description: CPU units for the ECS task (1 vCPU = 1024 units)
+
+  TaskMemory:
+    Type: String
+    Default: "1024"
+    AllowedValues: ["512", "1024", "2048", "4096", "8192"]
+    Description: Memory in MB for the ECS task
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+
+Resources:
+  # ECS Task Definition for ClickHouse
+  ClickHouseTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ProjectName}-${Environment}-clickhouse"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${InfraStackName}-ECS-TaskExecutionRole"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${InfraStackName}-ECS-TaskRole"
+      Volumes:
+        - Name: clickhouse-data
+          EfsVolumeConfiguration:
+            FileSystemId: !ImportValue
+              Fn::Sub: "${InfraStackName}-ClickHouse-EFS"
+            RootDirectory: "/data"
+            TransitEncryption: ENABLED
+        - Name: clickhouse-logs
+          EfsVolumeConfiguration:
+            FileSystemId: !ImportValue
+              Fn::Sub: "${InfraStackName}-ClickHouse-EFS"
+            RootDirectory: "/logs"
+            TransitEncryption: ENABLED
+        - Name: clickhouse-config
+          EfsVolumeConfiguration:
+            FileSystemId: !ImportValue
+              Fn::Sub: "${InfraStackName}-ClickHouse-EFS"
+            RootDirectory: "/config"
+            TransitEncryption: ENABLED
+      ContainerDefinitions:
+        - Name: clickhouse
+          Image: !Sub
+            - "${ECRUri}:${ImageTag}"
+            - ECRUri: !ImportValue
+                Fn::Sub: "${InfraStackName}-ClickHouse-ECR-URI"
+              ImageTag: !Ref ImageTag
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8123
+              Protocol: tcp
+              Name: http
+            - ContainerPort: 9000
+              Protocol: tcp
+              Name: native
+          Environment:
+            - Name: CLICKHOUSE_DB
+              Value: "sutram"
+            - Name: CLICKHOUSE_USER
+              Value: "admin"
+            - Name: CLICKHOUSE_PASSWORD
+              Value: "clickhouse123"
+            - Name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              Value: "1"
+          MountPoints:
+            - SourceVolume: clickhouse-data
+              ContainerPath: "/var/lib/clickhouse"
+            - SourceVolume: clickhouse-logs
+              ContainerPath: "/var/log/clickhouse-server"
+            - SourceVolume: clickhouse-config
+              ContainerPath: "/etc/clickhouse-server/config.d"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${InfraStackName}-ClickHouse-LogGroup"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - "CMD-SHELL"
+              - "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 120
+          Ulimits:
+            - Name: nofile
+              SoftLimit: 262144
+              HardLimit: 262144
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-task"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ECS Service for ClickHouse
+  ClickHouseService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${ProjectName}-${Environment}-clickhouse-service"
+      Cluster: !ImportValue
+        Fn::Sub: "${InfraStackName}-ECS-Cluster"
+      TaskDefinition: !Ref ClickHouseTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !ImportValue
+              Fn::Sub: "${InfraStackName}-Database-SecurityGroup"
+          Subnets: !Split
+            - ","
+            - !ImportValue
+              Fn::Sub: "${InfraStackName}-Private-Subnets"
+          AssignPublicIp: DISABLED
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      ServiceTags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-service"
+        - Key: Environment
+          Value: !Ref Environment
+      EnableExecuteCommand: !If [IsProduction, false, true]
+      ServiceRegistries:
+        - RegistryArn: !GetAtt ClickHouseServiceDiscovery.Arn
+          ContainerName: clickhouse
+          ContainerPort: 8123
+
+  # Service Discovery Namespace (moved before service discovery service)
+  ServiceDiscoveryNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}.local"
+      Vpc: !ImportValue
+        Fn::Sub: "${InfraStackName}-VPC-ID"
+      Description: !Sub "Service discovery for ${ProjectName} ${Environment}"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-service-discovery"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Service Discovery for ClickHouse
+  ClickHouseServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    DependsOn: ServiceDiscoveryNamespace
+    Properties:
+      Name: clickhouse
+      DnsConfig:
+        NamespaceId: !Ref ServiceDiscoveryNamespace
+        DnsRecords:
+          - Type: A
+            TTL: 60
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-discovery"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Network Load Balancer for ClickHouse (internal access)
+  ClickHouseNLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-ch-nlb"
+      Type: network
+      Scheme: internal
+      Subnets: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${InfraStackName}-Private-Subnets"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-clickhouse-nlb"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Target Group for ClickHouse HTTP Interface
+  ClickHouseHTTPTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-ch-http-tg"
+      Port: 8123
+      Protocol: TCP
+      VpcId: !ImportValue
+        Fn::Sub: "${InfraStackName}-VPC-ID"
+      HealthCheckEnabled: true
+      HealthCheckPath: /ping
+      HealthCheckPort: 8123
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 6
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ch-http-tg"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Target Group for ClickHouse Native Interface
+  ClickHouseNativeTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-ch-native-tg"
+      Port: 9000
+      Protocol: TCP
+      VpcId: !ImportValue
+        Fn::Sub: "${InfraStackName}-VPC-ID"
+      HealthCheckEnabled: true
+      HealthCheckPort: 8123
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /ping
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 6
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: ip
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ch-native-tg"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # NLB Listener for HTTP Interface
+  ClickHouseHTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ClickHouseHTTPTargetGroup
+      LoadBalancerArn: !Ref ClickHouseNLB
+      Port: 8123
+      Protocol: TCP
+
+  # NLB Listener for Native Interface
+  ClickHouseNativeListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ClickHouseNativeTargetGroup
+      LoadBalancerArn: !Ref ClickHouseNLB
+      Port: 9000
+      Protocol: TCP
+
+  # Route53 Record for ClickHouse Service
+  ClickHouseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue
+        Fn::Sub: "${InfraStackName}-HostedZone-ID"
+      Name: !Sub "clickhouse.${ProjectName}-${Environment}.local"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ClickHouseNLB.DNSName
+        HostedZoneId: !GetAtt ClickHouseNLB.CanonicalHostedZoneID
+
+Outputs:
+  ClickHouseLoadBalancerDNSName:
+    Description: ClickHouse Load Balancer DNS Name
+    Value: !GetAtt ClickHouseNLB.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-LoadBalancer-DNS"
+
+  ClickHouseServiceDNSName:
+    Description: ClickHouse Service DNS Name (Route53)
+    Value: !Sub "clickhouse.${ProjectName}-${Environment}.local"
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-DNS"
+
+  ClickHouseHTTPURL:
+    Description: ClickHouse HTTP Interface URL
+    Value: !Sub "http://${ClickHouseNLB.DNSName}:8123"
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-HTTP-URL"
+
+  ClickHouseNativeURL:
+    Description: ClickHouse Native Interface URL
+    Value: !Sub "${ClickHouseNLB.DNSName}:9000"
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-Native-URL"
+
+  ClickHouseServiceName:
+    Description: ECS Service Name
+    Value: !Ref ClickHouseService
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-Service-Name"
+
+  ClickHouseTaskDefinitionArn:
+    Description: ClickHouse Task Definition ARN
+    Value: !Ref ClickHouseTaskDefinition
+    Export:
+      Name: !Sub "${AWS::StackName}-ClickHouse-TaskDefinition"
+
+  ServiceDiscoveryNamespaceId:
+    Description: Service Discovery Namespace ID
+    Value: !Ref ServiceDiscoveryNamespace
+    Export:
+      Name: !Sub "${AWS::StackName}-ServiceDiscovery-Namespace"

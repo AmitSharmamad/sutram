@@ -56,13 +56,13 @@ Parameters:
     Description: Minimum number of instances in Auto Scaling Group
 
   KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Name of an existing EC2 KeyPair to enable SSH access
-    Default: ""
+    Type: String
+    Description: Name of an existing EC2 KeyPair to enable SSH access (optional)
+    Default: "NONE"
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, prod]
-  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+  HasKeyName: !Not [!Equals [!Ref KeyName, "NONE"]]
 
 Mappings:
   RegionMap:

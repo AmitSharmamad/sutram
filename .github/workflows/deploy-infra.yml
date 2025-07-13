@@ -39,23 +39,8 @@ jobs:
 
       - name: Deploy Infrastructure to Dev
         run: |
-          aws cloudformation deploy \
-            --template-file aws/templates/infra.yaml \
-            --stack-name sutram-infra-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              UseSingleNATGateway=true \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
-
-      - name: Verify Deployment
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name sutram-infra-dev \
-            --region ap-south-1 \
-            --query 'Stacks[0].StackStatus' \
-            --output text
+          chmod +x aws/scripts/infra.sh
+          aws/scripts/infra.sh dev
 
   deploy-infra-prod:
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
@@ -75,20 +60,5 @@ jobs:
 
       - name: Deploy Infrastructure to Prod
         run: |
-          aws cloudformation deploy \
-            --template-file aws/templates/infra.yaml \
-            --stack-name sutram-infra-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              UseSingleNATGateway=false \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
-
-      - name: Verify Deployment
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name sutram-infra-prod \
-            --region ap-south-1 \
-            --query 'Stacks[0].StackStatus' \
-            --output text
+          chmod +x aws/scripts/infra.sh
+          aws/scripts/infra.sh prod
