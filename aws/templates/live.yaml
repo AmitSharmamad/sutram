@@ -149,7 +149,16 @@ Resources:
           Fn::Base64: !Sub |
             #!/bin/bash
             yum update -y
-            yum install -y golang git
+            
+            # Install Go 1.24.5
+            cd /tmp
+            wget https://go.dev/dl/go1.24.5.linux-amd64.tar.gz
+            tar -C /usr/local -xzf go1.24.5.linux-amd64.tar.gz
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+            ln -s /usr/local/go/bin/go /usr/bin/go
+            ln -s /usr/local/go/bin/gofmt /usr/bin/gofmt
+            
+            yum install -y git
             
             # Create app user
             useradd -m -s /bin/bash sutram
