@@ -35,9 +35,9 @@ jobs:
           aws-region: ap-south-1
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24.5'
 
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
@@ -171,9 +171,9 @@ jobs:
           aws-region: ap-south-1
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24.5'
 
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
