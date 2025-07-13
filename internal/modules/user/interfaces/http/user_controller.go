@@ -14,19 +14,21 @@ import (
 
 // UserController handles user-related HTTP requests
 type UserController struct {
-	authService      *service.AuthService
-	userService      *service.UserService
-	dashboardService *service.DashboardService
-	waitlistService  *service.WaitlistService
+	authService       *service.AuthService
+	userService       *service.UserService
+	dashboardService  *service.DashboardService
+	waitlistService   *service.WaitlistService
+	usageLimitService service.UsageLimitService
 }
 
 // NewUserController creates a new user controller
 func NewUserController(authService *service.AuthService, userService *service.UserService, dashboardService *service.DashboardService) *UserController {
 	return &UserController{
-		authService:      authService,
-		userService:      userService,
-		dashboardService: dashboardService,
-		waitlistService:  nil, // Will be set via SetWaitlistService
+		authService:       authService,
+		userService:       userService,
+		dashboardService:  dashboardService,
+		waitlistService:   nil, // Will be set via SetWaitlistService
+		usageLimitService: nil, // Will be set via SetUsageLimitService
 	}
 }
 
@@ -906,6 +908,16 @@ func (c *UserController) GetDashboardStatistics(ctx *gin.Context) {
 // SetWaitlistService sets the waitlist service
 func (c *UserController) SetWaitlistService(waitlistService *service.WaitlistService) {
 	c.waitlistService = waitlistService
+}
+
+// SetUsageLimitService sets the usage limit service
+func (c *UserController) SetUsageLimitService(usageLimitService service.UsageLimitService) {
+	c.usageLimitService = usageLimitService
+}
+
+// GetUsageLimitService returns the usage limit service
+func (c *UserController) GetUsageLimitService() service.UsageLimitService {
+	return c.usageLimitService
 }
 
 // JoinWaitlist handles joining the waitlist

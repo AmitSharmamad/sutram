@@ -1,23 +1,54 @@
-# GitHub Workflows for Sutram Trading Platform
+# GitHub Workflows
 
-This directory contains GitHub Actions workflows for automated deployment and management of the Sutram Trading Platform. The workflows are designed to handle different aspects of the application lifecycle including testing, building, deployment, and infrastructure management.
+This directory contains GitHub Actions workflows for automated deployment of individual services.
 
-## 🚀 Workflows Overview
+## Deployment Workflows
 
-### 1. **Main Deployment Workflow** (`deploy.yml`)
-- **Triggers**: Push to `main` or `develop` branches
-- **Purpose**: Build and deploy the main web application
-- **Environments**: 
-  - Development (from `develop` branch)
-  - Staging (from `main` branch)
-  - Production (from `main` branch, after staging)
+Each service has its own dedicated deployment workflow:
 
-### 2. **Live Trading Service Deployment** (`deploy-live.yml`)
-- **Triggers**: Push to `main`/`develop` branches with changes to live service, or manual dispatch
-- **Purpose**: Deploy the live trading WebSocket service
-- **Features**: 
-  - Separate Docker image for live service
-  - Manual deployment option with environment selection
+### Infrastructure
+- **File**: `deploy-infra.yml`
+- **Triggers**: Changes to `aws/templates/infra.yaml`, config files, or manual dispatch
+- **Deploys**: VPC, networking, security groups, Route53
+
+### Databases
+- **PostgreSQL**: `deploy-pg.yml` - RDS PostgreSQL instance
+- **ClickHouse**: `deploy-ch.yml` - EC2-based ClickHouse database
+
+### Services
+- **Web Service**: `deploy-web.yml` - Main web application with ALB
+- **Live Service**: `deploy-live.yml` - Real-time data processing service
+- **Deployment Service**: `deploy-deployment.yml` - Deployment management service
+
+### Complete Deployment
+- **File**: `deploy-all.yml`
+- **Trigger**: Manual dispatch only
+- **Deploys**: All services in correct dependency order
+
+## Deployment Strategy
+
+### Development Environment
+- **Branch**: `dev`
+- **Trigger**: Automatic on push to `dev` branch
+- **Configuration**: Cost-optimized settings
+
+### Production Environment
+- **Branch**: `main`
+- **Trigger**: Automatic on push to `main` branch
+- **Configuration**: Production-grade settings with high availability
+
+## Dependencies
+
+Services are deployed in the following order to respect dependencies:
+1. **Infrastructure** (VPC, networking)
+2. **Databases** (PostgreSQL, ClickHouse)
+3. **Services** (Web, Live, Deployment)
+
+Each workflow checks for required dependencies before deployment.
+
+## Manual Deployment
+
+All workflows support manual dispatch through GitHub Actions UI with environment selection.
   - Health checks after deployment
 
 ### 3. **Infrastructure Deployment** (`deploy-infrastructure.yml`)

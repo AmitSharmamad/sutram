@@ -2,6 +2,7 @@ package http
 
 import (
 	"algo/internal/infra/http/middleware"
+	"algo/internal/modules/user/application/service"
 	userHttp "algo/internal/modules/user/interfaces/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ func RegisterRoutes(
 	controller *DeploymentController,
 	deploymentPositionLogController *DeploymentPositionLogController,
 	userController *userHttp.UserController,
+	usageLimitService service.UsageLimitService,
 ) {
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
@@ -22,7 +24,7 @@ func RegisterRoutes(
 	deploymentAuth.Use(middleware.AuthMiddleware(authServiceAdapter))
 	{
 		// Deployment management
-		deploymentAuth.POST("", controller.CreateDeployment)
+		deploymentAuth.POST("", middleware.DeploymentLimitMiddleware(usageLimitService), controller.CreateDeployment)
 		deploymentAuth.GET("", controller.GetUserDeployments)
 		deploymentAuth.GET("/search", controller.SearchDeployments)
 		deploymentAuth.GET("/:deployment_id", controller.GetDeploymentByID)
@@ -36,7 +38,7 @@ func RegisterRoutes(
 		// Strategy-specific deployments
 		deploymentAuth.GET("/strategy/:strategy_id", controller.GetDeploymentsByStrategy)
 		deploymentAuth.GET("/strategy/:strategy_id/status", controller.GetDeploymentStatus)
-		deploymentAuth.POST("/all", controller.DeployAllInstruments)
+		deploymentAuth.POST("/all", middleware.DeploymentLimitMiddleware(usageLimitService), controller.DeployAllInstruments)
 
 		// Deployment position logs
 		deploymentAuth.POST("/position/log", deploymentPositionLogController.CreateLog)

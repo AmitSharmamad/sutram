@@ -1,0 +1,160 @@
+name: Deploy Deployment Service
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'aws/templates/deployment.yaml'
+      - 'aws/config/**'
+      - 'cmd/deployment/**'
+      - 'internal/**'
+      - '.github/workflows/deploy-deployment.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  deploy-deployment-dev:
+    if: github.ref == 'refs/heads/dev' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Check Dependencies
+        run: |
+          # Verify that infrastructure and database stacks exist
+          if ! aws cloudformation describe-stacks --stack-name sutram-infra-dev --region ap-south-1 >/dev/null 2>&1; then
+            echo "Infrastructure stack not found. Please deploy infrastructure first."
+            exit 1
+          fi
+          if ! aws cloudformation describe-stacks --stack-name sutram-pg-dev --region ap-south-1 >/dev/null 2>&1; then
+            echo "PostgreSQL stack not found. Please deploy PostgreSQL first."
+            exit 1
+          fi
+          if ! aws cloudformation describe-stacks --stack-name sutram-ch-dev --region ap-south-1 >/dev/null 2>&1; then
+            echo "ClickHouse stack not found. Please deploy ClickHouse first."
+            exit 1
+          fi
+
+      - name: Build Deployment Service
+        run: |
+          # Build the Go binary
+          go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
+
+      - name: Deploy Deployment Service to Dev
+        run: |
+          aws cloudformation deploy \
+            --template-file aws/templates/deployment.yaml \
+            --stack-name sutram-deployment-dev \
+            --parameter-overrides \
+              Environment=dev \
+              ProjectName=sutram \
+              InfraStackName=sutram-infra-dev \
+              PostgreSQLStackName=sutram-pg-dev \
+              ClickHouseStackName=sutram-ch-dev \
+              DeploymentInstanceType=t3.micro \
+              DesiredCapacity=1 \
+              MinSize=1 \
+              MaxSize=1 \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ap-south-1
+
+      - name: Verify Deployment
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name sutram-deployment-dev \
+            --region ap-south-1 \
+            --query 'Stacks[0].StackStatus' \
+            --output text
+
+  deploy-deployment-prod:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: prod
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Check Dependencies
+        run: |
+          # Verify that infrastructure and database stacks exist
+          if ! aws cloudformation describe-stacks --stack-name sutram-infra-prod --region ap-south-1 >/dev/null 2>&1; then
+            echo "Infrastructure stack not found. Please deploy infrastructure first."
+            exit 1
+          fi
+          if ! aws cloudformation describe-stacks --stack-name sutram-pg-prod --region ap-south-1 >/dev/null 2>&1; then
+            echo "PostgreSQL stack not found. Please deploy PostgreSQL first."
+            exit 1
+          fi
+          if ! aws cloudformation describe-stacks --stack-name sutram-ch-prod --region ap-south-1 >/dev/null 2>&1; then
+            echo "ClickHouse stack not found. Please deploy ClickHouse first."
+            exit 1
+          fi
+
+      - name: Build Deployment Service
+        run: |
+          # Build the Go binary
+          go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
+
+      - name: Deploy Deployment Service to Prod
+        run: |
+          aws cloudformation deploy \
+            --template-file aws/templates/deployment.yaml \
+            --stack-name sutram-deployment-prod \
+            --parameter-overrides \
+              Environment=prod \
+              ProjectName=sutram \
+              InfraStackName=sutram-infra-prod \
+              PostgreSQLStackName=sutram-pg-prod \
+              ClickHouseStackName=sutram-ch-prod \
+              DeploymentInstanceType=t3.small \
+              DesiredCapacity=1 \
+              MinSize=1 \
+              MaxSize=3 \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ap-south-1
+
+      - name: Verify Deployment
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name sutram-deployment-prod \
+            --region ap-south-1 \
+            --query 'Stacks[0].StackStatus' \
+            --output text
