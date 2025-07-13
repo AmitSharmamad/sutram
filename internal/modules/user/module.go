@@ -76,16 +76,20 @@ func (m *Module) initialize() {
 	userRepo := postgres.NewUserRepository(m.db)
 	roleRepo := postgres.NewRoleRepository(m.db)
 	waitlistRepo := postgres.NewWaitlistRepository(sqlxDB)
+	usageLimitRepo := postgres.NewUsageLimitRepository(m.db)
+	usageLogRepo := postgres.NewUsageLogRepository(m.db)
 
 	// Create services
-	userService := service.NewUserService(userRepo, roleRepo)
+	userService := service.NewUserService(userRepo, roleRepo, usageLimitRepo, usageLogRepo)
 	waitlistService := service.NewWaitlistService(waitlistRepo)
+	usageLimitService := service.NewUsageLimitService(usageLimitRepo, usageLogRepo)
 	jwtService := auth.NewJWTService(m.jwtSecret, 24*time.Hour) // 24-hour token validity
 	authService := service.NewAuthService(userService, jwtService)
 
 	// Create controller (dashboard service will be set later)
 	m.controller = http.NewUserController(authService, userService, nil)
 	m.controller.SetWaitlistService(waitlistService)
+	m.controller.SetUsageLimitService(usageLimitService)
 }
 
 // RegisterRoutes registers the user module routes with the given router
@@ -98,12 +102,18 @@ func (m *Module) GetController() *http.UserController {
 	return m.controller
 }
 
+// GetUsageLimitService returns the usage limit service through the controller
+func (m *Module) GetUsageLimitService() service.UsageLimitService {
+	return m.controller.GetUsageLimitService()
+}
+
 // SetDashboardService sets the dashboard service and updates the controller
 func (m *Module) SetDashboardService(dashboardService *service.DashboardService) {
 	m.dashboardService = dashboardService
 	// Recreate the controller with the dashboard service
 	authService := m.controller.GetAuthService()
 	userService := m.controller.GetUserService()
+	usageLimitService := m.controller.GetUsageLimitService()
 
 	// Get sqlx connection for waitlist repository
 	sqlxDB, err := infraRepo.ProvidePostgresSQLXDB()
@@ -117,4 +127,5 @@ func (m *Module) SetDashboardService(dashboardService *service.DashboardService)
 
 	m.controller = http.NewUserController(authService, userService, dashboardService)
 	m.controller.SetWaitlistService(waitlistService)
+	m.controller.SetUsageLimitService(usageLimitService)
 }

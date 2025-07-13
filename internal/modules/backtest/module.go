@@ -118,7 +118,13 @@ func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
 		panic("Backtest module: UserController not set or invalid type")
 	}
 
-	backtestHttp.RegisterRoutes(router, m.controller, userController)
+	// Get usage limit service from user controller
+	usageLimitService := userController.GetUsageLimitService()
+	if usageLimitService == nil {
+		panic("Backtest module: Usage limit service not available from user controller")
+	}
+
+	backtestHttp.RegisterRoutes(router, m.controller, userController, usageLimitService)
 }
 
 // GetController returns the backtest controller

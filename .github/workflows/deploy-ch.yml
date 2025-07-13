@@ -1,0 +1,112 @@
+name: Deploy ClickHouse Database
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'aws/templates/ch.yaml'
+      - 'aws/config/**'
+      - '.github/workflows/deploy-ch.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  deploy-ch-dev:
+    if: github.ref == 'refs/heads/dev' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Check Infrastructure Dependency
+        run: |
+          # Verify that infrastructure stack exists
+          if ! aws cloudformation describe-stacks --stack-name sutram-infra-dev --region ap-south-1 >/dev/null 2>&1; then
+            echo "Infrastructure stack not found. Please deploy infrastructure first."
+            exit 1
+          fi
+
+      - name: Deploy ClickHouse to Dev
+        run: |
+          aws cloudformation deploy \
+            --template-file aws/templates/ch.yaml \
+            --stack-name sutram-ch-dev \
+            --parameter-overrides \
+              Environment=dev \
+              ProjectName=sutram \
+              InfraStackName=sutram-infra-dev \
+              ClickHouseInstanceType=t3.micro \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ap-south-1
+
+      - name: Verify Deployment
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name sutram-ch-dev \
+            --region ap-south-1 \
+            --query 'Stacks[0].StackStatus' \
+            --output text
+
+  deploy-ch-prod:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: prod
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Check Infrastructure Dependency
+        run: |
+          # Verify that infrastructure stack exists
+          if ! aws cloudformation describe-stacks --stack-name sutram-infra-prod --region ap-south-1 >/dev/null 2>&1; then
+            echo "Infrastructure stack not found. Please deploy infrastructure first."
+            exit 1
+          fi
+
+      - name: Deploy ClickHouse to Prod
+        run: |
+          aws cloudformation deploy \
+            --template-file aws/templates/ch.yaml \
+            --stack-name sutram-ch-prod \
+            --parameter-overrides \
+              Environment=prod \
+              ProjectName=sutram \
+              InfraStackName=sutram-infra-prod \
+              ClickHouseInstanceType=c5n.large \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region ap-south-1
+
+      - name: Verify Deployment
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name sutram-ch-prod \
+            --region ap-south-1 \
+            --query 'Stacks[0].StackStatus' \
+            --output text

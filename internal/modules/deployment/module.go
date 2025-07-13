@@ -142,8 +142,14 @@ func (m *Module) initializeComponents() {
 
 // RegisterRoutes registers the deployment module routes with the given router
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
+	// Get usage limit service from user controller
+	usageLimitService := m.userController.GetUsageLimitService()
+	if usageLimitService == nil {
+		panic("Deployment module: Usage limit service not available from user controller")
+	}
+
 	// Register main deployment routes using the router.go implementation
-	http.RegisterRoutes(router, m.controller, m.positionLogController, m.userController)
+	http.RegisterRoutes(router, m.controller, m.positionLogController, m.userController, usageLimitService)
 
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(m.userController.GetAuthService())

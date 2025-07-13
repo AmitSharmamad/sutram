@@ -1,0 +1,385 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sutram Trading Platform - Web Service'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Environment name
+  
+  ProjectName:
+    Type: String
+    Default: sutram
+    Description: Project name for resource naming
+
+  InfraStackName:
+    Type: String
+    Default: sutram-infra
+    Description: Name of the infrastructure stack to import values from
+
+  PostgreSQLStackName:
+    Type: String
+    Default: sutram-pg
+    Description: Name of the PostgreSQL stack to import values from
+
+  ClickHouseStackName:
+    Type: String
+    Default: sutram-ch
+    Description: Name of the ClickHouse stack to import values from
+
+  WebInstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium, t3.large]
+    Description: EC2 instance type for web service
+
+  DesiredCapacity:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 10
+    Description: Desired number of instances in Auto Scaling Group
+
+  MaxSize:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 10
+    Description: Maximum number of instances in Auto Scaling Group
+
+  MinSize:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 10
+    Description: Minimum number of instances in Auto Scaling Group
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+    Default: ""
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, prod]
+  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+
+Mappings:
+  RegionMap:
+    ap-south-1:
+      AMI: ami-0f5ee92e2d63afc18  # Amazon Linux 2 AMI
+
+Resources:
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-web-alb"
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - !ImportValue
+          Fn::Sub: "${InfraStackName}-ALB-SecurityGroup"
+      Subnets: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${InfraStackName}-Public-Subnets"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-alb"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Target Group
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-web-tg"
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !ImportValue
+        Fn::Sub: "${InfraStackName}-VPC-ID"
+      HealthCheckPath: /health
+      HealthCheckPort: 8080
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-tg"
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ALB Listener
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Launch Template
+  WebLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${ProjectName}-${Environment}-web-lt"
+      LaunchTemplateData:
+        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+        InstanceType: !Ref WebInstanceType
+        KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
+        SecurityGroupIds:
+          - !ImportValue
+            Fn::Sub: "${InfraStackName}-Web-SecurityGroup"
+        IamInstanceProfile:
+          Arn: !GetAtt WebInstanceProfile.Arn
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 20
+              VolumeType: gp3
+              Encrypted: !If [IsProduction, true, false]
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y golang git
+            
+            # Create app user
+            useradd -m -s /bin/bash sutram
+            
+            # Create application directory
+            mkdir -p /opt/sutram
+            chown sutram:sutram /opt/sutram
+            
+            # Set environment variables
+            cat > /etc/environment << 'EOF'
+            POSTGRES_HOST=${PostgreSQLStackName}-PostgreSQL-DNS
+            POSTGRES_PORT=5432
+            POSTGRES_DB=sutram
+            POSTGRES_USER=admin
+            POSTGRES_PASSWORD=postgres123
+            CLICKHOUSE_HOST=${ClickHouseStackName}-ClickHouse-DNS
+            CLICKHOUSE_PORT=9000
+            CLICKHOUSE_DB=sutram
+            CLICKHOUSE_USER=admin
+            CLICKHOUSE_PASSWORD=clickhouse123
+            APP_ENV=${Environment}
+            APP_PORT=8080
+            EOF
+            
+            # Create systemd service
+            cat > /etc/systemd/system/sutram-web.service << 'EOF'
+            [Unit]
+            Description=Sutram Web Service
+            After=network.target
+            
+            [Service]
+            Type=simple
+            User=sutram
+            WorkingDirectory=/opt/sutram
+            ExecStart=/opt/sutram/web
+            Restart=always
+            RestartSec=10
+            EnvironmentFile=/etc/environment
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+            
+            # Enable service
+            systemctl daemon-reload
+            systemctl enable sutram-web
+            
+            # Create health check endpoint script
+            cat > /opt/sutram/health.sh << 'EOF'
+            #!/bin/bash
+            # Simple health check - can be enhanced based on actual requirements
+            curl -f http://localhost:8080/health || exit 1
+            EOF
+            chmod +x /opt/sutram/health.sh
+            
+            # Note: In production, you would deploy the actual binary here
+            # For now, create a simple placeholder that responds to health checks
+            cat > /opt/sutram/placeholder.go << 'EOF'
+            package main
+            
+            import (
+                "fmt"
+                "net/http"
+                "os"
+            )
+            
+            func main() {
+                http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+                    w.WriteHeader(http.StatusOK)
+                    fmt.Fprintf(w, "OK")
+                })
+                
+                http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+                    w.WriteHeader(http.StatusOK)
+                    fmt.Fprintf(w, "Sutram Web Service - ${Environment}")
+                })
+                
+                port := os.Getenv("APP_PORT")
+                if port == "" {
+                    port = "8080"
+                }
+                
+                fmt.Printf("Starting server on port %s\n", port)
+                http.ListenAndServe(":"+port, nil)
+            }
+            EOF
+            
+            # Build and start placeholder service
+            cd /opt/sutram
+            su sutram -c "go mod init sutram-web && go build -o web placeholder.go"
+            systemctl start sutram-web
+            
+            # Signal CloudFormation
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub "${ProjectName}-${Environment}-web"
+              - Key: Environment
+                Value: !Ref Environment
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub "${ProjectName}-${Environment}-web-asg"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebLaunchTemplate
+        Version: !GetAtt WebLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier: !Split
+        - ","
+        - !ImportValue
+          Fn::Sub: "${InfraStackName}-Private-Subnets"
+      TargetGroupARNs:
+        - !Ref WebTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-instance"
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Environment
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Count: !Ref DesiredCapacity
+        Timeout: PT10M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT10M
+        WaitOnResourceSignals: true
+
+  # IAM Role for Web Instances
+  WebRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-web-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: WebServicePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-*/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-role"
+        - Key: Environment
+          Value: !Ref Environment
+
+  WebInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-${Environment}-web-profile"
+      Roles:
+        - !Ref WebRole
+
+  # Route53 Record for Web Service
+  WebDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !ImportValue
+        Fn::Sub: "${InfraStackName}-HostedZone-ID"
+      Name: !Sub "web.${ProjectName}-${Environment}.local"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+
+Outputs:
+  LoadBalancerDNSName:
+    Description: Application Load Balancer DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancer-DNS"
+
+  LoadBalancerHostedZoneId:
+    Description: Application Load Balancer Hosted Zone ID
+    Value: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+    Export:
+      Name: !Sub "${AWS::StackName}-LoadBalancer-HostedZoneId"
+
+  WebServiceDNSName:
+    Description: Web Service DNS Name (Route53)
+    Value: !Sub "web.${ProjectName}-${Environment}.local"
+    Export:
+      Name: !Sub "${AWS::StackName}-Web-DNS"
+
+  WebServiceURL:
+    Description: Web Service URL
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+    Export:
+      Name: !Sub "${AWS::StackName}-Web-URL"
+
+  AutoScalingGroupName:
+    Description: Auto Scaling Group Name
+    Value: !Ref AutoScalingGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-AutoScalingGroup-Name"
+
+  TargetGroupArn:
+    Description: Target Group ARN
+    Value: !Ref WebTargetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-TargetGroup-ARN"
