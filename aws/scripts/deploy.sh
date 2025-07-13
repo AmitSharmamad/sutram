@@ -1,9 +1,30 @@
 #!/bin/bash
 
-# Sutram AWS CloudFormation Deployment Scripts
-# This script provides functions to deploy and manage CloudFormation stacks
+# Deploy Sutram Infrastructure
+# Usage: ./deploy.sh [environment] [service]
+# Example: ./deploy.sh dev all
+# Example: ./deploy.sh prod web
 
 set -e
+
+# Default values
+ENVIRONMENT=${1:-dev}
+SERVICE=${2:-all}
+
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+CONFIG_DIR="$PROJECT_ROOT/config"
+TEMPLATES_DIR="$PROJECT_ROOT/templates"
+
+# Source environment configuration
+if [ -f "$CONFIG_DIR/${ENVIRONMENT}.env" ]; then
+    source "$CONFIG_DIR/${ENVIRONMENT}.env"
+else
+    echo "Error: Configuration file for environment '$ENVIRONMENT' not found!"
+    echo "Expected: $CONFIG_DIR/${ENVIRONMENT}.env"
+    exit 1
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -12,12 +33,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Default values
-ENVIRONMENT="dev"
-CONFIG_FILE=""
-DRY_RUN=false
-
-# Helper functions
+# Logging functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -34,253 +50,203 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Load environment configuration
-load_config() {
-    local env=$1
-    CONFIG_FILE="config/${env}.env"
-    
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        log_error "Configuration file $CONFIG_FILE not found!"
-        exit 1
-    fi
-    
-    log_info "Loading configuration from $CONFIG_FILE"
-    set -a
-    source "$CONFIG_FILE"
-    set +a
-    
-    # Validate required variables
-    if [[ -z "$PROJECT_NAME" || -z "$ENVIRONMENT" || -z "$AWS_REGION" ]]; then
-        log_error "Missing required configuration variables!"
-        exit 1
-    fi
-}
-
-# Get stack name with environment prefix
-get_stack_name() {
-    local stack_type=$1
-    echo "${PROJECT_NAME}-${ENVIRONMENT}-${stack_type}"
-}
-
-# Check if stack exists
-stack_exists() {
-    local stack_name=$1
-    aws cloudformation describe-stacks --stack-name "$stack_name" --region "$AWS_REGION" > /dev/null 2>&1
-}
-
-# Wait for stack operation to complete
-wait_for_stack() {
-    local stack_name=$1
-    local operation=$2
-    
-    log_info "Waiting for stack $operation to complete: $stack_name"
-    
-    if [[ "$operation" == "DELETE" ]]; then
-        aws cloudformation wait stack-delete-complete --stack-name "$stack_name" --region "$AWS_REGION"
-    else
-        aws cloudformation wait stack-create-complete --stack-name "$stack_name" --region "$AWS_REGION" 2>/dev/null || \
-        aws cloudformation wait stack-update-complete --stack-name "$stack_name" --region "$AWS_REGION"
-    fi
-}
-
-# Deploy a single stack
+# Function to deploy a CloudFormation stack
 deploy_stack() {
-    local stack_type=$1
-    local template_file="templates/${stack_type}.yaml"
-    local stack_name=$(get_stack_name "$stack_type")
-    
-    if [[ ! -f "$template_file" ]]; then
-        log_error "Template file $template_file not found!"
-        return 1
-    fi
+    local stack_name=$1
+    local template_file=$2
+    local parameters=$3
     
     log_info "Deploying stack: $stack_name"
+    log_info "Template: $template_file"
     
-    # Prepare parameters
-    local params=""
-    
-    case "$stack_type" in
-        "01-networking")
-            params="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
-            params="$params ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
-            # Cost optimization parameters
-            if [[ -n "$USE_SINGLE_NAT_GATEWAY" ]]; then
-                params="$params ParameterKey=UseSingleNATGateway,ParameterValue=$USE_SINGLE_NAT_GATEWAY"
-            fi
-            ;;
-        "02-data")
-            params="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
-            params="$params ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
-            params="$params ParameterKey=NetworkingStackName,ParameterValue=$(get_stack_name '01-networking')"
-            params="$params ParameterKey=DatabaseInstanceClass,ParameterValue=$DATABASE_INSTANCE_CLASS"
-            params="$params ParameterKey=ClickHouseInstanceType,ParameterValue=$CLICKHOUSE_INSTANCE_TYPE"
-            params="$params ParameterKey=RedisNodeType,ParameterValue=$REDIS_NODE_TYPE"
-            # Cost optimization parameters
-            if [[ -n "$DISABLE_MULTI_AZ" ]]; then
-                params="$params ParameterKey=DisableMultiAZ,ParameterValue=$DISABLE_MULTI_AZ"
-            fi
-            if [[ -n "$MINIMAL_STORAGE" ]]; then
-                params="$params ParameterKey=MinimalStorage,ParameterValue=$MINIMAL_STORAGE"
-            fi
-            ;;
-        "03-app-infrastructure")
-            params="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
-            params="$params ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
-            params="$params ParameterKey=NetworkingStackName,ParameterValue=$(get_stack_name '01-networking')"
-            if [[ -n "$CERTIFICATE_ARN" ]]; then
-                params="$params ParameterKey=CertificateArn,ParameterValue=$CERTIFICATE_ARN"
-            fi
-            if [[ -n "$DOMAIN_NAME" ]]; then
-                params="$params ParameterKey=DomainName,ParameterValue=$DOMAIN_NAME"
-            fi
-            # Cost optimization parameters
-            if [[ -n "$USE_FARGATE_SPOT" ]]; then
-                params="$params ParameterKey=UseFargateSpot,ParameterValue=$USE_FARGATE_SPOT"
-            fi
-            if [[ -n "$DISABLE_CONTAINER_INSIGHTS" ]]; then
-                params="$params ParameterKey=DisableContainerInsights,ParameterValue=$DISABLE_CONTAINER_INSIGHTS"
-            fi
-            ;;
-        "04-app-services")
-            params="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
-            params="$params ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
-            params="$params ParameterKey=NetworkingStackName,ParameterValue=$(get_stack_name '01-networking')"
-            params="$params ParameterKey=DataStackName,ParameterValue=$(get_stack_name '02-data')"
-            params="$params ParameterKey=AppInfraStackName,ParameterValue=$(get_stack_name '03-app-infrastructure')"
-            params="$params ParameterKey=WebAppImageTag,ParameterValue=$WEB_APP_IMAGE_TAG"
-            params="$params ParameterKey=LiveTradingImageTag,ParameterValue=$LIVE_TRADING_IMAGE_TAG"
-            params="$params ParameterKey=WebAppDesiredCount,ParameterValue=$WEB_APP_DESIRED_COUNT"
-            params="$params ParameterKey=LiveTradingDesiredCount,ParameterValue=$LIVE_TRADING_DESIRED_COUNT"
-            # Cost optimization parameters
-            if [[ -n "$MINIMAL_RESOURCES" ]]; then
-                params="$params ParameterKey=MinimalResources,ParameterValue=$MINIMAL_RESOURCES"
-            fi
-            ;;
-        "05-cdn")
-            params="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
-            params="$params ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
-            params="$params ParameterKey=AppInfraStackName,ParameterValue=$(get_stack_name '03-app-infrastructure')"
-            params="$params ParameterKey=DataStackName,ParameterValue=$(get_stack_name '02-data')"
-            if [[ -n "$DOMAIN_NAME" ]]; then
-                params="$params ParameterKey=DomainName,ParameterValue=$DOMAIN_NAME"
-            fi
-            if [[ -n "$CREATE_ROUTE53_HOSTED_ZONE" ]]; then
-                params="$params ParameterKey=CreateRoute53HostedZone,ParameterValue=$CREATE_ROUTE53_HOSTED_ZONE"
-            fi
-            if [[ -n "$ROUTE53_HOSTED_ZONE_ID" ]]; then
-                params="$params ParameterKey=Route53HostedZoneId,ParameterValue=$ROUTE53_HOSTED_ZONE_ID"
-            fi
-            # Cost optimization parameters
-            if [[ -n "$DISABLE_CDN" ]]; then
-                params="$params ParameterKey=DisableCDN,ParameterValue=$DISABLE_CDN"
-            fi
-            if [[ -n "$DISABLE_WAF" ]]; then
-                params="$params ParameterKey=DisableWAF,ParameterValue=$DISABLE_WAF"
-            fi
-            ;;
-    esac
-    
-    # Check if this is a dry run
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "DRY RUN: Would deploy stack $stack_name with parameters:"
-        echo "$params" | tr ' ' '\n'
-        return 0
-    fi
-    
-    # Check if stack exists to determine operation
-    local operation="create-stack"
-    if stack_exists "$stack_name"; then
-        operation="update-stack"
+    # Check if stack exists
+    if aws cloudformation describe-stacks --stack-name "$stack_name" >/dev/null 2>&1; then
         log_info "Stack exists, updating..."
+        aws cloudformation update-stack \
+            --stack-name "$stack_name" \
+            --template-body "file://$template_file" \
+            --parameters "$parameters" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-cli-pager
+        
+        log_info "Waiting for stack update to complete..."
+        aws cloudformation wait stack-update-complete --stack-name "$stack_name"
     else
         log_info "Stack does not exist, creating..."
+        aws cloudformation create-stack \
+            --stack-name "$stack_name" \
+            --template-body "file://$template_file" \
+            --parameters "$parameters" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-cli-pager
+        
+        log_info "Waiting for stack creation to complete..."
+        aws cloudformation wait stack-create-complete --stack-name "$stack_name"
     fi
     
-    # Deploy the stack
-    local param_args=""
-    if [[ -n "$params" ]]; then
-        param_args="--parameters $params"
-    fi
-    
-    aws cloudformation "$operation" \
-        --stack-name "$stack_name" \
-        --template-body "file://$template_file" \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --region "$AWS_REGION" \
-        $param_args
-    
-    # Wait for completion
-    wait_for_stack "$stack_name" "DEPLOY"
-    log_success "Stack deployed successfully: $stack_name"
+    log_success "Stack $stack_name deployed successfully!"
 }
 
-# Delete a single stack
-delete_stack() {
-    local stack_type=$1
-    local stack_name=$(get_stack_name "$stack_type")
+# Function to deploy infrastructure
+deploy_infra() {
+    log_info "Deploying infrastructure (VPC, networking)..."
     
-    if ! stack_exists "$stack_name"; then
-        log_warning "Stack does not exist: $stack_name"
-        return 0
-    fi
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=UseSingleNATGateway,ParameterValue=$USE_SINGLE_NAT_GATEWAY"
     
-    log_info "Deleting stack: $stack_name"
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "DRY RUN: Would delete stack $stack_name"
-        return 0
-    fi
-    
-    aws cloudformation delete-stack --stack-name "$stack_name" --region "$AWS_REGION"
-    wait_for_stack "$stack_name" "DELETE"
-    log_success "Stack deleted successfully: $stack_name"
+    deploy_stack "$INFRA_STACK_NAME" "$TEMPLATES_DIR/infra.yaml" "$parameters"
 }
 
-# Validate template
-validate_template() {
-    local template_file=$1
+# Function to deploy PostgreSQL
+deploy_pg() {
+    log_info "Deploying PostgreSQL database..."
     
-    log_info "Validating template: $template_file"
-    aws cloudformation validate-template --template-body "file://$template_file" --region "$AWS_REGION" > /dev/null
-    log_success "Template is valid: $template_file"
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=InfraStackName,ParameterValue=$INFRA_STACK_NAME"
+    parameters="$parameters ParameterKey=DatabaseInstanceClass,ParameterValue=$DATABASE_INSTANCE_CLASS"
+    parameters="$parameters ParameterKey=DisableMultiAZ,ParameterValue=$DISABLE_MULTI_AZ"
+    parameters="$parameters ParameterKey=MinimalStorage,ParameterValue=$MINIMAL_STORAGE"
+    
+    deploy_stack "$PG_STACK_NAME" "$TEMPLATES_DIR/pg.yaml" "$parameters"
 }
 
-# Show stack outputs
-show_outputs() {
-    local stack_type=$1
-    local stack_name=$(get_stack_name "$stack_type")
+# Function to deploy ClickHouse
+deploy_ch() {
+    log_info "Deploying ClickHouse database..."
     
-    if ! stack_exists "$stack_name"; then
-        log_error "Stack does not exist: $stack_name"
-        return 1
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=InfraStackName,ParameterValue=$INFRA_STACK_NAME"
+    parameters="$parameters ParameterKey=ClickHouseInstanceType,ParameterValue=$CLICKHOUSE_INSTANCE_TYPE"
+    
+    if [ -n "$KEY_NAME" ]; then
+        parameters="$parameters ParameterKey=KeyName,ParameterValue=$KEY_NAME"
     fi
     
-    log_info "Stack outputs for: $stack_name"
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --region "$AWS_REGION" \
-        --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue,Description]' \
-        --output table
+    deploy_stack "$CH_STACK_NAME" "$TEMPLATES_DIR/ch.yaml" "$parameters"
 }
 
-# Get stack status
-get_stack_status() {
-    local stack_type=$1
-    local stack_name=$(get_stack_name "$stack_type")
+# Function to deploy web service
+deploy_web() {
+    log_info "Deploying web service..."
     
-    if ! stack_exists "$stack_name"; then
-        echo "NOT_EXISTS"
-        return 0
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=InfraStackName,ParameterValue=$INFRA_STACK_NAME"
+    parameters="$parameters ParameterKey=PostgreSQLStackName,ParameterValue=$PG_STACK_NAME"
+    parameters="$parameters ParameterKey=ClickHouseStackName,ParameterValue=$CH_STACK_NAME"
+    parameters="$parameters ParameterKey=WebInstanceType,ParameterValue=$WEB_INSTANCE_TYPE"
+    parameters="$parameters ParameterKey=DesiredCapacity,ParameterValue=$WEB_DESIRED_CAPACITY"
+    parameters="$parameters ParameterKey=MinSize,ParameterValue=$WEB_MIN_SIZE"
+    parameters="$parameters ParameterKey=MaxSize,ParameterValue=$WEB_MAX_SIZE"
+    
+    if [ -n "$KEY_NAME" ]; then
+        parameters="$parameters ParameterKey=KeyName,ParameterValue=$KEY_NAME"
     fi
     
-    aws cloudformation describe-stacks \
-        --stack-name "$stack_name" \
-        --region "$AWS_REGION" \
-        --query 'Stacks[0].StackStatus' \
-        --output text
+    deploy_stack "$WEB_STACK_NAME" "$TEMPLATES_DIR/web.yaml" "$parameters"
 }
 
-# Export functions for use by Makefile
-export -f log_info log_success log_warning log_error
-export -f load_config get_stack_name stack_exists wait_for_stack
-export -f deploy_stack delete_stack validate_template show_outputs get_stack_status
+# Function to deploy live service
+deploy_live() {
+    log_info "Deploying live service..."
+    
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=InfraStackName,ParameterValue=$INFRA_STACK_NAME"
+    parameters="$parameters ParameterKey=PostgreSQLStackName,ParameterValue=$PG_STACK_NAME"
+    parameters="$parameters ParameterKey=ClickHouseStackName,ParameterValue=$CH_STACK_NAME"
+    parameters="$parameters ParameterKey=LiveInstanceType,ParameterValue=$LIVE_INSTANCE_TYPE"
+    parameters="$parameters ParameterKey=DesiredCapacity,ParameterValue=$LIVE_DESIRED_CAPACITY"
+    parameters="$parameters ParameterKey=MinSize,ParameterValue=$LIVE_MIN_SIZE"
+    parameters="$parameters ParameterKey=MaxSize,ParameterValue=$LIVE_MAX_SIZE"
+    
+    if [ -n "$KEY_NAME" ]; then
+        parameters="$parameters ParameterKey=KeyName,ParameterValue=$KEY_NAME"
+    fi
+    
+    deploy_stack "$LIVE_STACK_NAME" "$TEMPLATES_DIR/live.yaml" "$parameters"
+}
+
+# Function to deploy deployment service
+deploy_deployment() {
+    log_info "Deploying deployment service..."
+    
+    local parameters="ParameterKey=Environment,ParameterValue=$ENVIRONMENT"
+    parameters="$parameters ParameterKey=ProjectName,ParameterValue=$PROJECT_NAME"
+    parameters="$parameters ParameterKey=InfraStackName,ParameterValue=$INFRA_STACK_NAME"
+    parameters="$parameters ParameterKey=PostgreSQLStackName,ParameterValue=$PG_STACK_NAME"
+    parameters="$parameters ParameterKey=ClickHouseStackName,ParameterValue=$CH_STACK_NAME"
+    parameters="$parameters ParameterKey=DeploymentInstanceType,ParameterValue=$DEPLOYMENT_INSTANCE_TYPE"
+    parameters="$parameters ParameterKey=DesiredCapacity,ParameterValue=$DEPLOYMENT_DESIRED_CAPACITY"
+    parameters="$parameters ParameterKey=MinSize,ParameterValue=$DEPLOYMENT_MIN_SIZE"
+    parameters="$parameters ParameterKey=MaxSize,ParameterValue=$DEPLOYMENT_MAX_SIZE"
+    
+    if [ -n "$KEY_NAME" ]; then
+        parameters="$parameters ParameterKey=KeyName,ParameterValue=$KEY_NAME"
+    fi
+    
+    deploy_stack "$DEPLOYMENT_STACK_NAME" "$TEMPLATES_DIR/deployment.yaml" "$parameters"
+}
+
+# Function to show deployment status
+show_status() {
+    log_info "Deployment Status for environment: $ENVIRONMENT"
+    echo
+    
+    stacks=("$INFRA_STACK_NAME" "$PG_STACK_NAME" "$CH_STACK_NAME" "$WEB_STACK_NAME" "$LIVE_STACK_NAME" "$DEPLOYMENT_STACK_NAME")
+    
+    for stack in "${stacks[@]}"; do
+        if aws cloudformation describe-stacks --stack-name "$stack" >/dev/null 2>&1; then
+            status=$(aws cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text)
+            echo -e "${GREEN}✓${NC} $stack: $status"
+        else
+            echo -e "${RED}✗${NC} $stack: NOT_DEPLOYED"
+        fi
+    done
+}
+
+# Main deployment logic
+case $SERVICE in
+    "all")
+        log_info "Deploying all services for environment: $ENVIRONMENT"
+        deploy_infra
+        deploy_pg
+        deploy_ch
+        deploy_web
+        deploy_live
+        deploy_deployment
+        log_success "All services deployed successfully!"
+        show_status
+        ;;
+    "infra")
+        deploy_infra
+        ;;
+    "pg")
+        deploy_pg
+        ;;
+    "ch")
+        deploy_ch
+        ;;
+    "web")
+        deploy_web
+        ;;
+    "live")
+        deploy_live
+        ;;
+    "deployment")
+        deploy_deployment
+        ;;
+    "status")
+        show_status
+        ;;
+    *)
+        log_error "Unknown service: $SERVICE"
+        echo "Usage: $0 [environment] [service]"
+        echo "Environment: dev, prod"
+        echo "Service: all, infra, pg, ch, web, live, deployment, status"
+        exit 1
+        ;;
+esac
