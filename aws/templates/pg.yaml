@@ -38,6 +38,8 @@ Parameters:
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, prod]
+  MinimalStorage: !Equals [!Ref MinimalStorage, "true"]
+  DisableMultiAZ: !Equals [!Ref DisableMultiAZ, "true"]
 
 Resources:
   # RDS Subnet Group

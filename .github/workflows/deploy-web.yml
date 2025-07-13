@@ -44,53 +44,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Check Dependencies
-        run: |
-          # Verify that infrastructure and database stacks exist
-          if ! aws cloudformation describe-stacks --stack-name sutram-infra-dev --region ap-south-1 >/dev/null 2>&1; then
-            echo "Infrastructure stack not found. Please deploy infrastructure first."
-            exit 1
-          fi
-          if ! aws cloudformation describe-stacks --stack-name sutram-pg-dev --region ap-south-1 >/dev/null 2>&1; then
-            echo "PostgreSQL stack not found. Please deploy PostgreSQL first."
-            exit 1
-          fi
-          if ! aws cloudformation describe-stacks --stack-name sutram-ch-dev --region ap-south-1 >/dev/null 2>&1; then
-            echo "ClickHouse stack not found. Please deploy ClickHouse first."
-            exit 1
-          fi
+      - name: Install Wire
+        run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Build Web Service
+      - name: Build and Deploy Web Service to Dev
         run: |
-          # Build the Go binary
-          wire cmd/web/wire.go
-          go build -gcflags="all=-N -l" -o bin/web cmd/web/wire_gen.go cmd/web/main.go
-
-      - name: Deploy Web Service to Dev
-        run: |
-          aws cloudformation deploy \
-            --template-file aws/templates/web.yaml \
-            --stack-name sutram-web-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              PostgreSQLStackName=sutram-pg-dev \
-              ClickHouseStackName=sutram-ch-dev \
-              WebInstanceType=t3.micro \
-              DesiredCapacity=1 \
-              MinSize=1 \
-              MaxSize=2 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
-
-      - name: Verify Deployment
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name sutram-web-dev \
-            --region ap-south-1 \
-            --query 'Stacks[0].StackStatus' \
-            --output text
+          chmod +x aws/scripts/web.sh
+          aws/scripts/web.sh dev
 
   deploy-web-prod:
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
@@ -116,50 +76,7 @@ jobs:
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Check Dependencies
+      - name: Build and Deploy Web Service to Prod
         run: |
-          # Verify that infrastructure and database stacks exist
-          if ! aws cloudformation describe-stacks --stack-name sutram-infra-prod --region ap-south-1 >/dev/null 2>&1; then
-            echo "Infrastructure stack not found. Please deploy infrastructure first."
-            exit 1
-          fi
-          if ! aws cloudformation describe-stacks --stack-name sutram-pg-prod --region ap-south-1 >/dev/null 2>&1; then
-            echo "PostgreSQL stack not found. Please deploy PostgreSQL first."
-            exit 1
-          fi
-          if ! aws cloudformation describe-stacks --stack-name sutram-ch-prod --region ap-south-1 >/dev/null 2>&1; then
-            echo "ClickHouse stack not found. Please deploy ClickHouse first."
-            exit 1
-          fi
-
-      - name: Build Web Service
-        run: |
-          # Build the Go binary
-          wire cmd/web/wire.go
-          go build -gcflags="all=-N -l" -o bin/web cmd/web/wire_gen.go cmd/web/main.go
-
-      - name: Deploy Web Service to Prod
-        run: |
-          aws cloudformation deploy \
-            --template-file aws/templates/web.yaml \
-            --stack-name sutram-web-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              PostgreSQLStackName=sutram-pg-prod \
-              ClickHouseStackName=sutram-ch-prod \
-              WebInstanceType=t3.medium \
-              DesiredCapacity=2 \
-              MinSize=2 \
-              MaxSize=10 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
-
-      - name: Verify Deployment
-        run: |
-          aws cloudformation describe-stacks \
-            --stack-name sutram-web-prod \
-            --region ap-south-1 \
-            --query 'Stacks[0].StackStatus' \
-            --output text
+          chmod +x aws/scripts/web.sh
+          aws/scripts/web.sh prod

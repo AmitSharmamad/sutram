@@ -2,16 +2,48 @@
 
 This is the web application component of the Sutram algorithmic trading platform.
 
+## Infrastructure Options
+
+This application supports two deployment options:
+
+1. **ECS (Recommended)**: Containerized deployment on AWS ECS Fargate
+2. **EC2**: Traditional deployment on EC2 instances
+
+For detailed migration information, see [ECS_MIGRATION.md](./ECS_MIGRATION.md).
+
 ## Prerequisites
 
 - Go 1.23 or higher
 - Docker and Docker Compose
 - PostgreSQL
 - ClickHouse (for analytics)
+- AWS CLI (for ECS deployment)
 
 ## Quick Start
 
-### Running with Docker Compose
+### AWS Deployment
+
+Deploy all services to AWS with a single command:
+
+```bash
+# Complete deployment to dev
+cd aws
+make deploy ENV=dev
+
+# Or deploy to production
+cd aws
+make deploy ENV=prod
+
+# Deploy specific service
+cd aws
+make deploy ENV=dev SERVICE=web
+```
+
+For more details, see the `aws/scripts/` directory for individual deployment scripts.
+
+### Local Development
+
+#### Running with Docker Compose
 
 The easiest way to run the application is using Docker Compose:
 
@@ -20,7 +52,7 @@ The easiest way to run the application is using Docker Compose:
 docker-compose up -d
 ```
 
-### Running WebSocket Server for Live Data
+#### Running WebSocket Server for Live Data
 
 The platform includes a WebSocket server for streaming live market data:
 
@@ -42,7 +74,7 @@ make run-live
 The WebSocket server will run on port 9091 by default and will connect to the upstream
 WebSocket provider (wss://api-feed.dhan.co) with the credentials provided in the .env file.
 
-### Running Locally
+#### Running Locally
 
 1. Start the databases:
 

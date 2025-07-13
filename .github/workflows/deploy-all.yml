@@ -42,114 +42,35 @@ jobs:
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Build All Services
-        run: |
-          # Build Web Service
-          wire cmd/web/wire.go
-          go build -gcflags="all=-N -l" -o bin/web cmd/web/wire_gen.go cmd/web/main.go
-          
-          # Build Live Service
-          go build -gcflags="all=-N -l" -o bin/live cmd/live/main.go
-          
-          # Build Deployment Service
-          go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
-
       - name: Deploy All Services to Dev
         run: |
           echo "Deploying all services in correct order..."
           
+          # Make scripts executable
+          chmod +x aws/scripts/*.sh
+          
           # Deploy Infrastructure
-          aws cloudformation deploy \
-            --template-file aws/templates/infra.yaml \
-            --stack-name sutram-infra-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              UseSingleNATGateway=true \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/infra.sh dev
           
           # Deploy PostgreSQL
-          aws cloudformation deploy \
-            --template-file aws/templates/pg.yaml \
-            --stack-name sutram-pg-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              DatabaseInstanceClass=db.t3.micro \
-              DisableMultiAZ=true \
-              MinimalStorage=true \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/pg.sh dev
           
           # Deploy ClickHouse
-          aws cloudformation deploy \
-            --template-file aws/templates/ch.yaml \
-            --stack-name sutram-ch-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              ClickHouseInstanceType=t3.micro \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/ch.sh dev
           
           # Deploy Web Service
-          aws cloudformation deploy \
-            --template-file aws/templates/web.yaml \
-            --stack-name sutram-web-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              PostgreSQLStackName=sutram-pg-dev \
-              ClickHouseStackName=sutram-ch-dev \
-              WebInstanceType=t3.micro \
-              DesiredCapacity=1 \
-              MinSize=1 \
-              MaxSize=2 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/web.sh dev
           
           # Deploy Live Service
-          aws cloudformation deploy \
-            --template-file aws/templates/live.yaml \
-            --stack-name sutram-live-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              PostgreSQLStackName=sutram-pg-dev \
-              ClickHouseStackName=sutram-ch-dev \
-              LiveInstanceType=t3.micro \
-              DesiredCapacity=1 \
-              MinSize=1 \
-              MaxSize=2 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/live.sh dev
           
           # Deploy Deployment Service
-          aws cloudformation deploy \
-            --template-file aws/templates/deployment.yaml \
-            --stack-name sutram-deployment-dev \
-            --parameter-overrides \
-              Environment=dev \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-dev \
-              PostgreSQLStackName=sutram-pg-dev \
-              ClickHouseStackName=sutram-ch-dev \
-              DeploymentInstanceType=t3.micro \
-              DesiredCapacity=1 \
-              MinSize=1 \
-              MaxSize=1 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/deployment.sh dev
 
       - name: Verify All Deployments
         run: |
           echo "Verifying deployment status..."
-          for stack in sutram-infra-dev sutram-pg-dev sutram-ch-dev sutram-web-dev sutram-live-dev sutram-deployment-dev; do
+          for stack in sutram-infra-dev sutram-pg-dev sutram-ch-ecs-dev sutram-web-dev sutram-live-dev sutram-deployment-dev; do
             status=$(aws cloudformation describe-stacks --stack-name $stack --region ap-south-1 --query 'Stacks[0].StackStatus' --output text)
             echo "$stack: $status"
           done
@@ -178,114 +99,35 @@ jobs:
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Build All Services
-        run: |
-          # Build Web Service
-          wire cmd/web/wire.go
-          go build -gcflags="all=-N -l" -o bin/web cmd/web/wire_gen.go cmd/web/main.go
-          
-          # Build Live Service
-          go build -gcflags="all=-N -l" -o bin/live cmd/live/main.go
-          
-          # Build Deployment Service
-          go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
-
       - name: Deploy All Services to Prod
         run: |
           echo "Deploying all services in correct order..."
           
+          # Make scripts executable
+          chmod +x aws/scripts/*.sh
+          
           # Deploy Infrastructure
-          aws cloudformation deploy \
-            --template-file aws/templates/infra.yaml \
-            --stack-name sutram-infra-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              UseSingleNATGateway=false \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/infra.sh prod
           
           # Deploy PostgreSQL
-          aws cloudformation deploy \
-            --template-file aws/templates/pg.yaml \
-            --stack-name sutram-pg-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              DatabaseInstanceClass=db.r5.large \
-              DisableMultiAZ=false \
-              MinimalStorage=false \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/pg.sh prod
           
           # Deploy ClickHouse
-          aws cloudformation deploy \
-            --template-file aws/templates/ch.yaml \
-            --stack-name sutram-ch-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              ClickHouseInstanceType=c5n.large \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/ch.sh prod
           
           # Deploy Web Service
-          aws cloudformation deploy \
-            --template-file aws/templates/web.yaml \
-            --stack-name sutram-web-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              PostgreSQLStackName=sutram-pg-prod \
-              ClickHouseStackName=sutram-ch-prod \
-              WebInstanceType=t3.medium \
-              DesiredCapacity=2 \
-              MinSize=2 \
-              MaxSize=10 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/web.sh prod
           
           # Deploy Live Service
-          aws cloudformation deploy \
-            --template-file aws/templates/live.yaml \
-            --stack-name sutram-live-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              PostgreSQLStackName=sutram-pg-prod \
-              ClickHouseStackName=sutram-ch-prod \
-              LiveInstanceType=t3.medium \
-              DesiredCapacity=2 \
-              MinSize=2 \
-              MaxSize=10 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/live.sh prod
           
           # Deploy Deployment Service
-          aws cloudformation deploy \
-            --template-file aws/templates/deployment.yaml \
-            --stack-name sutram-deployment-prod \
-            --parameter-overrides \
-              Environment=prod \
-              ProjectName=sutram \
-              InfraStackName=sutram-infra-prod \
-              PostgreSQLStackName=sutram-pg-prod \
-              ClickHouseStackName=sutram-ch-prod \
-              DeploymentInstanceType=t3.small \
-              DesiredCapacity=1 \
-              MinSize=1 \
-              MaxSize=3 \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --region ap-south-1
+          aws/scripts/deployment.sh prod
 
       - name: Verify All Deployments
         run: |
           echo "Verifying deployment status..."
-          for stack in sutram-infra-prod sutram-pg-prod sutram-ch-prod sutram-web-prod sutram-live-prod sutram-deployment-prod; do
+          for stack in sutram-infra-prod sutram-pg-prod sutram-ch-ecs-prod sutram-web-prod sutram-live-prod sutram-deployment-prod; do
             status=$(aws cloudformation describe-stacks --stack-name $stack --region ap-south-1 --query 'Stacks[0].StackStatus' --output text)
             echo "$stack: $status"
           done
