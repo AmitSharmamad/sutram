@@ -46,8 +46,12 @@ Resources:
       InstanceType: !Ref ClickHouseInstanceType
       ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
       KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
-      SubnetId: !Select [0, !Split [",", !ImportValue
-        Fn::Sub: "${InfraStackName}-Private-Subnets"]]
+      SubnetId: !Select 
+        - 0 
+        - !Split 
+          - ","
+          - !ImportValue
+            Fn::Sub: "${InfraStackName}-Private-Subnets"
       SecurityGroupIds:
         - !ImportValue
           Fn::Sub: "${InfraStackName}-Database-SecurityGroup"
