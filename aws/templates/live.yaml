@@ -1,407 +1,124 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Sutram Trading Platform - Live Service'
+Description: 'Sutram Live Service on ECS'
 
 Parameters:
   Environment:
     Type: String
     Default: dev
     AllowedValues: [dev, prod]
-    Description: Environment name
-  
   ProjectName:
     Type: String
     Default: sutram
-    Description: Project name for resource naming
-
-  InfraStackName:
-    Type: String
-    Default: sutram-infra
-    Description: Name of the infrastructure stack to import values from
-
-  PostgreSQLStackName:
-    Type: String
-    Default: sutram-pg
-    Description: Name of the PostgreSQL stack to import values from
-
-  ClickHouseStackName:
-    Type: String
-    Default: sutram-ch
-    Description: Name of the ClickHouse stack to import values from
-
-  LiveInstanceType:
-    Type: String
-    Default: t3.micro
-    AllowedValues: [t3.micro, t3.small, t3.medium, t3.large]
-    Description: EC2 instance type for live service
-
-  DesiredCapacity:
+  CPU:
     Type: Number
-    Default: 1
-    MinValue: 1
-    MaxValue: 10
-    Description: Desired number of instances in Auto Scaling Group
-
-  MaxSize:
+    Default: 256
+  Memory:
     Type: Number
-    Default: 3
-    MinValue: 1
-    MaxValue: 10
-    Description: Maximum number of instances in Auto Scaling Group
-
-  MinSize:
+    Default: 512
+  LivePort:
     Type: Number
-    Default: 1
-    MinValue: 1
-    MaxValue: 10
-    Description: Minimum number of instances in Auto Scaling Group
-
-  KeyName:
+    Default: 8081
+  ImageTag:
     Type: String
-    Description: Name of an existing EC2 KeyPair to enable SSH access (optional)
-    Default: "NONE"
-
-Conditions:
-  IsProduction: !Equals [!Ref Environment, prod]
-  HasKeyName: !Not [!Equals [!Ref KeyName, "NONE"]]
-
-Mappings:
-  RegionMap:
-    ap-south-1:
-      AMI: ami-0f5ee92e2d63afc18  # Amazon Linux 2 AMI
+    Default: latest
 
 Resources:
-  # Application Load Balancer for Live Service
-  LiveLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  # Security Group for Live Service
+  LiveSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      Name: !Sub "${ProjectName}-${Environment}-live-alb"
-      Type: application
-      Scheme: internet-facing
-      SecurityGroups:
-        - !ImportValue
-          Fn::Sub: "${InfraStackName}-ALB-SecurityGroup"
-      Subnets: !Split
-        - ","
-        - !ImportValue
-          Fn::Sub: "${InfraStackName}-Public-Subnets"
+      GroupDescription: Security group for Live Service
+      VpcId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
+      SecurityGroupIngress:
+        # Allow access only from other ECS services (like web service)
+        - IpProtocol: tcp
+          FromPort: !Ref LivePort
+          ToPort: !Ref LivePort
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-live-alb"
-        - Key: Environment
-          Value: !Ref Environment
+          Value: !Sub "${ProjectName}-${Environment}-live-sg"
 
-  # Target Group for Live Service
-  LiveTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  # CloudWatch Log Group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
     Properties:
-      Name: !Sub "${ProjectName}-${Environment}-live-tg"
-      Port: 8081
-      Protocol: HTTP
-      VpcId: !ImportValue
-        Fn::Sub: "${InfraStackName}-VPC-ID"
-      HealthCheckPath: /health
-      HealthCheckPort: 8081
-      HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
-      TargetType: instance
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-live-tg"
-        - Key: Environment
-          Value: !Ref Environment
+      LogGroupName: !Sub "/ecs/${ProjectName}-${Environment}-live"
+      RetentionInDays: !If [IsProd, 30, 7]
 
-  # ALB Listener for Live Service
-  LiveALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
+  # ECS Task Definition
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
     Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref LiveTargetGroup
-      LoadBalancerArn: !Ref LiveLoadBalancer
-      Port: 80
-      Protocol: HTTP
+      Family: !Sub "${ProjectName}-${Environment}-live"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref CPU
+      Memory: !Ref Memory
+      ExecutionRoleArn:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-execution-role-arn"
+      TaskRoleArn:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: live
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ProjectName}-${Environment}-live:${ImageTag}"
+          Essential: true
+          PortMappings:
+            - ContainerPort: !Ref LivePort
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: !Ref LivePort
+            - Name: ENVIRONMENT
+              Value: !Ref Environment
+            - Name: DB_HOST
+              Value:
+                Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-endpoint"
+            - Name: DB_PORT
+              Value:
+                Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-port"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
 
-  # Launch Template for Live Service
-  LiveLaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
+  # ECS Service
+  Service:
+    Type: AWS::ECS::Service
     Properties:
-      LaunchTemplateName: !Sub "${ProjectName}-${Environment}-live-lt"
-      LaunchTemplateData:
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
-        InstanceType: !Ref LiveInstanceType
-        KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
-        SecurityGroupIds:
-          - !ImportValue
-            Fn::Sub: "${InfraStackName}-Web-SecurityGroup"
-        IamInstanceProfile:
-          Arn: !GetAtt LiveInstanceProfile.Arn
-        BlockDeviceMappings:
-          - DeviceName: /dev/xvda
-            Ebs:
-              VolumeSize: 20
-              VolumeType: gp3
-              Encrypted: !If [IsProduction, true, false]
-              DeleteOnTermination: true
-        UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            yum update -y
-            
-            # Install Go 1.24.5
-            cd /tmp
-            wget https://go.dev/dl/go1.24.5.linux-amd64.tar.gz
-            tar -C /usr/local -xzf go1.24.5.linux-amd64.tar.gz
-            echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-            ln -s /usr/local/go/bin/go /usr/bin/go
-            ln -s /usr/local/go/bin/gofmt /usr/bin/gofmt
-            
-            yum install -y git
-            
-            # Create app user
-            useradd -m -s /bin/bash sutram
-            
-            # Create application directory
-            mkdir -p /opt/sutram
-            chown sutram:sutram /opt/sutram
-            
-            # Set environment variables
-            cat > /etc/environment << 'EOF'
-            POSTGRES_HOST=${PostgreSQLStackName}-PostgreSQL-DNS
-            POSTGRES_PORT=5432
-            POSTGRES_DB=sutram
-            POSTGRES_USER=admin
-            POSTGRES_PASSWORD=postgres123
-            CLICKHOUSE_HOST=${ClickHouseStackName}-ClickHouse-DNS
-            CLICKHOUSE_PORT=9000
-            CLICKHOUSE_DB=sutram
-            CLICKHOUSE_USER=admin
-            CLICKHOUSE_PASSWORD=clickhouse123
-            APP_ENV=${Environment}
-            APP_PORT=8081
-            SERVICE_TYPE=live
-            EOF
-            
-            # Create systemd service
-            cat > /etc/systemd/system/sutram-live.service << 'EOF'
-            [Unit]
-            Description=Sutram Live Service
-            After=network.target
-            
-            [Service]
-            Type=simple
-            User=sutram
-            WorkingDirectory=/opt/sutram
-            ExecStart=/opt/sutram/live
-            Restart=always
-            RestartSec=10
-            EnvironmentFile=/etc/environment
-            
-            [Install]
-            WantedBy=multi-user.target
-            EOF
-            
-            # Enable service
-            systemctl daemon-reload
-            systemctl enable sutram-live
-            
-            # Create health check endpoint script
-            cat > /opt/sutram/health.sh << 'EOF'
-            #!/bin/bash
-            # Simple health check - can be enhanced based on actual requirements
-            curl -f http://localhost:8081/health || exit 1
-            EOF
-            chmod +x /opt/sutram/health.sh
-            
-            # Note: In production, you would deploy the actual binary here
-            # For now, create a simple placeholder that responds to health checks
-            cat > /opt/sutram/placeholder.go << 'EOF'
-            package main
-            
-            import (
-                "fmt"
-                "net/http"
-                "os"
-            )
-            
-            func main() {
-                http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-                    w.WriteHeader(http.StatusOK)
-                    fmt.Fprintf(w, "OK")
-                })
-                
-                http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-                    w.WriteHeader(http.StatusOK)
-                    fmt.Fprintf(w, "Sutram Live Service - ${Environment}")
-                })
-                
-                http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-                    w.WriteHeader(http.StatusOK)
-                    fmt.Fprintf(w, "WebSocket endpoint ready")
-                })
-                
-                port := os.Getenv("APP_PORT")
-                if port == "" {
-                    port = "8081"
-                }
-                
-                fmt.Printf("Starting live service on port %s\n", port)
-                http.ListenAndServe(":"+port, nil)
-            }
-            EOF
-            
-            # Build and start placeholder service
-            cd /opt/sutram
-            su sutram -c "go mod init sutram-live && go build -o live placeholder.go"
-            systemctl start sutram-live
-            
-            # Signal CloudFormation
-            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource LiveAutoScalingGroup --region ${AWS::Region}
-        TagSpecifications:
-          - ResourceType: instance
-            Tags:
-              - Key: Name
-                Value: !Sub "${ProjectName}-${Environment}-live"
-              - Key: Environment
-                Value: !Ref Environment
+      ServiceName: !Sub "${ProjectName}-${Environment}-live"
+      Cluster:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-cluster"
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !If [IsProd, 2, 1]
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+            - !Ref LiveSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-1-id"
+            - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
+          AssignPublicIp: DISABLED
 
-  # Auto Scaling Group for Live Service
-  LiveAutoScalingGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      AutoScalingGroupName: !Sub "${ProjectName}-${Environment}-live-asg"
-      LaunchTemplate:
-        LaunchTemplateId: !Ref LiveLaunchTemplate
-        Version: !GetAtt LiveLaunchTemplate.LatestVersionNumber
-      MinSize: !Ref MinSize
-      MaxSize: !Ref MaxSize
-      DesiredCapacity: !Ref DesiredCapacity
-      VPCZoneIdentifier: !Split
-        - ","
-        - !ImportValue
-          Fn::Sub: "${InfraStackName}-Private-Subnets"
-      TargetGroupARNs:
-        - !Ref LiveTargetGroup
-      HealthCheckType: ELB
-      HealthCheckGracePeriod: 300
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-live-instance"
-          PropagateAtLaunch: true
-        - Key: Environment
-          Value: !Ref Environment
-          PropagateAtLaunch: true
-    CreationPolicy:
-      ResourceSignal:
-        Count: !Ref DesiredCapacity
-        Timeout: PT10M
-    UpdatePolicy:
-      AutoScalingRollingUpdate:
-        MinInstancesInService: 1
-        MaxBatchSize: 1
-        PauseTime: PT10M
-        WaitOnResourceSignals: true
-
-  # IAM Role for Live Instances
-  LiveRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${ProjectName}-${Environment}-live-role"
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-      Policies:
-        - PolicyName: LiveServicePolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:DeleteObject
-                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-*/*"
-              - Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-*"
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/*"
-              - Effect: Allow
-                Action:
-                  - cloudwatch:PutMetricData
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-live-role"
-        - Key: Environment
-          Value: !Ref Environment
-
-  LiveInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      InstanceProfileName: !Sub "${ProjectName}-${Environment}-live-profile"
-      Roles:
-        - !Ref LiveRole
-
-  # Route53 Record for Live Service
-  LiveDNSRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !ImportValue
-        Fn::Sub: "${InfraStackName}-HostedZone-ID"
-      Name: !Sub "live.${ProjectName}-${Environment}.local"
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt LiveLoadBalancer.DNSName
-        HostedZoneId: !GetAtt LiveLoadBalancer.CanonicalHostedZoneID
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
 
 Outputs:
-  LiveLoadBalancerDNSName:
-    Description: Live Service Load Balancer DNS Name
-    Value: !GetAtt LiveLoadBalancer.DNSName
+  ServiceName:
+    Description: Live Service Name
+    Value: !Ref Service
     Export:
-      Name: !Sub "${AWS::StackName}-Live-LoadBalancer-DNS"
+      Name: !Sub "${ProjectName}-${Environment}-live-service"
 
-  LiveLoadBalancerHostedZoneId:
-    Description: Live Service Load Balancer Hosted Zone ID
-    Value: !GetAtt LiveLoadBalancer.CanonicalHostedZoneID
+  LiveSecurityGroup:
+    Description: Live Service Security Group ID
+    Value: !Ref LiveSecurityGroup
     Export:
-      Name: !Sub "${AWS::StackName}-Live-LoadBalancer-HostedZoneId"
-
-  LiveServiceDNSName:
-    Description: Live Service DNS Name (Route53)
-    Value: !Sub "live.${ProjectName}-${Environment}.local"
-    Export:
-      Name: !Sub "${AWS::StackName}-Live-DNS"
-
-  LiveServiceURL:
-    Description: Live Service URL
-    Value: !Sub "http://${LiveLoadBalancer.DNSName}"
-    Export:
-      Name: !Sub "${AWS::StackName}-Live-URL"
-
-  LiveAutoScalingGroupName:
-    Description: Live Service Auto Scaling Group Name
-    Value: !Ref LiveAutoScalingGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-Live-AutoScalingGroup-Name"
-
-  LiveTargetGroupArn:
-    Description: Live Service Target Group ARN
-    Value: !Ref LiveTargetGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-Live-TargetGroup-ARN"
+      Name: !Sub "${ProjectName}-${Environment}-live-sg-id"
