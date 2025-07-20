@@ -59,6 +59,7 @@ func NewOAuthService(
 func (s *OAuthService) isEmailWhitelisted(email string) bool {
 	// Whitelist of allowed emails
 	allowedEmails := []string{
+		"admin@sutram.co",
 		"amitsharmamad@gmail.com",
 		"Narendra.polisetty09@gmail.com",
 		"kkmarella@gmail.com",
