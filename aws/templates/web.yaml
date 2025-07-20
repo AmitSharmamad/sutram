@@ -21,6 +21,19 @@ Parameters:
   ImageTag:
     Type: String
     Default: latest
+  GoogleOAuthClientId:
+    Type: String
+    Default: 527787289499-ae0fqthcusd5jpti5d2liq5mgr667llv.apps.googleusercontent.com
+    Description: Google OAuth Client ID
+  GoogleOAuthClientSecret:
+    Type: String
+    Default: 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
+    Description: Google OAuth Client Secret
+    NoEcho: true
+  GoogleOAuthRedirectURL:
+    Type: String
+    Default: ""
+    Description: Google OAuth Redirect URL (will be auto-generated if empty)
 
 Resources:
   # Application Load Balancer
@@ -137,6 +150,37 @@ Resources:
             - Name: DB_PORT
               Value:
                 Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-port"
+            - Name: DATABASE_URL
+              Value: !Sub 
+                - "postgresql://${DBUsername}:${DBPassword}@${DBEndpoint}:${DBPort}/${DBName}?sslmode=require"
+                - DBUsername: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-username"
+                  DBPassword: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-password"
+                  DBEndpoint: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-endpoint"
+                  DBPort: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-port"
+                  DBName: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-name"
+            - Name: CH_URL
+              Value: !Sub 
+                - "clickhouse://sutram_user:change_me_clickhouse@${ClickHouseEndpoint}:9000/sutram"
+                - ClickHouseEndpoint: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
+            - Name: GOOGLE_OAUTH_CLIENT_ID
+              Value: !Ref GoogleOAuthClientId
+            - Name: GOOGLE_OAUTH_CLIENT_SECRET
+              Value: !Ref GoogleOAuthClientSecret
+            - Name: GOOGLE_OAUTH_REDIRECT_URL
+              Value: !If 
+                - UseCustomRedirectURL
+                - !Ref GoogleOAuthRedirectURL
+                - !Sub "http://${ApplicationLoadBalancer.DNSName}/api/auth/oauth/google/callback"
+            - Name: WEB_HTTP_PORT
+              Value: !Ref WebPort
+            - Name: GIN_MODE
+              Value: !If [IsProd, "release", "debug"]
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -170,6 +214,7 @@ Resources:
 
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
+  UseCustomRedirectURL: !Not [!Equals [!Ref GoogleOAuthRedirectURL, ""]]
 
 Outputs:
   LoadBalancerDNS:
