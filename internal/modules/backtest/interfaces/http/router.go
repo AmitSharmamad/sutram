@@ -13,13 +13,6 @@ func RegisterRoutes(router *gin.RouterGroup, controller *BacktestController, use
 	// Create auth service adapter
 	authServiceAdapter := userHttp.NewAuthServiceAdapter(userController.GetAuthService())
 
-	// Create a backtest router group for public endpoints
-	backtest := router.Group("/backtest")
-	{
-		// Health check endpoint
-		backtest.GET("/health", controller.HealthCheck)
-	}
-
 	// Create a backtest router group for authenticated endpoints
 	backtestAuth := router.Group("/backtest")
 	backtestAuth.Use(middleware.AuthMiddleware(authServiceAdapter))

@@ -43,6 +43,13 @@ func main() {
 	// Setup middleware
 	setupMiddleware(router)
 
+	// Add global health endpoint at root path
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "Application is running",
+		})
+	})
+
 	// Setup API routes
 	apiRouter := router.Group("/api")
 

@@ -80,6 +80,24 @@ Resources:
             - Name: DB_PORT
               Value:
                 Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-port"
+            - Name: DATABASE_URL
+              Value: !Sub 
+                - "postgresql://${DBUsername}:${DBPassword}@${DBEndpoint}:${DBPort}/${DBName}?sslmode=require"
+                - DBUsername: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-username"
+                  DBPassword: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-password"
+                  DBEndpoint: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-endpoint"
+                  DBPort: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-port"
+                  DBName: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-name"
+            - Name: CH_URL
+              Value: !Sub 
+                - "clickhouse://sutram_user:REDACTED_PASSWORD@${ClickHouseEndpoint}:9000/sutram"
+                - ClickHouseEndpoint: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
           LogConfiguration:
             LogDriver: awslogs
             Options:

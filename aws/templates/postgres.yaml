@@ -151,3 +151,21 @@ Outputs:
     Value: !Ref ECSSecurityGroup
     Export:
       Name: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+
+  DatabaseName:
+    Description: Database Name
+    Value: !Ref DBName
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-name"
+
+  DatabaseUsername:
+    Description: Database Username
+    Value: !Ref DBUsername
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-username"
+
+  DatabasePassword:
+    Description: Database Password
+    Value: !Ref DBPassword
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-password"

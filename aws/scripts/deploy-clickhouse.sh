@@ -28,8 +28,15 @@ load_env "$ENV_FILE"
 check_aws
 
 # Stack names
+INFRA_STACK_NAME="${PROJECT_NAME}-${ENVIRONMENT}-infra"
 POSTGRES_STACK_NAME="${PROJECT_NAME}-${ENVIRONMENT}-postgres"
 STACK_NAME="${PROJECT_NAME}-${ENVIRONMENT}-clickhouse"
+
+# Check if Infrastructure stack exists (for ECS cluster and service discovery)
+if ! stack_exists "$INFRA_STACK_NAME"; then
+    print_error "Infrastructure stack $INFRA_STACK_NAME does not exist. Deploy infrastructure first."
+    exit 1
+fi
 
 # Check if PostgreSQL stack exists (for ECS security group)
 if ! stack_exists "$POSTGRES_STACK_NAME"; then

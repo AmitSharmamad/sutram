@@ -49,7 +49,10 @@ deploy_stack "$STACK_NAME" \
     "CPU=$CPU" \
     "Memory=$MEMORY" \
     "WebPort=$WEB_PORT" \
-    "ImageTag=$IMAGE_TAG"
+    "ImageTag=$IMAGE_TAG" \
+    "GoogleOAuthClientId=$GOOGLE_OAUTH_CLIENT_ID" \
+    "GoogleOAuthClientSecret=$GOOGLE_OAUTH_CLIENT_SECRET" \
+    "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL"
 
 # Get load balancer URL
 ALB_DNS=$(get_stack_output "$STACK_NAME" "LoadBalancerDNS")
