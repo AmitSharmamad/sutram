@@ -15,6 +15,7 @@ fi
 
 ENVIRONMENT="$1"
 IMAGE_TAG="${2:-latest}"
+FORCE_UPDATE="$(date +%Y%m%d-%H%M%S)"
 
 # Validate environment
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
@@ -50,6 +51,7 @@ deploy_stack "$STACK_NAME" \
     "Memory=$MEMORY" \
     "WebPort=$WEB_PORT" \
     "ImageTag=$IMAGE_TAG" \
+    "ForceUpdate=$FORCE_UPDATE" \
     "GoogleOAuthClientId=$GOOGLE_OAUTH_CLIENT_ID" \
     "GoogleOAuthClientSecret=$GOOGLE_OAUTH_CLIENT_SECRET" \
     "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL"
