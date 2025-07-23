@@ -1,26 +1,26 @@
 name: Deploy Web Service
 
-on:
-  push:
-    branches:
-      - dev
-      - main
-    paths:
-      - 'aws/templates/web.yaml'
-      - 'aws/config/**'
-      - 'cmd/web/**'
-      - 'internal/**'
-      - '.github/workflows/deploy-web.yml'
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - prod
+# on:
+#   push:
+#     branches:
+#       - dev
+#       - main
+#     paths:
+#       - 'aws/templates/web.yaml'
+#       - 'aws/config/**'
+#       - 'cmd/web/**'
+#       - 'internal/**'
+#       - '.github/workflows/deploy-web.yml'
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy to'
+#         required: true
+#         default: 'dev'
+#         type: choice
+#         options:
+#           - dev
+#           - prod
 
 jobs:
   deploy-web-dev:
