@@ -1,27 +1,4 @@
-# Build stage
-FROM golang:1.24.5-alpine AS builder
-
-# Set working directory
-WORKDIR /app
-
-# Install git, ca-certificates, and wire
-RUN apk add --no-cache git ca-certificates && \
-    go install github.com/google/wire/cmd/wire@latest
-
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY . .
-
-# Generate wire code and build the web application
-RUN wire cmd/web/wire.go && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o web cmd/web/wire_gen.go cmd/web/main.go
-
-# Final stage
+# Single stage - just copy the pre-built binary
 FROM alpine:latest
 
 # Install ca-certificates and curl for health checks
@@ -33,8 +10,8 @@ RUN adduser -D -s /bin/sh sutram
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder /app/web .
+# Copy the pre-built binary from the host
+COPY bin/web ./web
 
 # Change ownership
 RUN chown sutram:sutram /app/web
