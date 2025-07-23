@@ -1,24 +1,24 @@
 name: Deploy ClickHouse Database
 
-on:
-  push:
-    branches:
-      - dev
-      - main
-    paths:
-      - 'aws/templates/clickhouse.yaml'
-      - 'aws/config/**'
-      - '.github/workflows/deploy-ch.yml'
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - prod
+# on:
+#   push:
+#     branches:
+#       - dev
+#       - main
+#     paths:
+#       - 'aws/templates/clickhouse.yaml'
+#       - 'aws/config/**'
+#       - '.github/workflows/deploy-ch.yml'
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy to'
+#         required: true
+#         default: 'dev'
+#         type: choice
+#         options:
+#           - dev
+#           - prod
 
 jobs:
   deploy-ch-dev:
