@@ -54,7 +54,7 @@ jobs:
       - name: Build and Push Web Docker Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.PROJECT_NAME }}-dev-web
+          ECR_REPOSITORY: sutram-dev-web
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Build Docker image
@@ -94,7 +94,7 @@ jobs:
       - name: Build and Push Web Docker Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.PROJECT_NAME }}-prod-web
+          ECR_REPOSITORY: sutram-prod-web
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Build Docker image
