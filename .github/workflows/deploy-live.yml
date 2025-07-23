@@ -54,7 +54,7 @@ jobs:
       - name: Build and Push Live Docker Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.PROJECT_NAME }}-dev-live
+          ECR_REPOSITORY: sutram-dev-live
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Build Docker image
@@ -99,7 +99,7 @@ jobs:
       - name: Build and Push Live Docker Image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.PROJECT_NAME }}-prod-live
+          ECR_REPOSITORY: sutram-prod-live
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Build Docker image
