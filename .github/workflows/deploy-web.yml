@@ -35,6 +35,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.5'
+          cache: true
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -47,8 +48,26 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download Go Dependencies
+        run: go mod download
+
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
+
+      - name: Generate Wire Code and Build Binary
+        run: |
+          wire cmd/web/wire.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/web cmd/web/wire_gen.go cmd/web/main.go
 
       - name: Build and Push Web Docker Image
         env:
@@ -76,6 +95,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache: true
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -87,8 +112,26 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download Go Dependencies
+        run: go mod download
+
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
+
+      - name: Generate Wire Code and Build Binary
+        run: |
+          wire cmd/web/wire.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/web cmd/web/wire_gen.go cmd/web/main.go
 
       - name: Build and Push Web Docker Image
         env:
