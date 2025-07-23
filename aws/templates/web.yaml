@@ -21,6 +21,10 @@ Parameters:
   ImageTag:
     Type: String
     Default: latest
+  ForceUpdate:
+    Type: String
+    Default: ""
+    Description: Timestamp to force ECS service update even with same image tag
   GoogleOAuthClientId:
     Type: String
     Default: REDACTED_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com
@@ -144,6 +148,8 @@ Resources:
               Value: !Ref WebPort
             - Name: ENVIRONMENT
               Value: !Ref Environment
+            - Name: FORCE_UPDATE
+              Value: !Ref ForceUpdate
             - Name: DB_HOST
               Value:
                 Fn::ImportValue: !Sub "${ProjectName}-${Environment}-db-endpoint"
