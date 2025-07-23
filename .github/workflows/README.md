@@ -118,7 +118,7 @@ ANGELONE_API_KEY
 Add the following variables to your repository:
 
 ```bash
-AWS_REGION              # Default: us-east-1
+AWS_REGION              # Default: ap-south-1
 ```
 
 ### 3. Environment Protection Rules
