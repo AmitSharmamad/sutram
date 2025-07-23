@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - main
     paths:
       - 'aws/templates/web.yaml'
       - 'aws/config/**'
@@ -69,7 +68,7 @@ jobs:
           aws/scripts/deploy-web.sh dev ${{ github.sha }}
 
   deploy-web-prod:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: prod
     

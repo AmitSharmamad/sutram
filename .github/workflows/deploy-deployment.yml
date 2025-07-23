@@ -1,26 +1,16 @@
 name: Deploy Deployment Service
 
-# on:
-#   push:
-#     branches:
-#       - dev
-#       - main
-#     paths:
-#       - 'aws/templates/deployment.yaml'
-#       - 'aws/config/**'
-#       - 'cmd/deployment/**'
-#       - 'internal/**'
-#       - '.github/workflows/deploy-deployment.yml'
-#   workflow_dispatch:
-#     inputs:
-#       environment:
-#         description: 'Environment to deploy to'
-#         required: true
-#         default: 'dev'
-#         type: choice
-#         options:
-#           - dev
-#           - prod
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
 
 jobs:
   deploy-deployment-dev:
@@ -69,7 +59,7 @@ jobs:
           aws/scripts/deploy-deployment.sh dev ${{ github.sha }}
 
   deploy-deployment-prod:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 30

@@ -1,13 +1,6 @@
 name: Deploy Infrastructure
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'aws/templates/infra.yaml'
-      - 'aws/config/**'
-      - '.github/workflows/deploy-infra.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -44,7 +37,7 @@ jobs:
           aws/scripts/deploy-infra.sh dev
 
   deploy-infra-prod:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 20
