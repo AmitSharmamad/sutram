@@ -1,26 +1,16 @@
 name: Deploy Live Service
 
-# on:
-#   push:
-#     branches:
-#       - dev
-#       - main
-#     paths:
-#       - 'aws/templates/live.yaml'
-#       - 'aws/config/**'
-#       - 'cmd/live/**'
-#       - 'internal/**'
-#       - '.github/workflows/deploy-live.yml'
-#   workflow_dispatch:
-#     inputs:
-#       environment:
-#         description: 'Environment to deploy to'
-#         required: true
-#         default: 'dev'
-#         type: choice
-#         options:
-#           - dev
-#           - prod
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
 
 jobs:
   deploy-live-dev:
@@ -69,7 +59,7 @@ jobs:
           aws/scripts/deploy-live.sh dev ${{ github.sha }}
 
   deploy-live-prod:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 30

@@ -1,13 +1,6 @@
 name: Deploy ClickHouse Database
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'aws/templates/clickhouse.yaml'
-      - 'aws/config/**'
-      - '.github/workflows/deploy-ch.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -44,7 +37,7 @@ jobs:
           aws/scripts/deploy-clickhouse.sh dev
 
   deploy-ch-prod:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 25
