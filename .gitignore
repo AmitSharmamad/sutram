@@ -132,7 +132,7 @@ s-migrate
 s-live
 s-client
 main
-live
+/live
 
 # data
 # data/historical
@@ -142,6 +142,7 @@ db/db
 
 bin/web-server
 
-web
+# Ignore the compiled web binary in the root directory, but not docker/web/
+/web
 
 data
