@@ -25,6 +25,7 @@ jobs:
     if: github.ref == 'refs/heads/dev' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
     runs-on: ubuntu-latest
     environment: dev
+    timeout-minutes: 20
     
     steps:
       - name: Checkout code
@@ -36,16 +37,18 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
+          mask-aws-account-id: false
 
       - name: Deploy Infrastructure to Dev
         run: |
-          chmod +x aws/scripts/infra.sh
-          aws/scripts/infra.sh dev
+          chmod +x aws/scripts/deploy-infra.sh
+          aws/scripts/deploy-infra.sh dev
 
   deploy-infra-prod:
     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
     runs-on: ubuntu-latest
     environment: prod
+    timeout-minutes: 20
     
     steps:
       - name: Checkout code
@@ -57,8 +60,9 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
+          mask-aws-account-id: false
 
       - name: Deploy Infrastructure to Prod
         run: |
-          chmod +x aws/scripts/infra.sh
-          aws/scripts/infra.sh prod
+          chmod +x aws/scripts/deploy-infra.sh
+          aws/scripts/deploy-infra.sh prod
