@@ -1,15 +1,6 @@
 name: Deploy Web Service
 
 on:
-  push:
-    branches:
-      - dev
-    paths:
-      - 'aws/templates/web.yaml'
-      - 'aws/config/**'
-      - 'cmd/web/**'
-      - 'internal/**'
-      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
     inputs:
       environment:
