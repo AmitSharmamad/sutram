@@ -1,0 +1,171 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sutram PostgreSQL RDS Database'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  ProjectName:
+    Type: String
+    Default: sutram
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+  DBName:
+    Type: String
+    Default: sutram_dev
+  DBUsername:
+    Type: String
+    Default: sutram_user
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: change_me_dev
+
+Resources:
+  # DB Subnet Group
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS database
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-1-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-db-subnet-group"
+
+  # Security Group for RDS
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS PostgreSQL
+      VpcId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref ECSSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-db-sg"
+
+  # Security Group for ECS (to allow access to RDS)
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ECS tasks
+      VpcId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
+      SecurityGroupEgress:
+        # Allow HTTPS for pulling container images and API calls
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        # Allow HTTP for health checks and API calls
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        # Allow DNS resolution
+        - IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+        # Allow access to PostgreSQL within VPC
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref VpcCidr
+        # Allow access to ClickHouse HTTP interface within VPC
+        - IpProtocol: tcp
+          FromPort: 8123
+          ToPort: 8123
+          CidrIp: !Ref VpcCidr
+        # Allow access to ClickHouse Native interface within VPC
+        - IpProtocol: tcp
+          FromPort: 9000
+          ToPort: 9000
+          CidrIp: !Ref VpcCidr
+        # Allow inter-service communication within VPC
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8082
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ecs-sg"
+
+  # RDS PostgreSQL Instance
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-${Environment}-postgres"
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: postgres
+      EngineVersion: '17.5'
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: !If [IsProd, 7, 1]
+      DeletionProtection: !If [IsProd, true, false]
+      MultiAZ: !If [IsProd, true, false]
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-postgres"
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
+Outputs:
+  DatabaseEndpoint:
+    Description: RDS PostgreSQL Endpoint
+    Value: !GetAtt Database.Endpoint.Address
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-endpoint"
+
+  DatabasePort:
+    Description: RDS PostgreSQL Port
+    Value: !GetAtt Database.Endpoint.Port
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-port"
+
+  ECSSecurityGroup:
+    Description: Security Group for ECS tasks
+    Value: !Ref ECSSecurityGroup
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+
+  DatabaseName:
+    Description: Database Name
+    Value: !Ref DBName
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-name"
+
+  DatabaseUsername:
+    Description: Database Username
+    Value: !Ref DBUsername
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-username"
+
+  DatabasePassword:
+    Description: Database Password
+    Value: !Ref DBPassword
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-password"

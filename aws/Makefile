@@ -1,112 +1,117 @@
-# Sutram AWS Infrastructure Makefile
+.PHONY: help deploy-dev deploy-prod destroy-dev destroy-prod deploy-infra-dev deploy-infra-prod deploy-postgres-dev deploy-postgres-prod deploy-clickhouse-dev deploy-clickhouse-prod deploy-web-dev deploy-web-prod deploy-live-dev deploy-live-prod deploy-deployment-dev deploy-deployment-prod validate-setup setup-ecr
 
-.PHONY: help deploy destroy status clean validate
-
-# Default environment
+# Default environment and image tag
 ENV ?= dev
+TAG ?= latest
 
-# Help target
-help:
-	@echo "Sutram AWS Infrastructure Management"
+# Default target
+.DEFAULT_GOAL := help
+
+help: ## Show this help message
+	@echo "Sutram AWS Deployment Commands"
+	@echo "==============================="
 	@echo ""
-	@echo "Usage:"
-	@echo "  make deploy ENV=<env> SERVICE=<service>  - Deploy infrastructure"
-	@echo "  make destroy ENV=<env> SERVICE=<service> - Destroy infrastructure"
-	@echo "  make status ENV=<env>                    - Show deployment status"
-	@echo "  make validate                            - Validate CloudFormation templates"
-	@echo "  make clean                               - Clean temporary files"
+	@echo "Usage: make <target> [ENV=dev|prod] [TAG=image_tag]"
 	@echo ""
-	@echo "Environments:"
-	@echo "  dev   - Development environment (default)"
-	@echo "  prod  - Production environment"
-	@echo ""
-	@echo "Services:"
-	@echo "  all        - All services (default)"
-	@echo "  infra      - Infrastructure (VPC, networking)"
-	@echo "  pg         - PostgreSQL database"
-	@echo "  ch         - ClickHouse database"
-	@echo "  web        - Web service"
-	@echo "  live       - Live service"
-	@echo "  deployment - Deployment service"
+	@echo "Main Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Examples:"
-	@echo "  make deploy                              # Deploy all services to dev"
-	@echo "  make deploy ENV=prod                     # Deploy all services to prod"
-	@echo "  make deploy ENV=dev SERVICE=web          # Deploy only web service to dev"
-	@echo "  make destroy ENV=dev SERVICE=all         # Destroy all dev services"
-	@echo "  make status ENV=prod                     # Show prod deployment status"
+	@echo "  make deploy-dev                    # Deploy all services to dev"
+	@echo "  make deploy-prod TAG=v1.2.3       # Deploy all services to prod with specific tag"
+	@echo "  make deploy-web ENV=dev TAG=latest # Deploy only web service to dev"
+	@echo "  make destroy-dev                   # Destroy all dev resources"
 
-# Default service
-SERVICE ?= all
+# Full deployment commands
+deploy-dev: ## Deploy all services to dev environment
+	@./scripts/deploy-all.sh dev $(TAG)
 
-# Deploy infrastructure
-deploy:
-	@echo "Deploying $(SERVICE) to $(ENV) environment..."
-	@./scripts/deploy.sh $(ENV) $(SERVICE)
+deploy-prod: ## Deploy all services to prod environment
+	@./scripts/deploy-all.sh prod $(TAG)
 
-# Destroy infrastructure
-destroy:
-	@echo "Destroying $(SERVICE) in $(ENV) environment..."
-	@./scripts/destroy.sh $(ENV) $(SERVICE)
+# Individual service deployment commands
+deploy-infra: ## Deploy infrastructure (VPC) to specified environment
+	@./scripts/deploy-infra.sh $(ENV)
 
-# Show deployment status
-status:
-	@echo "Checking deployment status for $(ENV) environment..."
-	@./scripts/deploy.sh $(ENV) status
+deploy-postgres: ## Deploy PostgreSQL to specified environment
+	@./scripts/deploy-postgres.sh $(ENV)
 
-# Validate CloudFormation templates
-validate:
+deploy-clickhouse: ## Deploy ClickHouse to specified environment
+	@./scripts/deploy-clickhouse.sh $(ENV)
+
+deploy-web: ## Deploy web service to specified environment
+	@./scripts/deploy-web.sh $(ENV) $(TAG)
+
+deploy-live: ## Deploy live service to specified environment
+	@./scripts/deploy-live.sh $(ENV) $(TAG)
+
+deploy-deployment: ## Deploy deployment service to specified environment
+	@./scripts/deploy-deployment.sh $(ENV) $(TAG)
+
+# Quick access commands for dev environment
+deploy-infra-dev: ## Deploy infrastructure to dev
+	@./scripts/deploy-infra.sh dev
+
+deploy-postgres-dev: ## Deploy PostgreSQL to dev
+	@./scripts/deploy-postgres.sh dev
+
+deploy-clickhouse-dev: ## Deploy ClickHouse to dev
+	@./scripts/deploy-clickhouse.sh dev
+
+deploy-web-dev: ## Deploy web service to dev
+	@./scripts/deploy-web.sh dev $(TAG)
+
+deploy-live-dev: ## Deploy live service to dev
+	@./scripts/deploy-live.sh dev $(TAG)
+
+deploy-deployment-dev: ## Deploy deployment service to dev
+	@./scripts/deploy-deployment.sh dev $(TAG)
+
+# Quick access commands for prod environment
+deploy-infra-prod: ## Deploy infrastructure to prod
+	@./scripts/deploy-infra.sh prod
+
+deploy-postgres-prod: ## Deploy PostgreSQL to prod
+	@./scripts/deploy-postgres.sh prod
+
+deploy-clickhouse-prod: ## Deploy ClickHouse to prod
+	@./scripts/deploy-clickhouse.sh prod
+
+deploy-web-prod: ## Deploy web service to prod
+	@./scripts/deploy-web.sh prod $(TAG)
+
+deploy-live-prod: ## Deploy live service to prod
+	@./scripts/deploy-live.sh prod $(TAG)
+
+deploy-deployment-prod: ## Deploy deployment service to prod
+	@./scripts/deploy-deployment.sh prod $(TAG)
+
+# Destruction commands
+destroy-dev: ## Destroy all dev environment resources
+	@./scripts/destroy-all.sh dev
+
+destroy-prod: ## Destroy all prod environment resources
+	@./scripts/destroy-all.sh prod
+
+# Utility commands
+validate-setup: ## Validate the entire AWS deployment setup
+	@./scripts/validate-setup.sh
+
+setup-ecr: ## Setup ECR repositories for specified environment
+	@./scripts/setup-ecr.sh $(ENV)
+
+setup-ecr-dev: ## Setup ECR repositories for dev
+	@./scripts/setup-ecr.sh dev
+
+setup-ecr-prod: ## Setup ECR repositories for prod
+	@./scripts/setup-ecr.sh prod
+
+check-aws: ## Check if AWS CLI is configured
+	@./scripts/common.sh && check_aws
+
+validate-templates: ## Validate all CloudFormation templates
 	@echo "Validating CloudFormation templates..."
 	@for template in templates/*.yaml; do \
 		echo "Validating $$template..."; \
-		aws cloudformation validate-template --template-body file://$$template >/dev/null && \
-		echo "✓ $$template is valid" || \
-		echo "✗ $$template is invalid"; \
+		aws cloudformation validate-template --template-body file://$$template > /dev/null && echo "✓ $$template is valid" || echo "✗ $$template is invalid"; \
 	done
-
-# Clean temporary files
-clean:
-	@echo "Cleaning temporary files..."
-	@find . -name "*.tmp" -delete
-	@find . -name ".DS_Store" -delete
-	@echo "✓ Cleanup complete"
-
-# Quick shortcuts
-deploy-dev:
-	@make deploy ENV=dev SERVICE=all
-
-deploy-prod:
-	@make deploy ENV=prod SERVICE=all
-
-destroy-dev:
-	@make destroy ENV=dev SERVICE=all
-
-destroy-prod:
-	@make destroy ENV=prod SERVICE=all
-
-# Infrastructure only
-infra-dev:
-	@make deploy ENV=dev SERVICE=infra
-
-infra-prod:
-	@make deploy ENV=prod SERVICE=infra
-
-# Databases only
-db-dev:
-	@make deploy ENV=dev SERVICE=pg
-	@make deploy ENV=dev SERVICE=ch
-
-db-prod:
-	@make deploy ENV=prod SERVICE=pg
-	@make deploy ENV=prod SERVICE=ch
-
-# Services only (requires databases to be deployed first)
-services-dev:
-	@make deploy ENV=dev SERVICE=web
-	@make deploy ENV=dev SERVICE=live
-	@make deploy ENV=dev SERVICE=deployment
-
-services-prod:
-	@make deploy ENV=prod SERVICE=web
-	@make deploy ENV=prod SERVICE=live
-	@make deploy ENV=prod SERVICE=deployment
