@@ -23,6 +23,70 @@ Parameters:
     Default: latest
 
 Resources:
+  # Application Load Balancer for Live Service
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-live-alb"
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-1-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-2-id"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-live-alb"
+
+  # Security Group for ALB
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Live Service Load Balancer
+      VpcId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-live-alb-sg"
+
+  # Target Group for Live Service
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-live-tg"
+      Port: !Ref LivePort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  # Listener for ALB
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
   # Security Group for Live Service
   LiveSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -31,6 +95,11 @@ Resources:
       VpcId:
         Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
       SecurityGroupIngress:
+        # Allow access from ALB
+        - IpProtocol: tcp
+          FromPort: !Ref LivePort
+          ToPort: !Ref LivePort
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
         # Allow access only from other ECS services (like web service)
         - IpProtocol: tcp
           FromPort: !Ref LivePort
@@ -108,6 +177,7 @@ Resources:
   # ECS Service
   Service:
     Type: AWS::ECS::Service
+    DependsOn: Listener
     Properties:
       ServiceName: !Sub "${ProjectName}-${Environment}-live"
       Cluster:
@@ -115,6 +185,10 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !If [IsProd, 2, 1]
       LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: live
+          ContainerPort: !Ref LivePort
+          TargetGroupArn: !Ref TargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
@@ -124,6 +198,18 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-1-id"
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
+
+  # Route53 Private Record for Live Service
+  LiveDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
+      Name: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
 
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
@@ -140,3 +226,25 @@ Outputs:
     Value: !Ref LiveSecurityGroup
     Export:
       Name: !Sub "${ProjectName}-${Environment}-live-sg-id"
+
+  LoadBalancerDNS:
+    Description: Live Application Load Balancer DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-live-alb-dns"
+
+  LoadBalancerURL:
+    Description: Live Application Load Balancer URL
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+
+  ServiceDomain:
+    Description: Custom private domain for Live Service (VPC-only)
+    Value: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-live-domain"
+
+  ServiceURL:
+    Description: Custom private URL for Live Service (VPC-only)
+    Value: !If [IsProd, "https://live.sutram.co", "https://live.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-live-url"

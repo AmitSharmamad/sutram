@@ -218,6 +218,18 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
+  # Route53 Private Record for Web Service
+  WebDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
+      Name: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
   UseCustomRedirectURL: !Not [!Equals [!Ref GoogleOAuthRedirectURL, ""]]
@@ -232,3 +244,15 @@ Outputs:
   LoadBalancerURL:
     Description: Application Load Balancer URL
     Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+
+  ServiceDomain:
+    Description: Custom private domain for Web Service (VPC-only)
+    Value: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-web-domain"
+
+  ServiceURL:
+    Description: Custom private URL for Web Service (VPC-only)
+    Value: !If [IsProd, "https://web.sutram.co", "https://web.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-web-url"
