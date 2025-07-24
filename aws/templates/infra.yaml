@@ -228,16 +228,20 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-ecs-task-role"
 
-  # Route53 Hosted Zone for sutram.co
+  # Route53 Private Hosted Zone for sutram.co
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
       Name: sutram.co
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref AWS::Region
       HostedZoneConfig:
-        Comment: !Sub "Hosted zone for ${ProjectName} ${Environment} services"
+        Comment: !Sub "Private hosted zone for ${ProjectName} ${Environment} services"
+        PrivateZone: true
       HostedZoneTags:
         - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-hosted-zone"
+          Value: !Sub "${ProjectName}-${Environment}-private-hosted-zone"
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
@@ -299,7 +303,7 @@ Outputs:
       Name: !Sub "${ProjectName}-${Environment}-ecs-task-role-arn"
 
   HostedZone:
-    Description: Route53 Hosted Zone ID for sutram.co
+    Description: Route53 Private Hosted Zone ID for sutram.co
     Value: !Ref HostedZone
     Export:
       Name: !Sub "${ProjectName}-${Environment}-hosted-zone-id"

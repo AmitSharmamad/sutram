@@ -218,13 +218,13 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Record for Web Service
+  # Route53 Private Record for Web Service
   WebDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId:
         Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !Sub "web.sutram.co"
+      Name: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName
@@ -246,13 +246,13 @@ Outputs:
     Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
 
   ServiceDomain:
-    Description: Custom domain for Web Service
-    Value: "web.sutram.co"
+    Description: Custom private domain for Web Service (VPC-only)
+    Value: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-web-domain"
 
   ServiceURL:
-    Description: Custom URL for Web Service
-    Value: "https://web.sutram.co"
+    Description: Custom private URL for Web Service (VPC-only)
+    Value: !If [IsProd, "https://web.sutram.co", "https://web.dev.sutram.co"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-web-url"

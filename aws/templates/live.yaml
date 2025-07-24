@@ -199,13 +199,13 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Record for Live Service
+  # Route53 Private Record for Live Service
   LiveDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId:
         Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !Sub "live.sutram.co"
+      Name: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName
@@ -238,13 +238,13 @@ Outputs:
     Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
 
   ServiceDomain:
-    Description: Custom domain for Live Service
-    Value: "live.sutram.co"
+    Description: Custom private domain for Live Service (VPC-only)
+    Value: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-live-domain"
 
   ServiceURL:
-    Description: Custom URL for Live Service
-    Value: "https://live.sutram.co"
+    Description: Custom private URL for Live Service (VPC-only)
+    Value: !If [IsProd, "https://live.sutram.co", "https://live.dev.sutram.co"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-live-url"
