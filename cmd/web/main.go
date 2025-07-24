@@ -172,16 +172,27 @@ func initializeModules(router *gin.RouterGroup) {
 	// Set user controller to enable auth middleware for all strategy endpoints
 	// This ensures that all strategy endpoints are protected by authentication
 	strategyModule.SetUserController(userController)
-	strategyModule.RegisterRoutes(router)
+	// Note: RegisterRoutes will be called after SetDeploymentRepository
 
 	// Initialize deployment module
 	deploymentModule := deployment.New()
 	deploymentModule.Initialize(userController, strategyModule)
 	deploymentModule.RegisterRoutes(router)
 
+	// Wire deployment repository into strategy module for validation
+	deploymentRepo := deploymentModule.GetDeploymentRepository()
+	if deploymentRepo != nil {
+		strategyModule.SetDeploymentRepository(deploymentRepo)
+	}
+
+	// Now register strategy routes with the properly configured controller
+	strategyModule.RegisterRoutes(router)
+
 	// Initialize backtest module
 	backtestModule := backtest.New()
 	backtestModule.SetUserController(userController)
+	// Set the strategy module with deployment repository already configured
+	backtestModule.SetStrategyModule(strategyModule)
 	backtestModule.RegisterRoutes(router)
 
 	// Initialize marketplace module

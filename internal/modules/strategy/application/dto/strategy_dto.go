@@ -184,6 +184,7 @@ type StrategyResponse struct {
 	CreatedAt            time.Time            `json:"created_at" db:"created_at"`
 	UpdatedAt            time.Time            `json:"updated_at" db:"updated_at"`
 	IsActive             bool                 `json:"is_active" db:"is_active"`
+	IsReadonly           bool                 `json:"is_readonly" db:"is_readonly"`
 }
 
 // StrategyFilter represents filters for searching strategies
@@ -201,6 +202,11 @@ type StrategyFilter struct {
 
 // FromDomain converts a domain model to a response DTO
 func FromDomain(strategy *model.Strategy) *StrategyResponse {
+	return FromDomainWithReadonly(strategy, false)
+}
+
+// FromDomainWithReadonly converts a domain model to a response DTO with readonly status
+func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *StrategyResponse {
 	response := &StrategyResponse{
 		ID:               strategy.ID,
 		UserID:           strategy.UserID,
@@ -223,6 +229,7 @@ func FromDomain(strategy *model.Strategy) *StrategyResponse {
 		CreatedAt:        strategy.CreatedAt,
 		UpdatedAt:        strategy.UpdatedAt,
 		IsActive:         strategy.IsActive,
+		IsReadonly:       isReadonly,
 	}
 
 	// Handle nullable fields

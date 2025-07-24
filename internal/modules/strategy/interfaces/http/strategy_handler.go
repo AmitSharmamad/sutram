@@ -254,6 +254,11 @@ func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 				"success": false,
 				"error":   "Invalid expression: " + err.Error(),
 			})
+		case service.ErrStrategyReadonly:
+			c.JSON(http.StatusConflict, gin.H{
+				"success": false,
+				"error":   "Strategy cannot be modified as deployments exist",
+			})
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
