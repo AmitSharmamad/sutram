@@ -181,6 +181,18 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
+  # Route53 Private Record for ClickHouse Service
+  ClickHouseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
+      Name: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !Sub "clickhouse.${ProjectName}-${Environment}.local"
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -208,3 +220,15 @@ Outputs:
     Value: !Sub "clickhouse.${ProjectName}-${Environment}.local"
     Export:
       Name: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
+
+  ServiceDomain:
+    Description: Custom private domain for ClickHouse Service (VPC-only)
+    Value: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ch-domain"
+
+  ClickHouseCustomEndpoint:
+    Description: ClickHouse Service Custom Private Endpoint (VPC-only)
+    Value: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-clickhouse-custom-endpoint"
