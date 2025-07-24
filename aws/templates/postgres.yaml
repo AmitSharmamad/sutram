@@ -130,6 +130,18 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-postgres"
 
+  # Route53 Record for PostgreSQL Service
+  PostgreSQLDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
+      Name: !Sub "pg.sutram.co"
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !GetAtt Database.Endpoint.Address
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -169,3 +181,15 @@ Outputs:
     Value: !Ref DBPassword
     Export:
       Name: !Sub "${ProjectName}-${Environment}-db-password"
+
+  ServiceDomain:
+    Description: Custom domain for PostgreSQL Service
+    Value: "pg.sutram.co"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-pg-domain"
+
+  DatabaseURL:
+    Description: PostgreSQL connection URL with custom domain
+    Value: !Sub "postgresql://${DBUsername}:${DBPassword}@pg.sutram.co:${Database.Endpoint.Port}/${DBName}"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-db-custom-url"

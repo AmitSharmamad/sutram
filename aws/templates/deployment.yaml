@@ -210,6 +210,18 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
+  # Route53 Record for Deployment Service
+  DeploymentDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId:
+        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
+      Name: !Sub "deployment.sutram.co"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
 
@@ -223,6 +235,18 @@ Outputs:
   LoadBalancerURL:
     Description: Deployment Application Load Balancer URL
     Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+
+  ServiceDomain:
+    Description: Custom domain for Deployment Service
+    Value: "deployment.sutram.co"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-deployment-domain"
+
+  ServiceURL:
+    Description: Custom URL for Deployment Service
+    Value: "https://deployment.sutram.co"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-deployment-url"
 
   ServiceName:
     Description: Deployment Service Name
