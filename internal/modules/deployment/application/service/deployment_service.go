@@ -88,6 +88,9 @@ type DeploymentService interface {
 	Run(ctx context.Context, deploymentWithStrategy *DeploymentWithStrategy, currentTimestamp time.Time, instrumentData *instrumentModel.Instrument) error
 
 	GetActiveInstrumentIDs() []int
+
+	// GetRepository returns the deployment repository for cross-module access
+	GetRepository() repository.DeploymentRepository
 }
 
 // deploymentService implements DeploymentService
@@ -2212,4 +2215,9 @@ func instrumentMasterToDTO(master *instrumentModel.InstrumentMaster) *instrument
 		ExchInstrumentType: master.ExchInstrumentType,
 		SymbolName:         master.SymbolName,
 	}
+}
+
+// GetRepository returns the deployment repository for cross-module access
+func (s *deploymentService) GetRepository() repository.DeploymentRepository {
+	return s.deploymentRepo
 }

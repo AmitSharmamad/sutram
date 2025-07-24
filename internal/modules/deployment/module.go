@@ -8,6 +8,7 @@ import (
 	infraRepo "algo/internal/infra/persistance/repository"
 	backtestEngine "algo/internal/modules/backtest/application/service"
 	"algo/internal/modules/deployment/application/service"
+	"algo/internal/modules/deployment/domain/repository"
 	"algo/internal/modules/deployment/infrastructure/persistence/postgres"
 	"algo/internal/modules/deployment/interfaces/http"
 	instrumentRepo "algo/internal/modules/instrument/infrastructure/persistence/clickhouse"
@@ -229,4 +230,13 @@ func (m *Module) GetDeploymentService() service.DeploymentService {
 // GetEventHandler returns the deployment event handler
 func (m *Module) GetEventHandler() *http.DeploymentEventHandler {
 	return m.eventHandler
+}
+
+// GetDeploymentRepository returns the deployment repository from the service
+func (m *Module) GetDeploymentRepository() repository.DeploymentRepository {
+	if m.deploymentService == nil {
+		return nil
+	}
+	// Access the repository through the service - we need to expose it from the service
+	return m.deploymentService.GetRepository()
 }
