@@ -59,6 +59,7 @@ type DeploymentService interface {
 	SearchDeployments(ctx context.Context, filter *dto.DeploymentFilter, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
 	StopAllDeployments(ctx context.Context, userID uuid.UUID) error
 	StartAllDeployments(ctx context.Context, userID uuid.UUID) error
+	ExitDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentExitResponse, error)
 	DeployAllInstruments(ctx context.Context, strategyID uuid.UUID, userID uuid.UUID) ([]*dto.DeploymentResponse, error)
 
 	// Deployment log operations
@@ -809,6 +810,123 @@ func (s *deploymentService) StartAllDeployments(ctx context.Context, userID uuid
 	}
 
 	return nil
+}
+
+// ExitDeployment closes all open positions for a deployment
+func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*dto.DeploymentExitResponse, error) {
+	// Retrieve existing deployment
+	deployment, err := s.deploymentRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrDeploymentNotFound, err)
+	}
+
+	// Check authorization
+	if deployment.UserID != userID {
+		return nil, ErrUnauthorized
+	}
+
+	// Get all open positions for this deployment
+	openPositions, err := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get open positions: %w", err)
+	}
+
+	exitTime := time.Now()
+	var totalPNL float64
+	var positionDetails []dto.ExitPositionDetail
+
+	// Close all open positions
+	for _, position := range openPositions {
+		// Use current market price or entry price as exit price (in real scenario, would get from market data)
+		exitPrice := position.EntryPrice
+		exitReason := "DEPLOYMENT_EXIT"
+
+		// Close the position using domain model method
+		position.ClosePosition(exitPrice, exitTime, exitReason)
+
+		// Update the position in the repository
+		err := s.positionRepo.Update(ctx, position)
+		if err != nil {
+			fmt.Printf("Error updating closed position %s: %v\n", position.ID, err)
+			continue
+		}
+
+		var pnl float64
+		if position.PNL != nil {
+			pnl = *position.PNL
+			totalPNL += pnl
+		}
+
+		positionDetails = append(positionDetails, dto.ExitPositionDetail{
+			PositionID: position.ID.String(),
+			ExitPrice:  exitPrice,
+			PNL:        pnl,
+		})
+
+		// Log the position closure
+		logEntry, err := model.NewDeploymentLog(
+			deployment.ID,
+			model.StatusCompleted,
+			map[string]any{
+				"position_id": position.ID,
+				"exit_price":  exitPrice,
+				"exit_time":   exitTime,
+				"exit_reason": exitReason,
+				"pnl":         pnl,
+				"action":      "DEPLOYMENT_EXIT",
+			},
+		)
+		if err == nil {
+			s.logRepo.Create(ctx, logEntry)
+		}
+	}
+
+	// Get strategy for event publishing
+	strategy, err := s.strategyRepo.GetByID(ctx, deployment.StrategyID)
+	if err != nil {
+		fmt.Printf("Error getting strategy for event publishing: %v\n", err)
+	}
+
+	// Publish deployment.exit event
+	if s.eventPublisher != nil && strategy != nil {
+		event := &dto.DeploymentEvent{
+			EventType:    dto.EventTypeDeploymentExit,
+			DeploymentID: deployment.ID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Timestamp:    exitTime,
+			Data: &dto.DeploymentExitData{
+				DeploymentID:    deployment.ID,
+				ClosedPositions: len(openPositions),
+				TotalPNL:        totalPNL,
+				ExitTime:        exitTime,
+				ExitReason:      "DEPLOYMENT_EXIT",
+				PositionDetails: positionDetails,
+			},
+			Metadata: dto.EventMetadata{
+				UserID:       deployment.UserID,
+				StrategyName: strategy.Name,
+			},
+		}
+
+		// Publish the event to all subscribed clients
+		if err := s.eventPublisher.PublishEvent(ctx, event); err != nil {
+			// Log the error but don't fail the deployment exit
+			fmt.Printf("Error publishing deployment.exit event: %v\n", err)
+		}
+	}
+
+	// Create response
+	response := &dto.DeploymentExitResponse{
+		DeploymentID:    deployment.ID,
+		ClosedPositions: len(openPositions),
+		TotalPNL:        totalPNL,
+		ExitTime:        exitTime,
+		PositionDetails: positionDetails,
+		Message:         fmt.Sprintf("Successfully exited deployment and closed %d position(s)", len(openPositions)),
+	}
+
+	return response, nil
 }
 
 // DeployAllInstruments creates deployments for all instruments of a strategy
