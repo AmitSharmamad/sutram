@@ -28,13 +28,16 @@ const (
 	EventTypeEODSquareOff          DeploymentEventType = "eod_square_off"
 
 	// Deployment status events
-	EventTypeDeploymentCreated  DeploymentEventType = "deployment.created"
-	EventTypeDeploymentError    DeploymentEventType = "deployment_error"
-	EventTypeEntryWindowClosed  DeploymentEventType = "entry_window_closed"
-	EventTypeEntryWindowOpen    DeploymentEventType = "entry_window_open"
-	EventTypeMarketDataReceived DeploymentEventType = "market_data_received"
-	EventTypeMarketClosed       DeploymentEventType = "market_closed"
-	EventTypeScheduledExecution DeploymentEventType = "scheduled_execution"
+	EventTypeDeploymentCreated     DeploymentEventType = "deployment.created"
+	EventTypeDeploymentActivated   DeploymentEventType = "deployment.activated"
+	EventTypeDeploymentDeactivated DeploymentEventType = "deployment.deactivated"
+	EventTypeDeploymentDeleted     DeploymentEventType = "deployment.deleted"
+	EventTypeDeploymentError       DeploymentEventType = "deployment_error"
+	EventTypeEntryWindowClosed     DeploymentEventType = "entry_window_closed"
+	EventTypeEntryWindowOpen       DeploymentEventType = "entry_window_open"
+	EventTypeMarketDataReceived    DeploymentEventType = "market_data_received"
+	EventTypeMarketClosed          DeploymentEventType = "market_closed"
+	EventTypeScheduledExecution    DeploymentEventType = "scheduled_execution"
 )
 
 // DeploymentEvent represents a real-time deployment event
@@ -176,4 +179,11 @@ type DeploymentCreatedData struct {
 	Timeframe    string    `json:"timeframe"`
 	IsActive     bool      `json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// DeploymentStatusChangeData contains data for deployment status change events
+type DeploymentStatusChangeData struct {
+	DeploymentID uuid.UUID `json:"deployment_id"`
+	IsActive     bool      `json:"is_active"`
+	Timestamp    time.Time `json:"timestamp"`
 }

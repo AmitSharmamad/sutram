@@ -530,6 +530,31 @@ func (s *deploymentService) DeleteDeployment(ctx context.Context, id uuid.UUID, 
 		return ErrUnauthorized
 	}
 
+	// Publish deployment.deleted event before deletion
+	if s.eventPublisher != nil {
+		event := &dto.DeploymentEvent{
+			EventType:    dto.EventTypeDeploymentDeleted,
+			DeploymentID: deployment.ID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Timestamp:    time.Now(),
+			Data: &dto.DeploymentStatusChangeData{
+				DeploymentID: deployment.ID,
+				IsActive:     false,
+				Timestamp:    time.Now(),
+			},
+			Metadata: dto.EventMetadata{
+				UserID: deployment.UserID,
+			},
+		}
+
+		// Publish the event to all subscribed clients
+		if err := s.eventPublisher.PublishEvent(ctx, event); err != nil {
+			// Log the error but don't fail the deployment deletion
+			fmt.Printf("Error publishing deployment.deleted event: %v\n", err)
+		}
+	}
+
 	// Delete from repository
 	if err := s.deploymentRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("%w: %v", ErrDeploymentDeleteFailed, err)
@@ -575,6 +600,31 @@ func (s *deploymentService) ActivateDeployment(ctx context.Context, id uuid.UUID
 		return fmt.Errorf("failed to activate deployment: %w", err)
 	}
 
+	// Publish deployment.activated event
+	if s.eventPublisher != nil {
+		event := &dto.DeploymentEvent{
+			EventType:    dto.EventTypeDeploymentActivated,
+			DeploymentID: deployment.ID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Timestamp:    time.Now(),
+			Data: &dto.DeploymentStatusChangeData{
+				DeploymentID: deployment.ID,
+				IsActive:     true,
+				Timestamp:    time.Now(),
+			},
+			Metadata: dto.EventMetadata{
+				UserID: deployment.UserID,
+			},
+		}
+
+		// Publish the event to all subscribed clients
+		if err := s.eventPublisher.PublishEvent(ctx, event); err != nil {
+			// Log the error but don't fail the deployment activation
+			fmt.Printf("Error publishing deployment.activated event: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
@@ -594,6 +644,31 @@ func (s *deploymentService) DeactivateDeployment(ctx context.Context, id uuid.UU
 	// Deactivate deployment
 	if err := s.deploymentRepo.DeactivateDeployment(ctx, id); err != nil {
 		return fmt.Errorf("failed to deactivate deployment: %w", err)
+	}
+
+	// Publish deployment.deactivated event
+	if s.eventPublisher != nil {
+		event := &dto.DeploymentEvent{
+			EventType:    dto.EventTypeDeploymentDeactivated,
+			DeploymentID: deployment.ID,
+			StrategyID:   deployment.StrategyID,
+			InstrumentID: deployment.InstrumentID,
+			Timestamp:    time.Now(),
+			Data: &dto.DeploymentStatusChangeData{
+				DeploymentID: deployment.ID,
+				IsActive:     false,
+				Timestamp:    time.Now(),
+			},
+			Metadata: dto.EventMetadata{
+				UserID: deployment.UserID,
+			},
+		}
+
+		// Publish the event to all subscribed clients
+		if err := s.eventPublisher.PublishEvent(ctx, event); err != nil {
+			// Log the error but don't fail the deployment deactivation
+			fmt.Printf("Error publishing deployment.deactivated event: %v\n", err)
+		}
 	}
 
 	return nil
