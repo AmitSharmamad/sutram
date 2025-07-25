@@ -437,25 +437,21 @@ func (s *UserService) GetAllRoles(ctx context.Context) ([]model.Role, error) {
 // createDefaultUsageLimits creates default usage limits for a new user based on their role
 func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.UUID, roleName string) error {
 	// Define default limits based on role
-	var backtestLimit, deploymentLimit, liveTradesLimit int
+	var backtestLimit, deploymentLimit int
 
 	switch roleName {
 	case "admin":
 		backtestLimit = 999999
 		deploymentLimit = 999999
-		liveTradesLimit = 999999
 	case "paid_user":
 		backtestLimit = 100
 		deploymentLimit = 20
-		liveTradesLimit = 500
 	case "free_user":
 		backtestLimit = 10
 		deploymentLimit = 3
-		liveTradesLimit = 50
 	default:
 		backtestLimit = 5
 		deploymentLimit = 1
-		liveTradesLimit = 10
 	}
 
 	now := time.Now()
@@ -490,22 +486,6 @@ func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.
 
 	if err := s.usageLimitRepo.Create(ctx, deploymentUsageLimit); err != nil {
 		return fmt.Errorf("failed to create deployment limit: %w", err)
-	}
-
-	// Create live trades limit
-	liveTradesUsageLimit := &entity.UsageLimit{
-		UserID:       userID,
-		LimitType:    entity.LiveTradesPerDay,
-		LimitValue:   liveTradesLimit,
-		CurrentUsage: 0,
-		ResetPeriod:  entity.Daily,
-		LastResetAt:  now,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-
-	if err := s.usageLimitRepo.Create(ctx, liveTradesUsageLimit); err != nil {
-		return fmt.Errorf("failed to create live trades limit: %w", err)
 	}
 
 	return nil

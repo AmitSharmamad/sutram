@@ -59,16 +59,3 @@ SELECT DISTINCT u.id, 'deployment_count'::usage_limit_type,
        0, 'never'::reset_period_type
 FROM "user" u
 ON CONFLICT (user_id, limit_type) DO NOTHING;
-
--- Live trades per day limits
-INSERT INTO user_usage_limits (user_id, limit_type, limit_value, current_usage, reset_period)
-SELECT DISTINCT u.id, 'live_trades_per_day'::usage_limit_type,
-       CASE 
-           WHEN EXISTS (SELECT 1 FROM user_role ur JOIN role r ON ur.role_id = r.id WHERE ur.user_id = u.id AND r.name = 'admin') THEN 999999
-           WHEN EXISTS (SELECT 1 FROM user_role ur JOIN role r ON ur.role_id = r.id WHERE ur.user_id = u.id AND r.name = 'paid_user') THEN 500
-           WHEN EXISTS (SELECT 1 FROM user_role ur JOIN role r ON ur.role_id = r.id WHERE ur.user_id = u.id AND r.name = 'free_user') THEN 50
-           ELSE 10
-       END,
-       0, 'daily'::reset_period_type
-FROM "user" u
-ON CONFLICT (user_id, limit_type) DO NOTHING;

@@ -80,12 +80,11 @@ type Instrument struct {
 var (
 	// Sample instruments to simulate (initial state)
 	initialInstruments = []Instrument{
-		{SecurityID: 3411, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
-		{SecurityID: 2029, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
-		{SecurityID: 14366, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
-		{SecurityID: 1491, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
-		{SecurityID: 11915, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
-		{SecurityID: 12018, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 2885, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 1333, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 3045, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 1594, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
+		{SecurityID: 4963, ExchangeSegment: 1, Symbol: "HDFCBANK", LTP: 1650.20, Open: 1645.50, High: 1658.75, Low: 1642.30, Close: 1650.20, Volume: 156000, ATP: 1649.85, LTQ: 75, OI: 0, PrevClose: 1643.80},
 	}
 
 	// Current instruments (working copy that gets modified during simulation)
