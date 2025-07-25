@@ -571,7 +571,7 @@ func getSchedulerConfig() *SchedulerConfig {
 		MarketStartMin:  marketStartMin,
 		MarketEndHour:   marketEndHour,
 		MarketEndMin:    marketEndMin,
-		SimulationSpeed: 1 * time.Second, // Default: 1 minute per second
+		SimulationSpeed: 500 * time.Millisecond, // Default: 5 seconds per second
 	}
 
 	// Override configuration based on environment

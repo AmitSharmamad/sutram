@@ -217,6 +217,7 @@ func initializeModules(router *gin.RouterGroup) {
 		backtestModule.GetBacktestService(),
 		marketplaceModule.GetSellerService(),
 		communityModule.GetUserService(),
+		instrumentModule.GetInstrumentService(),
 	)
 	userModule.SetDashboardService(dashboardService)
 
