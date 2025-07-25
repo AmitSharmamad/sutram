@@ -10,6 +10,7 @@ import (
 	communityService "algo/internal/modules/community/application/service"
 	deploymentDto "algo/internal/modules/deployment/application/dto"
 	deploymentService "algo/internal/modules/deployment/application/service"
+	instrumentService "algo/internal/modules/instrument/application/service"
 	marketplaceService "algo/internal/modules/marketplace/application/service"
 	strategyService "algo/internal/modules/strategy/application/service"
 	"algo/internal/modules/user/application/dto"
@@ -24,6 +25,7 @@ type DashboardService struct {
 	backtestService    backtestService.BacktestService
 	marketplaceService *marketplaceService.SellerService
 	communityService   *communityService.UserService
+	instrumentService  *instrumentService.InstrumentService
 }
 
 // NewDashboardService creates a new dashboard service
@@ -33,6 +35,7 @@ func NewDashboardService(
 	backtestService backtestService.BacktestService,
 	marketplaceService *marketplaceService.SellerService,
 	communityService *communityService.UserService,
+	instrumentService *instrumentService.InstrumentService,
 ) *DashboardService {
 	return &DashboardService{
 		deploymentService:  deploymentService,
@@ -40,7 +43,31 @@ func NewDashboardService(
 		backtestService:    backtestService,
 		marketplaceService: marketplaceService,
 		communityService:   communityService,
+		instrumentService:  instrumentService,
 	}
+}
+
+// getInstrumentName retrieves the actual instrument name from the instrument master table
+func (s *DashboardService) getInstrumentName(ctx context.Context, instrumentID int) string {
+	instrumentMaster, err := s.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx, int64(instrumentID))
+	if err != nil {
+		// Fallback to placeholder if lookup fails
+		return fmt.Sprintf("Instrument-%d", instrumentID)
+	}
+
+	// Prefer TradingSymbol for display, fallback to InstrumentName or Name
+	if instrumentMaster.TradingSymbol != "" {
+		return instrumentMaster.TradingSymbol
+	}
+	if instrumentMaster.InstrumentName != "" {
+		return instrumentMaster.InstrumentName
+	}
+	if instrumentMaster.Name != "" {
+		return instrumentMaster.Name
+	}
+
+	// Final fallback
+	return fmt.Sprintf("Instrument-%d", instrumentID)
 }
 
 // GetDashboardStatistics aggregates and returns all dashboard statistics for a user
@@ -217,7 +244,7 @@ func (s *DashboardService) getLiveTradingStatusStats(ctx context.Context, userID
 		strategyStatus := dto.StrategyStatusInfo{
 			DeploymentID:   deployment.ID,
 			StrategyName:   deployment.Name,
-			InstrumentName: fmt.Sprintf("Instrument-%d", deployment.InstrumentID), // Would need instrument service
+			InstrumentName: s.getInstrumentName(ctx, deployment.InstrumentID),
 			IsActive:       deployment.IsActive,
 			CurrentPnL:     currentPnL,
 		}
@@ -230,7 +257,7 @@ func (s *DashboardService) getLiveTradingStatusStats(ctx context.Context, userID
 				recentTrade := dto.RecentTradeInfo{
 					TradeID:        position.ID,
 					StrategyName:   deployment.Name,
-					InstrumentName: fmt.Sprintf("Instrument-%d", deployment.InstrumentID),
+					InstrumentName: s.getInstrumentName(ctx, deployment.InstrumentID),
 					Direction:      string(position.Direction),
 					PnL:            *position.PNL,
 					ExecutedAt:     position.UpdatedAt,
@@ -419,7 +446,7 @@ func (s *DashboardService) getQuickAnalyticsStats(ctx context.Context, userID uu
 		for instrumentID, value := range assetAllocation {
 			allocationPct := (value / totalValue) * 100
 			stats.AssetAllocation = append(stats.AssetAllocation, dto.AssetAllocationData{
-				InstrumentName: fmt.Sprintf("Instrument-%d", instrumentID),
+				InstrumentName: s.getInstrumentName(ctx, instrumentID),
 				AllocationPct:  allocationPct,
 				CurrentValue:   value,
 			})

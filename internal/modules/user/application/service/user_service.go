@@ -104,24 +104,27 @@ func (s *UserService) Register(ctx context.Context, name, username, email, phone
 		return nil, fmt.Errorf("error creating user: %w", err)
 	}
 
-	// Assign default "free_user" role
-	freeRole, err := s.roleRepo.FindByName(ctx, "free_user")
-	if err != nil {
-		return nil, fmt.Errorf("error finding free_user role: %w", err)
-	}
-
-	if freeRole != nil {
-		if err := s.roleRepo.AssignRoleToUser(ctx, user.ID, freeRole.ID); err != nil {
-			return nil, fmt.Errorf("error assigning default role: %w", err)
+	// For admin users, skip automatic role assignment
+	if !s.shouldGetAdminRole(email) {
+		// Assign default "free_user" role
+		freeRole, err := s.roleRepo.FindByName(ctx, "free_user")
+		if err != nil {
+			return nil, fmt.Errorf("error finding free_user role: %w", err)
 		}
 
-		// Add the role to the user object
-		user.Roles = []model.Role{*freeRole}
+		if freeRole != nil {
+			if err := s.roleRepo.AssignRoleToUser(ctx, user.ID, freeRole.ID); err != nil {
+				return nil, fmt.Errorf("error assigning default role: %w", err)
+			}
 
-		// Create default usage limits for the new user
-		if err := s.createDefaultUsageLimits(ctx, user.ID, "free_user"); err != nil {
-			// Log error but don't fail user creation
-			fmt.Printf("Error creating default usage limits for user %s: %v\n", user.ID, err)
+			// Add the role to the user object
+			user.Roles = []model.Role{*freeRole}
+
+			// Create default usage limits for the new user
+			if err := s.createDefaultUsageLimits(ctx, user.ID, "free_user"); err != nil {
+				// Log error but don't fail user creation
+				fmt.Printf("Error creating default usage limits for user %s: %v\n", user.ID, err)
+			}
 		}
 	}
 
@@ -489,4 +492,25 @@ func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.
 	}
 
 	return nil
+}
+
+// shouldGetAdminRole checks if an email should automatically get admin role
+func (s *UserService) shouldGetAdminRole(email string) bool {
+	// Whitelist of admin emails
+	allowedEmails := []string{
+		"admin@sutram.co",
+		"amitsharmamad@gmail.com",
+		"Narendra.polisetty09@gmail.com",
+		"kkmarella@gmail.com",
+		"ajitsharma6329@gmail.com",
+		"koushikmarella@gmail.com",
+	}
+
+	for _, allowedEmail := range allowedEmails {
+		if email == allowedEmail {
+			return true
+		}
+	}
+
+	return false
 }

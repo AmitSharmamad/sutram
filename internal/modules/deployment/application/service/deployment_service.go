@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	backtestEngine "algo/internal/modules/backtest/application/service"
@@ -1388,6 +1389,23 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 	// If no current position exists, check entry conditions
 	if currentPosition == nil {
+		// Before proceeding with entry conditions, verify there are no open positions for this deployment
+		// This is a critical check to ensure only one position per deployment at any time
+		openPositions, err := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, deployment.ID)
+		if err != nil {
+			fmt.Printf("Error checking for open positions before entry: %v\n", err)
+			return err
+		}
+
+		if len(openPositions) > 0 {
+			fmt.Printf("Deployment %s already has %d open position(s), skipping entry signal evaluation\n",
+				deployment.ID, len(openPositions))
+
+			// Update the cached position to the first open position to fix cache inconsistency
+			deploymentWithStrategy.CurrentPosition = openPositions[0]
+			return nil
+		}
+
 		// Check if the current time is within the entry time window
 		canCheckEntryCondition := true
 
@@ -1458,8 +1476,36 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 				if err != nil {
 					fmt.Printf("Error creating new deployment position: %v\n", err)
 				} else {
+					// Final safety check: verify no open positions exist right before creation
+					// This prevents race conditions in concurrent execution
+					existingOpenPositions, checkErr := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, deployment.ID)
+					if checkErr != nil {
+						fmt.Printf("Error checking for existing open positions before creation: %v\n", checkErr)
+						return checkErr
+					}
+
+					if len(existingOpenPositions) > 0 {
+						fmt.Printf("Found %d existing open position(s) for deployment %s, aborting new position creation\n",
+							len(existingOpenPositions), deployment.ID)
+
+						// Update the cached position to maintain consistency
+						deploymentWithStrategy.CurrentPosition = existingOpenPositions[0]
+						return nil
+					}
+
 					// Persist the new position
 					if err := s.positionRepo.Create(ctx, newPosition); err != nil {
+						// Check if this is a constraint violation indicating another open position exists
+						if strings.Contains(err.Error(), "only one open position per deployment is allowed") {
+							fmt.Printf("Cannot create position for deployment %s: another open position already exists\n", deployment.ID)
+
+							// Refresh the open positions and update the cache
+							if refreshedPositions, refreshErr := s.positionRepo.GetOpenPositionsByDeploymentID(ctx, deployment.ID); refreshErr == nil && len(refreshedPositions) > 0 {
+								deploymentWithStrategy.CurrentPosition = refreshedPositions[0]
+								fmt.Printf("Updated cached position for deployment %s\n", deployment.ID)
+							}
+							return nil
+						}
 						fmt.Printf("Error saving new position: %v\n", err)
 					} else {
 						actionTaken = true
