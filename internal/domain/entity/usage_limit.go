@@ -13,8 +13,6 @@ type UsageLimitType string
 const (
 	BacktestPerMonth UsageLimitType = "backtest_per_month"
 	DeploymentCount  UsageLimitType = "deployment_count"
-	LiveTradesPerDay UsageLimitType = "live_trades_per_day"
-	APICallsPerHour  UsageLimitType = "api_calls_per_hour"
 )
 
 // ResetPeriodType represents the reset period for usage limits

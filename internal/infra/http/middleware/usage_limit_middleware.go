@@ -58,10 +58,6 @@ func UsageLimitMiddleware(usageLimitService service.UsageLimitService, limitType
 				message = "Monthly backtest limit exceeded"
 			case entity.DeploymentCount:
 				message = "Deployment limit exceeded"
-			case entity.LiveTradesPerDay:
-				message = "Daily live trades limit exceeded"
-			case entity.APICallsPerHour:
-				message = "Hourly API calls limit exceeded"
 			default:
 				message = "Usage limit exceeded"
 			}
