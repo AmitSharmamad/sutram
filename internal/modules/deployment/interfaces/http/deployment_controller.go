@@ -736,6 +736,60 @@ func (c *DeploymentController) StartAllDeployments(ctx *gin.Context) {
 	})
 }
 
+// ExitDeployment handles the request to exit a deployment (close all open positions)
+func (c *DeploymentController) ExitDeployment(ctx *gin.Context) {
+	// Parse deployment ID from URL
+	idParam := ctx.Param("deployment_id")
+	deploymentID, err := uuid.Parse(idParam)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "Invalid deployment ID",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Get user ID from context (set by auth middleware)
+	userID, ok := getUserIDFromContext(ctx)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "Invalid user ID",
+		})
+		return
+	}
+
+	// Exit the deployment
+	response, err := c.deploymentService.ExitDeployment(ctx, deploymentID, userID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		message := "Failed to exit deployment"
+
+		switch err {
+		case service.ErrDeploymentNotFound:
+			status = http.StatusNotFound
+			message = "Deployment not found"
+		case service.ErrUnauthorized:
+			status = http.StatusForbidden
+			message = "You don't have permission to exit this deployment"
+		}
+
+		ctx.JSON(status, gin.H{
+			"success": false,
+			"message": message,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Deployment exited successfully",
+		"data":    response,
+	})
+}
+
 // Helper function to get user ID from context
 func getUserIDFromContext(ctx *gin.Context) (uuid.UUID, bool) {
 	// Get the user ID from the context (set by middleware)

@@ -835,6 +835,43 @@ func (l *DeploymentEventListener) HandleDeploymentDeleted(ctx context.Context, e
 	return nil
 }
 
+// HandleDeploymentExit handles deployment.exit events
+func (l *DeploymentEventListener) HandleDeploymentExit(ctx context.Context, event *dto.DeploymentEvent) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Extract deployment exit data
+	exitData, ok := event.Data.(*dto.DeploymentExitData)
+	if !ok {
+		log.Printf("Invalid deployment exit event data")
+		return fmt.Errorf("invalid deployment exit event data")
+	}
+
+	// Remove from all timeframe lists
+	removed := false
+	for timeframe, deployments := range l.deploymentsByTimeframe {
+		for i, dep := range deployments {
+			if dep.Deployment.ID == exitData.DeploymentID {
+				// Remove deployment from the slice
+				l.deploymentsByTimeframe[timeframe] = append(deployments[:i], deployments[i+1:]...)
+				log.Printf("Removed exited deployment %v from timeframe %s (reason: %s, PNL: %.2f, remaining: %d deployments)",
+					exitData.DeploymentID, timeframe, exitData.ExitReason, exitData.TotalPNL, len(l.deploymentsByTimeframe[timeframe]))
+				removed = true
+				break
+			}
+		}
+		if removed {
+			break
+		}
+	}
+
+	if !removed {
+		log.Printf("Deployment %v not found in any timeframe list for exit", exitData.DeploymentID)
+	}
+
+	return nil
+}
+
 // GetDeploymentsByTimeframe returns a copy of the current deployments by timeframe
 func (l *DeploymentEventListener) GetDeploymentsByTimeframe() map[string][]*deploymentService.DeploymentWithStrategy {
 	l.mutex.RLock()
@@ -1003,6 +1040,19 @@ func processWebSocketMessage(ctx context.Context, message []byte, eventListener 
 		}
 		event.Data = &statusData
 		return eventListener.HandleDeploymentDeleted(ctx, &event)
+
+	case dto.EventTypeDeploymentExit:
+		// Re-marshal the data as DeploymentExitData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment exit data: %w", err)
+		}
+		var exitData dto.DeploymentExitData
+		if err := json.Unmarshal(dataBytes, &exitData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment exit data: %w", err)
+		}
+		event.Data = &exitData
+		return eventListener.HandleDeploymentExit(ctx, &event)
 
 	default:
 		log.Printf("⚠️ Unknown event type: %s", event.EventType)
