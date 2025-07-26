@@ -19,6 +19,7 @@ import (
 	"algo/internal/modules/strategy"
 	"algo/internal/modules/user"
 	userService "algo/internal/modules/user/application/service"
+	"algo/internal/modules/web"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -53,8 +54,8 @@ func main() {
 	// Setup API routes
 	apiRouter := router.Group("/api")
 
-	// Initialize modules
-	initializeModules(apiRouter)
+	// Initialize modules and store reference to web module for shutdown
+	webModule := initializeModules(apiRouter)
 
 	// Get port from environment or use default
 	port := getEnv("WEB_HTTP_PORT", "")
@@ -83,6 +84,11 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down server...")
+
+	// Shutdown web module first
+	if webModule != nil {
+		webModule.Shutdown()
+	}
 
 	// Create a deadline for server shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -156,7 +162,7 @@ func loggingMiddleware() gin.HandlerFunc {
 }
 
 // initializeModules initializes and connects all application modules
-func initializeModules(router *gin.RouterGroup) {
+func initializeModules(router *gin.RouterGroup) *web.Module {
 	// Initialize user module first as other modules depend on its controllers for auth
 	userModule := user.New()
 
@@ -210,6 +216,13 @@ func initializeModules(router *gin.RouterGroup) {
 	oauthModule.Initialize(userController)
 	oauthModule.RegisterRoutes(router)
 
+	// Initialize web events module for page-specific WebSocket events
+	webModule := web.New()
+	if err := webModule.Initialize(userController); err != nil {
+		log.Fatalf("Failed to initialize web module: %v", err)
+	}
+	webModule.RegisterRoutes(router)
+
 	// Create and set dashboard service after all modules are initialized but before user routes
 	dashboardService := userService.NewDashboardService(
 		deploymentModule.GetDeploymentService(),
@@ -224,7 +237,8 @@ func initializeModules(router *gin.RouterGroup) {
 	// Register user routes after dashboard service is set
 	userModule.RegisterRoutes(router)
 
-	// Additional modules will be initialized here
+	// Return the web module for shutdown handling
+	return webModule
 }
 
 // getEnv gets environment variable or returns default value
