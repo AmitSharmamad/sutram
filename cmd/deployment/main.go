@@ -847,15 +847,29 @@ func (l *DeploymentEventListener) HandleDeploymentExit(ctx context.Context, even
 		return fmt.Errorf("invalid deployment exit event data")
 	}
 
-	// Remove from all timeframe lists
+	log.Printf("🚨 Processing deployment.exit event for deployment %v (reason: %s)",
+		exitData.DeploymentID, exitData.ExitReason)
+
+	// Find the deployment in execution lists and remove immediately
 	removed := false
+
 	for timeframe, deployments := range l.deploymentsByTimeframe {
 		for i, dep := range deployments {
 			if dep.Deployment.ID == exitData.DeploymentID {
-				// Remove deployment from the slice
+				log.Printf("� Found deployment %v in timeframe %s execution list", exitData.DeploymentID, timeframe)
+
+				// Check if deployment has open positions that need attention
+				if dep.CurrentPosition != nil {
+					log.Printf("⚠️ Deployment %v has open position %s - positions should have been closed by ExitDeployment API",
+						exitData.DeploymentID, dep.CurrentPosition.ID)
+				} else {
+					log.Printf("✅ Deployment %v has no open positions", exitData.DeploymentID)
+				}
+
+				// Remove deployment from the execution slice immediately
 				l.deploymentsByTimeframe[timeframe] = append(deployments[:i], deployments[i+1:]...)
-				log.Printf("Removed exited deployment %v from timeframe %s (reason: %s, PNL: %.2f, remaining: %d deployments)",
-					exitData.DeploymentID, timeframe, exitData.ExitReason, exitData.TotalPNL, len(l.deploymentsByTimeframe[timeframe]))
+				log.Printf("🗑️ Removed deployment %v from timeframe %s execution list (remaining: %d deployments)",
+					exitData.DeploymentID, timeframe, len(l.deploymentsByTimeframe[timeframe]))
 				removed = true
 				break
 			}
@@ -866,7 +880,9 @@ func (l *DeploymentEventListener) HandleDeploymentExit(ctx context.Context, even
 	}
 
 	if !removed {
-		log.Printf("Deployment %v not found in any timeframe list for exit", exitData.DeploymentID)
+		log.Printf("⚠️ Deployment %v not found in any timeframe execution list", exitData.DeploymentID)
+	} else {
+		log.Printf("✅ Successfully processed deployment.exit event for deployment %v - removed from execution", exitData.DeploymentID)
 	}
 
 	return nil

@@ -9,9 +9,13 @@ CREATE TABLE IF NOT EXISTS deployment (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now(),
-    PRIMARY KEY (id),
-    UNIQUE (user_id, strategy_id, instrument_id)
+    PRIMARY KEY (id)
 );
+
+-- Partial unique constraint to allow only one active deployment per user/strategy/instrument
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deployment_active_unique 
+ON deployment(user_id, strategy_id, instrument_id) 
+WHERE is_active = true;
 
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_deployment_user_id ON deployment(user_id);
