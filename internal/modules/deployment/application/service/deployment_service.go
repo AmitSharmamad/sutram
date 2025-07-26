@@ -148,9 +148,35 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 	}
 
 	// Check if deployment already exists
-	existingDeployment, err := s.deploymentRepo.GetByUserStrategyInstrument(ctx, userID, req.StrategyID, req.InstrumentID)
-	if err == nil && existingDeployment != nil {
-		return nil, ErrDeploymentAlreadyExists
+	existingActiveDeployment, err := s.deploymentRepo.GetActiveByUserStrategyInstrument(ctx, userID, req.StrategyID, req.InstrumentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing active deployment: %w", err)
+	}
+
+	// If an active deployment exists, deactivate it before creating a new one
+	if existingActiveDeployment != nil {
+		if err := s.deploymentRepo.DeactivateDeployment(ctx, existingActiveDeployment.ID); err != nil {
+			return nil, fmt.Errorf("failed to deactivate existing deployment: %w", err)
+		}
+
+		// Create deactivation log entry
+		deactivationLog, err := model.NewDeploymentLog(
+			existingActiveDeployment.ID,
+			model.StatusStopped,
+			map[string]interface{}{
+				"reason":      "replaced_by_new_deployment",
+				"replaced_by": "",
+				"action":      "auto_deactivation",
+			},
+		)
+
+		if err != nil {
+			// Log the error but don't fail the deployment creation
+			fmt.Printf("Error creating deactivation log model: %v\n", err)
+		} else if err := s.logRepo.Create(ctx, deactivationLog); err != nil {
+			// Log the error but don't fail the deployment creation
+			fmt.Printf("Error creating deactivation log: %v\n", err)
+		}
 	}
 
 	// Create new deployment
@@ -165,6 +191,25 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 	// Save to repository
 	if err := s.deploymentRepo.Create(ctx, deployment); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrDeploymentCreateFailed, err)
+	}
+
+	// Update the deactivation log with the new deployment ID if we deactivated an existing deployment
+	if existingActiveDeployment != nil {
+		updatedDeactivationLog, err := model.NewDeploymentLog(
+			existingActiveDeployment.ID,
+			model.StatusStopped,
+			map[string]interface{}{
+				"reason":      "replaced_by_new_deployment",
+				"replaced_by": deployment.ID.String(),
+				"action":      "auto_deactivation",
+			},
+		)
+
+		if err != nil {
+			fmt.Printf("Error creating updated deactivation log model: %v\n", err)
+		} else if err := s.logRepo.Create(ctx, updatedDeactivationLog); err != nil {
+			fmt.Printf("Error creating updated deactivation log: %v\n", err)
+		}
 	}
 
 	// Create initial deployment metrics
@@ -596,6 +641,36 @@ func (s *deploymentService) ActivateDeployment(ctx context.Context, id uuid.UUID
 		return ErrUnauthorized
 	}
 
+	// Check if there's already an active deployment for the same user/strategy/instrument combination
+	existingActiveDeployment, err := s.deploymentRepo.GetActiveByUserStrategyInstrument(ctx, deployment.UserID, deployment.StrategyID, deployment.InstrumentID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing active deployment: %w", err)
+	}
+
+	// If an active deployment exists and it's not the same deployment we're trying to activate, deactivate it first
+	if existingActiveDeployment != nil && existingActiveDeployment.ID != deployment.ID {
+		if err := s.deploymentRepo.DeactivateDeployment(ctx, existingActiveDeployment.ID); err != nil {
+			return fmt.Errorf("failed to deactivate existing deployment: %w", err)
+		}
+
+		// Create deactivation log entry
+		deactivationLog, err := model.NewDeploymentLog(
+			existingActiveDeployment.ID,
+			model.StatusStopped,
+			map[string]interface{}{
+				"reason":      "replaced_by_activation",
+				"replaced_by": deployment.ID.String(),
+				"action":      "auto_deactivation",
+			},
+		)
+
+		if err != nil {
+			fmt.Printf("Error creating deactivation log model: %v\n", err)
+		} else if err := s.logRepo.Create(ctx, deactivationLog); err != nil {
+			fmt.Printf("Error creating deactivation log: %v\n", err)
+		}
+	}
+
 	// Activate deployment
 	if err := s.deploymentRepo.ActivateDeployment(ctx, id); err != nil {
 		return fmt.Errorf("failed to activate deployment: %w", err)
@@ -839,7 +914,7 @@ func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, us
 	for _, position := range openPositions {
 		// Use current market price or entry price as exit price (in real scenario, would get from market data)
 		exitPrice := position.EntryPrice
-		exitReason := "DEPLOYMENT_EXIT"
+		exitReason := "Manual Exit"
 
 		// Close the position using domain model method
 		position.ClosePosition(exitPrice, exitTime, exitReason)
@@ -873,7 +948,7 @@ func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, us
 				"exit_time":   exitTime,
 				"exit_reason": exitReason,
 				"pnl":         pnl,
-				"action":      "DEPLOYMENT_EXIT",
+				"action":      "MANUAL_EXIT",
 			},
 		)
 		if err == nil {
@@ -900,7 +975,7 @@ func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, us
 				ClosedPositions: len(openPositions),
 				TotalPNL:        totalPNL,
 				ExitTime:        exitTime,
-				ExitReason:      "DEPLOYMENT_EXIT",
+				ExitReason:      "Manual Exit",
 				PositionDetails: positionDetails,
 			},
 			Metadata: dto.EventMetadata{
@@ -916,6 +991,53 @@ func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, us
 		}
 	}
 
+	// Deactivate the deployment after closing all positions
+	if err := s.deploymentRepo.DeactivateDeployment(ctx, deployment.ID); err != nil {
+		fmt.Printf("Error deactivating deployment after exit: %v\n", err)
+		// Continue - don't fail the exit operation if deactivation fails
+	} else {
+		// Create deactivation log entry
+		deactivationLog, err := model.NewDeploymentLog(
+			deployment.ID,
+			model.StatusStopped,
+			map[string]any{
+				"reason":           "manual_exit",
+				"action":           "auto_deactivation_after_manual_exit",
+				"closed_positions": len(openPositions),
+				"total_pnl":        totalPNL,
+			},
+		)
+
+		if err != nil {
+			fmt.Printf("Error creating deactivation log after exit: %v\n", err)
+		} else if err := s.logRepo.Create(ctx, deactivationLog); err != nil {
+			fmt.Printf("Error creating deactivation log after exit: %v\n", err)
+		}
+
+		// Publish deployment.deactivated event
+		if s.eventPublisher != nil {
+			deactivationEvent := &dto.DeploymentEvent{
+				EventType:    dto.EventTypeDeploymentDeactivated,
+				DeploymentID: deployment.ID,
+				StrategyID:   deployment.StrategyID,
+				InstrumentID: deployment.InstrumentID,
+				Timestamp:    time.Now(),
+				Data: &dto.DeploymentStatusChangeData{
+					DeploymentID: deployment.ID,
+					IsActive:     false,
+					Timestamp:    time.Now(),
+				},
+				Metadata: dto.EventMetadata{
+					UserID: deployment.UserID,
+				},
+			}
+
+			if err := s.eventPublisher.PublishEvent(ctx, deactivationEvent); err != nil {
+				fmt.Printf("Error publishing deployment.deactivated event after exit: %v\n", err)
+			}
+		}
+	}
+
 	// Create response
 	response := &dto.DeploymentExitResponse{
 		DeploymentID:    deployment.ID,
@@ -923,7 +1045,7 @@ func (s *deploymentService) ExitDeployment(ctx context.Context, id uuid.UUID, us
 		TotalPNL:        totalPNL,
 		ExitTime:        exitTime,
 		PositionDetails: positionDetails,
-		Message:         fmt.Sprintf("Successfully exited deployment and closed %d position(s)", len(openPositions)),
+		Message:         fmt.Sprintf("Successfully exited deployment, closed %d position(s), and deactivated deployment", len(openPositions)),
 	}
 
 	return response, nil
@@ -2059,9 +2181,17 @@ func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID 
 	}
 
 	// Get all deployments for this strategy
-	deployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
+	allDeployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get strategy deployments: %w", err)
+	}
+
+	// Filter for only active deployments
+	var deployments []*model.Deployment
+	for _, deployment := range allDeployments {
+		if deployment.IsActive {
+			deployments = append(deployments, deployment)
+		}
 	}
 
 	// Create a map for quick lookup of deployments by instrument ID
