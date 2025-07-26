@@ -4,7 +4,7 @@ CREATE TYPE segment AS ENUM ('F&O', 'EQ');
 CREATE TYPE direction AS ENUM ('LONG', 'SHORT');
 CREATE TYPE transaction_type AS ENUM ('BUY', 'SELL');
 CREATE TYPE product_type AS ENUM('CNC', 'MIS', 'NRML');
-CREATE TYPE order_type AS ENUM('MARKET');
+CREATE TYPE order_type AS ENUM('MARKET', 'LIMIT');
 CREATE TYPE order_state AS ENUM('SENT', 'EXECUTED', 'CANCELLED');
 CREATE TYPE value_type AS ENUM('ABSOLUTE', 'PERCENTAGE');
 CREATE TYPE chart_type AS ENUM('CANDLESTICK');
@@ -44,3 +44,10 @@ CREATE TYPE usage_limit_type AS ENUM (
 CREATE TYPE reset_period_type AS ENUM (
     'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'
 );
+
+-- Enums for options trading support
+CREATE TYPE strike_price_type AS ENUM ('ATM', 'ITM', 'OTM', 'Custom');
+CREATE TYPE expiry_type AS ENUM ('Weekly', 'Monthly', 'Quarterly');
+CREATE TYPE leg_status AS ENUM ('ACTIVE', 'INACTIVE', 'EXECUTED', 'CANCELLED');
+CREATE TYPE instrument_type AS ENUM ('EQUITY', 'FUTURES', 'OPTIONS');
+CREATE TYPE option_type_enum AS ENUM ('CALL', 'PUT');
