@@ -123,7 +123,7 @@ func (s *InstrumentService) GetAllInstrumentMasters(ctx context.Context) ([]*mod
 }
 
 // GetInstrumentMastersWithFilters gets instrument masters with filtering and pagination
-func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange, segment, query string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
+func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange string, segment model.Segment, query string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -134,7 +134,13 @@ func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context,
 	offset := (page - 1) * pageSize
 	limit := pageSize
 
-	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segment, query, offset, limit)
+	// Convert segment enum to string for repository call
+	segmentStr := ""
+	if segment != "" && segment.IsValid() {
+		segmentStr = segment.String()
+	}
+
+	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segmentStr, query, offset, limit)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error finding instrument masters with filters: %w", err)
 	}
@@ -190,6 +196,14 @@ func (s *InstrumentService) UpdateInstrument(ctx context.Context, instrument *mo
 
 // CreateInstrumentMaster creates a new instrument master
 func (s *InstrumentService) CreateInstrumentMaster(ctx context.Context, master *model.InstrumentMaster) error {
+	// Validate enums before creation
+	if !master.Segment.IsValid() {
+		return fmt.Errorf("invalid segment: %s", master.Segment)
+	}
+	if !master.ExchInstrumentType.IsValid() {
+		return fmt.Errorf("invalid instrument type: %s", master.ExchInstrumentType)
+	}
+
 	if err := s.instrumentMasterRepo.Create(ctx, master); err != nil {
 		return fmt.Errorf("error creating instrument master: %w", err)
 	}
@@ -198,6 +212,14 @@ func (s *InstrumentService) CreateInstrumentMaster(ctx context.Context, master *
 
 // UpdateInstrumentMaster updates an instrument master
 func (s *InstrumentService) UpdateInstrumentMaster(ctx context.Context, master *model.InstrumentMaster) error {
+	// Validate enums before update
+	if !master.Segment.IsValid() {
+		return fmt.Errorf("invalid segment: %s", master.Segment)
+	}
+	if !master.ExchInstrumentType.IsValid() {
+		return fmt.Errorf("invalid instrument type: %s", master.ExchInstrumentType)
+	}
+
 	// Check if instrument master exists by exchange security ID
 	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(master.ExchangeSecurityID))
 	if err != nil {
