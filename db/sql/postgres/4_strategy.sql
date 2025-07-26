@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS strategy (
     instruments INT[] NOT NULL,
     chart_type chart_type NOT NULL,
     chart_timeframe chart_timeframe NOT NULL,
+    trading_day trading_day NOT NULL
     trade_type trade_type NOT NULL,
     qty INT NOT NULL,
     entry_expression TEXT NOT NULL,
