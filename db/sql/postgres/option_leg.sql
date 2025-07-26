@@ -1,8 +1,8 @@
 -- Options Trading Leg Table
 -- Captures all details for individual legs in multi-leg options strategies
 
-CREATE TABLE option_legs (
-    leg_id UUID DEFAULT gen_random_uuid(),
+CREATE TABLE option_leg (
+    id UUID DEFAULT gen_random_uuid(),
 
     -- Strategy/Trade identification
     strategy_id UUID NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE option_legs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (leg_id),
+    PRIMARY KEY (id),
     FOREIGN KEY (strategy_id) REFERENCES strategy(id) ON DELETE CASCADE,
 
     -- Additional constraints
@@ -58,10 +58,10 @@ CREATE TABLE option_legs (
 );
 
 -- Indexes for better performance
-CREATE INDEX idx_option_legs_strategy_id ON option_legs(strategy_id);
-CREATE INDEX idx_option_legs_select_index ON option_legs(select_index);
-CREATE INDEX idx_option_legs_expiry_date ON option_legs(expiry_date);
-CREATE INDEX idx_option_legs_leg_status ON option_legs(leg_status);
+CREATE INDEX idx_option_leg_strategy_id ON option_leg(strategy_id);
+CREATE INDEX idx_option_leg_select_index ON option_leg(select_index);
+CREATE INDEX idx_option_leg_expiry_date ON option_leg(expiry_date);
+CREATE INDEX idx_option_leg_leg_status ON option_leg(leg_status);
 
 -- Trigger to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -72,7 +72,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_option_legs_updated_at
-    BEFORE UPDATE ON option_legs
+CREATE TRIGGER update_option_leg_updated_at
+    BEFORE UPDATE ON option_leg
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
