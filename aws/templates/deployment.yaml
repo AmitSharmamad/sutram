@@ -178,6 +178,10 @@ Resources:
                 - "clickhouse://sutram_user:REDACTED_PASSWORD@${ClickHouseEndpoint}:9000/sutram"
                 - ClickHouseEndpoint: 
                     Fn::ImportValue: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
+            - Name: DEPLOYMENT_WEBSOCKET_PORT
+              Value: !Ref DeploymentPort
+            - Name: GIN_MODE
+              Value: !If [IsProd, "release", "debug"]
           LogConfiguration:
             LogDriver: awslogs
             Options:

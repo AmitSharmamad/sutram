@@ -185,6 +185,11 @@ Resources:
                 - !Sub "http://${ApplicationLoadBalancer.DNSName}/api/auth/oauth/google/callback"
             - Name: WEB_HTTP_PORT
               Value: !Ref WebPort
+            - Name: DEPLOYMENT_SERVER_URL
+              Value: !Sub 
+                - "ws://${DeploymentDomain}/api/deployment/events/internal/ws"
+                - DeploymentDomain: 
+                    Fn::ImportValue: !Sub "${ProjectName}-${Environment}-deployment-domain"
             - Name: GIN_MODE
               Value: !If [IsProd, "release", "debug"]
           LogConfiguration:
