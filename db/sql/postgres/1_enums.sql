@@ -51,3 +51,5 @@ CREATE TYPE expiry_type AS ENUM ('Weekly', 'Monthly', 'Quarterly');
 CREATE TYPE leg_status AS ENUM ('ACTIVE', 'INACTIVE', 'EXECUTED', 'CANCELLED');
 CREATE TYPE instrument_type AS ENUM ('EQUITY', 'FUTURES', 'OPTIONS');
 CREATE TYPE option_type_enum AS ENUM ('CALL', 'PUT');
+
+CREATE TYPE trading_day AS ENUM ('M', 'T', 'W', 'Th', 'F');
