@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"algo/internal/modules/instrument/domain/model"
 	"time"
 )
 
@@ -17,24 +18,24 @@ type InstrumentDTO struct {
 
 // InstrumentMasterDTO represents instrument master data for API responses
 type InstrumentMasterDTO struct {
-	ExchangeSecurityID int32     `json:"exchange_security_id"`
-	Exchange           string    `json:"exchange"`
-	Segment            string    `json:"segment"`
-	Symbol             string    `json:"symbol"`
-	Name               string    `json:"name"`
-	StartDate          time.Time `json:"start_date"`
-	Expiry             time.Time `json:"expiry,omitempty"`
-	ExmExchID          int32     `json:"exm_exch_id"`
-	SmstSecurityID     int32     `json:"smst_security_id"`
-	InstrumentName     string    `json:"instrument_name"`
-	TradingSymbol      string    `json:"trading_symbol"`
-	LotUnits           int32     `json:"lot_units"`
-	StrikePrice        float64   `json:"strike_price"`
-	OptionType         string    `json:"option_type"`
-	TickSize           float64   `json:"tick_size"`
-	ExpiryFlag         string    `json:"expiry_flag"`
-	ExchInstrumentType string    `json:"exch_instrument_type"`
-	SymbolName         string    `json:"symbol_name"`
+	ExchangeSecurityID int32                `json:"exchange_security_id"`
+	Exchange           string               `json:"exchange"`
+	Segment            model.Segment        `json:"segment"`
+	Symbol             string               `json:"symbol"`
+	Name               string               `json:"name"`
+	StartDate          time.Time            `json:"start_date"`
+	Expiry             time.Time            `json:"expiry,omitempty"`
+	ExmExchID          int32                `json:"exm_exch_id"`
+	SmstSecurityID     int32                `json:"smst_security_id"`
+	InstrumentName     string               `json:"instrument_name"`
+	TradingSymbol      string               `json:"trading_symbol"`
+	LotUnits           int32                `json:"lot_units"`
+	StrikePrice        float64              `json:"strike_price"`
+	OptionType         string               `json:"option_type"`
+	TickSize           float64              `json:"tick_size"`
+	ExpiryFlag         string               `json:"expiry_flag"`
+	ExchInstrumentType model.InstrumentType `json:"exch_instrument_type"`
+	SymbolName         string               `json:"symbol_name"`
 }
 
 // InstrumentWithMetadataDTO combines instrument data with its metadata
@@ -66,44 +67,44 @@ type UpdateInstrumentRequest struct {
 
 // CreateInstrumentMasterRequest represents request to create an instrument master
 type CreateInstrumentMasterRequest struct {
-	Exchange           string    `json:"exchange" binding:"required"`
-	Segment            string    `json:"segment" binding:"required"`
-	Symbol             string    `json:"symbol" binding:"required"`
-	Name               string    `json:"name" binding:"required"`
-	StartDate          time.Time `json:"start_date" binding:"required"`
-	Expiry             time.Time `json:"expiry,omitempty"`
-	ExmExchID          int32     `json:"exm_exch_id"`
-	SmstSecurityID     int32     `json:"smst_security_id"`
-	InstrumentName     string    `json:"instrument_name"`
-	TradingSymbol      string    `json:"trading_symbol"`
-	LotUnits           int32     `json:"lot_units"`
-	StrikePrice        float64   `json:"strike_price"`
-	OptionType         string    `json:"option_type"`
-	TickSize           float64   `json:"tick_size"`
-	ExpiryFlag         string    `json:"expiry_flag"`
-	ExchInstrumentType string    `json:"exch_instrument_type"`
-	SymbolName         string    `json:"symbol_name"`
+	Exchange           string               `json:"exchange" binding:"required"`
+	Segment            model.Segment        `json:"segment" binding:"required"`
+	Symbol             string               `json:"symbol" binding:"required"`
+	Name               string               `json:"name" binding:"required"`
+	StartDate          time.Time            `json:"start_date" binding:"required"`
+	Expiry             time.Time            `json:"expiry,omitempty"`
+	ExmExchID          int32                `json:"exm_exch_id"`
+	SmstSecurityID     int32                `json:"smst_security_id"`
+	InstrumentName     string               `json:"instrument_name"`
+	TradingSymbol      string               `json:"trading_symbol"`
+	LotUnits           int32                `json:"lot_units"`
+	StrikePrice        float64              `json:"strike_price"`
+	OptionType         string               `json:"option_type"`
+	TickSize           float64              `json:"tick_size"`
+	ExpiryFlag         string               `json:"expiry_flag"`
+	ExchInstrumentType model.InstrumentType `json:"exch_instrument_type"`
+	SymbolName         string               `json:"symbol_name"`
 }
 
 // UpdateInstrumentMasterRequest represents request to update an instrument master
 type UpdateInstrumentMasterRequest struct {
-	Exchange           string    `json:"exchange"`
-	Segment            string    `json:"segment"`
-	Symbol             string    `json:"symbol"`
-	Name               string    `json:"name"`
-	StartDate          time.Time `json:"start_date"`
-	Expiry             time.Time `json:"expiry,omitempty"`
-	ExmExchID          int32     `json:"exm_exch_id"`
-	SmstSecurityID     int32     `json:"smst_security_id"`
-	InstrumentName     string    `json:"instrument_name"`
-	TradingSymbol      string    `json:"trading_symbol"`
-	LotUnits           int32     `json:"lot_units"`
-	StrikePrice        float64   `json:"strike_price"`
-	OptionType         string    `json:"option_type"`
-	TickSize           float64   `json:"tick_size"`
-	ExpiryFlag         string    `json:"expiry_flag"`
-	ExchInstrumentType string    `json:"exch_instrument_type"`
-	SymbolName         string    `json:"symbol_name"`
+	Exchange           string               `json:"exchange"`
+	Segment            model.Segment        `json:"segment"`
+	Symbol             string               `json:"symbol"`
+	Name               string               `json:"name"`
+	StartDate          time.Time            `json:"start_date"`
+	Expiry             time.Time            `json:"expiry,omitempty"`
+	ExmExchID          int32                `json:"exm_exch_id"`
+	SmstSecurityID     int32                `json:"smst_security_id"`
+	InstrumentName     string               `json:"instrument_name"`
+	TradingSymbol      string               `json:"trading_symbol"`
+	LotUnits           int32                `json:"lot_units"`
+	StrikePrice        float64              `json:"strike_price"`
+	OptionType         string               `json:"option_type"`
+	TickSize           float64              `json:"tick_size"`
+	ExpiryFlag         string               `json:"expiry_flag"`
+	ExchInstrumentType model.InstrumentType `json:"exch_instrument_type"`
+	SymbolName         string               `json:"symbol_name"`
 }
 
 // GetInstrumentsByTimeRangeRequest represents a request to fetch instruments by time range
@@ -116,11 +117,11 @@ type GetInstrumentsByTimeRangeRequest struct {
 
 // InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters
 type InstrumentMasterFilterDTO struct {
-	Exchange string `form:"exchange"`
-	Segment  string `form:"segment"`
-	Query    string `form:"query"`
-	Page     int    `form:"page,default=1"`
-	PageSize int    `form:"pageSize,default=10"`
+	Exchange string        `form:"exchange"`
+	Segment  model.Segment `form:"segment"`
+	Query    string        `form:"query"`
+	Page     int           `form:"page,default=1"`
+	PageSize int           `form:"pageSize,default=10"`
 }
 
 // PaginatedResponse represents a paginated API response
