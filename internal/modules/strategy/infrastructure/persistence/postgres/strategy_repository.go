@@ -116,19 +116,24 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 
 	var strategy model.Strategy
 	var instruments pq.Int32Array
+	var positionType sql.NullString
+	var tradeType sql.NullString
+	var qty sql.NullInt32
+	var capital sql.NullFloat64
+	var maxAllocation sql.NullFloat64
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&strategy.ID,
 		&strategy.UserID,
 		&strategy.Name,
 		&strategy.Description,
-		&strategy.PositionType,
+		&positionType,
 		&instruments,
 		&strategy.ChartType,
 		&strategy.ChartTimeframe,
 		&strategy.TradingDays,
-		&strategy.TradeType,
-		&strategy.Qty,
+		&tradeType,
+		&qty,
 		&strategy.EntryExpression,
 		&strategy.ExitExpression,
 		&strategy.TargetProfit,
@@ -138,7 +143,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&strategy.TrailingStopLoss,
 		&strategy.TrailingStopLossType,
 		&strategy.ExitType,
-		&strategy.Capital,
+		&capital,
 		&strategy.MaxTrades,
 		&strategy.Brokerage,
 		&strategy.Slippage,
@@ -153,7 +158,7 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&strategy.CreatedAt,
 		&strategy.UpdatedAt,
 		&strategy.IsActive,
-		&strategy.MaxAllocation,
+		&maxAllocation,
 	)
 
 	if err != nil {
@@ -161,6 +166,26 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 			return nil, ErrStrategyNotFound
 		}
 		return nil, fmt.Errorf("%w: %v", ErrDatabaseError, err)
+	}
+
+	// Handle nullable fields
+	if positionType.Valid {
+		pt := model.Direction(positionType.String)
+		strategy.PositionType = &pt
+	}
+	if tradeType.Valid {
+		tt := model.TradeType(tradeType.String)
+		strategy.TradeType = &tt
+	}
+	if qty.Valid {
+		q := int(qty.Int32)
+		strategy.Qty = &q
+	}
+	if capital.Valid {
+		strategy.Capital = &capital.Float64
+	}
+	if maxAllocation.Valid {
+		strategy.MaxAllocation = &maxAllocation.Float64
 	}
 
 	strategy.Instruments = instruments

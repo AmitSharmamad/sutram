@@ -94,13 +94,13 @@ var (
 type CreateStrategyRequest struct {
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
-	PositionType         model.Direction       `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
+	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
 	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
 	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
-	TradingDays          model.TradingDayArray `json:"trading_days" validate:"required,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
-	TradeType            model.TradeType       `json:"trade_type" validate:"required,oneof=MIS CNC/NRML" db:"trade_type"`
-	Qty                  int                   `json:"qty" validate:"required,gt=0" db:"qty"`
+	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
+	TradeType            *model.TradeType      `json:"trade_type,omitempty" validate:"omitempty,oneof=MIS CNC/NRML" db:"trade_type"`
+	Qty                  *int                  `json:"qty,omitempty" validate:"omitempty,gt=0" db:"qty"`
 	EntryExpression      string                `json:"entry_expression" validate:"required" db:"entry_expression"`
 	ExitExpression       string                `json:"exit_expression" db:"exit_expression"`
 	TargetProfit         *float64              `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
@@ -110,8 +110,8 @@ type CreateStrategyRequest struct {
 	TrailingStopLoss     *float64              `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
 	TrailingStopLossType *model.ValueType      `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
 	ExitType             *string               `json:"exit_type" db:"exit_type"`
-	Capital              *float64              `json:"capital" validate:"omitempty,gte=0" db:"capital"`
-	MaxAllocation        *float64              `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
+	Capital              *float64              `json:"capital,omitempty" validate:"omitempty,gte=0" db:"capital"`
+	MaxAllocation        *float64              `json:"max_allocation,omitempty" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                  `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
 	Brokerage            *int                  `json:"brokerage" validate:"omitempty,gte=0" db:"brokerage"`
 	Slippage             *float64              `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
@@ -126,13 +126,13 @@ type UpdateStrategyRequest struct {
 	ID                   uuid.UUID             `json:"id" validate:"required" db:"id"`
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
-	PositionType         model.Direction       `json:"position_type" validate:"required,oneof=LONG SHORT BOTH" db:"position_type"`
+	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
 	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
 	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
-	TradingDays          model.TradingDayArray `json:"trading_days" validate:"required,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
-	TradeType            model.TradeType       `json:"trade_type" validate:"required,oneof=MIS CNC/NRML" db:"trade_type"`
-	Qty                  int                   `json:"qty" validate:"required,gt=0" db:"qty"`
+	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
+	TradeType            *model.TradeType      `json:"trade_type,omitempty" validate:"omitempty,oneof=MIS CNC/NRML" db:"trade_type"`
+	Qty                  *int                  `json:"qty,omitempty" validate:"omitempty,gt=0" db:"qty"`
 	EntryExpression      string                `json:"entry_expression" validate:"required" db:"entry_expression"`
 	ExitExpression       string                `json:"exit_expression" db:"exit_expression"`
 	TargetProfit         *float64              `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
@@ -142,8 +142,8 @@ type UpdateStrategyRequest struct {
 	TrailingStopLoss     *float64              `json:"trailing_stop_loss" validate:"omitempty,gte=0" db:"trailing_stop_loss"`
 	TrailingStopLossType *model.ValueType      `json:"trailing_stop_loss_type" validate:"omitempty,oneof=ABSOLUTE PERCENTAGE" db:"trailing_stop_loss_type"`
 	ExitType             *string               `json:"exit_type" db:"exit_type"`
-	Capital              *float64              `json:"capital" validate:"omitempty,gte=0" db:"capital"`
-	MaxAllocation        *float64              `json:"max_allocation" validate:"omitempty,gte=0" db:"max_allocation"`
+	Capital              *float64              `json:"capital,omitempty" validate:"omitempty,gte=0" db:"capital"`
+	MaxAllocation        *float64              `json:"max_allocation,omitempty" validate:"omitempty,gte=0" db:"max_allocation"`
 	MaxTrades            *int                  `json:"max_trades" validate:"omitempty,gt=0" db:"max_trades"`
 	Brokerage            *int                  `json:"brokerage" validate:"omitempty,gte=0" db:"brokerage"`
 	Slippage             *float64              `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
@@ -159,13 +159,13 @@ type StrategyResponse struct {
 	UserID               uuid.UUID             `json:"user_id" db:"user_id"`
 	Name                 string                `json:"name" db:"name"`
 	Description          string                `json:"description" db:"description"`
-	PositionType         model.Direction       `json:"position_type" db:"position_type"`
+	PositionType         *model.Direction      `json:"position_type,omitempty" db:"position_type"`
 	Instruments          pq.Int32Array         `json:"instruments" db:"instruments"`
 	ChartType            model.ChartType       `json:"chart_type" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" db:"chart_timeframe"`
-	TradingDays          model.TradingDayArray `json:"trading_days" db:"trading_days"`
-	TradeType            model.TradeType       `json:"trade_type" db:"trade_type"`
-	Qty                  int                   `json:"qty" db:"qty"`
+	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" db:"trading_days"`
+	TradeType            *model.TradeType      `json:"trade_type,omitempty" db:"trade_type"`
+	Qty                  *int                  `json:"qty,omitempty" db:"qty"`
 	EntryExpression      string                `json:"entry_expression" db:"entry_expression"`
 	ExitExpression       string                `json:"exit_expression" db:"exit_expression"`
 	TargetProfit         float64               `json:"target_profit,omitempty" db:"target_profit"`
@@ -175,8 +175,8 @@ type StrategyResponse struct {
 	TrailingStopLoss     float64               `json:"trailing_stop_loss,omitempty" db:"trailing_stop_loss"`
 	TrailingStopLossType model.ValueType       `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
 	ExitType             string                `json:"exit_type,omitempty" db:"exit_type"`
-	Capital              float64               `json:"capital,omitempty" db:"capital"`
-	MaxAllocation        float64               `json:"max_allocation,omitempty" db:"max_allocation"`
+	Capital              *float64              `json:"capital,omitempty" db:"capital"`
+	MaxAllocation        *float64              `json:"max_allocation,omitempty" db:"max_allocation"`
 	MaxTrades            int                   `json:"max_trades,omitempty" db:"max_trades"`
 	Brokerage            int                   `json:"brokerage,omitempty" db:"brokerage"`
 	Slippage             float64               `json:"slippage,omitempty" db:"slippage"`
@@ -291,14 +291,19 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		stopLossType = *req.StopLossType
 	}
 
-	capital := 0.0
-	if req.Capital != nil {
-		capital = *req.Capital
-	}
+	capital := req.Capital
+	maxAllocation := req.MaxAllocation
 
-	maxAllocation := 0.0
-	if req.MaxAllocation != nil {
-		maxAllocation = *req.MaxAllocation
+	// Set default trading days if not provided (all weekdays)
+	tradingDays := req.TradingDays
+	if len(tradingDays) == 0 {
+		tradingDays = model.TradingDayArray{
+			model.Monday,
+			model.Tuesday,
+			model.Wednesday,
+			model.Thursday,
+			model.Friday,
+		}
 	}
 
 	// Create strategy with required parameters
@@ -310,7 +315,7 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		req.Instruments,
 		req.ChartType,
 		req.ChartTimeframe,
-		req.TradingDays,
+		tradingDays,
 		req.TradeType,
 		req.Qty,
 		req.EntryExpression,
@@ -329,10 +334,6 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		if req.TrailingStopLossType != nil {
 			strategy.TrailingStopLossType = req.TrailingStopLossType
 		}
-	}
-
-	if req.MaxAllocation != nil {
-		strategy.MaxAllocation = *req.MaxAllocation
 	}
 
 	if req.ExitType != nil {
@@ -393,14 +394,16 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		stopLossType = *req.StopLossType
 	}
 
-	capital := 0.0
-	if req.Capital != nil {
-		capital = *req.Capital
-	}
-
-	maxAllocation := 0.0
-	if req.MaxAllocation != nil {
-		maxAllocation = *req.MaxAllocation
+	// Set default trading days if not provided (all weekdays)
+	tradingDays := req.TradingDays
+	if len(tradingDays) == 0 {
+		tradingDays = model.TradingDayArray{
+			model.Monday,
+			model.Tuesday,
+			model.Wednesday,
+			model.Thursday,
+			model.Friday,
+		}
 	}
 
 	// Create the strategy object with base fields
@@ -412,7 +415,7 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		Instruments:      req.Instruments,
 		ChartType:        req.ChartType,
 		ChartTimeframe:   req.ChartTimeframe,
-		TradingDays:      req.TradingDays,
+		TradingDays:      tradingDays,
 		TradeType:        req.TradeType,
 		Qty:              req.Qty,
 		EntryExpression:  req.EntryExpression,
@@ -421,8 +424,8 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		TargetProfitType: targetProfitType,
 		StopLoss:         stopLoss,
 		StopLossType:     stopLossType,
-		Capital:          capital,
-		MaxAllocation:    maxAllocation,
+		Capital:          req.Capital,
+		MaxAllocation:    req.MaxAllocation,
 	}
 
 	// Set optional fields
@@ -436,10 +439,6 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 
 	if req.ExitType != nil {
 		strategy.ExitType = req.ExitType
-	}
-
-	if req.MaxAllocation != nil {
-		strategy.MaxAllocation = *req.MaxAllocation
 	}
 
 	if req.MaxTrades != nil {

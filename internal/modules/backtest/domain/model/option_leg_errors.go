@@ -7,6 +7,6 @@ var (
 	ErrInvalidOptionDetails = errors.New("option type is required for F&O segment")
 	ErrInvalidStrikePrice   = errors.New("strike price is required for F&O segment")
 	ErrInvalidEquityDetails = errors.New("option type and strike price should not be set for EQ segment")
-	ErrInvalidLegSequence   = errors.New("leg sequence must be greater than 0")
+	ErrInvalidOrder         = errors.New("order must be greater than 0")
 	ErrInvalidTotalLot      = errors.New("total lot must be greater than 0")
 )

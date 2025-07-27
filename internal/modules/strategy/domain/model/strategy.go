@@ -158,13 +158,13 @@ type Strategy struct {
 	UserID               uuid.UUID       `json:"user_id" db:"user_id"`
 	Name                 string          `json:"name" db:"name"`
 	Description          string          `json:"description" db:"description"`
-	PositionType         Direction       `json:"position_type" db:"position_type"`
+	PositionType         *Direction      `json:"position_type,omitempty" db:"position_type"`
 	Instruments          pq.Int32Array   `json:"instruments" db:"instruments"`
 	ChartType            ChartType       `json:"chart_type" db:"chart_type"`
 	ChartTimeframe       ChartTimeframe  `json:"chart_timeframe" db:"chart_timeframe"`
 	TradingDays          TradingDayArray `json:"trading_days" db:"trading_days"`
-	TradeType            TradeType       `json:"trade_type" db:"trade_type"`
-	Qty                  int             `json:"qty" db:"qty"`
+	TradeType            *TradeType      `json:"trade_type,omitempty" db:"trade_type"`
+	Qty                  *int            `json:"qty,omitempty" db:"qty"`
 	EntryExpression      string          `json:"entry_expression" db:"entry_expression"`
 	ExitExpression       string          `json:"exit_expression,omitempty" db:"exit_expression"`
 	TargetProfit         float64         `json:"target_profit" db:"target_profit"`
@@ -174,8 +174,8 @@ type Strategy struct {
 	TrailingStopLoss     *float64        `json:"trailing_stop_loss,omitempty" db:"trailing_stop_loss"`
 	TrailingStopLossType *ValueType      `json:"trailing_stop_loss_type,omitempty" db:"trailing_stop_loss_type"`
 	ExitType             *string         `json:"exit_type,omitempty" db:"exit_type"`
-	Capital              float64         `json:"capital" db:"capital"`
-	MaxAllocation        float64         `json:"max_allocation" db:"max_allocation"`
+	Capital              *float64        `json:"capital,omitempty" db:"capital"`
+	MaxAllocation        *float64        `json:"max_allocation,omitempty" db:"max_allocation"`
 	MaxTrades            *int            `json:"max_trades,omitempty" db:"max_trades"`
 	Brokerage            *int            `json:"brokerage,omitempty" db:"brokerage"`
 	Slippage             *float64        `json:"slippage,omitempty" db:"slippage"`
@@ -197,21 +197,21 @@ func NewStrategy(
 	userID uuid.UUID,
 	name string,
 	description string,
-	positionType Direction,
+	positionType *Direction,
 	instruments pq.Int32Array,
 	chartType ChartType,
 	chartTimeframe ChartTimeframe,
 	tradingDays TradingDayArray,
-	tradeType TradeType,
-	qty int,
+	tradeType *TradeType,
+	qty *int,
 	entryExpression string,
 	exitExpression string,
 	targetProfit float64,
 	targetProfitType ValueType,
 	stopLoss float64,
 	stopLossType ValueType,
-	capital float64,
-	maxAllocation float64,
+	capital *float64,
+	maxAllocation *float64,
 ) *Strategy {
 	return &Strategy{
 		ID:               uuid.New(),
@@ -245,13 +245,13 @@ func NewStrategy(
 func (s *Strategy) Update(
 	name string,
 	description string,
-	positionType Direction,
+	positionType *Direction,
 	instruments pq.Int32Array,
 	chartType ChartType,
 	chartTimeframe ChartTimeframe,
 	tradingDays TradingDayArray,
-	tradeType TradeType,
-	qty int,
+	tradeType *TradeType,
+	qty *int,
 	entryExpression string,
 	exitExpression string,
 	targetProfit float64,
@@ -261,8 +261,8 @@ func (s *Strategy) Update(
 	trailingStopLoss *float64,
 	trailingStopLossType *ValueType,
 	exitType *string,
-	capital float64,
-	maxAllocation float64,
+	capital *float64,
+	maxAllocation *float64,
 	maxTrades *int,
 	brokerage *int,
 	slippage *float64,

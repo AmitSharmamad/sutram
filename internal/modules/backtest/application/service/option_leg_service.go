@@ -25,7 +25,7 @@ var (
 	ErrOptionLegCreateFailed   = errors.New("failed to create option leg")
 	ErrOptionLegUpdateFailed   = errors.New("failed to update option leg")
 	ErrOptionLegDeleteFailed   = errors.New("failed to delete option leg")
-	ErrDuplicateLegSequence    = errors.New("leg sequence already exists for this strategy")
+	ErrDuplicateOrder          = errors.New("leg sequence already exists for this strategy")
 )
 
 // OptionLegService defines the service for option leg operations
@@ -85,7 +85,7 @@ func (s *optionLegService) CreateOptionLeg(ctx context.Context, req *dto.CreateO
 	// Check if leg sequence already exists for the strategy
 	existingLeg, err := s.optionLegRepo.GetByStrategyIDAndSequence(ctx, req.StrategyID, req.LegSequence)
 	if err == nil && existingLeg != nil {
-		return nil, ErrDuplicateLegSequence
+		return nil, ErrDuplicateOrder
 	}
 
 	// Convert DTO to domain model
@@ -153,7 +153,7 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 		if *req.LegSequence != optionLeg.LegSequence {
 			existingLeg, err := s.optionLegRepo.GetByStrategyIDAndSequence(ctx, optionLeg.StrategyID, *req.LegSequence)
 			if err == nil && existingLeg != nil {
-				return nil, ErrDuplicateLegSequence
+				return nil, ErrDuplicateOrder
 			}
 		}
 		optionLeg.LegSequence = *req.LegSequence
@@ -171,8 +171,8 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	if req.ActionType != nil {
 		optionLeg.ActionType = *req.ActionType
 	}
-	if req.StrikePriceType != nil {
-		optionLeg.StrikePriceType = *req.StrikePriceType
+	if req.StrikeType != nil {
+		optionLeg.StrikeType = *req.StrikeType
 	}
 	if req.StrikePrice != nil {
 		optionLeg.StrikePrice = req.StrikePrice
@@ -305,7 +305,7 @@ func (s *optionLegService) ValidateOptionLeg(ctx context.Context, req *dto.Creat
 		if req.OptionType == nil {
 			return model.ErrInvalidOptionDetails
 		}
-		if req.StrikePrice == nil && req.StrikePriceType == model.StrikePriceTypeCustom {
+		if req.StrikePrice == nil && req.StrikeType == model.StrikePriceTypeCustom {
 			return model.ErrInvalidStrikePrice
 		}
 	}
@@ -319,7 +319,7 @@ func (s *optionLegService) ValidateOptionLeg(ctx context.Context, req *dto.Creat
 
 	// Validate leg sequence
 	if req.LegSequence <= 0 {
-		return model.ErrInvalidLegSequence
+		return model.ErrInvalidOrder
 	}
 
 	// Validate total lot
