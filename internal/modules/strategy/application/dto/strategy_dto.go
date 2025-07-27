@@ -117,6 +117,10 @@ type CreateStrategyRequest struct {
 	Slippage             *float64              `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
 	EntryStartTime       *types.TimeOnly       `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time" db:"entry_end_time"`
+	Segment              model.Segment         `json:"segment" validate:"required,oneof=F&O EQ" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" validate:"required,oneof=CONDITIONAL TIME_BASED" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time" db:"exit_time"`
 	StartDate            *time.Time            `json:"start_date" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date" db:"end_date"`
 }
@@ -149,6 +153,10 @@ type UpdateStrategyRequest struct {
 	Slippage             *float64              `json:"slippage" validate:"omitempty,gte=0,lte=100" db:"slippage"`
 	EntryStartTime       *types.TimeOnly       `json:"entry_start_time" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time" db:"entry_end_time"`
+	Segment              model.Segment         `json:"segment" validate:"required,oneof=F&O EQ" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" validate:"required,oneof=CONDITIONAL TIME_BASED" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time" db:"exit_time"`
 	StartDate            *time.Time            `json:"start_date" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date" db:"end_date"`
 }
@@ -182,6 +190,10 @@ type StrategyResponse struct {
 	Slippage             float64               `json:"slippage,omitempty" db:"slippage"`
 	EntryStartTime       *types.TimeOnly       `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time,omitempty" db:"entry_end_time"`
+	Segment              model.Segment         `json:"segment" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time,omitempty" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time,omitempty" db:"exit_time"`
 	StartDate            *time.Time            `json:"start_date,omitempty" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date,omitempty" db:"end_date"`
 	CreatedAt            time.Time             `json:"created_at" db:"created_at"`
@@ -198,6 +210,8 @@ type StrategyFilter struct {
 	Instrument     *int                  `json:"instrument" db:"instrument"`
 	ChartType      *model.ChartType      `json:"chart_type" db:"chart_type"`
 	ChartTimeframe *model.ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
+	Segment        *model.Segment        `json:"segment" db:"segment"`
+	StrategyType   *model.StrategyType   `json:"strategy_type" db:"strategy_type"`
 	IsActive       *bool                 `json:"is_active" db:"is_active"`
 	CreatedAfter   *time.Time            `json:"created_after" db:"created_after"`
 	CreatedBefore  *time.Time            `json:"created_before" db:"created_before"`
@@ -219,6 +233,7 @@ func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *Strategy
 		Instruments:      strategy.Instruments,
 		ChartType:        strategy.ChartType,
 		ChartTimeframe:   strategy.ChartTimeframe,
+		TradingDays:      strategy.TradingDays,
 		TradeType:        strategy.TradeType,
 		Qty:              strategy.Qty,
 		EntryExpression:  strategy.EntryExpression,
@@ -229,6 +244,8 @@ func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *Strategy
 		StopLossType:     strategy.StopLossType,
 		Capital:          strategy.Capital,
 		MaxAllocation:    strategy.MaxAllocation,
+		Segment:          strategy.Segment,
+		StrategyType:     strategy.StrategyType,
 		CreatedAt:        strategy.CreatedAt,
 		UpdatedAt:        strategy.UpdatedAt,
 		IsActive:         strategy.IsActive,
@@ -262,6 +279,8 @@ func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *Strategy
 
 	response.EntryStartTime = strategy.EntryStartTime
 	response.EntryEndTime = strategy.EntryEndTime
+	response.EntryTime = strategy.EntryTime
+	response.ExitTime = strategy.ExitTime
 	response.StartDate = strategy.StartDate
 	response.EndDate = strategy.EndDate
 
@@ -368,6 +387,18 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		strategy.EndDate = req.EndDate
 	}
 
+	// Set segment and strategy type
+	strategy.Segment = req.Segment
+	strategy.StrategyType = req.StrategyType
+
+	if req.EntryTime != nil {
+		strategy.EntryTime = req.EntryTime
+	}
+
+	if req.ExitTime != nil {
+		strategy.ExitTime = req.ExitTime
+	}
+
 	return strategy
 }
 
@@ -426,6 +457,8 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		StopLossType:     stopLossType,
 		Capital:          req.Capital,
 		MaxAllocation:    req.MaxAllocation,
+		Segment:          req.Segment,
+		StrategyType:     req.StrategyType,
 	}
 
 	// Set optional fields
@@ -467,6 +500,14 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 
 	if req.EndDate != nil {
 		strategy.EndDate = req.EndDate
+	}
+
+	if req.EntryTime != nil {
+		strategy.EntryTime = req.EntryTime
+	}
+
+	if req.ExitTime != nil {
+		strategy.ExitTime = req.ExitTime
 	}
 
 	return strategy
