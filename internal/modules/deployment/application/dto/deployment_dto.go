@@ -70,3 +70,13 @@ type PositionSummary struct {
 	ClosedPositions int     `json:"closed_positions"`
 	TotalPNL        float64 `json:"total_pnl"`
 }
+
+// DeploymentExitResponse represents the response for exiting a deployment
+type DeploymentExitResponse struct {
+	DeploymentID    uuid.UUID            `json:"deployment_id"`
+	ClosedPositions int                  `json:"closed_positions"`
+	TotalPNL        float64              `json:"total_pnl"`
+	ExitTime        time.Time            `json:"exit_time"`
+	PositionDetails []ExitPositionDetail `json:"position_details"`
+	Message         string               `json:"message"`
+}

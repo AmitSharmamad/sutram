@@ -28,13 +28,17 @@ const (
 	EventTypeEODSquareOff          DeploymentEventType = "eod_square_off"
 
 	// Deployment status events
-	EventTypeDeploymentCreated  DeploymentEventType = "deployment.created"
-	EventTypeDeploymentError    DeploymentEventType = "deployment_error"
-	EventTypeEntryWindowClosed  DeploymentEventType = "entry_window_closed"
-	EventTypeEntryWindowOpen    DeploymentEventType = "entry_window_open"
-	EventTypeMarketDataReceived DeploymentEventType = "market_data_received"
-	EventTypeMarketClosed       DeploymentEventType = "market_closed"
-	EventTypeScheduledExecution DeploymentEventType = "scheduled_execution"
+	EventTypeDeploymentCreated     DeploymentEventType = "deployment.created"
+	EventTypeDeploymentActivated   DeploymentEventType = "deployment.activated"
+	EventTypeDeploymentDeactivated DeploymentEventType = "deployment.deactivated"
+	EventTypeDeploymentDeleted     DeploymentEventType = "deployment.deleted"
+	EventTypeDeploymentExit        DeploymentEventType = "deployment.exit"
+	EventTypeDeploymentError       DeploymentEventType = "deployment_error"
+	EventTypeEntryWindowClosed     DeploymentEventType = "entry_window_closed"
+	EventTypeEntryWindowOpen       DeploymentEventType = "entry_window_open"
+	EventTypeMarketDataReceived    DeploymentEventType = "market_data_received"
+	EventTypeMarketClosed          DeploymentEventType = "market_closed"
+	EventTypeScheduledExecution    DeploymentEventType = "scheduled_execution"
 )
 
 // DeploymentEvent represents a real-time deployment event
@@ -176,4 +180,28 @@ type DeploymentCreatedData struct {
 	Timeframe    string    `json:"timeframe"`
 	IsActive     bool      `json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// DeploymentStatusChangeData contains data for deployment status change events
+type DeploymentStatusChangeData struct {
+	DeploymentID uuid.UUID `json:"deployment_id"`
+	IsActive     bool      `json:"is_active"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+// DeploymentExitData contains data for deployment exit events
+type DeploymentExitData struct {
+	DeploymentID    uuid.UUID            `json:"deployment_id"`
+	ClosedPositions int                  `json:"closed_positions"`
+	TotalPNL        float64              `json:"total_pnl"`
+	ExitTime        time.Time            `json:"exit_time"`
+	ExitReason      string               `json:"exit_reason"`
+	PositionDetails []ExitPositionDetail `json:"position_details"`
+}
+
+// ExitPositionDetail contains details of each position closed during exit
+type ExitPositionDetail struct {
+	PositionID string  `json:"position_id"`
+	ExitPrice  float64 `json:"exit_price"`
+	PNL        float64 `json:"pnl"`
 }

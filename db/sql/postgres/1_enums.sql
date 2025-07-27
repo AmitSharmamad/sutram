@@ -37,9 +37,7 @@ CREATE TYPE permission_type AS ENUM (
 -- Enum for usage limit types
 CREATE TYPE usage_limit_type AS ENUM (
     'backtest_per_month',
-    'deployment_count',
-    'live_trades_per_day',
-    'api_calls_per_hour'
+    'deployment_count'
 );
 
 -- Enum for reset period types

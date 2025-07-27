@@ -37,6 +37,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -47,6 +48,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/gin-contrib/cors"
@@ -157,8 +160,8 @@ func main() {
 
 // initDB initializes the ClickHouse database connection
 func initDB() error {
-	// Create DSN for ClickHouse
-	conn := "clickhouse://admin:admin@localhost:9000"
+	// Create DSN for ClickHouse - use environment variable with fallback
+	conn := getEnv("CH_URL", "clickhouse://admin:admin@localhost:9000")
 	db, err := sqlx.Connect("clickhouse", conn)
 
 	if err != nil {
@@ -453,11 +456,17 @@ func startWebSocketServer(deploymentMod *deploymentModule.Module) {
 
 	// Add status endpoint
 	apiRouter.GET("/deployment/status", func(c *gin.Context) {
+		webPort := getEnv("WEB_HTTP_PORT", "")
 		c.JSON(http.StatusOK, gin.H{
 			"status": "running",
 			"time":   time.Now().Format(time.RFC3339),
 			"websocket_endpoints": gin.H{
-				"deployment_events": "/ws/api/deployment/events/ws",
+				"deployment_events":          "/ws/api/deployment/events/ws",
+				"deployment_events_internal": "/ws/api/deployment/events/internal/ws",
+			},
+			"listening_to": gin.H{
+				"web_server_port": webPort,
+				"event_source":    fmt.Sprintf("ws://%s:%s/api/deployment/events/internal/ws", getEnv("WEB_HTTP_HOST", "localhost"), webPort),
 			},
 		})
 	})
@@ -479,6 +488,7 @@ func startWebSocketServer(deploymentMod *deploymentModule.Module) {
 	go func() {
 		log.Printf("Deployment WebSocket server started on port %s", port)
 		log.Printf("WebSocket endpoint available at: ws://localhost:%s/api/deployment/events/ws", port)
+		log.Printf("Internal WebSocket endpoint available at: ws://localhost:%s/api/deployment/events/internal/ws", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %s", err)
 		}
@@ -571,7 +581,7 @@ func getSchedulerConfig() *SchedulerConfig {
 		MarketStartMin:  marketStartMin,
 		MarketEndHour:   marketEndHour,
 		MarketEndMin:    marketEndMin,
-		SimulationSpeed: 1 * time.Second, // Default: 1 minute per second
+		SimulationSpeed: 5 * time.Second, // Default: 5 seconds per second
 	}
 
 	// Override configuration based on environment
@@ -701,6 +711,183 @@ func (l *DeploymentEventListener) HandleDeploymentCreated(ctx context.Context, e
 	return nil
 }
 
+// HandleDeploymentActivated handles deployment.activated events
+func (l *DeploymentEventListener) HandleDeploymentActivated(ctx context.Context, event *dto.DeploymentEvent) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Extract deployment status change data
+	statusData, ok := event.Data.(*dto.DeploymentStatusChangeData)
+	if !ok {
+		log.Printf("Invalid deployment activated event data")
+		return fmt.Errorf("invalid deployment activated event data")
+	}
+
+	// Re-fetch all active deployments to get the activated deployment
+	allDeployments, err := l.deploymentService.GetActiveDeploymentsWithStrategies(ctx)
+	if err != nil {
+		log.Printf("Failed to get active deployments: %v", err)
+		return err
+	}
+
+	// Find the activated deployment
+	var activatedDeployment *deploymentService.DeploymentWithStrategy
+	for _, dep := range allDeployments {
+		if dep.Deployment.ID == statusData.DeploymentID {
+			activatedDeployment = dep
+			break
+		}
+	}
+
+	if activatedDeployment != nil {
+		timeframe := string(activatedDeployment.Strategy.ChartTimeframe)
+
+		// Check if deployment already exists in the list to avoid duplicates
+		exists := false
+		for _, existing := range l.deploymentsByTimeframe[timeframe] {
+			if existing.Deployment.ID == statusData.DeploymentID {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			l.deploymentsByTimeframe[timeframe] = append(l.deploymentsByTimeframe[timeframe], activatedDeployment)
+			log.Printf("Added activated deployment %v to timeframe %s (total: %d deployments)",
+				statusData.DeploymentID, timeframe, len(l.deploymentsByTimeframe[timeframe]))
+		}
+	}
+
+	return nil
+}
+
+// HandleDeploymentDeactivated handles deployment.deactivated events
+func (l *DeploymentEventListener) HandleDeploymentDeactivated(ctx context.Context, event *dto.DeploymentEvent) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Extract deployment status change data
+	statusData, ok := event.Data.(*dto.DeploymentStatusChangeData)
+	if !ok {
+		log.Printf("Invalid deployment deactivated event data")
+		return fmt.Errorf("invalid deployment deactivated event data")
+	}
+
+	// Remove from all timeframe lists
+	removed := false
+	for timeframe, deployments := range l.deploymentsByTimeframe {
+		for i, dep := range deployments {
+			if dep.Deployment.ID == statusData.DeploymentID {
+				// Remove deployment from the slice
+				l.deploymentsByTimeframe[timeframe] = append(deployments[:i], deployments[i+1:]...)
+				log.Printf("Removed deactivated deployment %v from timeframe %s (remaining: %d deployments)",
+					statusData.DeploymentID, timeframe, len(l.deploymentsByTimeframe[timeframe]))
+				removed = true
+				break
+			}
+		}
+		if removed {
+			break
+		}
+	}
+
+	if !removed {
+		log.Printf("Deployment %v not found in any timeframe list for deactivation", statusData.DeploymentID)
+	}
+
+	return nil
+}
+
+// HandleDeploymentDeleted handles deployment.deleted events
+func (l *DeploymentEventListener) HandleDeploymentDeleted(ctx context.Context, event *dto.DeploymentEvent) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Extract deployment status change data
+	statusData, ok := event.Data.(*dto.DeploymentStatusChangeData)
+	if !ok {
+		log.Printf("Invalid deployment deleted event data")
+		return fmt.Errorf("invalid deployment deleted event data")
+	}
+
+	// Remove from all timeframe lists
+	removed := false
+	for timeframe, deployments := range l.deploymentsByTimeframe {
+		for i, dep := range deployments {
+			if dep.Deployment.ID == statusData.DeploymentID {
+				// Remove deployment from the slice
+				l.deploymentsByTimeframe[timeframe] = append(deployments[:i], deployments[i+1:]...)
+				log.Printf("Removed deleted deployment %v from timeframe %s (remaining: %d deployments)",
+					statusData.DeploymentID, timeframe, len(l.deploymentsByTimeframe[timeframe]))
+				removed = true
+				break
+			}
+		}
+		if removed {
+			break
+		}
+	}
+
+	if !removed {
+		log.Printf("Deployment %v not found in any timeframe list for deletion", statusData.DeploymentID)
+	}
+
+	return nil
+}
+
+// HandleDeploymentExit handles deployment.exit events
+func (l *DeploymentEventListener) HandleDeploymentExit(ctx context.Context, event *dto.DeploymentEvent) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Extract deployment exit data
+	exitData, ok := event.Data.(*dto.DeploymentExitData)
+	if !ok {
+		log.Printf("Invalid deployment exit event data")
+		return fmt.Errorf("invalid deployment exit event data")
+	}
+
+	log.Printf("🚨 Processing deployment.exit event for deployment %v (reason: %s)",
+		exitData.DeploymentID, exitData.ExitReason)
+
+	// Find the deployment in execution lists and remove immediately
+	removed := false
+
+	for timeframe, deployments := range l.deploymentsByTimeframe {
+		for i, dep := range deployments {
+			if dep.Deployment.ID == exitData.DeploymentID {
+				log.Printf("� Found deployment %v in timeframe %s execution list", exitData.DeploymentID, timeframe)
+
+				// Check if deployment has open positions that need attention
+				if dep.CurrentPosition != nil {
+					log.Printf("⚠️ Deployment %v has open position %s - positions should have been closed by ExitDeployment API",
+						exitData.DeploymentID, dep.CurrentPosition.ID)
+				} else {
+					log.Printf("✅ Deployment %v has no open positions", exitData.DeploymentID)
+				}
+
+				// Remove deployment from the execution slice immediately
+				l.deploymentsByTimeframe[timeframe] = append(deployments[:i], deployments[i+1:]...)
+				log.Printf("🗑️ Removed deployment %v from timeframe %s execution list (remaining: %d deployments)",
+					exitData.DeploymentID, timeframe, len(l.deploymentsByTimeframe[timeframe]))
+				removed = true
+				break
+			}
+		}
+		if removed {
+			break
+		}
+	}
+
+	if !removed {
+		log.Printf("⚠️ Deployment %v not found in any timeframe execution list", exitData.DeploymentID)
+	} else {
+		log.Printf("✅ Successfully processed deployment.exit event for deployment %v - removed from execution", exitData.DeploymentID)
+	}
+
+	return nil
+}
+
 // GetDeploymentsByTimeframe returns a copy of the current deployments by timeframe
 func (l *DeploymentEventListener) GetDeploymentsByTimeframe() map[string][]*deploymentService.DeploymentWithStrategy {
 	l.mutex.RLock()
@@ -716,50 +903,183 @@ func (l *DeploymentEventListener) GetDeploymentsByTimeframe() map[string][]*depl
 }
 
 // startWebSocketListener starts a WebSocket client to listen for deployment events
-func startWebSocketListener(ctx context.Context, eventListener *DeploymentEventListener) { // Get WebSocket server details
-	wsPort := getEnv("DEPLOYMENT_WEBSOCKET_PORT", "")
-	if wsPort == "" {
-		log.Printf("DEPLOYMENT_WEBSOCKET_PORT not set, WebSocket listener disabled")
+func startWebSocketListener(ctx context.Context, eventListener *DeploymentEventListener) {
+	webHost := getEnv("WEB_HTTP_HOST", "localhost")
+	webPort := getEnv("WEB_HTTP_PORT", "")
+	if webPort == "" {
+		log.Printf("WEB_HTTP_PORT not set, WebSocket listener disabled")
 		return
 	}
 
-	// TODO: Implement actual WebSocket client connection to ws://localhost:{wsPort}/api/deployment/events/ws
-	// For now, we'll implement a simple polling mechanism to check for new deployments
-	// In a full implementation, you would establish a WebSocket connection and listen for events
-	// This is a simplified approach that periodically refreshes the deployment list
+	wsURL := fmt.Sprintf("ws://%s:%s/api/deployment/events/internal/ws", webHost, webPort)
+	log.Printf("Attempting to connect to internal WebSocket server at %s", wsURL)
 
-	ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
-	defer ticker.Stop()
-
-	log.Printf("WebSocket listener started, will poll for deployment changes every 30 seconds")
-
+	// Retry connection logic
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("WebSocket listener stopped")
 			return
-		case <-ticker.C:
-			// Periodically refresh the deployment list to pick up new deployments
-			log.Printf("Refreshing deployment list from database...")
-
-			// Get fresh deployments from the database
-			freshDeployments, err := getActiveDeploymentsByTimeframe(ctx, eventListener.deploymentService)
+		default:
+			err := connectAndListenWebSocket(ctx, wsURL, eventListener)
 			if err != nil {
-				log.Printf("Failed to refresh deployments: %v", err)
-				continue
-			}
-
-			// Update the event listener's deployment map
-			eventListener.mutex.Lock()
-			eventListener.deploymentsByTimeframe = freshDeployments
-			eventListener.mutex.Unlock()
-
-			// Log the current deployment counts
-			for timeframe, deployments := range freshDeployments {
-				log.Printf("Timeframe %s: %d deployments", timeframe, len(deployments))
+				log.Printf("WebSocket connection failed: %v, retrying in 30 seconds...", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(30 * time.Second):
+					continue
+				}
 			}
 		}
 	}
+}
+
+// connectAndListenWebSocket establishes WebSocket connection and processes messages
+func connectAndListenWebSocket(ctx context.Context, wsURL string, eventListener *DeploymentEventListener) error {
+	// Establish WebSocket connection
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to dial WebSocket: %w", err)
+	}
+	defer conn.Close()
+
+	log.Printf("✅ Connected to WebSocket server at %s", wsURL)
+
+	// Set up ping/pong to keep connection alive
+	conn.SetPongHandler(func(appData string) error {
+		log.Printf("Received pong: %s", appData)
+		return nil
+	})
+
+	// Send periodic pings
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
+
+	// Channel to handle messages
+	messageChan := make(chan []byte, 100)
+	errorChan := make(chan error, 1)
+
+	// Goroutine to read messages
+	go func() {
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				errorChan <- err
+				return
+			}
+			messageChan <- message
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("WebSocket listener context cancelled")
+			return nil
+
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
+				return fmt.Errorf("failed to send ping: %w", err)
+			}
+
+		case message := <-messageChan:
+			if err := processWebSocketMessage(ctx, message, eventListener); err != nil {
+				log.Printf("Failed to process WebSocket message: %v", err)
+			}
+
+		case err := <-errorChan:
+			return fmt.Errorf("WebSocket read error: %w", err)
+		}
+	}
+}
+
+// processWebSocketMessage processes incoming WebSocket messages
+func processWebSocketMessage(ctx context.Context, message []byte, eventListener *DeploymentEventListener) error {
+	// Parse the deployment event
+	var event dto.DeploymentEvent
+	if err := json.Unmarshal(message, &event); err != nil {
+		return fmt.Errorf("failed to unmarshal event: %w", err)
+	}
+
+	log.Printf("📨 Received WebSocket event: %s for deployment %v", event.EventType, getDeploymentIDFromEvent(&event))
+
+	// Handle different event types
+	switch event.EventType {
+	case dto.EventTypeDeploymentCreated:
+		// Re-marshal the data as DeploymentCreatedData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment created data: %w", err)
+		}
+		var deploymentData dto.DeploymentCreatedData
+		if err := json.Unmarshal(dataBytes, &deploymentData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment created data: %w", err)
+		}
+		event.Data = &deploymentData
+		return eventListener.HandleDeploymentCreated(ctx, &event)
+
+	case dto.EventTypeDeploymentActivated:
+		// Re-marshal the data as DeploymentStatusChangeData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment activated data: %w", err)
+		}
+		var statusData dto.DeploymentStatusChangeData
+		if err := json.Unmarshal(dataBytes, &statusData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment activated data: %w", err)
+		}
+		event.Data = &statusData
+		return eventListener.HandleDeploymentActivated(ctx, &event)
+
+	case dto.EventTypeDeploymentDeactivated:
+		// Re-marshal the data as DeploymentStatusChangeData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment deactivated data: %w", err)
+		}
+		var statusData dto.DeploymentStatusChangeData
+		if err := json.Unmarshal(dataBytes, &statusData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment deactivated data: %w", err)
+		}
+		event.Data = &statusData
+		return eventListener.HandleDeploymentDeactivated(ctx, &event)
+
+	case dto.EventTypeDeploymentDeleted:
+		// Re-marshal the data as DeploymentStatusChangeData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment deleted data: %w", err)
+		}
+		var statusData dto.DeploymentStatusChangeData
+		if err := json.Unmarshal(dataBytes, &statusData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment deleted data: %w", err)
+		}
+		event.Data = &statusData
+		return eventListener.HandleDeploymentDeleted(ctx, &event)
+
+	case dto.EventTypeDeploymentExit:
+		// Re-marshal the data as DeploymentExitData
+		dataBytes, err := json.Marshal(event.Data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal deployment exit data: %w", err)
+		}
+		var exitData dto.DeploymentExitData
+		if err := json.Unmarshal(dataBytes, &exitData); err != nil {
+			return fmt.Errorf("failed to unmarshal deployment exit data: %w", err)
+		}
+		event.Data = &exitData
+		return eventListener.HandleDeploymentExit(ctx, &event)
+
+	default:
+		log.Printf("⚠️ Unknown event type: %s", event.EventType)
+		return nil
+	}
+}
+
+// getDeploymentIDFromEvent extracts deployment ID from event for logging
+func getDeploymentIDFromEvent(event *dto.DeploymentEvent) interface{} {
+	return event.DeploymentID
 }
 
 // shouldExecuteTimeframe determines if deployments for a specific timeframe should execute at the given timestamp
@@ -959,6 +1279,7 @@ func getNextExecutionTime(timeframe string, startTime time.Time) time.Time {
 // # Basic Configuration
 // APP_ENV=development
 // DEPLOYMENT_WEBSOCKET_PORT=9091
+// WEB_HTTP_PORT=8080
 //
 // # Simulator Configuration (Development)
 // SIMULATION_SPEED=1s
@@ -983,7 +1304,9 @@ func getNextExecutionTime(timeframe string, startTime time.Time) time.Time {
 // - Staging: Real-time but with FORCE_SIMULATOR=true for testing
 //
 // WebSocket Integration:
-// - When a deployment is created via API, it publishes a 'deployment.created' event
-// - The deployment scheduler listens for these events and dynamically updates its deployment list
+// - When a deployment is created via the web server API, it publishes a 'deployment.created' event
+// - The deployment scheduler connects to the web server's internal WebSocket endpoint to listen for these events
 // - This enables real-time addition of new deployments without requiring a restart
-// - The scheduler polls every 30 seconds to sync with the database for reliability
+// - The deployment server runs its own WebSocket server for deployment execution events
+// - The scheduler listens to the web server (WEB_HTTP_PORT) for deployment lifecycle events
+// - The scheduler publishes execution events to its own WebSocket server (DEPLOYMENT_WEBSOCKET_PORT)

@@ -77,6 +77,28 @@ func (s *OAuthService) isEmailWhitelisted(email string) bool {
 	return false
 }
 
+// shouldGetAdminRole checks if an email should automatically get admin role
+func (s *OAuthService) shouldGetAdminRole(email string) bool {
+	// Same list as whitelist - all whitelisted emails get admin role
+	allowedEmails := []string{
+		"admin@sutram.co",
+		"amitsharmamad@gmail.com",
+		"Narendra.polisetty09@gmail.com",
+		"kkmarella@gmail.com",
+		"ajitsharma6329@gmail.com",
+		"koushikmarella@gmail.com",
+	}
+
+	// Check if the email should get admin role
+	for _, allowedEmail := range allowedEmails {
+		if strings.EqualFold(email, allowedEmail) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cleanupExpiredStates periodically removes expired state tokens
 func (s *OAuthService) cleanupExpiredStates() {
 	ticker := time.NewTicker(10 * time.Minute)
@@ -299,6 +321,19 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 				return nil, "", err
 			}
 
+			// Check if user should get admin role
+			if s.shouldGetAdminRole(oauthResp.Email) {
+				adminCtx, adminCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer adminCancel()
+
+				// Assign admin role to the existing user
+				err = s.userService.AssignRoleToUser(adminCtx, existingUser.ID, "admin")
+				if err != nil {
+					// Log error but don't fail the authentication
+					fmt.Printf("Failed to assign admin role to existing OAuth user %s: %v\n", existingUser.Email, err)
+				}
+			}
+
 			// Get JWT token with a fresh context
 			jwtCtx, jwtCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer jwtCancel()
@@ -393,6 +428,19 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 			err = s.userOAuthRepo.Create(createCtx, userOAuth)
 			if err != nil {
 				return nil, "", err
+			}
+
+			// Check if user should get admin role
+			if s.shouldGetAdminRole(oauthResp.Email) {
+				adminCtx, adminCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer adminCancel()
+
+				// Assign admin role to the new user
+				err = s.userService.AssignRoleToUser(adminCtx, newUser.ID, "admin")
+				if err != nil {
+					// Log error but don't fail the authentication
+					fmt.Printf("Failed to assign admin role to new OAuth user %s: %v\n", newUser.Email, err)
+				}
 			}
 
 			// Get JWT token with a fresh context

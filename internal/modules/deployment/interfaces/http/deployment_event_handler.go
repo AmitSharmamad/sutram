@@ -80,6 +80,35 @@ func (h *DeploymentEventHandler) HandleWebSocket(c *gin.Context) {
 	// The connection handling is now managed by the event publisher
 }
 
+// HandleInternalWebSocket handles WebSocket upgrade for internal services without authentication
+func (h *DeploymentEventHandler) HandleInternalWebSocket(c *gin.Context) {
+	// Check if this is an internal service call (optional security check)
+	clientIP := c.ClientIP()
+	if clientIP != "127.0.0.1" && clientIP != "::1" && clientIP != "localhost" {
+		log.Printf("Internal WebSocket endpoint accessed from non-localhost IP: %s", clientIP)
+		// In production, you might want to be more strict about this
+	}
+
+	// Upgrade HTTP connection to WebSocket
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade internal WebSocket connection: %v", err)
+		return
+	}
+
+	log.Printf("New internal deployment events WebSocket connection from %s", clientIP)
+
+	// For internal services, we use a special internal user ID and subscribe to all events
+	internalUserID := "internal-service"
+	if err := h.eventPublisher.SubscribeUser(c.Request.Context(), internalUserID, conn); err != nil {
+		log.Printf("Failed to subscribe internal service to deployment events: %v", err)
+		conn.Close()
+		return
+	}
+
+	// The connection handling is now managed by the event publisher
+}
+
 // RegisterWebSocketRoutes registers WebSocket routes for deployment events
 func RegisterWebSocketRoutes(router *gin.RouterGroup, eventHandler *DeploymentEventHandler, userController *userHttp.UserController) {
 	// Create auth service adapter
@@ -88,6 +117,9 @@ func RegisterWebSocketRoutes(router *gin.RouterGroup, eventHandler *DeploymentEv
 	// Create middleware
 	authMiddleware := middleware.AuthMiddleware(authServiceAdapter)
 
-	// WebSocket endpoint for deployment events
+	// WebSocket endpoint for deployment events (authenticated)
 	router.GET("/deployment/events/ws", authMiddleware, eventHandler.HandleWebSocket)
+
+	// Internal WebSocket endpoint for deployment events (no authentication required)
+	router.GET("/deployment/events/internal/ws", eventHandler.HandleInternalWebSocket)
 }

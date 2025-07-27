@@ -104,24 +104,27 @@ func (s *UserService) Register(ctx context.Context, name, username, email, phone
 		return nil, fmt.Errorf("error creating user: %w", err)
 	}
 
-	// Assign default "free_user" role
-	freeRole, err := s.roleRepo.FindByName(ctx, "free_user")
-	if err != nil {
-		return nil, fmt.Errorf("error finding free_user role: %w", err)
-	}
-
-	if freeRole != nil {
-		if err := s.roleRepo.AssignRoleToUser(ctx, user.ID, freeRole.ID); err != nil {
-			return nil, fmt.Errorf("error assigning default role: %w", err)
+	// For admin users, skip automatic role assignment
+	if !s.shouldGetAdminRole(email) {
+		// Assign default "free_user" role
+		freeRole, err := s.roleRepo.FindByName(ctx, "free_user")
+		if err != nil {
+			return nil, fmt.Errorf("error finding free_user role: %w", err)
 		}
 
-		// Add the role to the user object
-		user.Roles = []model.Role{*freeRole}
+		if freeRole != nil {
+			if err := s.roleRepo.AssignRoleToUser(ctx, user.ID, freeRole.ID); err != nil {
+				return nil, fmt.Errorf("error assigning default role: %w", err)
+			}
 
-		// Create default usage limits for the new user
-		if err := s.createDefaultUsageLimits(ctx, user.ID, "free_user"); err != nil {
-			// Log error but don't fail user creation
-			fmt.Printf("Error creating default usage limits for user %s: %v\n", user.ID, err)
+			// Add the role to the user object
+			user.Roles = []model.Role{*freeRole}
+
+			// Create default usage limits for the new user
+			if err := s.createDefaultUsageLimits(ctx, user.ID, "free_user"); err != nil {
+				// Log error but don't fail user creation
+				fmt.Printf("Error creating default usage limits for user %s: %v\n", user.ID, err)
+			}
 		}
 	}
 
@@ -437,25 +440,21 @@ func (s *UserService) GetAllRoles(ctx context.Context) ([]model.Role, error) {
 // createDefaultUsageLimits creates default usage limits for a new user based on their role
 func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.UUID, roleName string) error {
 	// Define default limits based on role
-	var backtestLimit, deploymentLimit, liveTradesLimit int
+	var backtestLimit, deploymentLimit int
 
 	switch roleName {
 	case "admin":
 		backtestLimit = 999999
 		deploymentLimit = 999999
-		liveTradesLimit = 999999
 	case "paid_user":
 		backtestLimit = 100
 		deploymentLimit = 20
-		liveTradesLimit = 500
 	case "free_user":
 		backtestLimit = 10
 		deploymentLimit = 3
-		liveTradesLimit = 50
 	default:
 		backtestLimit = 5
 		deploymentLimit = 1
-		liveTradesLimit = 10
 	}
 
 	now := time.Now()
@@ -492,21 +491,26 @@ func (s *UserService) createDefaultUsageLimits(ctx context.Context, userID uuid.
 		return fmt.Errorf("failed to create deployment limit: %w", err)
 	}
 
-	// Create live trades limit
-	liveTradesUsageLimit := &entity.UsageLimit{
-		UserID:       userID,
-		LimitType:    entity.LiveTradesPerDay,
-		LimitValue:   liveTradesLimit,
-		CurrentUsage: 0,
-		ResetPeriod:  entity.Daily,
-		LastResetAt:  now,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
-
-	if err := s.usageLimitRepo.Create(ctx, liveTradesUsageLimit); err != nil {
-		return fmt.Errorf("failed to create live trades limit: %w", err)
-	}
-
 	return nil
+}
+
+// shouldGetAdminRole checks if an email should automatically get admin role
+func (s *UserService) shouldGetAdminRole(email string) bool {
+	// Whitelist of admin emails
+	allowedEmails := []string{
+		"admin@sutram.co",
+		"amitsharmamad@gmail.com",
+		"Narendra.polisetty09@gmail.com",
+		"kkmarella@gmail.com",
+		"ajitsharma6329@gmail.com",
+		"koushikmarella@gmail.com",
+	}
+
+	for _, allowedEmail := range allowedEmails {
+		if email == allowedEmail {
+			return true
+		}
+	}
+
+	return false
 }

@@ -32,6 +32,7 @@ func RegisterRoutes(
 		deploymentAuth.DELETE("/:deployment_id", controller.DeleteDeployment)
 		deploymentAuth.PUT("/:deployment_id/activate", controller.ActivateDeployment)
 		deploymentAuth.PUT("/:deployment_id/deactivate", controller.DeactivateDeployment)
+		deploymentAuth.POST("/:deployment_id/exit", controller.ExitDeployment)
 		deploymentAuth.POST("/stop-all", controller.StopAllDeployments)
 		deploymentAuth.POST("/start-all", controller.StartAllDeployments)
 

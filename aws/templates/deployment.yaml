@@ -178,6 +178,11 @@ Resources:
                 - "clickhouse://sutram_user:change_me_clickhouse@${ClickHouseEndpoint}:9000/sutram"
                 - ClickHouseEndpoint: 
                     Fn::ImportValue: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
+            - Name: WEB_HTTP_HOST
+              Value:
+                Fn::ImportValue: !Sub "${ProjectName}-${Environment}-web-alb-dns"
+            - Name: WEB_HTTP_PORT
+              Value: "80"
           LogConfiguration:
             LogDriver: awslogs
             Options:

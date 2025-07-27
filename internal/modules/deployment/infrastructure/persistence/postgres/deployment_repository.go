@@ -286,6 +286,37 @@ func (r *DeploymentRepository) GetByUserStrategyInstrument(ctx context.Context, 
 	return &deployment, nil
 }
 
+// GetActiveByUserStrategyInstrument retrieves an active deployment by user, strategy, and instrument
+func (r *DeploymentRepository) GetActiveByUserStrategyInstrument(ctx context.Context, userID, strategyID uuid.UUID, instrumentID int) (*model.Deployment, error) {
+	query := `
+		SELECT id, user_id, strategy_id, instrument_id, name, description, is_active, created_at, updated_at
+		FROM deployment
+		WHERE user_id = $1 AND strategy_id = $2 AND instrument_id = $3 AND is_active = true
+	`
+
+	var deployment model.Deployment
+	err := r.db.QueryRowContext(ctx, query, userID, strategyID, instrumentID).Scan(
+		&deployment.ID,
+		&deployment.UserID,
+		&deployment.StrategyID,
+		&deployment.InstrumentID,
+		&deployment.Name,
+		&deployment.Description,
+		&deployment.IsActive,
+		&deployment.CreatedAt,
+		&deployment.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil // Return nil without error if no active deployment found
+		}
+		return nil, fmt.Errorf("failed to get active deployment: %w", err)
+	}
+
+	return &deployment, nil
+}
+
 // Update updates an existing deployment
 func (r *DeploymentRepository) Update(ctx context.Context, deployment *model.Deployment) error {
 	query := `

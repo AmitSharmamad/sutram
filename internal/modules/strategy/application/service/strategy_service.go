@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	deploymentRepository "algo/internal/modules/deployment/domain/repository"
 	"algo/internal/modules/strategy/application/dto"
 	"algo/internal/modules/strategy/domain/model"
 	"algo/internal/modules/strategy/domain/repository"
@@ -22,6 +23,7 @@ var (
 	ErrStrategyCreateFailed = errors.New("failed to create strategy")
 	ErrStrategyUpdateFailed = errors.New("failed to update strategy")
 	ErrStrategyDeleteFailed = errors.New("failed to delete strategy")
+	ErrStrategyReadonly     = errors.New("strategy cannot be modified as deployments exist")
 )
 
 // StrategyService defines the service for strategy operations
@@ -65,14 +67,15 @@ type StrategyService interface {
 
 // strategyService implements the StrategyService interface
 type strategyService struct {
-	strategyRepo repository.StrategyRepository
-	// Could add other dependencies like expression validator, instrument service, etc.
+	strategyRepo   repository.StrategyRepository
+	deploymentRepo deploymentRepository.DeploymentRepository
 }
 
 // NewStrategyService creates a new strategy service
-func NewStrategyService(strategyRepo repository.StrategyRepository) StrategyService {
+func NewStrategyService(strategyRepo repository.StrategyRepository, deploymentRepo deploymentRepository.DeploymentRepository) StrategyService {
 	return &strategyService{
-		strategyRepo: strategyRepo,
+		strategyRepo:   strategyRepo,
+		deploymentRepo: deploymentRepo,
 	}
 }
 
@@ -120,7 +123,13 @@ func (s *strategyService) GetStrategyByID(ctx context.Context, id uuid.UUID, use
 		return nil, ErrUnauthorized
 	}
 
-	return dto.FromDomain(strategy), nil
+	// Check if strategy has deployments to determine readonly status
+	hasDeployments, err := s.hasDeployments(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check deployments: %w", err)
+	}
+
+	return dto.FromDomainWithReadonly(strategy, hasDeployments), nil
 }
 
 // GetUserStrategies retrieves all strategies for a user
@@ -130,10 +139,14 @@ func (s *strategyService) GetUserStrategies(ctx context.Context, userID uuid.UUI
 		return nil, err
 	}
 
-	// Convert domain models to response DTOs
+	// Convert domain models to response DTOs with readonly status
 	var strategyResponses []*dto.StrategyResponse
 	for _, strategy := range strategies {
-		strategyResponses = append(strategyResponses, dto.FromDomain(strategy))
+		hasDeployments, err := s.hasDeployments(ctx, strategy.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check deployments for strategy %s: %w", strategy.ID, err)
+		}
+		strategyResponses = append(strategyResponses, dto.FromDomainWithReadonly(strategy, hasDeployments))
 	}
 
 	return strategyResponses, nil
@@ -153,10 +166,14 @@ func (s *strategyService) GetDefaultStrategies(ctx context.Context) ([]*dto.Stra
 		return nil, err
 	}
 
-	// Convert domain models to response DTOs
+	// Convert domain models to response DTOs with readonly status
 	var strategyResponses []*dto.StrategyResponse
 	for _, strategy := range strategies {
-		strategyResponses = append(strategyResponses, dto.FromDomain(strategy))
+		hasDeployments, err := s.hasDeployments(ctx, strategy.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check deployments for strategy %s: %w", strategy.ID, err)
+		}
+		strategyResponses = append(strategyResponses, dto.FromDomainWithReadonly(strategy, hasDeployments))
 	}
 
 	return strategyResponses, nil
@@ -180,7 +197,18 @@ func (s *strategyService) UpdateStrategy(ctx context.Context, req *dto.UpdateStr
 		return nil, ErrUnauthorized
 	}
 
-	// Validate entry expression
+	// Check if deployments exist for this strategy (only if deployment repo is available)
+	if s.deploymentRepo != nil {
+		deployments, err := s.deploymentRepo.GetByStrategyID(ctx, req.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check strategy deployments: %w", err)
+		}
+
+		// If any deployments exist, don't allow strategy modification
+		if len(deployments) > 0 {
+			return nil, ErrStrategyReadonly
+		}
+	} // Validate entry expression
 	if err := validateExpression(req.EntryExpression); err != nil {
 		return nil, ErrInvalidExpression
 	}
@@ -207,7 +235,8 @@ func (s *strategyService) UpdateStrategy(ctx context.Context, req *dto.UpdateStr
 		return nil, ErrStrategyUpdateFailed
 	}
 
-	return dto.FromDomain(updatedStrategy), nil
+	// Note: Since we already checked that no deployments exist, readonly should be false
+	return dto.FromDomainWithReadonly(updatedStrategy, false), nil
 }
 
 // DeleteStrategy deletes a strategy
@@ -469,4 +498,19 @@ func validateExpression(expression string) error {
 // GetRepository returns the strategy repository
 func (s *strategyService) GetRepository() repository.StrategyRepository {
 	return s.strategyRepo
+}
+
+// hasDeployments checks if a strategy has any deployments
+func (s *strategyService) hasDeployments(ctx context.Context, strategyID uuid.UUID) (bool, error) {
+	// If deployment repository is not available, assume no deployments exist
+	if s.deploymentRepo == nil {
+		return false, nil
+	}
+
+	deployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
+	if err != nil {
+		return false, fmt.Errorf("failed to check strategy deployments: %w", err)
+	}
+
+	return len(deployments) > 0, nil
 }

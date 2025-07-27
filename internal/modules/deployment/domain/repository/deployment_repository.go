@@ -31,6 +31,9 @@ type DeploymentRepository interface {
 	// GetByUserStrategyInstrument retrieves a deployment by user, strategy, and instrument
 	GetByUserStrategyInstrument(ctx context.Context, userID, strategyID uuid.UUID, instrumentID int) (*model.Deployment, error)
 
+	// GetActiveByUserStrategyInstrument retrieves an active deployment by user, strategy, and instrument
+	GetActiveByUserStrategyInstrument(ctx context.Context, userID, strategyID uuid.UUID, instrumentID int) (*model.Deployment, error)
+
 	// Update updates an existing deployment in the database
 	Update(ctx context.Context, deployment *model.Deployment) error
 
