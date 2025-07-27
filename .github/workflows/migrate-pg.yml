@@ -1,0 +1,159 @@
+name: Run PostgreSQL Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run migrations on'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      action:
+        description: 'Migration action to perform'
+        required: true
+        default: 'up'
+        type: choice
+        options:
+          - up
+          - down
+          - version
+          - validate
+      steps:
+        description: 'Number of steps (only for steps action)'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  migrate-pg-dev:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev'
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Load environment variables
+        run: |
+          echo "Loading dev environment variables..."
+          # Add any dev-specific environment setup here
+
+      - name: Build PostgreSQL migration binary
+        run: |
+          echo "Building PostgreSQL migration binary..."
+          go build -o bin/db-migrate cmd/db-migrate/main.go
+
+      - name: Run PostgreSQL migration - up
+        if: github.event.inputs.action == 'up'
+        run: |
+          echo "Running all pending PostgreSQL migrations..."
+          ./bin/db-migrate -action=up
+
+      - name: Run PostgreSQL migration - down
+        if: github.event.inputs.action == 'down'
+        run: |
+          echo "Rolling back PostgreSQL migrations..."
+          ./bin/db-migrate -action=down
+
+      - name: Run PostgreSQL migration - version
+        if: github.event.inputs.action == 'version'
+        run: |
+          echo "Checking current PostgreSQL migration version..."
+          ./bin/db-migrate -action=version
+
+      - name: Run PostgreSQL migration - validate
+        if: github.event.inputs.action == 'validate'
+        run: |
+          echo "Validating PostgreSQL migrations..."
+          ./bin/db-migrate -action=validate
+
+      - name: Run PostgreSQL migration - steps
+        if: github.event.inputs.action == 'steps'
+        run: |
+          echo "Running PostgreSQL migration steps..."
+          ./bin/db-migrate -action=steps -steps=${{ github.event.inputs.steps }}
+
+  migrate-pg-prod:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Load environment variables
+        run: |
+          echo "Loading prod environment variables..."
+          # Add any prod-specific environment setup here
+
+      - name: Build PostgreSQL migration binary
+        run: |
+          echo "Building PostgreSQL migration binary..."
+          go build -o bin/db-migrate cmd/db-migrate/main.go
+
+      - name: Run PostgreSQL migration - up
+        if: github.event.inputs.action == 'up'
+        run: |
+          echo "Running all pending PostgreSQL migrations..."
+          ./bin/db-migrate -action=up
+
+      - name: Run PostgreSQL migration - down
+        if: github.event.inputs.action == 'down'
+        run: |
+          echo "Rolling back PostgreSQL migrations..."
+          ./bin/db-migrate -action=down
+
+      - name: Run PostgreSQL migration - version
+        if: github.event.inputs.action == 'version'
+        run: |
+          echo "Checking current PostgreSQL migration version..."
+          ./bin/db-migrate -action=version
+
+      - name: Run PostgreSQL migration - validate
+        if: github.event.inputs.action == 'validate'
+        run: |
+          echo "Validating PostgreSQL migrations..."
+          ./bin/db-migrate -action=validate
+
+      - name: Run PostgreSQL migration - steps
+        if: github.event.inputs.action == 'steps'
+        run: |
+          echo "Running PostgreSQL migration steps..."
+          ./bin/db-migrate -action=steps -steps=${{ github.event.inputs.steps }}
