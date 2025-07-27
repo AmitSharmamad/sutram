@@ -15,9 +15,9 @@ INSERT INTO "user" (
 -- 1. Moving Average Crossover Strategy
 INSERT INTO strategy (
     user_id, name, description, position_type, instruments, chart_type, chart_timeframe, 
-    trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
+    trading_days, trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
     stop_loss, stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, capital, max_allocation, 
-    max_trades, is_active
+    max_trades, segment, strategy_type
 ) VALUES (
     'e65c67f1-2b43-4581-b33b-ec26295e741b', -- system user ID
     'Moving Average Crossover',
@@ -26,6 +26,7 @@ INSERT INTO strategy (
     '{}', -- empty array for instruments
     'CANDLESTICK',
     '15m',
+    '{MON,TUE,WED,THU,FRI}',
     'MIS',
     100,
     'CLOSE(0) > EMA(CLOSE, 9, 0) AND EMA(CLOSE, 9, 0) CrossesAbove EMA(CLOSE, 21, 0)',
@@ -39,15 +40,16 @@ INSERT INTO strategy (
     100000,
     10000,
     5,
-    true
+    'EQ',
+    'CONDITIONAL'
 );
 
 -- 2. RSI Oversold/Overbought Strategy
 INSERT INTO strategy (
     user_id, name, description, position_type, instruments, chart_type, chart_timeframe, 
-    trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
+    trading_days, trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
     stop_loss, stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, capital, max_allocation, 
-    max_trades, is_active
+    max_trades, segment, strategy_type
 ) VALUES (
     'e65c67f1-2b43-4581-b33b-ec26295e741b', -- system user ID
     'RSI Reversal Strategy',
@@ -56,6 +58,7 @@ INSERT INTO strategy (
     '{}', -- empty array for instruments
     'CANDLESTICK',
     '5m',
+    '{MON,TUE,WED,THU,FRI}',
     'MIS',
     100,
     'RSI(CLOSE, 14, 0) CrossesAbove NUMBER(30)',
@@ -69,15 +72,16 @@ INSERT INTO strategy (
     100000,
     10000,
     5,
-    true
+    'EQ',
+    'CONDITIONAL'
 );
 
 -- 4. MACD Bullish Crossover
 INSERT INTO strategy (
     user_id, name, description, position_type, instruments, chart_type, chart_timeframe, 
-    trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
+    trading_days, trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
     stop_loss, stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, capital, max_allocation, 
-    max_trades, is_active
+    max_trades, segment, strategy_type
 ) VALUES (
     'e65c67f1-2b43-4581-b33b-ec26295e741b', -- system user ID
     'MACD Bullish Crossover',
@@ -86,6 +90,7 @@ INSERT INTO strategy (
     '{}', -- empty array for instruments
     'CANDLESTICK',
     '30m',
+    '{MON,TUE,WED,THU,FRI}',
     'MIS',
     100,
     'MACD(12, 26, 9, STANDARD, 0) CrossesAbove MACD(12, 26, 9, SIGNAL, 0) AND MACD(12, 26, 9, STANDARD, 0) < NUMBER(0)',
@@ -99,15 +104,16 @@ INSERT INTO strategy (
     100000,
     10000,
     3,
-    true
+    'EQ',
+    'CONDITIONAL'
 );
 
 -- 6. Triple EMA Crossover Strategy
 INSERT INTO strategy (
     user_id, name, description, position_type, instruments, chart_type, chart_timeframe, 
-    trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
+    trading_days, trade_type, qty, entry_expression, exit_expression, target_profit, target_profit_type, 
     stop_loss, stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, capital, max_allocation, 
-    max_trades, is_active
+    max_trades, segment, strategy_type
 ) VALUES (
     'e65c67f1-2b43-4581-b33b-ec26295e741b', -- system user ID
     'Triple EMA Strategy',
@@ -116,6 +122,7 @@ INSERT INTO strategy (
     '{}', -- empty array for instruments
     'CANDLESTICK',
     '15m',
+    '{MON,TUE,WED,THU,FRI}',
     'MIS',
     100,
     'EMA(CLOSE, 5, 0) > EMA(CLOSE, 10, 0) AND EMA(CLOSE, 10, 0) > EMA(CLOSE, 20, 0) AND CLOSE(0) > EMA(CLOSE, 5, 0)',
@@ -129,7 +136,8 @@ INSERT INTO strategy (
     100000,
     10000,
     4,
-    true
+    'EQ',
+    'CONDITIONAL'
 );
 
 -- 8. Stochastic Cross Strategy

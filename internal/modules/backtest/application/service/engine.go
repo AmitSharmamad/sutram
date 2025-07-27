@@ -125,8 +125,8 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 
 		instrumentIDInt := int(instrumentMaster.ExchangeSecurityID)
 		qty := 1 // Default quantity
-		if strategyResp.Qty > 0 {
-			qty = strategyResp.Qty
+		if strategyResp.Qty != nil && *strategyResp.Qty > 0 {
+			qty = *strategyResp.Qty
 		}
 
 		// Create a run for this instrument (in memory)
@@ -220,7 +220,10 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 			// Subtract commission and slippage from total P&L
 			if run.RunMetrics.TotalReturnPct != 0 {
 				// Convert percentage back to absolute value to subtract costs
-				initialCapital := strategyResp.Capital
+				initialCapital := 100000.0 // Default capital
+				if strategyResp.Capital != nil {
+					initialCapital = *strategyResp.Capital
+				}
 				totalPnL := (run.RunMetrics.TotalReturnPct / 100.0) * initialCapital
 				adjustedPnL := totalPnL - commission - slippage
 				run.RunMetrics.TotalReturnPct = (adjustedPnL / initialCapital) * 100
@@ -534,7 +537,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 		dateTruncated := currentTimestamp.Truncate(24 * time.Hour)
 		if !dateTruncated.Equal(currentTradingDay) {
 			// If we have an open position and this is an MIS (intraday) trade, close it at the end of the previous day
-			if openPosition != nil && openPosition.State == model.Entered && strategy.TradeType == strategyModel.TradeType("MIS") {
+			if openPosition != nil && openPosition.State == model.Entered && strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") {
 				// Find the last timestamp from the previous day
 				var lastTimestampFromPreviousDay *time.Time
 
@@ -549,7 +552,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 				if lastTimestampFromPreviousDay != nil {
 					// Use the consolidated MIS square-off function
-					if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, *lastTimestampFromPreviousDay, &positions, &capital) {
+					if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, *lastTimestampFromPreviousDay, &positions, capital) {
 						openPosition = nil
 					}
 				}
@@ -566,28 +569,28 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 				currentTimestamp,
 				i,
 				run,
-				capital,
+				*capital,
 			)
 
 			if newPosition != nil {
 				openPosition = newPosition
-				capital = updatedCapital
+				*capital = updatedCapital
 			}
 		}
 
 		// If position is still open, check exit condition
 		if openPosition != nil {
 			// Process exit conditions and check if position was closed
-			if e.processExitConditions(openPosition, strategy, indicatorArrayMap, currentTimestamp, i, &positions, &capital) {
+			if e.processExitConditions(openPosition, strategy, indicatorArrayMap, currentTimestamp, i, &positions, capital) {
 				// Position was closed, reset open position and continue to next iteration
 				openPosition = nil
 				continue
 			}
 
 			// Close the position if MIS end-of-day is hit
-			if strategy.TradeType == strategyModel.TradeType("MIS") && e.marketHoursUtil.IsMISEndOfDayHit(currentTimestamp, run.InstrumentMaster.Exchange) {
+			if strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") && e.marketHoursUtil.IsMISEndOfDayHit(currentTimestamp, run.InstrumentMaster.Exchange) {
 				// Use the consolidated MIS square-off function
-				if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, currentTimestamp, &positions, &capital) {
+				if e.handleMISSquareOff(openPosition, strategy, indicatorArrayMap, currentTimestamp, &positions, capital) {
 					openPosition = nil
 				}
 			}
@@ -597,7 +600,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	// Handle any remaining open position at the end of backtest period
 	if openPosition != nil && openPosition.State == model.Entered {
 		// If this is a MIS position, close it at the end of the backtest
-		if strategy.TradeType == strategyModel.TradeType("MIS") && len(timestamps) > 0 {
+		if strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") && len(timestamps) > 0 {
 			// Get the last timestamp and close price from indicators
 			lastTimestamp := timestamps[len(timestamps)-1]
 			var lastClosePrice float64
@@ -635,7 +638,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 
 			// Add net profit/loss if available
 			if openPosition.NetProfitLoss != nil {
-				capital += *openPosition.NetProfitLoss
+				*capital += *openPosition.NetProfitLoss
 			}
 		} else {
 			// For CNC/NRML positions, just add to the list without closing
@@ -663,7 +666,7 @@ func (e *BacktestEngine) executeBacktestInMemory(strategy *strategyDto.StrategyR
 	positions = closedPositions
 
 	// Calculate metrics
-	metrics := e.calculateMetrics(positions, initialCapital, capital, run)
+	metrics := e.calculateMetrics(positions, initialCapital, *capital, run)
 
 	functionEndTime := time.Now()
 	executionDuration := functionEndTime.Sub(functionStartTime)
@@ -760,7 +763,13 @@ func (e *BacktestEngine) updateStopLossBasedOnTrailing(
 	entryPrice := *position.EntryPriceOrder
 	currentStopLoss := *position.StopLossPrice
 
-	initialStopDistance := *e.calculateStopLoss(entryPrice, strategy.StopLoss, strategy.StopLossType, strategy.PositionType)
+	initialStopDistance := *e.calculateStopLoss(entryPrice, strategy.StopLoss, strategy.StopLossType,
+		func() strategyModel.Direction {
+			if strategy.PositionType != nil {
+				return *strategy.PositionType
+			}
+			return strategyModel.Direction("LONG") // default fallback
+		}())
 
 	// Calculate the trailing amount based on type (percentage or absolute)
 	trailingAmount := 0.0
@@ -846,20 +855,31 @@ func (e *BacktestEngine) isTargetProfitTriggered(position *model.Position, strat
 
 // calculatePositionSize calculates the position size based on strategy settings
 func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyResponse, price float64) float64 {
+	// Get values from pointers, using defaults if nil
+	qty := 0
+	if strategy.Qty != nil {
+		qty = *strategy.Qty
+	}
+
+	maxAllocation := 0.0
+	if strategy.MaxAllocation != nil {
+		maxAllocation = *strategy.MaxAllocation
+	}
+
 	// 1. If strategy.qty <= 0 and strategy.max_allocation <= 0 throw an error
-	if strategy.Qty <= 0 && strategy.MaxAllocation <= 0 {
+	if qty <= 0 && maxAllocation <= 0 {
 		panic("Invalid position size parameters")
 	}
 
 	// 2. If strategy.qty > 0 and strategy.max_allocation <= 0 then return strategy.qty
-	if strategy.Qty > 0 && strategy.MaxAllocation <= 0 {
-		return float64(strategy.Qty)
+	if qty > 0 && maxAllocation <= 0 {
+		return float64(qty)
 	}
 
 	// 3. If strategy.qty <= 0 and strategy.max_allocation > 0 then return strategy.max_allocation / price as integer
 	// Ensure at least 1 share is purchased if the calculation results in less than 0
-	if strategy.Qty <= 0 && strategy.MaxAllocation > 0 {
-		quantity := math.Floor(strategy.MaxAllocation / price)
+	if qty <= 0 && maxAllocation > 0 {
+		quantity := math.Floor(maxAllocation / price)
 		if quantity <= 0 {
 			return 1
 		}
@@ -868,11 +888,11 @@ func (e *BacktestEngine) calculatePositionSize(strategy *strategyDto.StrategyRes
 
 	// 4. If strategy.qty > 0 and strategy.max_allocation > 0,
 	// then return the lowest between (strategy.qty, strategy.max_allocation / price) as integer
-	qtyValue := float64(strategy.Qty) * price
-	if qtyValue < strategy.MaxAllocation {
-		return float64(strategy.Qty)
+	qtyValue := float64(qty) * price
+	if qtyValue < maxAllocation {
+		return float64(qty)
 	} else {
-		quantity := math.Floor(strategy.MaxAllocation / price)
+		quantity := math.Floor(maxAllocation / price)
 		if quantity <= 0 {
 			return 1
 		}
@@ -1163,7 +1183,7 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 
 	// Check if MIS square-off time has been reached (3:15 PM IST)
 	// Prevent new MIS entries after this time
-	if strategy.TradeType == strategyModel.TradeType("MIS") {
+	if strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") {
 		if e.marketHoursUtil.IsMISEndOfDayHit(currentTimestamp, run.InstrumentMaster.Exchange) {
 			canCheckEntryCondition = false
 		}
@@ -1192,7 +1212,7 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 
 		// Determine position direction from strategy
 		var direction model.Direction
-		if strategy.PositionType == "LONG" || strategy.PositionType == "long" {
+		if strategy.PositionType != nil && (string(*strategy.PositionType) == "LONG" || string(*strategy.PositionType) == "long") {
 			direction = model.Long
 		} else {
 			direction = model.Short
@@ -1217,7 +1237,12 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 			*newPosition.EntryPriceOrder,
 			strategy.StopLoss,
 			strategy.StopLossType,
-			strategy.PositionType,
+			func() strategyModel.Direction {
+				if strategy.PositionType != nil {
+					return *strategy.PositionType
+				}
+				return strategyModel.Direction("LONG") // default fallback
+			}(),
 		)
 
 		// Store the initial stop loss price for trailing stop loss detection
@@ -1231,7 +1256,12 @@ func (e *BacktestEngine) checkAndCreateNewPosition(
 			*newPosition.EntryPriceOrder,
 			strategy.TargetProfit,
 			strategy.TargetProfitType,
-			strategy.PositionType,
+			func() strategyModel.Direction {
+				if strategy.PositionType != nil {
+					return *strategy.PositionType
+				}
+				return strategyModel.Direction("LONG") // default fallback
+			}(),
 		)
 
 		// Update capital for position entry
@@ -1254,7 +1284,7 @@ func (e *BacktestEngine) handleMISSquareOff(
 ) bool {
 	// Only process MIS positions that are entered
 	if openPosition == nil || openPosition.State != model.Entered ||
-		strategy.TradeType != strategyModel.TradeType("MIS") {
+		strategy.TradeType == nil || *strategy.TradeType != strategyModel.TradeType("MIS") {
 		return false
 	}
 
