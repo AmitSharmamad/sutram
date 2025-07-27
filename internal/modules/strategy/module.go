@@ -17,11 +17,12 @@ import (
 
 // Module represents the strategy module
 type Module struct {
-	db             *sql.DB
-	controller     *strategyHttp.StrategyHandler
-	userController *userHttp.UserController
-	service        service.StrategyService
-	deploymentRepo deploymentRepository.DeploymentRepository
+	db               *sql.DB
+	controller       *strategyHttp.StrategyHandler
+	userController   *userHttp.UserController
+	service          service.StrategyService
+	optionLegService service.OptionLegService
+	deploymentRepo   deploymentRepository.DeploymentRepository
 }
 
 // ProvideModule provides a wire provider set for the strategy module
@@ -57,9 +58,13 @@ func (m *Module) initialize() {
 	// Create repository
 	strategyRepo := ProvideStrategyRepository(m.db)
 
+	// Create option leg service early
+	optionLegRepo := ProvideOptionLegRepository(m.db)
+	m.optionLegService = ProvideOptionLegService(optionLegRepo)
+
 	// Note: deployment repository will be set later to avoid circular dependency
 	// For now, create service with nil deployment repo - this will be updated later
-	m.service = ProvideStrategyService(strategyRepo, nil)
+	m.service = ProvideStrategyService(strategyRepo, nil, m.optionLegService)
 
 	// Do NOT create controller here - wait until deployment repository is set
 	// m.controller = ProvideStrategyHandler(m.service)
@@ -71,10 +76,17 @@ func (m *Module) SetDeploymentRepository(deploymentRepo deploymentRepository.Dep
 
 	// Recreate the service with the deployment repository
 	strategyRepo := ProvideStrategyRepository(m.db)
-	m.service = ProvideStrategyService(strategyRepo, deploymentRepo)
+
+	// Option leg service should already be created in initialize
+	if m.optionLegService == nil {
+		optionLegRepo := ProvideOptionLegRepository(m.db)
+		m.optionLegService = ProvideOptionLegService(optionLegRepo)
+	}
+
+	m.service = ProvideStrategyService(strategyRepo, deploymentRepo, m.optionLegService)
 
 	// Create the controller with the updated service (first time creation)
-	m.controller = ProvideStrategyHandler(m.service)
+	m.controller = ProvideStrategyHandler(m.service, m.optionLegService)
 }
 
 // RegisterRoutes registers the strategy module routes with the given router
@@ -106,11 +118,21 @@ func ProvideStrategyRepository(db *sql.DB) repository.StrategyRepository {
 }
 
 // ProvideStrategyService provides a strategy service
-func ProvideStrategyService(repo repository.StrategyRepository, deploymentRepo deploymentRepository.DeploymentRepository) service.StrategyService {
-	return service.NewStrategyService(repo, deploymentRepo)
+func ProvideStrategyService(repo repository.StrategyRepository, deploymentRepo deploymentRepository.DeploymentRepository, optionLegService service.OptionLegService) service.StrategyService {
+	return service.NewStrategyService(repo, deploymentRepo, optionLegService)
+}
+
+// ProvideOptionLegRepository provides an option leg repository
+func ProvideOptionLegRepository(db *sql.DB) repository.OptionLegRepository {
+	return postgres.NewOptionLegRepository(db)
+}
+
+// ProvideOptionLegService provides an option leg service
+func ProvideOptionLegService(repo repository.OptionLegRepository) service.OptionLegService {
+	return service.NewOptionLegService(repo)
 }
 
 // ProvideStrategyHandler provides a strategy controller
-func ProvideStrategyHandler(service service.StrategyService) *strategyHttp.StrategyHandler {
-	return strategyHttp.NewStrategyHandler(service)
+func ProvideStrategyHandler(service service.StrategyService, optionLegService service.OptionLegService) *strategyHttp.StrategyHandler {
+	return strategyHttp.NewStrategyHandler(service, optionLegService)
 }
