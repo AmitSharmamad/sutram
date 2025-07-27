@@ -112,4 +112,31 @@ git:
 # ---------------------------------------------------------- #
 
 db:
-	make -C db all
+	@make -C db all
+
+# Database Migration Commands
+db-migrate-up:
+	@echo "Running all pending database migrations..."
+	@make -C db migrate-up
+
+db-migrate-down:
+	@echo "Rolling back database migrations..."
+	@make -C db migrate-down
+
+db-migrate-version:
+	@echo "Checking current migration version..."
+	@make -C db migrate-version
+
+db-migrate-validate:
+	@echo "Validating database migrations..."
+	@make -C db migrate-validate
+
+db-setup:
+	@echo "Setting up database with migrations..."
+	@make -C db setup
+
+db-fresh:
+	@echo "Fresh database setup..."
+	@make -C db fresh
+
+.PHONY: db-migrate-up db-migrate-down db-migrate-version db-migrate-validate db-setup db-fresh
