@@ -29,8 +29,6 @@ type UsageLimitService interface {
 
 	// Periodic resets
 	ResetMonthlyUsage(ctx context.Context) error
-	ResetDailyUsage(ctx context.Context) error
-	ResetHourlyUsage(ctx context.Context) error
 
 	// Usage history
 	GetUsageHistory(ctx context.Context, userID uuid.UUID, limitType entity.UsageLimitType, limit int, offset int) ([]*entity.UsageLog, error)
@@ -202,16 +200,6 @@ func (s *usageLimitService) ResetUsageForUser(ctx context.Context, userID uuid.U
 // ResetMonthlyUsage resets all monthly usage limits
 func (s *usageLimitService) ResetMonthlyUsage(ctx context.Context) error {
 	return s.usageLimitRepo.BulkResetUsage(ctx, entity.BacktestPerMonth)
-}
-
-// ResetDailyUsage resets all daily usage limits
-func (s *usageLimitService) ResetDailyUsage(ctx context.Context) error {
-	return s.usageLimitRepo.BulkResetUsage(ctx, entity.LiveTradesPerDay)
-}
-
-// ResetHourlyUsage resets all hourly usage limits
-func (s *usageLimitService) ResetHourlyUsage(ctx context.Context) error {
-	return s.usageLimitRepo.BulkResetUsage(ctx, entity.APICallsPerHour)
 }
 
 // GetUsageHistory gets usage history for a user and limit type

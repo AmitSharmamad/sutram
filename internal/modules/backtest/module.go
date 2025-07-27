@@ -43,12 +43,6 @@ func New() *Module {
 		panic(err) // In a real app, handle this more gracefully
 	}
 
-	// Create strategy module
-	strategyMod, err := strategyModule.ProvideStrategyModule()
-	if err != nil {
-		panic(err)
-	}
-
 	// Create instrument module
 	instrumentMod, err := instrumentModule.ProvideInstrumentModule()
 	if err != nil {
@@ -57,14 +51,17 @@ func New() *Module {
 
 	module := &Module{
 		db:               db,
-		strategyModule:   strategyMod,
 		instrumentModule: instrumentMod,
 	}
 
-	// Initialize module components
-	module.initialize()
-
 	return module
+}
+
+// SetStrategyModule sets the strategy module (to be called from main.go)
+func (m *Module) SetStrategyModule(strategyMod *strategyModule.Module) {
+	m.strategyModule = strategyMod
+	// Initialize module components after strategy module is set
+	m.initialize()
 }
 
 // initialize sets up the backtest module

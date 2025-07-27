@@ -65,6 +65,10 @@ func (r *PgDeploymentPositionRepository) Create(ctx context.Context, position *m
 	).Scan(&id)
 
 	if err != nil {
+		// Check if this is a unique constraint violation for the one-open-position-per-deployment rule
+		if strings.Contains(err.Error(), "idx_deployment_position_one_open_per_deployment") {
+			return fmt.Errorf("deployment already has an open position - only one open position per deployment is allowed: %w", err)
+		}
 		return fmt.Errorf("failed to create deployment position: %w", err)
 	}
 
