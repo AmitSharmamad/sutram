@@ -1401,15 +1401,21 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 	// Prepare strategy data
 	strategyResponse := &strategyDto.StrategyResponse{
-		ID:               strategy.ID,
-		UserID:           strategy.UserID,
-		Name:             strategy.Name,
-		Description:      strategy.Description,
-		EntryExpression:  strategy.EntryExpression,
-		ExitExpression:   strategy.ExitExpression,
-		ChartTimeframe:   strategyModel.ChartTimeframe(strategy.ChartTimeframe),
-		PositionType:     strategy.PositionType,
-		TradeType:        strategyModel.TradeType(strategy.TradeType),
+		ID:              strategy.ID,
+		UserID:          strategy.UserID,
+		Name:            strategy.Name,
+		Description:     strategy.Description,
+		EntryExpression: strategy.EntryExpression,
+		ExitExpression:  strategy.ExitExpression,
+		ChartTimeframe:  strategyModel.ChartTimeframe(strategy.ChartTimeframe),
+		PositionType:    strategy.PositionType,
+		TradeType: func() *strategyModel.TradeType {
+			if strategy.TradeType != nil {
+				tradeType := strategyModel.TradeType(*strategy.TradeType)
+				return &tradeType
+			}
+			return nil
+		}(),
 		Capital:          strategy.Capital,
 		Instruments:      strategy.Instruments,
 		Qty:              strategy.Qty,
@@ -1543,7 +1549,7 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 	// Handle existing position first - check exit conditions
 	if currentPosition != nil {
 		// Check for MIS end-of-day square-off first
-		if strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayHit(instrumentData) {
+		if strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") && s.isMISEndOfDayHit(instrumentData) {
 			// Force close the MIS position at end of day
 			exitPrice := instrumentData.Close
 			exitTime := instrumentData.Timestamp
@@ -1780,7 +1786,12 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 					quantity,
 					entryPrice,
 					entryTime,
-					strategy.PositionType,
+					func() strategyModel.Direction {
+						if strategy.PositionType != nil {
+							return *strategy.PositionType
+						}
+						return strategyModel.Direction("LONG") // default fallback
+					}(),
 					map[string]any{
 						"strategy_id": strategy.ID.String(),
 						"created_by":  "live_trading",
@@ -1833,14 +1844,26 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 						// Set stop loss and target profit prices
 						if strategyResponse.StopLoss > 0 {
-							stopLossPrice := s.calculateStopLoss(entryPrice, strategyResponse.StopLoss, strategyResponse.StopLossType, strategy.PositionType)
+							stopLossPrice := s.calculateStopLoss(entryPrice, strategyResponse.StopLoss, strategyResponse.StopLossType,
+								func() strategyModel.Direction {
+									if strategy.PositionType != nil {
+										return *strategy.PositionType
+									}
+									return strategyModel.Direction("LONG") // default fallback
+								}())
 							if stopLossPrice != nil {
 								newPosition.SetStopLossPrice(*stopLossPrice)
 							}
 						}
 
 						if strategyResponse.TargetProfit > 0 {
-							targetProfitPrice := s.calculateTargetProfit(entryPrice, strategyResponse.TargetProfit, strategyResponse.TargetProfitType, strategy.PositionType)
+							targetProfitPrice := s.calculateTargetProfit(entryPrice, strategyResponse.TargetProfit, strategyResponse.TargetProfitType,
+								func() strategyModel.Direction {
+									if strategy.PositionType != nil {
+										return *strategy.PositionType
+									}
+									return strategyModel.Direction("LONG") // default fallback
+								}())
 							if targetProfitPrice != nil {
 								newPosition.SetTargetProfitPrice(*targetProfitPrice)
 							}
@@ -1853,10 +1876,15 @@ func (s *deploymentService) Run(ctx context.Context, deploymentWithStrategy *Dep
 
 						// Publish position opened event
 						s.publishEventWithPrice(ctx, deployment, strategy, instrumentData, dto.EventTypePositionOpened, dto.PositionOpenedData{
-							PositionID:        newPosition.ID.String(),
-							EntryPrice:        entryPrice,
-							Quantity:          quantity,
-							Direction:         string(strategy.PositionType),
+							PositionID: newPosition.ID.String(),
+							EntryPrice: entryPrice,
+							Quantity:   quantity,
+							Direction: func() string {
+								if strategy.PositionType != nil {
+									return string(*strategy.PositionType)
+								}
+								return "LONG" // default fallback
+							}(),
 							EntryTime:         entryTime,
 							StopLossPrice:     newPosition.StopLossPrice,
 							TargetProfitPrice: newPosition.TargetProfitPrice,
@@ -2017,8 +2045,8 @@ func (s *deploymentService) evaluateEntryCondition(
 
 // calculatePositionSize calculates position size based on strategy settings
 func (s *deploymentService) calculatePositionSize(strategy *strategyDto.StrategyResponse, price float64) float64 {
-	if strategy.Qty > 0 {
-		return float64(strategy.Qty)
+	if strategy.Qty != nil && *strategy.Qty > 0 {
+		return float64(*strategy.Qty)
 	}
 
 	// Default to 1 unit if no quantity specified

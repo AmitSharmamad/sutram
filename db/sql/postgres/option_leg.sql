@@ -52,12 +52,8 @@ CREATE TABLE option_leg (
     CONSTRAINT valid_option_details CHECK (
         (segment = 'F&O' AND option_type IS NOT NULL) OR
         (segment = 'EQ' AND option_type IS NULL)
-    ),
-
-    CONSTRAINT valid_strike_price CHECK (
-        (segment = 'F&O' AND strike_price IS NOT NULL) OR
-        (segment = 'EQ' AND strike_price IS NULL)
     )
+
 );
 
 -- Indexes for better performance

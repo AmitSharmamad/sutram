@@ -41,7 +41,7 @@ type OptionLeg struct {
 	Segment            Segment         `json:"segment" db:"segment"`
 	OptionType         *OptionType     `json:"option_type,omitempty" db:"option_type"`
 	ActionType         TransactionType `json:"action_type" db:"action_type"`
-	StrikePriceType    StrikePriceType `json:"strike_price_type" db:"strike_price_type"`
+	StrikeType         StrikePriceType `json:"strike_type" db:"strike_type"`
 	StrikePrice        *float64        `json:"strike_price,omitempty" db:"strike_price"`
 	StrikeOffset       *int            `json:"strike_offset,omitempty" db:"strike_offset"`
 	TotalLot           int             `json:"total_lot" db:"total_lot"`
@@ -122,24 +122,24 @@ const (
 )
 
 // NewOptionLeg creates a new option leg
-func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikePriceType StrikePriceType, expiryType ExpiryType, expiryCycle ExpiryCycle) *OptionLeg {
+func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikeType StrikePriceType, expiryType ExpiryType, expiryCycle ExpiryCycle) *OptionLeg {
 	return &OptionLeg{
-		ID:              uuid.New(),
-		StrategyID:      strategyID,
-		LegSequence:     legSequence,
-		SelectIndex:     selectIndex,
-		Segment:         segment,
-		ActionType:      actionType,
-		StrikePriceType: strikePriceType,
-		TotalLot:        1,
-		OrderType:       OrderTypeMarket,
-		ExpiryType:      expiryType,
-		ExpiryCycle:     expiryCycle,
-		Exchange:        NSE,     // Default exchange
-		Asset:           Index,   // Default underlying type
-		InstrumentType:  Options, // Default instrument type
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
+		ID:             uuid.New(),
+		StrategyID:     strategyID,
+		LegSequence:    legSequence,
+		SelectIndex:    selectIndex,
+		Segment:        segment,
+		ActionType:     actionType,
+		StrikeType:     strikeType,
+		TotalLot:       1,
+		OrderType:      OrderTypeMarket,
+		ExpiryType:     expiryType,
+		ExpiryCycle:    expiryCycle,
+		Exchange:       NSE,     // Default exchange
+		Asset:          Index,   // Default underlying type
+		InstrumentType: Options, // Default instrument type
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 }
 
