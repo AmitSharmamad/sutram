@@ -37,7 +37,7 @@ func (r *OptionLegRepository) Create(ctx context.Context, optionLeg *model.Optio
 			id, strategy_id, leg_sequence, select_index, segment, option_type,
 			action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			expiry_date, days_to_expiry, status, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
 		)`
@@ -72,7 +72,7 @@ func (r *OptionLegRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		WHERE id = $1`
 
@@ -94,7 +94,7 @@ func (r *OptionLegRepository) GetByStrategyID(ctx context.Context, strategyID uu
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		WHERE strategy_id = $1
 		ORDER BY leg_sequence`
@@ -114,7 +114,7 @@ func (r *OptionLegRepository) GetByStrategyIDAndSequence(ctx context.Context, st
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		WHERE strategy_id = $1 AND leg_sequence = $2`
 
@@ -138,7 +138,7 @@ func (r *OptionLegRepository) Update(ctx context.Context, optionLeg *model.Optio
 			action_type = $6, strike_price_type = $7, strike_price = $8, strike_offset = $9,
 			total_lot = $10, lot_size = $11, total_quantity = $12, order_type = $13,
 			tick_offset = $14, expiry_type = $15, expiry_date = $16, days_to_expiry = $17,
-			leg_status = $18, updated_at = $19
+			status = $18, updated_at = $19
 		WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -204,7 +204,7 @@ func (r *OptionLegRepository) GetByIndex(ctx context.Context, selectIndex string
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		WHERE select_index = $1
 		ORDER BY created_at DESC`
@@ -224,7 +224,7 @@ func (r *OptionLegRepository) GetByExpiryDate(ctx context.Context, expiryDate st
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		WHERE expiry_date::text = $1
 		ORDER BY created_at DESC`
@@ -244,9 +244,9 @@ func (r *OptionLegRepository) GetByStatus(ctx context.Context, status model.LegS
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
-		WHERE leg_status = $1
+		WHERE status = $1
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, status)
@@ -273,7 +273,7 @@ func (r *OptionLegRepository) List(ctx context.Context, offset, limit int) ([]*m
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
 			   action_type, strike_price_type, strike_price, strike_offset, total_lot,
 			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_date, days_to_expiry, leg_status, created_at, updated_at
+			   expiry_date, days_to_expiry, status, created_at, updated_at
 		FROM option_leg 
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2`
@@ -294,7 +294,7 @@ func (r *OptionLegRepository) List(ctx context.Context, offset, limit int) ([]*m
 
 // UpdateStatus updates the status of an option leg
 func (r *OptionLegRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status model.LegStatus) error {
-	query := `UPDATE option_leg SET leg_status = $2, updated_at = $3 WHERE id = $1`
+	query := `UPDATE option_leg SET status = $2, updated_at = $3 WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id, status, time.Now())
 	if err != nil {
