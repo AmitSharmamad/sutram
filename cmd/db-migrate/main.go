@@ -23,10 +23,10 @@ func main() {
 	)
 	flag.Parse()
 
-	// Create migration module
-	migrationModule, err := migration.NewModule()
+	// Create PostgreSQL migration module
+	migrationModule, err := migration.NewPostgresModule()
 	if err != nil {
-		log.Fatalf("Failed to create migration module: %v", err)
+		log.Fatalf("Failed to create PostgreSQL migration module: %v", err)
 	}
 
 	// Execute the requested action
