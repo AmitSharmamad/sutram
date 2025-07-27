@@ -466,7 +466,7 @@ func startWebSocketServer(deploymentMod *deploymentModule.Module) {
 			},
 			"listening_to": gin.H{
 				"web_server_port": webPort,
-				"event_source":    fmt.Sprintf("ws://localhost:%s/api/deployment/events/internal/ws", webPort),
+				"event_source":    fmt.Sprintf("ws://%s:%s/api/deployment/events/internal/ws", getEnv("WEB_HTTP_HOST", "localhost"), webPort),
 			},
 		})
 	})
@@ -904,13 +904,14 @@ func (l *DeploymentEventListener) GetDeploymentsByTimeframe() map[string][]*depl
 
 // startWebSocketListener starts a WebSocket client to listen for deployment events
 func startWebSocketListener(ctx context.Context, eventListener *DeploymentEventListener) {
+	webHost := getEnv("WEB_HTTP_HOST", "localhost")
 	webPort := getEnv("WEB_HTTP_PORT", "")
 	if webPort == "" {
 		log.Printf("WEB_HTTP_PORT not set, WebSocket listener disabled")
 		return
 	}
 
-	wsURL := fmt.Sprintf("ws://localhost:%s/api/deployment/events/internal/ws", webPort)
+	wsURL := fmt.Sprintf("ws://%s:%s/api/deployment/events/internal/ws", webHost, webPort)
 	log.Printf("Attempting to connect to internal WebSocket server at %s", wsURL)
 
 	// Retry connection logic
