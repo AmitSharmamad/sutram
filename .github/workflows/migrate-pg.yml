@@ -53,10 +53,54 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Load environment variables
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Load environment variables and setup DATABASE_URL
         run: |
           echo "Loading dev environment variables..."
-          # Add any dev-specific environment setup here
+          
+          # Load common script functions
+          source aws/scripts/common.sh
+          
+          # Get database connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="dev"
+          
+          DB_USERNAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseUsername'].OutputValue" \
+            --output text)
+          
+          DB_PASSWORD=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePassword'].OutputValue" \
+            --output text)
+          
+          DB_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue" \
+            --output text)
+          
+          DB_PORT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePort'].OutputValue" \
+            --output text)
+          
+          DB_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseName'].OutputValue" \
+            --output text)
+          
+          # Construct DATABASE_URL
+          export DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}?sslmode=require"
+          echo "DATABASE_URL=${DATABASE_URL}" >> $GITHUB_ENV
+          
+          echo "Database connection configured successfully"
 
       - name: Build PostgreSQL migration binary
         run: |
@@ -118,10 +162,54 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Load environment variables
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Load environment variables and setup DATABASE_URL
         run: |
           echo "Loading prod environment variables..."
-          # Add any prod-specific environment setup here
+          
+          # Load common script functions
+          source aws/scripts/common.sh
+          
+          # Get database connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="prod"
+          
+          DB_USERNAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseUsername'].OutputValue" \
+            --output text)
+          
+          DB_PASSWORD=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePassword'].OutputValue" \
+            --output text)
+          
+          DB_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue" \
+            --output text)
+          
+          DB_PORT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePort'].OutputValue" \
+            --output text)
+          
+          DB_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseName'].OutputValue" \
+            --output text)
+          
+          # Construct DATABASE_URL
+          export DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}?sslmode=require"
+          echo "DATABASE_URL=${DATABASE_URL}" >> $GITHUB_ENV
+          
+          echo "Database connection configured successfully"
 
       - name: Build PostgreSQL migration binary
         run: |
