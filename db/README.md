@@ -1,2 +1,0 @@
-# gnaapakam
-Database for sutram
