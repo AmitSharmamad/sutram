@@ -65,11 +65,11 @@ const (
 type TradingDay string
 
 const (
-	Monday    TradingDay = "M"
-	Tuesday   TradingDay = "T"
-	Wednesday TradingDay = "W"
-	Thursday  TradingDay = "Th"
-	Friday    TradingDay = "F"
+	Monday    TradingDay = "MON"
+	Tuesday   TradingDay = "TUE"
+	Wednesday TradingDay = "WED"
+	Thursday  TradingDay = "THU"
+	Friday    TradingDay = "FRI"
 )
 
 // TradingDayArray is a custom type for PostgreSQL array of trading days

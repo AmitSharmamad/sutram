@@ -26,7 +26,6 @@ CREATE TABLE option_leg (
     -- Quantity
     total_lot INTEGER NOT NULL DEFAULT 1,
     lot_size INTEGER, -- Lot size for the instrument
-    total_quantity INTEGER, -- total_lot * lot_size
 
     -- Order details
     order_type order_type NOT NULL DEFAULT 'MARKET', -- Order type for the leg
@@ -38,7 +37,7 @@ CREATE TABLE option_leg (
     days_to_expiry INTEGER,
 
     -- Status and timestamps
-    leg_status leg_status DEFAULT 'ACTIVE',
+    status leg_status DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -61,7 +60,7 @@ CREATE TABLE option_leg (
 CREATE INDEX idx_option_leg_strategy_id ON option_leg(strategy_id);
 CREATE INDEX idx_option_leg_select_index ON option_leg(select_index);
 CREATE INDEX idx_option_leg_expiry_date ON option_leg(expiry_date);
-CREATE INDEX idx_option_leg_leg_status ON option_leg(leg_status);
+CREATE INDEX idx_option_leg_status ON option_leg(status);
 
 -- Trigger to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

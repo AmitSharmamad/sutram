@@ -26,7 +26,7 @@ type OptionLeg struct {
 	ExpiryType      ExpiryType      `json:"expiry_type" db:"expiry_type"`
 	ExpiryDate      *time.Time      `json:"expiry_date,omitempty" db:"expiry_date"`
 	DaysToExpiry    *int            `json:"days_to_expiry,omitempty" db:"days_to_expiry"`
-	LegStatus       LegStatus       `json:"leg_status" db:"leg_status"`
+	LegStatus       LegStatus       `json:"leg_status" db:"status"`
 	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
 }
