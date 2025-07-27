@@ -76,6 +76,15 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 		return
 	}
 
+	// Validate request
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Validation failed: " + err.Error(),
+		})
+		return
+	}
+
 	// Create strategy
 	strategy, err := h.strategyService.CreateStrategy(c.Request.Context(), &req, userID.(uuid.UUID))
 	if err != nil {
@@ -229,6 +238,15 @@ func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 
 	// Ensure ID in body matches URL
 	req.ID = id
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Validation failed: " + err.Error(),
+		})
+		return
+	}
 
 	// Update strategy
 	strategy, err := h.strategyService.UpdateStrategy(c.Request.Context(), &req, userID.(uuid.UUID))

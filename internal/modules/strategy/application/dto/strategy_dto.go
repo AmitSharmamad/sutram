@@ -94,14 +94,14 @@ var (
 type CreateStrategyRequest struct {
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
-	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
+	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT" db:"position_type"`
 	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
-	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
-	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
+	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK" db:"chart_type"`
+	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 1d" db:"chart_timeframe"`
 	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
 	TradeType            *model.TradeType      `json:"trade_type,omitempty" validate:"omitempty,oneof=MIS CNC/NRML" db:"trade_type"`
 	Qty                  *int                  `json:"qty,omitempty" validate:"omitempty,gt=0" db:"qty"`
-	EntryExpression      string                `json:"entry_expression" validate:"required" db:"entry_expression"`
+	EntryExpression      string                `json:"entry_expression,omitempty" db:"entry_expression"`
 	ExitExpression       string                `json:"exit_expression" db:"exit_expression"`
 	TargetProfit         *float64              `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
 	TargetProfitType     *model.ValueType      `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"target_profit_type"`
@@ -119,6 +119,10 @@ type CreateStrategyRequest struct {
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time            `json:"start_date" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date" db:"end_date"`
+	Segment              model.Segment         `json:"segment" validate:"required,oneof=F&O EQ" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" validate:"required,oneof=CONDITIONAL TIME_BASED" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time,omitempty" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time,omitempty" db:"exit_time"`
 }
 
 // UpdateStrategyRequest represents the request to update an existing strategy
@@ -126,14 +130,14 @@ type UpdateStrategyRequest struct {
 	ID                   uuid.UUID             `json:"id" validate:"required" db:"id"`
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
-	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
+	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT" db:"position_type"`
 	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
-	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
-	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
+	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK" db:"chart_type"`
+	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 1d" db:"chart_timeframe"`
 	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
 	TradeType            *model.TradeType      `json:"trade_type,omitempty" validate:"omitempty,oneof=MIS CNC/NRML" db:"trade_type"`
 	Qty                  *int                  `json:"qty,omitempty" validate:"omitempty,gt=0" db:"qty"`
-	EntryExpression      string                `json:"entry_expression" validate:"required" db:"entry_expression"`
+	EntryExpression      string                `json:"entry_expression,omitempty" db:"entry_expression"`
 	ExitExpression       string                `json:"exit_expression" db:"exit_expression"`
 	TargetProfit         *float64              `json:"target_profit" validate:"required,gte=0" db:"target_profit"`
 	TargetProfitType     *model.ValueType      `json:"target_profit_type" validate:"required,oneof=ABSOLUTE PERCENTAGE" db:"target_profit_type"`
@@ -151,6 +155,10 @@ type UpdateStrategyRequest struct {
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time" db:"entry_end_time"`
 	StartDate            *time.Time            `json:"start_date" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date" db:"end_date"`
+	Segment              model.Segment         `json:"segment" validate:"required,oneof=F&O EQ" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" validate:"required,oneof=CONDITIONAL TIME_BASED" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time,omitempty" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time,omitempty" db:"exit_time"`
 }
 
 // StrategyResponse represents the response for a strategy
@@ -184,6 +192,10 @@ type StrategyResponse struct {
 	EntryEndTime         *types.TimeOnly       `json:"entry_end_time,omitempty" db:"entry_end_time"`
 	StartDate            *time.Time            `json:"start_date,omitempty" db:"start_date"`
 	EndDate              *time.Time            `json:"end_date,omitempty" db:"end_date"`
+	Segment              model.Segment         `json:"segment" db:"segment"`
+	StrategyType         model.StrategyType    `json:"strategy_type" db:"strategy_type"`
+	EntryTime            *types.TimeOnly       `json:"entry_time,omitempty" db:"entry_time"`
+	ExitTime             *types.TimeOnly       `json:"exit_time,omitempty" db:"exit_time"`
 	CreatedAt            time.Time             `json:"created_at" db:"created_at"`
 	UpdatedAt            time.Time             `json:"updated_at" db:"updated_at"`
 	IsActive             bool                  `json:"is_active" db:"is_active"`
@@ -198,6 +210,8 @@ type StrategyFilter struct {
 	Instrument     *int                  `json:"instrument" db:"instrument"`
 	ChartType      *model.ChartType      `json:"chart_type" db:"chart_type"`
 	ChartTimeframe *model.ChartTimeframe `json:"chart_timeframe" db:"chart_timeframe"`
+	Segment        *model.Segment        `json:"segment" db:"segment"`
+	StrategyType   *model.StrategyType   `json:"strategy_type" db:"strategy_type"`
 	IsActive       *bool                 `json:"is_active" db:"is_active"`
 	CreatedAfter   *time.Time            `json:"created_after" db:"created_after"`
 	CreatedBefore  *time.Time            `json:"created_before" db:"created_before"`
@@ -219,6 +233,7 @@ func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *Strategy
 		Instruments:      strategy.Instruments,
 		ChartType:        strategy.ChartType,
 		ChartTimeframe:   strategy.ChartTimeframe,
+		TradingDays:      strategy.TradingDays,
 		TradeType:        strategy.TradeType,
 		Qty:              strategy.Qty,
 		EntryExpression:  strategy.EntryExpression,
@@ -229,6 +244,10 @@ func FromDomainWithReadonly(strategy *model.Strategy, isReadonly bool) *Strategy
 		StopLossType:     strategy.StopLossType,
 		Capital:          strategy.Capital,
 		MaxAllocation:    strategy.MaxAllocation,
+		Segment:          strategy.Segment,
+		StrategyType:     strategy.StrategyType,
+		EntryTime:        strategy.EntryTime,
+		ExitTime:         strategy.ExitTime,
 		CreatedAt:        strategy.CreatedAt,
 		UpdatedAt:        strategy.UpdatedAt,
 		IsActive:         strategy.IsActive,
@@ -326,6 +345,8 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 		stopLossType,
 		capital,
 		maxAllocation,
+		req.Segment,
+		req.StrategyType,
 	)
 
 	// Set optional fields
@@ -366,6 +387,14 @@ func (req *CreateStrategyRequest) ToDomain(userID uuid.UUID) *model.Strategy {
 
 	if req.EndDate != nil {
 		strategy.EndDate = req.EndDate
+	}
+
+	if req.EntryTime != nil {
+		strategy.EntryTime = req.EntryTime
+	}
+
+	if req.ExitTime != nil {
+		strategy.ExitTime = req.ExitTime
 	}
 
 	return strategy
@@ -426,6 +455,8 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		StopLossType:     stopLossType,
 		Capital:          req.Capital,
 		MaxAllocation:    req.MaxAllocation,
+		Segment:          req.Segment,
+		StrategyType:     req.StrategyType,
 	}
 
 	// Set optional fields
@@ -469,6 +500,14 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 		strategy.EndDate = req.EndDate
 	}
 
+	if req.EntryTime != nil {
+		strategy.EntryTime = req.EntryTime
+	}
+
+	if req.ExitTime != nil {
+		strategy.ExitTime = req.ExitTime
+	}
+
 	return strategy
 }
 
@@ -477,6 +516,35 @@ func (req *CreateStrategyRequest) Validate() error {
 	if err := validate.Struct(req); err != nil {
 		return err
 	}
+
+	// Business rule: when strategy_type is 'CONDITIONAL', entry_expression must be provided
+	if req.StrategyType == model.Conditional && req.EntryExpression == "" {
+		return errors.New("entry_expression is required for CONDITIONAL strategy type")
+	}
+
+	// Business rule: when strategy_type is 'TIME_BASED', entry_time and exit_time must be provided
+	if req.StrategyType == model.TimeBased {
+		if req.EntryTime == nil || req.ExitTime == nil {
+			return errors.New("entry_time and exit_time are required for TIME_BASED strategy type")
+		}
+	}
+
+	// Business rule: when segment is 'EQ', position_type, trade_type, qty, and max_allocation cannot be null
+	if req.Segment == model.EQ {
+		if req.PositionType == nil {
+			return errors.New("position_type is required for EQ segment")
+		}
+		if req.TradeType == nil {
+			return errors.New("trade_type is required for EQ segment")
+		}
+		if req.Qty == nil {
+			return errors.New("qty is required for EQ segment")
+		}
+		if req.MaxAllocation == nil {
+			return errors.New("max_allocation is required for EQ segment")
+		}
+	}
+
 	return nil
 }
 
@@ -485,5 +553,34 @@ func (req *UpdateStrategyRequest) Validate() error {
 	if err := validate.Struct(req); err != nil {
 		return err
 	}
+
+	// Business rule: when strategy_type is 'CONDITIONAL', entry_expression must be provided
+	if req.StrategyType == model.Conditional && req.EntryExpression == "" {
+		return errors.New("entry_expression is required for CONDITIONAL strategy type")
+	}
+
+	// Business rule: when strategy_type is 'TIME_BASED', entry_time and exit_time must be provided
+	if req.StrategyType == model.TimeBased {
+		if req.EntryTime == nil || req.ExitTime == nil {
+			return errors.New("entry_time and exit_time are required for TIME_BASED strategy type")
+		}
+	}
+
+	// Business rule: when segment is 'EQ', position_type, trade_type, qty, and max_allocation cannot be null
+	if req.Segment == model.EQ {
+		if req.PositionType == nil {
+			return errors.New("position_type is required for EQ segment")
+		}
+		if req.TradeType == nil {
+			return errors.New("trade_type is required for EQ segment")
+		}
+		if req.Qty == nil {
+			return errors.New("qty is required for EQ segment")
+		}
+		if req.MaxAllocation == nil {
+			return errors.New("max_allocation is required for EQ segment")
+		}
+	}
+
 	return nil
 }

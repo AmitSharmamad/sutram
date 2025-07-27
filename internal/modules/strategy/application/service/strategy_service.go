@@ -399,6 +399,8 @@ func (s *strategyService) DuplicateStrategy(ctx context.Context, id uuid.UUID, u
 		original.StopLossType,
 		original.Capital,
 		original.MaxAllocation,
+		original.Segment,
+		original.StrategyType,
 	)
 
 	// Copy additional optional fields
@@ -412,6 +414,8 @@ func (s *strategyService) DuplicateStrategy(ctx context.Context, id uuid.UUID, u
 	duplicate.EntryEndTime = original.EntryEndTime
 	duplicate.StartDate = original.StartDate
 	duplicate.EndDate = original.EndDate
+	duplicate.EntryTime = original.EntryTime
+	duplicate.ExitTime = original.ExitTime
 
 	// Save the duplicated strategy
 	err = s.strategyRepo.Create(ctx, duplicate)
@@ -461,6 +465,8 @@ func (s *strategyService) CloneDefaultStrategy(ctx context.Context, defaultStrat
 		defaultStrategy.StopLossType,
 		defaultStrategy.Capital,
 		defaultStrategy.MaxAllocation,
+		defaultStrategy.Segment,
+		defaultStrategy.StrategyType,
 	)
 
 	// Copy additional optional fields
@@ -474,6 +480,8 @@ func (s *strategyService) CloneDefaultStrategy(ctx context.Context, defaultStrat
 	clonedStrategy.EntryEndTime = defaultStrategy.EntryEndTime
 	clonedStrategy.StartDate = defaultStrategy.StartDate
 	clonedStrategy.EndDate = defaultStrategy.EndDate
+	clonedStrategy.EntryTime = defaultStrategy.EntryTime
+	clonedStrategy.ExitTime = defaultStrategy.ExitTime
 
 	// Save the cloned strategy
 	err = s.strategyRepo.Create(ctx, clonedStrategy)

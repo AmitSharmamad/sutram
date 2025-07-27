@@ -18,7 +18,6 @@ type Direction string
 const (
 	Long  Direction = "LONG"
 	Short Direction = "SHORT"
-	Both  Direction = "BOTH"
 )
 
 // Chart type enum
@@ -26,8 +25,6 @@ type ChartType string
 
 const (
 	Candlestick ChartType = "CANDLESTICK"
-	Heikinashi  ChartType = "HEIKINASHI"
-	Renko       ChartType = "RENKO"
 )
 
 // Chart timeframe enum
@@ -41,7 +38,6 @@ const (
 	FifteenMinutes ChartTimeframe = "15m"
 	ThirtyMinutes  ChartTimeframe = "30m"
 	OneHour        ChartTimeframe = "1h"
-	ThreeHours     ChartTimeframe = "3h"
 	OneDay         ChartTimeframe = "1d"
 )
 
@@ -212,6 +208,8 @@ func NewStrategy(
 	stopLossType ValueType,
 	capital *float64,
 	maxAllocation *float64,
+	segment Segment,
+	strategyType StrategyType,
 ) *Strategy {
 	return &Strategy{
 		ID:               uuid.New(),
@@ -233,8 +231,8 @@ func NewStrategy(
 		StopLossType:     stopLossType,
 		Capital:          capital,
 		MaxAllocation:    maxAllocation,
-		Segment:          FO,          // Default segment
-		StrategyType:     Conditional, // Default strategy type
+		Segment:          segment,
+		StrategyType:     strategyType,
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 		IsActive:         true,
