@@ -95,7 +95,7 @@ type CreateStrategyRequest struct {
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
 	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
-	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
+	Instruments          pq.Int32Array         `json:"instruments" validate:"omitempty,dive" db:"instruments"`
 	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
 	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`
@@ -131,7 +131,7 @@ type UpdateStrategyRequest struct {
 	Name                 string                `json:"name" validate:"required,min=3,max=100" db:"name"`
 	Description          string                `json:"description" validate:"max=500" db:"description"`
 	PositionType         *model.Direction      `json:"position_type,omitempty" validate:"omitempty,oneof=LONG SHORT BOTH" db:"position_type"`
-	Instruments          pq.Int32Array         `json:"instruments" validate:"required,min=1,dive" db:"instruments"`
+	Instruments          pq.Int32Array         `json:"instruments" validate:"omitempty,dive" db:"instruments"`
 	ChartType            model.ChartType       `json:"chart_type" validate:"required,oneof=CANDLESTICK HEIKINASHI RENKO" db:"chart_type"`
 	ChartTimeframe       model.ChartTimeframe  `json:"chart_timeframe" validate:"required,oneof=1m 3m 5m 10m 15m 30m 1h 3h 1d" db:"chart_timeframe"`
 	TradingDays          model.TradingDayArray `json:"trading_days,omitempty" validate:"omitempty,min=1,dive,oneof=MON TUE WED THU FRI" db:"trading_days"`

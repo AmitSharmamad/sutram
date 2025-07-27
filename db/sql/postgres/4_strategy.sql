@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS strategy (
     name VARCHAR NOT NULL,
     description VARCHAR,
     position_type direction,
-    instruments INT[] NOT NULL,
+    instruments INT[],
     chart_type chart_type,
     chart_timeframe chart_timeframe,
     trading_days trading_day[],

@@ -1063,6 +1063,11 @@ func (s *deploymentService) DeployAllInstruments(ctx context.Context, strategyID
 		return nil, ErrUnauthorized
 	}
 
+	// Check if strategy has instruments
+	if len(strategy.Instruments) == 0 {
+		return []*dto.DeploymentResponse{}, nil
+	}
+
 	// Get existing deployments for this strategy
 	existingDeployments, err := s.deploymentRepo.GetByStrategyID(ctx, strategyID)
 	if err != nil {
