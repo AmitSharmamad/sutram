@@ -14,7 +14,7 @@ services:
       - ./db/ch/data:/var/lib/clickhouse/
       - ./db/ch/logs:/var/log/clickhouse-server/
       - ../data:/var/lib/clickhouse/user_files
-      - ./sql/clickhouse:/docker-entrypoint-initdb.d/
+      # - ./sql/clickhouse:/docker-entrypoint-initdb.d/
     restart: unless-stopped
     networks:
       - sutram-network
