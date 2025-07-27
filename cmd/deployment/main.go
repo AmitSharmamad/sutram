@@ -160,8 +160,8 @@ func main() {
 
 // initDB initializes the ClickHouse database connection
 func initDB() error {
-	// Create DSN for ClickHouse
-	conn := "clickhouse://admin:admin@localhost:9000"
+	// Create DSN for ClickHouse - use environment variable with fallback
+	conn := getEnv("CH_URL", "clickhouse://admin:admin@localhost:9000")
 	db, err := sqlx.Connect("clickhouse", conn)
 
 	if err != nil {
