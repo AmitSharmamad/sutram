@@ -18,7 +18,7 @@ type InstrumentMasterRepository interface {
 	FindByExchange(ctx context.Context, exchange string) ([]*model.InstrumentMaster, error)
 
 	// FindBySegment finds instrument masters by segment
-	FindBySegment(ctx context.Context, segment string) ([]*model.InstrumentMaster, error)
+	FindBySegment(ctx context.Context, segment model.Segment) ([]*model.InstrumentMaster, error)
 
 	// FindAll returns all instrument masters
 	FindAll(ctx context.Context) ([]*model.InstrumentMaster, error)

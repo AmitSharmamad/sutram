@@ -82,6 +82,14 @@ migrate:
 
 # ---------------------------------------------------------- #
 
+ch-migrate:
+	@echo "Building the ClickHouse migration tool..."
+	@go build -o bin/ch-migrate cmd/ch-migrate/main.go
+	@echo "Running the ClickHouse migration tool..."
+	@./bin/ch-migrate
+
+# ---------------------------------------------------------- #
+
 deployment:
 	@echo "Building the deployment tool..."
 	@go build -gcflags="all=-N -l" -o bin/deployment cmd/deployment/main.go
@@ -112,4 +120,57 @@ git:
 # ---------------------------------------------------------- #
 
 db:
-	make -C db all
+	@make -C db all
+
+# Database Migration Commands
+db-migrate-up:
+	@echo "Running all pending database migrations..."
+	@make -C db migrate-up
+
+db-migrate-down:
+	@echo "Rolling back database migrations..."
+	@make -C db migrate-down
+
+db-migrate-version:
+	@echo "Checking current migration version..."
+	@make -C db migrate-version
+
+db-migrate-validate:
+	@echo "Validating database migrations..."
+	@make -C db migrate-validate
+
+db-setup:
+	@echo "Setting up database with migrations..."
+	@make -C db setup
+
+db-fresh:
+	@echo "Fresh database setup..."
+	@make -C db fresh
+
+# ClickHouse Migration Commands
+ch-migrate-up:
+	@echo "Running all pending ClickHouse migrations..."
+	@make -C db ch-migrate-up
+
+ch-migrate-down:
+	@echo "Rolling back ClickHouse migrations..."
+	@make -C db ch-migrate-down
+
+ch-migrate-version:
+	@echo "Checking current ClickHouse migration version..."
+	@make -C db ch-migrate-version
+
+ch-migrate-validate:
+	@echo "Validating ClickHouse migrations..."
+	@make -C db ch-migrate-validate
+
+ch-setup:
+	@echo "Setting up ClickHouse with migrations..."
+	@make -C db ch-setup
+
+# PostgreSQL only commands
+pg-setup:
+	@echo "Setting up PostgreSQL with migrations..."
+	@make -C db pg-setup
+
+.PHONY: db-migrate-up db-migrate-down db-migrate-version db-migrate-validate db-setup db-fresh ch-migrate-up ch-migrate-down ch-migrate-version ch-migrate-validate ch-setup pg-setup

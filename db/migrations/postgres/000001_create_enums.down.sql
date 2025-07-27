@@ -1,0 +1,27 @@
+-- Drop all ENUM types in reverse order to handle dependencies
+DROP TYPE IF EXISTS trading_day;
+DROP TYPE IF EXISTS strategy_type;
+DROP TYPE IF EXISTS asset;
+DROP TYPE IF EXISTS option_type;
+DROP TYPE IF EXISTS instrument_type;
+DROP TYPE IF EXISTS expiry_type;
+DROP TYPE IF EXISTS expiry_cycle;
+DROP TYPE IF EXISTS strike_type;
+DROP TYPE IF EXISTS reset_period_type;
+DROP TYPE IF EXISTS usage_limit_type;
+DROP TYPE IF EXISTS permission_type;
+DROP TYPE IF EXISTS role_type;
+DROP TYPE IF EXISTS position_state;
+DROP TYPE IF EXISTS run_state;
+DROP TYPE IF EXISTS run_type;
+DROP TYPE IF EXISTS trade_type;
+DROP TYPE IF EXISTS chart_timeframe;
+DROP TYPE IF EXISTS chart_type;
+DROP TYPE IF EXISTS value_type;
+DROP TYPE IF EXISTS order_state;
+DROP TYPE IF EXISTS order_type;
+DROP TYPE IF EXISTS product_type;
+DROP TYPE IF EXISTS transaction_type;
+DROP TYPE IF EXISTS direction;
+DROP TYPE IF EXISTS segment;
+DROP TYPE IF EXISTS exchange;
