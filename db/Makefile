@@ -51,12 +51,49 @@ migrate-force: migrate-build
 	@echo "Forcing migration version (use VERSION=n to specify)..."
 	@cd .. && ./bin/db-migrate -action=force -version=$(VERSION)
 
+# ClickHouse Migration targets
+ch-migrate-build:
+	@echo "Building ClickHouse migration binary..."
+	@cd .. && go build -o bin/ch-migrate cmd/ch-migrate/main.go
+
+ch-migrate-up: ch-migrate-build
+	@echo "Running all pending ClickHouse migrations..."
+	@cd .. && ./bin/ch-migrate -action=up
+
+ch-migrate-down: ch-migrate-build
+	@echo "Rolling back all ClickHouse migrations..."
+	@cd .. && ./bin/ch-migrate -action=down
+
+ch-migrate-steps: ch-migrate-build
+	@echo "Running ClickHouse migration steps (use STEPS=n to specify number)..."
+	@cd .. && ./bin/ch-migrate -action=steps -steps=$(or $(STEPS),1)
+
+ch-migrate-version: ch-migrate-build
+	@echo "Checking current ClickHouse migration version..."
+	@cd .. && ./bin/ch-migrate -action=version
+
+ch-migrate-validate: ch-migrate-build
+	@echo "Validating ClickHouse migrations..."
+	@cd .. && ./bin/ch-migrate -action=validate
+
+ch-migrate-force: ch-migrate-build
+	@echo "Forcing ClickHouse migration version (use VERSION=n to specify)..."
+	@cd .. && ./bin/ch-migrate -action=force -version=$(VERSION)
+
 # Migration setup - runs database and applies migrations
-setup: up migrate-up
+setup: up migrate-up ch-migrate-up
 	@echo "Database setup complete!"
 
 # Fresh setup - clean slate with migrations
-fresh: down clean up migrate-up
+fresh: down clean up migrate-up ch-migrate-up
 	@echo "Fresh database setup complete!"
 
-.PHONY: migrate-build migrate-up migrate-down migrate-steps migrate-version migrate-validate migrate-force setup fresh
+# PostgreSQL only setup
+pg-setup: pg migrate-up
+	@echo "PostgreSQL setup complete!"
+
+# ClickHouse only setup
+ch-setup: ch ch-migrate-up
+	@echo "ClickHouse setup complete!"
+
+.PHONY: migrate-build migrate-up migrate-down migrate-steps migrate-version migrate-validate migrate-force ch-migrate-build ch-migrate-up ch-migrate-down ch-migrate-steps ch-migrate-version ch-migrate-validate ch-migrate-force setup fresh pg-setup ch-setup

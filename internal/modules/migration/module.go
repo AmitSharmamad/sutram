@@ -10,11 +10,48 @@ import (
 
 // Module represents the migration module
 type Module struct {
-	service *MigrationService
+	pgService *MigrationService
+	chService *ClickHouseMigrationService
 }
 
-// NewModule creates a new migration module
+// NewModule creates a new migration module with both PostgreSQL and ClickHouse support
 func NewModule() (*Module, error) {
+	// Get PostgreSQL database connection
+	pgDB, err := repository.ProvidePostgresDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PostgreSQL database connection: %w", err)
+	}
+
+	// Get ClickHouse database connection
+	chSQLXDB, err := repository.ProvideClickHouseDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ClickHouse database connection: %w", err)
+	}
+
+	// Convert sqlx.DB to sql.DB for ClickHouse
+	chDB := chSQLXDB.DB
+
+	// Get absolute path to migrations directory
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	pgMigrationsDir := filepath.Join(workingDir, "db", "migrations", "postgres")
+	chMigrationsDir := filepath.Join(workingDir, "db", "migrations", "clickhouse")
+
+	// Create migration services
+	pgService := NewMigrationService(pgDB, pgMigrationsDir)
+	chService := NewClickHouseMigrationService(chDB, chMigrationsDir)
+
+	return &Module{
+		pgService: pgService,
+		chService: chService,
+	}, nil
+}
+
+// NewPostgresModule creates a new migration module for PostgreSQL only
+func NewPostgresModule() (*Module, error) {
 	// Get database connection
 	db, err := repository.ProvidePostgresDB()
 	if err != nil {
@@ -33,41 +70,129 @@ func NewModule() (*Module, error) {
 	service := NewMigrationService(db, migrationsDir)
 
 	return &Module{
-		service: service,
+		pgService: service,
 	}, nil
 }
 
-// GetService returns the migration service
-func (m *Module) GetService() *MigrationService {
-	return m.service
+// NewClickHouseModule creates a new migration module for ClickHouse only
+func NewClickHouseModule() (*Module, error) {
+	// Get ClickHouse database connection
+	chSQLXDB, err := repository.ProvideClickHouseDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ClickHouse database connection: %w", err)
+	}
+
+	// Convert sqlx.DB to sql.DB for ClickHouse
+	chDB := chSQLXDB.DB
+
+	// Get absolute path to migrations directory
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	chMigrationsDir := filepath.Join(workingDir, "db", "migrations", "clickhouse")
+
+	// Create migration service
+	chService := NewClickHouseMigrationService(chDB, chMigrationsDir)
+
+	return &Module{
+		chService: chService,
+	}, nil
 }
 
-// Up runs all available migrations
+// GetPostgresService returns the PostgreSQL migration service
+func (m *Module) GetPostgresService() *MigrationService {
+	return m.pgService
+}
+
+// GetClickHouseService returns the ClickHouse migration service
+func (m *Module) GetClickHouseService() *ClickHouseMigrationService {
+	return m.chService
+}
+
+// PostgreSQL migration methods for backward compatibility
 func (m *Module) Up() error {
-	return m.service.Up()
+	if m.pgService == nil {
+		return fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Up()
 }
 
-// Down runs all down migrations
 func (m *Module) Down() error {
-	return m.service.Down()
+	if m.pgService == nil {
+		return fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Down()
 }
 
-// Steps runs n migration steps
 func (m *Module) Steps(n int) error {
-	return m.service.Steps(n)
+	if m.pgService == nil {
+		return fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Steps(n)
 }
 
-// Force sets the migration version without running migrations
 func (m *Module) Force(version int) error {
-	return m.service.Force(version)
+	if m.pgService == nil {
+		return fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Force(version)
 }
 
-// Version returns the current migration version
 func (m *Module) Version() (uint, bool, error) {
-	return m.service.Version()
+	if m.pgService == nil {
+		return 0, false, fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Version()
 }
 
-// Validate checks if all migrations are valid
 func (m *Module) Validate() error {
-	return m.service.Validate()
+	if m.pgService == nil {
+		return fmt.Errorf("PostgreSQL migration service not initialized")
+	}
+	return m.pgService.Validate()
+}
+
+// ClickHouse migration methods
+func (m *Module) UpClickHouse() error {
+	if m.chService == nil {
+		return fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Up()
+}
+
+func (m *Module) DownClickHouse() error {
+	if m.chService == nil {
+		return fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Down()
+}
+
+func (m *Module) StepsClickHouse(n int) error {
+	if m.chService == nil {
+		return fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Steps(n)
+}
+
+func (m *Module) ForceClickHouse(version int) error {
+	if m.chService == nil {
+		return fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Force(version)
+}
+
+func (m *Module) VersionClickHouse() (uint, bool, error) {
+	if m.chService == nil {
+		return 0, false, fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Version()
+}
+
+func (m *Module) ValidateClickHouse() error {
+	if m.chService == nil {
+		return fmt.Errorf("ClickHouse migration service not initialized")
+	}
+	return m.chService.Validate()
 }
