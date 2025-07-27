@@ -53,6 +53,39 @@ const (
 	CNC_NRML = "CNC/NRML"
 )
 
+// Exchange enum
+type Exchange string
+
+const (
+	NSE Exchange = "NSE"
+	BSE Exchange = "BSE"
+	MCX Exchange = "MCX"
+)
+
+// Segment enum
+type Segment string
+
+const (
+	FO Segment = "F&O"
+	EQ Segment = "EQ"
+)
+
+// Asset enum
+type Asset string
+
+const (
+	Index Asset = "INDEX"
+	Stock Asset = "STOCK"
+)
+
+// StrategyType enum
+type StrategyType string
+
+const (
+	Conditional StrategyType = "CONDITIONAL"
+	TimeBased   StrategyType = "TIME_BASED"
+)
+
 // Value type enum
 type ValueType string
 
@@ -148,6 +181,10 @@ type Strategy struct {
 	Slippage             *float64        `json:"slippage,omitempty" db:"slippage"`
 	EntryStartTime       *types.TimeOnly `json:"entry_start_time,omitempty" db:"entry_start_time"`
 	EntryEndTime         *types.TimeOnly `json:"entry_end_time,omitempty" db:"entry_end_time"`
+	Segment              Segment         `json:"segment" db:"segment"`
+	StrategyType         StrategyType    `json:"strategy_type" db:"strategy_type"`
+	EntryTime            *types.TimeOnly `json:"entry_time,omitempty" db:"entry_time"`
+	ExitTime             *types.TimeOnly `json:"exit_time,omitempty" db:"exit_time"`
 	StartDate            *time.Time      `json:"start_date,omitempty" db:"start_date"`
 	EndDate              *time.Time      `json:"end_date,omitempty" db:"end_date"`
 	CreatedAt            time.Time       `json:"created_at" db:"created_at"`
@@ -196,6 +233,8 @@ func NewStrategy(
 		StopLossType:     stopLossType,
 		Capital:          capital,
 		MaxAllocation:    maxAllocation,
+		Segment:          FO,          // Default segment
+		StrategyType:     Conditional, // Default strategy type
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 		IsActive:         true,
@@ -231,6 +270,10 @@ func (s *Strategy) Update(
 	entryEndTime *types.TimeOnly,
 	startDate *time.Time,
 	endDate *time.Time,
+	segment Segment,
+	strategyType StrategyType,
+	entryTime *types.TimeOnly,
+	exitTime *types.TimeOnly,
 ) {
 	s.Name = name
 	s.Description = description
@@ -259,6 +302,10 @@ func (s *Strategy) Update(
 	s.EntryEndTime = entryEndTime
 	s.StartDate = startDate
 	s.EndDate = endDate
+	s.Segment = segment
+	s.StrategyType = strategyType
+	s.EntryTime = entryTime
+	s.ExitTime = exitTime
 	s.UpdatedAt = time.Now()
 }
 

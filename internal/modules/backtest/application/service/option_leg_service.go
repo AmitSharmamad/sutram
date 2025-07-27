@@ -51,12 +51,6 @@ type OptionLegService interface {
 	// GetOptionLegsByIndex retrieves option legs by index/underlying
 	GetOptionLegsByIndex(ctx context.Context, selectIndex string) ([]*dto.OptionLegResponse, error)
 
-	// GetOptionLegsByStatus retrieves option legs by status
-	GetOptionLegsByStatus(ctx context.Context, status model.LegStatus) ([]*dto.OptionLegResponse, error)
-
-	// UpdateOptionLegStatus updates the status of an option leg
-	UpdateOptionLegStatus(ctx context.Context, id uuid.UUID, status model.LegStatus) (*dto.OptionLegResponse, error)
-
 	// SearchOptionLegs searches option legs with filter criteria
 	SearchOptionLegs(ctx context.Context, filter *dto.OptionLegFilter) ([]*dto.OptionLegResponse, int64, error)
 
@@ -201,14 +195,14 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	if req.ExpiryType != nil {
 		optionLeg.ExpiryType = *req.ExpiryType
 	}
+	if req.ExpiryCycle != nil {
+		optionLeg.ExpiryCycle = *req.ExpiryCycle
+	}
 	if req.ExpiryDate != nil {
 		optionLeg.ExpiryDate = req.ExpiryDate
 	}
 	if req.DaysToExpiry != nil {
 		optionLeg.DaysToExpiry = req.DaysToExpiry
-	}
-	if req.LegStatus != nil {
-		optionLeg.LegStatus = *req.LegStatus
 	}
 
 	// Recalculate total quantity if lot size or total lot changed
@@ -277,45 +271,6 @@ func (s *optionLegService) GetOptionLegsByIndex(ctx context.Context, selectIndex
 	}
 
 	return responses, nil
-}
-
-// GetOptionLegsByStatus retrieves option legs by status
-func (s *optionLegService) GetOptionLegsByStatus(ctx context.Context, status model.LegStatus) ([]*dto.OptionLegResponse, error) {
-	optionLegs, err := s.optionLegRepo.GetByStatus(ctx, status)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get option legs by status: %w", err)
-	}
-
-	responses := make([]*dto.OptionLegResponse, len(optionLegs))
-	for i, optionLeg := range optionLegs {
-		responses[i] = dto.ToResponse(optionLeg)
-	}
-
-	return responses, nil
-}
-
-// UpdateOptionLegStatus updates the status of an option leg
-func (s *optionLegService) UpdateOptionLegStatus(ctx context.Context, id uuid.UUID, status model.LegStatus) (*dto.OptionLegResponse, error) {
-	// Check if option leg exists
-	optionLeg, err := s.optionLegRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get option leg: %w", err)
-	}
-
-	if optionLeg == nil {
-		return nil, ErrOptionLegNotFound
-	}
-
-	// Update status in database
-	if err := s.optionLegRepo.UpdateStatus(ctx, id, status); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrOptionLegUpdateFailed, err)
-	}
-
-	// Update local model and return response
-	optionLeg.LegStatus = status
-	optionLeg.UpdatedAt = time.Now()
-
-	return dto.ToResponse(optionLeg), nil
 }
 
 // SearchOptionLegs searches option legs with filter criteria

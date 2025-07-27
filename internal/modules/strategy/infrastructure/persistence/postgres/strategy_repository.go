@@ -42,10 +42,12 @@ func (r *StrategyRepository) Create(ctx context.Context, strategy *model.Strateg
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
 			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
-			start_date, end_date, created_at, updated_at, is_active, max_allocation
+			start_date, end_date, segment, strategy_type, 
+			entry_time, exit_time, created_at, updated_at, is_active, max_allocation
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 
-			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
+			$15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 
+			$27, $28, $29, $30, $31, $32, $33, $34, $35, $36
 		)
 	`
 
@@ -80,6 +82,10 @@ func (r *StrategyRepository) Create(ctx context.Context, strategy *model.Strateg
 		strategy.EntryEndTime,
 		strategy.StartDate,
 		strategy.EndDate,
+		strategy.Segment,
+		strategy.StrategyType,
+		strategy.EntryTime,
+		strategy.ExitTime,
 		strategy.CreatedAt,
 		strategy.UpdatedAt,
 		strategy.IsActive,
@@ -97,12 +103,13 @@ func (r *StrategyRepository) Create(ctx context.Context, strategy *model.Strateg
 func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Strategy, error) {
 	query := `
 		SELECT 
-			id, user_id, name, description, position_type, instruments, 
+			id, user_id, name, description, position_type, instruments,
 			chart_type, chart_timeframe, trading_days, trade_type, qty, entry_expression, 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
 			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
-			start_date, end_date, created_at, updated_at, is_active, max_allocation
+			start_date, end_date, segment, strategy_type, 
+			entry_time, exit_time, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE id = $1
 	`
@@ -139,6 +146,10 @@ func (r *StrategyRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 		&strategy.EntryEndTime,
 		&strategy.StartDate,
 		&strategy.EndDate,
+		&strategy.Segment,
+		&strategy.StrategyType,
+		&strategy.EntryTime,
+		&strategy.ExitTime,
 		&strategy.CreatedAt,
 		&strategy.UpdatedAt,
 		&strategy.IsActive,
@@ -253,7 +264,8 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
 			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
-			start_date, end_date, created_at, updated_at, is_active, max_allocation
+			start_date, end_date, segment, strategy_type, 
+			entry_time, exit_time, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -300,6 +312,10 @@ func (r *StrategyRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
 			&strategy.EndDate,
+			&strategy.Segment,
+			&strategy.StrategyType,
+			&strategy.EntryTime,
+			&strategy.ExitTime,
 			&strategy.CreatedAt,
 			&strategy.UpdatedAt,
 			&strategy.IsActive,
@@ -352,10 +368,14 @@ func (r *StrategyRepository) Update(ctx context.Context, strategy *model.Strateg
 			entry_end_time = $24, 
 			start_date = $25, 
 			end_date = $26, 
-			updated_at = $27, 
-			is_active = $28,
-			max_allocation = $29
-		WHERE id = $30
+			segment = $27,
+			strategy_type = $28,
+			entry_time = $29,
+			exit_time = $30,
+			updated_at = $31, 
+			is_active = $32,
+			max_allocation = $33
+		WHERE id = $34
 	`
 
 	result, err := r.db.ExecContext(
@@ -387,6 +407,10 @@ func (r *StrategyRepository) Update(ctx context.Context, strategy *model.Strateg
 		strategy.EntryEndTime,
 		strategy.StartDate,
 		strategy.EndDate,
+		strategy.Segment,
+		strategy.StrategyType,
+		strategy.EntryTime,
+		strategy.ExitTime,
 		time.Now(),
 		strategy.IsActive,
 		strategy.MaxAllocation,
@@ -479,7 +503,8 @@ func (r *StrategyRepository) GetActiveStrategies(ctx context.Context) ([]*model.
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
 			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
-			start_date, end_date, created_at, updated_at, is_active, max_allocation
+			start_date, end_date, segment, strategy_type, 
+			entry_time, exit_time, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE is_active = true
 		ORDER BY created_at DESC
@@ -526,6 +551,10 @@ func (r *StrategyRepository) GetActiveStrategies(ctx context.Context) ([]*model.
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
 			&strategy.EndDate,
+			&strategy.Segment,
+			&strategy.StrategyType,
+			&strategy.EntryTime,
+			&strategy.ExitTime,
 			&strategy.CreatedAt,
 			&strategy.UpdatedAt,
 			&strategy.IsActive,
@@ -554,7 +583,8 @@ func (r *StrategyRepository) GetActiveStrategiesByUserID(ctx context.Context, us
 			exit_expression, target_profit, target_profit_type, stop_loss, 
 			stop_loss_type, trailing_stop_loss, trailing_stop_loss_type, 
 			exit_type, capital, max_trades, brokerage, slippage, entry_start_time, entry_end_time, 
-			start_date, end_date, created_at, updated_at, is_active, max_allocation
+			start_date, end_date, segment, strategy_type, 
+			entry_time, exit_time, created_at, updated_at, is_active, max_allocation
 		FROM strategy
 		WHERE user_id = $1 AND is_active = true
 		ORDER BY created_at DESC
@@ -601,6 +631,10 @@ func (r *StrategyRepository) GetActiveStrategiesByUserID(ctx context.Context, us
 			&strategy.EntryEndTime,
 			&strategy.StartDate,
 			&strategy.EndDate,
+			&strategy.Segment,
+			&strategy.StrategyType,
+			&strategy.EntryTime,
+			&strategy.ExitTime,
 			&strategy.CreatedAt,
 			&strategy.UpdatedAt,
 			&strategy.IsActive,

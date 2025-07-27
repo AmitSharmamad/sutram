@@ -10,34 +10,38 @@ CREATE TABLE option_leg (
 
     -- Index/Underlying details
     select_index VARCHAR(50) NOT NULL, -- e.g., 'Nifty', 'BankNifty', 'FinNifty'
-    segment segment NOT NULL DEFAULT 'F&O', -- Using existing segment enum
+    segment segment NOT NULL, -- Using existing segment enum
 
     -- Option type (only applicable when segment is 'F&O')
-    option_type option_type_enum, -- Using proper enum for option type
+    option_type option_type, -- Using proper enum for option type
 
     -- Action type
     action_type transaction_type NOT NULL, -- Using existing transaction_type enum
 
     -- Strike price details
-    strike_price_type strike_price_type NOT NULL,
+    strike_type strike_type NOT NULL,
     strike_price DECIMAL(18,8), -- Actual strike price (populated based on strike_price_type)
-    strike_offset INTEGER, -- Offset from ATM (e.g., +100, -50 for OTM/ITM)
 
     -- Quantity
-    total_lot INTEGER NOT NULL DEFAULT 1,
+    total_lot INTEGER NOT NULL,
     lot_size INTEGER, -- Lot size for the instrument
 
     -- Order details
-    order_type order_type NOT NULL DEFAULT 'MARKET', -- Order type for the leg
+    order_type order_type NOT NULL, -- Order type for the leg
     tick_offset DECIMAL(18,8), -- Tick size for the instrument
 
     -- Expiry details
     expiry_type expiry_type NOT NULL,
+    expiry_cycle expiry_cycle NOT NULL,
     expiry_date DATE,
-    days_to_expiry INTEGER,
 
-    -- Status and timestamps
-    status leg_status DEFAULT 'ACTIVE',
+    -- Exchange and instrument details
+    exchange exchange NOT NULL,
+    asset asset NOT NULL,
+    exchange_security_id INTEGER,
+    instrument_type instrument_type NOT NULL,
+
+    -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -60,7 +64,6 @@ CREATE TABLE option_leg (
 CREATE INDEX idx_option_leg_strategy_id ON option_leg(strategy_id);
 CREATE INDEX idx_option_leg_select_index ON option_leg(select_index);
 CREATE INDEX idx_option_leg_expiry_date ON option_leg(expiry_date);
-CREATE INDEX idx_option_leg_status ON option_leg(status);
 
 -- Trigger to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
