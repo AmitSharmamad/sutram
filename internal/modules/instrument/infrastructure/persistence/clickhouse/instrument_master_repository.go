@@ -4,12 +4,82 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"algo/internal/modules/instrument/domain/model"
 	"algo/internal/modules/instrument/domain/repository"
 
 	"github.com/jmoiron/sqlx"
 )
+
+// InstrumentMasterRow represents the database row structure
+type InstrumentMasterRow struct {
+	ExchangeSecurityID int32     `db:"exchange_security_id"`
+	Exchange           string    `db:"exchange"`
+	Segment            string    `db:"segment"`
+	Symbol             string    `db:"symbol"`
+	Name               string    `db:"instrument"`
+	StartDate          time.Time `db:"start_date"`
+	Expiry             time.Time `db:"expiry"`
+	ExmExchID          int32     `db:"exm_exch_id"`
+	SmstSecurityID     int32     `db:"smst_security_id"`
+	InstrumentName     string    `db:"instrument_name"`
+	TradingSymbol      string    `db:"trading_symbol"`
+	LotUnits           int32     `db:"lot_units"`
+	StrikePrice        float64   `db:"strike_price"`
+	OptionType         string    `db:"option_type"`
+	TickSize           float64   `db:"tick_size"`
+	ExpiryFlag         string    `db:"expiry_flag"`
+	ExchInstrumentType string    `db:"exch_instrument_type"`
+	SymbolName         string    `db:"symbol_name"`
+}
+
+// toModel converts a database row to the domain model
+func (row *InstrumentMasterRow) toModel() (*model.InstrumentMaster, error) {
+	segment, segmentValid := model.ParseSegment(row.Segment)
+	if !segmentValid {
+		return nil, fmt.Errorf("invalid segment value: %s", row.Segment)
+	}
+
+	instrumentType, instrumentTypeValid := model.ParseInstrumentType(row.ExchInstrumentType)
+	if !instrumentTypeValid {
+		return nil, fmt.Errorf("invalid instrument type value: %s", row.ExchInstrumentType)
+	}
+
+	return &model.InstrumentMaster{
+		ExchangeSecurityID: row.ExchangeSecurityID,
+		Exchange:           row.Exchange,
+		Segment:            segment,
+		Symbol:             row.Symbol,
+		Name:               row.Name,
+		StartDate:          row.StartDate,
+		Expiry:             row.Expiry,
+		ExmExchID:          row.ExmExchID,
+		SmstSecurityID:     row.SmstSecurityID,
+		InstrumentName:     row.InstrumentName,
+		TradingSymbol:      row.TradingSymbol,
+		LotUnits:           row.LotUnits,
+		StrikePrice:        row.StrikePrice,
+		OptionType:         row.OptionType,
+		TickSize:           row.TickSize,
+		ExpiryFlag:         row.ExpiryFlag,
+		ExchInstrumentType: instrumentType,
+		SymbolName:         row.SymbolName,
+	}, nil
+}
+
+// convertRowsToModels converts multiple database rows to domain models
+func convertRowsToModels(rows []InstrumentMasterRow) ([]*model.InstrumentMaster, error) {
+	models := make([]*model.InstrumentMaster, len(rows))
+	for i, row := range rows {
+		model, err := row.toModel()
+		if err != nil {
+			return nil, err
+		}
+		models[i] = model
+	}
+	return models, nil
+}
 
 // InstrumentMasterRepository is a ClickHouse implementation of the InstrumentMasterRepository interface
 type InstrumentMasterRepository struct {
@@ -50,13 +120,13 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Contex
 		LIMIT 1
 	`
 
-	instrumentMaster := &model.InstrumentMaster{}
-	err := r.db.GetContext(ctx, instrumentMaster, query, exchangeSecurityID)
+	var row InstrumentMasterRow
+	err := r.db.GetContext(ctx, &row, query, exchangeSecurityID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying instrument master by exchange security ID: %w", err)
 	}
 
-	return instrumentMaster, nil
+	return row.toModel()
 }
 
 // FindBySymbol finds an instrument master by symbol
@@ -131,7 +201,12 @@ func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchang
 }
 
 // FindBySegment finds instrument masters by segment
-func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment string) ([]*model.InstrumentMaster, error) {
+func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment model.Segment) ([]*model.InstrumentMaster, error) {
+	// Validate the segment enum
+	if !segment.IsValid() {
+		return nil, fmt.Errorf("invalid segment: %s", segment)
+	}
+
 	query := `
 		SELECT 
 			exchange_security_id,
@@ -156,13 +231,13 @@ func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment 
 		WHERE segment = ?
 	`
 
-	var instrumentMasters []*model.InstrumentMaster
-	err := r.db.SelectContext(ctx, &instrumentMasters, query, segment)
+	var rows []InstrumentMasterRow
+	err := r.db.SelectContext(ctx, &rows, query, segment.String())
 	if err != nil {
 		return nil, fmt.Errorf("error querying instrument masters by segment: %w", err)
 	}
 
-	return instrumentMasters, nil
+	return convertRowsToModels(rows)
 }
 
 // FindAll returns all instrument masters
@@ -201,6 +276,14 @@ func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.Inst
 
 // Create creates a new instrument master
 func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaster *model.InstrumentMaster) error {
+	// Validate enums
+	if !instrumentMaster.Segment.IsValid() {
+		return fmt.Errorf("invalid segment: %s", instrumentMaster.Segment)
+	}
+	if !instrumentMaster.ExchInstrumentType.IsValid() {
+		return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
+	}
+
 	query := `
 		INSERT INTO instrument_master (
 			exchange_security_id,
@@ -229,7 +312,7 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 		query,
 		instrumentMaster.ExchangeSecurityID,
 		instrumentMaster.Exchange,
-		instrumentMaster.Segment,
+		instrumentMaster.Segment.String(),
 		instrumentMaster.Symbol,
 		instrumentMaster.Name,
 		instrumentMaster.StartDate,
@@ -243,7 +326,7 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 		instrumentMaster.OptionType,
 		instrumentMaster.TickSize,
 		instrumentMaster.ExpiryFlag,
-		instrumentMaster.ExchInstrumentType,
+		instrumentMaster.ExchInstrumentType.String(),
 		instrumentMaster.SymbolName,
 	)
 
@@ -256,6 +339,14 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 
 // Update updates an instrument master by exchange security ID
 func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaster *model.InstrumentMaster) error {
+	// Validate enums
+	if !instrumentMaster.Segment.IsValid() {
+		return fmt.Errorf("invalid segment: %s", instrumentMaster.Segment)
+	}
+	if !instrumentMaster.ExchInstrumentType.IsValid() {
+		return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
+	}
+
 	// Note: ClickHouse typically doesn't support direct updates as in traditional RDBMS
 	// This is a simplified version assuming you're using ALTER TABLE UPDATE syntax
 	query := `
@@ -284,7 +375,7 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 		ctx,
 		query,
 		instrumentMaster.Exchange,
-		instrumentMaster.Segment,
+		instrumentMaster.Segment.String(),
 		instrumentMaster.Symbol,
 		instrumentMaster.Name,
 		instrumentMaster.StartDate,
@@ -298,7 +389,7 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 		instrumentMaster.OptionType,
 		instrumentMaster.TickSize,
 		instrumentMaster.ExpiryFlag,
-		instrumentMaster.ExchInstrumentType,
+		instrumentMaster.ExchInstrumentType.String(),
 		instrumentMaster.SymbolName,
 		instrumentMaster.ExchangeSecurityID,
 	)
