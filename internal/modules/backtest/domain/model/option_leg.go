@@ -6,29 +6,59 @@ import (
 	"github.com/google/uuid"
 )
 
+// Exchange enum
+type Exchange string
+
+const (
+	NSE Exchange = "NSE"
+	BSE Exchange = "BSE"
+	MCX Exchange = "MCX"
+)
+
+// Asset enum
+type Asset string
+
+const (
+	Index Asset = "INDEX"
+	Stock Asset = "STOCK"
+)
+
+// InstrumentType enum
+type InstrumentType string
+
+const (
+	Options InstrumentType = "OPTIONS"
+	Futures InstrumentType = "FUTURES"
+	Equity  InstrumentType = "EQUITY"
+)
+
 // OptionLeg represents an individual leg in a multi-leg options strategy
 type OptionLeg struct {
-	ID              uuid.UUID       `json:"id" db:"id"`
-	StrategyID      uuid.UUID       `json:"strategy_id" db:"strategy_id"`
-	LegSequence     int             `json:"leg_sequence" db:"leg_sequence"`
-	SelectIndex     string          `json:"select_index" db:"select_index"`
-	Segment         Segment         `json:"segment" db:"segment"`
-	OptionType      *OptionType     `json:"option_type,omitempty" db:"option_type"`
-	ActionType      TransactionType `json:"action_type" db:"action_type"`
-	StrikePriceType StrikePriceType `json:"strike_price_type" db:"strike_price_type"`
-	StrikePrice     *float64        `json:"strike_price,omitempty" db:"strike_price"`
-	StrikeOffset    *int            `json:"strike_offset,omitempty" db:"strike_offset"`
-	TotalLot        int             `json:"total_lot" db:"total_lot"`
-	LotSize         *int            `json:"lot_size,omitempty" db:"lot_size"`
-	TotalQuantity   *int            `json:"total_quantity,omitempty" db:"total_quantity"`
-	OrderType       OrderType       `json:"order_type" db:"order_type"`
-	TickOffset      *float64        `json:"tick_offset,omitempty" db:"tick_offset"`
-	ExpiryType      ExpiryType      `json:"expiry_type" db:"expiry_type"`
-	ExpiryDate      *time.Time      `json:"expiry_date,omitempty" db:"expiry_date"`
-	DaysToExpiry    *int            `json:"days_to_expiry,omitempty" db:"days_to_expiry"`
-	LegStatus       LegStatus       `json:"leg_status" db:"status"`
-	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
+	ID                 uuid.UUID       `json:"id" db:"id"`
+	StrategyID         uuid.UUID       `json:"strategy_id" db:"strategy_id"`
+	LegSequence        int             `json:"leg_sequence" db:"leg_sequence"`
+	SelectIndex        string          `json:"select_index" db:"select_index"`
+	Segment            Segment         `json:"segment" db:"segment"`
+	OptionType         *OptionType     `json:"option_type,omitempty" db:"option_type"`
+	ActionType         TransactionType `json:"action_type" db:"action_type"`
+	StrikePriceType    StrikePriceType `json:"strike_price_type" db:"strike_price_type"`
+	StrikePrice        *float64        `json:"strike_price,omitempty" db:"strike_price"`
+	StrikeOffset       *int            `json:"strike_offset,omitempty" db:"strike_offset"`
+	TotalLot           int             `json:"total_lot" db:"total_lot"`
+	LotSize            *int            `json:"lot_size,omitempty" db:"lot_size"`
+	TotalQuantity      *int            `json:"total_quantity,omitempty" db:"total_quantity"`
+	OrderType          OrderType       `json:"order_type" db:"order_type"`
+	TickOffset         *float64        `json:"tick_offset,omitempty" db:"tick_offset"`
+	ExpiryType         ExpiryType      `json:"expiry_type" db:"expiry_type"`
+	ExpiryCycle        ExpiryCycle     `json:"expiry_cycle" db:"expiry_cycle"`
+	ExpiryDate         *time.Time      `json:"expiry_date,omitempty" db:"expiry_date"`
+	DaysToExpiry       *int            `json:"days_to_expiry,omitempty" db:"days_to_expiry"`
+	Exchange           Exchange        `json:"exchange" db:"exchange"`
+	Asset              Asset           `json:"asset" db:"asset"`
+	ExchangeSecurityID *int            `json:"exchange_security_id,omitempty" db:"exchange_security_id"`
+	InstrumentType     InstrumentType  `json:"instrument_type" db:"instrument_type"`
+	CreatedAt          time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at" db:"updated_at"`
 }
 
 // Segment enum
@@ -82,18 +112,17 @@ const (
 	ExpiryTypeQuarterly ExpiryType = "Quarterly"
 )
 
-// LegStatus enum
-type LegStatus string
+// ExpiryCycle enum
+type ExpiryCycle string
 
 const (
-	LegStatusActive    LegStatus = "ACTIVE"
-	LegStatusInactive  LegStatus = "INACTIVE"
-	LegStatusExecuted  LegStatus = "EXECUTED"
-	LegStatusCancelled LegStatus = "CANCELLED"
+	ExpiryCycleCurrent ExpiryCycle = "CURRENT"
+	ExpiryCycleNext    ExpiryCycle = "NEXT"
+	ExpiryCycleNext2   ExpiryCycle = "NEXT2"
 )
 
 // NewOptionLeg creates a new option leg
-func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikePriceType StrikePriceType, expiryType ExpiryType) *OptionLeg {
+func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikePriceType StrikePriceType, expiryType ExpiryType, expiryCycle ExpiryCycle) *OptionLeg {
 	return &OptionLeg{
 		ID:              uuid.New(),
 		StrategyID:      strategyID,
@@ -105,7 +134,10 @@ func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, seg
 		TotalLot:        1,
 		OrderType:       OrderTypeMarket,
 		ExpiryType:      expiryType,
-		LegStatus:       LegStatusActive,
+		ExpiryCycle:     expiryCycle,
+		Exchange:        NSE,     // Default exchange
+		Asset:           Index,   // Default underlying type
+		InstrumentType:  Options, // Default instrument type
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 	}

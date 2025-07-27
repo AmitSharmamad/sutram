@@ -24,6 +24,7 @@ type CreateOptionLegRequest struct {
 	OrderType       model.OrderType       `json:"order_type" validate:"required,oneof=MARKET LIMIT"`
 	TickOffset      *float64              `json:"tick_offset,omitempty"`
 	ExpiryType      model.ExpiryType      `json:"expiry_type" validate:"required,oneof=Weekly Monthly Quarterly"`
+	ExpiryCycle     model.ExpiryCycle     `json:"expiry_cycle" validate:"required,oneof=CURRENT NEXT NEXT2"`
 	ExpiryDate      *time.Time            `json:"expiry_date,omitempty"`
 	DaysToExpiry    *int                  `json:"days_to_expiry,omitempty"`
 }
@@ -43,9 +44,9 @@ type UpdateOptionLegRequest struct {
 	OrderType       *model.OrderType       `json:"order_type,omitempty" validate:"omitempty,oneof=MARKET LIMIT"`
 	TickOffset      *float64               `json:"tick_offset,omitempty"`
 	ExpiryType      *model.ExpiryType      `json:"expiry_type,omitempty" validate:"omitempty,oneof=Weekly Monthly Quarterly"`
+	ExpiryCycle     *model.ExpiryCycle     `json:"expiry_cycle,omitempty" validate:"omitempty,oneof=CURRENT NEXT NEXT2"`
 	ExpiryDate      *time.Time             `json:"expiry_date,omitempty"`
 	DaysToExpiry    *int                   `json:"days_to_expiry,omitempty"`
-	LegStatus       *model.LegStatus       `json:"leg_status,omitempty" validate:"omitempty,oneof=ACTIVE INACTIVE EXECUTED CANCELLED"`
 }
 
 // OptionLegResponse represents the response for option leg operations
@@ -66,9 +67,9 @@ type OptionLegResponse struct {
 	OrderType       model.OrderType       `json:"order_type"`
 	TickOffset      *float64              `json:"tick_offset,omitempty"`
 	ExpiryType      model.ExpiryType      `json:"expiry_type"`
+	ExpiryCycle     model.ExpiryCycle     `json:"expiry_cycle"`
 	ExpiryDate      *time.Time            `json:"expiry_date,omitempty"`
 	DaysToExpiry    *int                  `json:"days_to_expiry,omitempty"`
-	LegStatus       model.LegStatus       `json:"leg_status"`
 	CreatedAt       time.Time             `json:"created_at"`
 	UpdatedAt       time.Time             `json:"updated_at"`
 }
@@ -81,7 +82,6 @@ type OptionLegFilter struct {
 	OptionType  *model.OptionType      `json:"option_type,omitempty"`
 	ActionType  *model.TransactionType `json:"action_type,omitempty"`
 	ExpiryType  *model.ExpiryType      `json:"expiry_type,omitempty"`
-	LegStatus   *model.LegStatus       `json:"leg_status,omitempty"`
 	Page        int                    `json:"page" validate:"min=1"`
 	PerPage     int                    `json:"per_page" validate:"min=1,max=100"`
 }
@@ -96,6 +96,7 @@ func (req *CreateOptionLegRequest) ToModel() *model.OptionLeg {
 		req.ActionType,
 		req.StrikePriceType,
 		req.ExpiryType,
+		req.ExpiryCycle,
 	)
 
 	optionLeg.OptionType = req.OptionType
@@ -130,9 +131,9 @@ func ToResponse(optionLeg *model.OptionLeg) *OptionLegResponse {
 		OrderType:       optionLeg.OrderType,
 		TickOffset:      optionLeg.TickOffset,
 		ExpiryType:      optionLeg.ExpiryType,
+		ExpiryCycle:     optionLeg.ExpiryCycle,
 		ExpiryDate:      optionLeg.ExpiryDate,
 		DaysToExpiry:    optionLeg.DaysToExpiry,
-		LegStatus:       optionLeg.LegStatus,
 		CreatedAt:       optionLeg.CreatedAt,
 		UpdatedAt:       optionLeg.UpdatedAt,
 	}

@@ -46,10 +46,19 @@ CREATE TYPE reset_period_type AS ENUM (
 );
 
 -- Enums for options trading support
-CREATE TYPE strike_price_type AS ENUM ('ATM', 'ITM', 'OTM', 'Custom');
-CREATE TYPE expiry_type AS ENUM ('Weekly', 'Monthly', 'Quarterly');
-CREATE TYPE leg_status AS ENUM ('ACTIVE', 'INACTIVE', 'EXECUTED', 'CANCELLED');
+CREATE TYPE strike_type AS ENUM (
+    'OTM20', 'OTM19', 'OTM18', 'OTM17', 'OTM16', 'OTM15', 'OTM14', 'OTM13', 'OTM12', 'OTM11',
+    'OTM10', 'OTM9', 'OTM8', 'OTM7', 'OTM6', 'OTM5', 'OTM4', 'OTM3', 'OTM2', 'OTM1',
+    'ATM',
+    'ITM1', 'ITM2', 'ITM3', 'ITM4', 'ITM5', 'ITM6', 'ITM7', 'ITM8', 'ITM9', 'ITM10',
+    'ITM11', 'ITM12', 'ITM13', 'ITM14', 'ITM15', 'ITM16', 'ITM17', 'ITM18', 'ITM19', 'ITM20'
+);
+
+CREATE TYPE expiry_cycle AS ENUM ('CURRENT', 'NEXT', 'NEXT2');
+CREATE TYPE expiry_type AS ENUM ('WEEKLY', 'MONTHLY', 'QUARTERLY');
 CREATE TYPE instrument_type AS ENUM ('EQUITY', 'FUTURES', 'OPTIONS');
-CREATE TYPE option_type_enum AS ENUM ('CALL', 'PUT');
+CREATE TYPE option_type AS ENUM ('CALL', 'PUT');
+CREATE TYPE asset AS ENUM ('INDEX', 'STOCK');
+CREATE TYPE strategy_type AS ENUM ('CONDITIONAL', 'TIME_BASED');
 
 CREATE TYPE trading_day AS ENUM ('MON', 'TUE', 'WED', 'THU', 'FRI');
