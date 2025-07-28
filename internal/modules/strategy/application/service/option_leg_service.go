@@ -82,12 +82,6 @@ func (s *optionLegService) CreateOptionLeg(ctx context.Context, strategyID uuid.
 	// Convert DTO to domain model
 	optionLeg := req.ToModel(strategyID)
 
-	// Calculate total quantity if lot size is provided
-	if optionLeg.LotSize != nil {
-		totalQuantity := optionLeg.TotalLot * *optionLeg.LotSize
-		optionLeg.TotalQuantity = &totalQuantity
-	}
-
 	// Save to database
 	if err := s.optionLegRepo.Create(ctx, optionLeg); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrOptionLegCreateFailed, err)
@@ -168,9 +162,6 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	if req.StrikePrice != nil {
 		optionLeg.StrikePrice = req.StrikePrice
 	}
-	if req.StrikeOffset != nil {
-		optionLeg.StrikeOffset = req.StrikeOffset
-	}
 	if req.TotalLot != nil {
 		optionLeg.TotalLot = *req.TotalLot
 	}
@@ -192,16 +183,17 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	if req.ExpiryDate != nil {
 		optionLeg.ExpiryDate = req.ExpiryDate
 	}
-	if req.DaysToExpiry != nil {
-		optionLeg.DaysToExpiry = req.DaysToExpiry
+	if req.Exchange != nil {
+		optionLeg.Exchange = *req.Exchange
 	}
-
-	// Recalculate total quantity if lot size or total lot changed
-	if req.LotSize != nil || req.TotalLot != nil {
-		if optionLeg.LotSize != nil {
-			totalQuantity := optionLeg.TotalLot * *optionLeg.LotSize
-			optionLeg.TotalQuantity = &totalQuantity
-		}
+	if req.Asset != nil {
+		optionLeg.Asset = *req.Asset
+	}
+	if req.ExchangeSecurityID != nil {
+		optionLeg.ExchangeSecurityID = req.ExchangeSecurityID
+	}
+	if req.InstrumentType != nil {
+		optionLeg.InstrumentType = *req.InstrumentType
 	}
 
 	// Validate the updated option leg

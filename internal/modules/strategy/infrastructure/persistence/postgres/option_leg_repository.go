@@ -35,20 +35,20 @@ func (r *OptionLegRepository) Create(ctx context.Context, optionLeg *model.Optio
 	query := `
 		INSERT INTO option_leg (
 			id, strategy_id, leg_sequence, select_index, segment, option_type,
-			action_type, strike_type, strike_price, strike_offset, total_lot,
-			lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			action_type, strike_type, strike_price, total_lot,
+			lot_size, order_type, tick_offset, expiry_type,
+			expiry_cycle, expiry_date, exchange, asset, 
 			exchange_security_id, instrument_type, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
 		)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		optionLeg.ID, optionLeg.StrategyID, optionLeg.LegSequence, optionLeg.SelectIndex,
 		optionLeg.Segment, optionLeg.OptionType, optionLeg.ActionType, optionLeg.StrikeType,
-		optionLeg.StrikePrice, optionLeg.StrikeOffset, optionLeg.TotalLot, optionLeg.LotSize,
-		optionLeg.TotalQuantity, optionLeg.OrderType, optionLeg.TickOffset, optionLeg.ExpiryType,
-		optionLeg.ExpiryCycle, optionLeg.ExpiryDate, optionLeg.DaysToExpiry, optionLeg.Exchange, optionLeg.Asset,
+		optionLeg.StrikePrice, optionLeg.TotalLot, optionLeg.LotSize,
+		optionLeg.OrderType, optionLeg.TickOffset, optionLeg.ExpiryType,
+		optionLeg.ExpiryCycle, optionLeg.ExpiryDate, optionLeg.Exchange, optionLeg.Asset,
 		optionLeg.ExchangeSecurityID, optionLeg.InstrumentType, optionLeg.CreatedAt,
 		optionLeg.UpdatedAt,
 	)
@@ -72,9 +72,9 @@ func (r *OptionLegRepository) Create(ctx context.Context, optionLeg *model.Optio
 func (r *OptionLegRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.OptionLeg, error) {
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		WHERE id = $1`
@@ -95,9 +95,9 @@ func (r *OptionLegRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 func (r *OptionLegRepository) GetByStrategyID(ctx context.Context, strategyID uuid.UUID) ([]*model.OptionLeg, error) {
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		WHERE strategy_id = $1 ORDER BY leg_sequence`
@@ -115,9 +115,9 @@ func (r *OptionLegRepository) GetByStrategyID(ctx context.Context, strategyID uu
 func (r *OptionLegRepository) GetByStrategyIDAndSequence(ctx context.Context, strategyID uuid.UUID, legSequence int) (*model.OptionLeg, error) {
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		WHERE strategy_id = $1 AND leg_sequence = $2`
@@ -139,19 +139,19 @@ func (r *OptionLegRepository) Update(ctx context.Context, optionLeg *model.Optio
 	query := `
 		UPDATE option_leg SET
 			leg_sequence = $2, select_index = $3, segment = $4, option_type = $5,
-			action_type = $6, strike_type = $7, strike_price = $8, strike_offset = $9,
-			total_lot = $10, lot_size = $11, total_quantity = $12, order_type = $13,
-			tick_offset = $14, expiry_type = $15, expiry_cycle = $16, expiry_date = $17, days_to_expiry = $18,
-			exchange = $19, asset = $20, exchange_security_id = $21, 
-			instrument_type = $22, updated_at = $23
+			action_type = $6, strike_type = $7, strike_price = $8,
+			total_lot = $9, lot_size = $10, order_type = $11,
+			tick_offset = $12, expiry_type = $13, expiry_cycle = $14, expiry_date = $15,
+			exchange = $16, asset = $17, exchange_security_id = $18, 
+			instrument_type = $19, updated_at = $20
 		WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query,
 		optionLeg.ID, optionLeg.LegSequence, optionLeg.SelectIndex, optionLeg.Segment,
 		optionLeg.OptionType, optionLeg.ActionType, optionLeg.StrikeType, optionLeg.StrikePrice,
-		optionLeg.StrikeOffset, optionLeg.TotalLot, optionLeg.LotSize, optionLeg.TotalQuantity,
+		optionLeg.TotalLot, optionLeg.LotSize,
 		optionLeg.OrderType, optionLeg.TickOffset, optionLeg.ExpiryType, optionLeg.ExpiryCycle, optionLeg.ExpiryDate,
-		optionLeg.DaysToExpiry, optionLeg.Exchange, optionLeg.Asset,
+		optionLeg.Exchange, optionLeg.Asset,
 		optionLeg.ExchangeSecurityID, optionLeg.InstrumentType, time.Now(),
 	)
 
@@ -208,9 +208,9 @@ func (r *OptionLegRepository) DeleteByStrategyID(ctx context.Context, strategyID
 func (r *OptionLegRepository) GetByIndex(ctx context.Context, selectIndex string) ([]*model.OptionLeg, error) {
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		WHERE select_index = $1
@@ -229,9 +229,9 @@ func (r *OptionLegRepository) GetByIndex(ctx context.Context, selectIndex string
 func (r *OptionLegRepository) GetByExpiryDate(ctx context.Context, expiryDate string) ([]*model.OptionLeg, error) {
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		WHERE expiry_date::text = $1
@@ -259,9 +259,9 @@ func (r *OptionLegRepository) List(ctx context.Context, offset, limit int) ([]*m
 	// Get paginated results
 	query := `
 		SELECT id, strategy_id, leg_sequence, select_index, segment, option_type,
-			   action_type, strike_type, strike_price, strike_offset, total_lot,
-			   lot_size, total_quantity, order_type, tick_offset, expiry_type,
-			   expiry_cycle, expiry_date, days_to_expiry, exchange, asset, 
+			   action_type, strike_type, strike_price, total_lot,
+			   lot_size, order_type, tick_offset, expiry_type,
+			   expiry_cycle, expiry_date, exchange, asset, 
 			   exchange_security_id, instrument_type, created_at, updated_at
 		FROM option_leg 
 		ORDER BY created_at DESC
@@ -286,20 +286,17 @@ func (r *OptionLegRepository) scanOptionLeg(row *sql.Row) (*model.OptionLeg, err
 	var optionLeg model.OptionLeg
 	var optionType sql.NullString
 	var strikePrice sql.NullFloat64
-	var strikeOffset sql.NullInt32
 	var lotSize sql.NullInt32
-	var totalQuantity sql.NullInt32
 	var tickOffset sql.NullFloat64
 	var expiryDate sql.NullTime
-	var daysToExpiry sql.NullInt32
 	var exchangeSecurityID sql.NullInt32
 
 	err := row.Scan(
 		&optionLeg.ID, &optionLeg.StrategyID, &optionLeg.LegSequence, &optionLeg.SelectIndex,
 		&optionLeg.Segment, &optionType, &optionLeg.ActionType, &optionLeg.StrikeType,
-		&strikePrice, &strikeOffset, &optionLeg.TotalLot, &lotSize, &totalQuantity,
+		&strikePrice, &optionLeg.TotalLot, &lotSize,
 		&optionLeg.OrderType, &tickOffset, &optionLeg.ExpiryType, &optionLeg.ExpiryCycle, &expiryDate,
-		&daysToExpiry, &optionLeg.Exchange, &optionLeg.Asset,
+		&optionLeg.Exchange, &optionLeg.Asset,
 		&exchangeSecurityID, &optionLeg.InstrumentType, &optionLeg.CreatedAt, &optionLeg.UpdatedAt,
 	)
 
@@ -315,27 +312,15 @@ func (r *OptionLegRepository) scanOptionLeg(row *sql.Row) (*model.OptionLeg, err
 	if strikePrice.Valid {
 		optionLeg.StrikePrice = &strikePrice.Float64
 	}
-	if strikeOffset.Valid {
-		offset := int(strikeOffset.Int32)
-		optionLeg.StrikeOffset = &offset
-	}
 	if lotSize.Valid {
 		size := int(lotSize.Int32)
 		optionLeg.LotSize = &size
-	}
-	if totalQuantity.Valid {
-		quantity := int(totalQuantity.Int32)
-		optionLeg.TotalQuantity = &quantity
 	}
 	if tickOffset.Valid {
 		optionLeg.TickOffset = &tickOffset.Float64
 	}
 	if expiryDate.Valid {
 		optionLeg.ExpiryDate = &expiryDate.Time
-	}
-	if daysToExpiry.Valid {
-		days := int(daysToExpiry.Int32)
-		optionLeg.DaysToExpiry = &days
 	}
 	if exchangeSecurityID.Valid {
 		id := int(exchangeSecurityID.Int32)
@@ -353,20 +338,17 @@ func (r *OptionLegRepository) scanOptionLegs(rows *sql.Rows) ([]*model.OptionLeg
 		var optionLeg model.OptionLeg
 		var optionType sql.NullString
 		var strikePrice sql.NullFloat64
-		var strikeOffset sql.NullInt32
 		var lotSize sql.NullInt32
-		var totalQuantity sql.NullInt32
 		var tickOffset sql.NullFloat64
 		var expiryDate sql.NullTime
-		var daysToExpiry sql.NullInt32
 		var exchangeSecurityID sql.NullInt32
 
 		err := rows.Scan(
 			&optionLeg.ID, &optionLeg.StrategyID, &optionLeg.LegSequence, &optionLeg.SelectIndex,
 			&optionLeg.Segment, &optionType, &optionLeg.ActionType, &optionLeg.StrikeType,
-			&strikePrice, &strikeOffset, &optionLeg.TotalLot, &lotSize, &totalQuantity,
+			&strikePrice, &optionLeg.TotalLot, &lotSize,
 			&optionLeg.OrderType, &tickOffset, &optionLeg.ExpiryType, &optionLeg.ExpiryCycle, &expiryDate,
-			&daysToExpiry, &optionLeg.Exchange, &optionLeg.Asset,
+			&optionLeg.Exchange, &optionLeg.Asset,
 			&exchangeSecurityID, &optionLeg.InstrumentType, &optionLeg.CreatedAt, &optionLeg.UpdatedAt,
 		)
 
@@ -382,27 +364,15 @@ func (r *OptionLegRepository) scanOptionLegs(rows *sql.Rows) ([]*model.OptionLeg
 		if strikePrice.Valid {
 			optionLeg.StrikePrice = &strikePrice.Float64
 		}
-		if strikeOffset.Valid {
-			offset := int(strikeOffset.Int32)
-			optionLeg.StrikeOffset = &offset
-		}
 		if lotSize.Valid {
 			size := int(lotSize.Int32)
 			optionLeg.LotSize = &size
-		}
-		if totalQuantity.Valid {
-			quantity := int(totalQuantity.Int32)
-			optionLeg.TotalQuantity = &quantity
 		}
 		if tickOffset.Valid {
 			optionLeg.TickOffset = &tickOffset.Float64
 		}
 		if expiryDate.Valid {
 			optionLeg.ExpiryDate = &expiryDate.Time
-		}
-		if daysToExpiry.Valid {
-			days := int(daysToExpiry.Int32)
-			optionLeg.DaysToExpiry = &days
 		}
 		if exchangeSecurityID.Valid {
 			id := int(exchangeSecurityID.Int32)

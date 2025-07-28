@@ -101,30 +101,6 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 		return
 	}
 
-	// Create option legs if segment is F&O and option legs are provided
-	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
-		var optionLegResponses []*dto.OptionLegResponse
-		for i, legReq := range req.OptionLegs {
-			// Set leg sequence if not provided
-			if legReq.LegSequence == 0 {
-				legReq.LegSequence = i + 1
-			}
-
-			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), strategy.ID, &legReq)
-			if err != nil {
-				// If option leg creation fails, we should consider whether to delete the strategy
-				// For now, we'll return an error but keep the strategy
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"success": false,
-					"error":   "Failed to create option leg: " + err.Error(),
-				})
-				return
-			}
-			optionLegResponses = append(optionLegResponses, optionLeg)
-		}
-		strategy.OptionLegs = optionLegResponses
-	}
-
 	// Return created strategy
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,

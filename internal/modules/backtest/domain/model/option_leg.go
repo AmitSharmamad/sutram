@@ -43,7 +43,6 @@ type OptionLeg struct {
 	ActionType         TransactionType `json:"action_type" db:"action_type"`
 	StrikeType         StrikePriceType `json:"strike_type" db:"strike_type"`
 	StrikePrice        *float64        `json:"strike_price,omitempty" db:"strike_price"`
-	StrikeOffset       *int            `json:"strike_offset,omitempty" db:"strike_offset"`
 	TotalLot           int             `json:"total_lot" db:"total_lot"`
 	LotSize            *int            `json:"lot_size,omitempty" db:"lot_size"`
 	TotalQuantity      *int            `json:"total_quantity,omitempty" db:"total_quantity"`
