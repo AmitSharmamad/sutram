@@ -31,7 +31,7 @@ var (
 // OptionLegService defines the service for option leg operations
 type OptionLegService interface {
 	// CreateOptionLeg creates a new option leg
-	CreateOptionLeg(ctx context.Context, req *dto.CreateOptionLegRequest) (*dto.OptionLegResponse, error)
+	CreateOptionLeg(ctx context.Context, strategyID uuid.UUID, req *dto.CreateOptionLegRequest) (*dto.OptionLegResponse, error)
 
 	// GetOptionLegByID retrieves an option leg by its ID
 	GetOptionLegByID(ctx context.Context, id uuid.UUID) (*dto.OptionLegResponse, error)
@@ -76,20 +76,20 @@ func NewOptionLegService(optionLegRepo repository.OptionLegRepository, instrumen
 }
 
 // CreateOptionLeg creates a new option leg
-func (s *optionLegService) CreateOptionLeg(ctx context.Context, req *dto.CreateOptionLegRequest) (*dto.OptionLegResponse, error) {
+func (s *optionLegService) CreateOptionLeg(ctx context.Context, strategyID uuid.UUID, req *dto.CreateOptionLegRequest) (*dto.OptionLegResponse, error) {
 	// Validate the request
 	if err := s.ValidateOptionLeg(ctx, req); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
 	// Check if leg sequence already exists for the strategy
-	existingLeg, err := s.optionLegRepo.GetByStrategyIDAndSequence(ctx, req.StrategyID, req.LegSequence)
+	existingLeg, err := s.optionLegRepo.GetByStrategyIDAndSequence(ctx, strategyID, req.LegSequence)
 	if err == nil && existingLeg != nil {
 		return nil, ErrDuplicateOrder
 	}
 
 	// Convert DTO to domain model
-	optionLeg := req.ToModel()
+	optionLeg := req.ToModel(strategyID)
 
 	// Calculate total quantity if lot size is provided
 	if optionLeg.LotSize != nil {
@@ -304,9 +304,6 @@ func (s *optionLegService) ValidateOptionLeg(ctx context.Context, req *dto.Creat
 	if req.Segment == model.SegmentFO {
 		if req.OptionType == nil {
 			return model.ErrInvalidOptionDetails
-		}
-		if req.StrikePrice == nil && req.StrikeType == model.StrikePriceTypeCustom {
-			return model.ErrInvalidStrikePrice
 		}
 	}
 

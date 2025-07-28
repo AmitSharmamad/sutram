@@ -30,19 +30,27 @@ func NewOptionLegHandler(optionLegService service.OptionLegService) *OptionLegHa
 // @Tags option-legs
 // @Accept json
 // @Produce json
+// @Param strategy_id path string true "Strategy ID"
 // @Param option_leg body dto.CreateOptionLegRequest true "Option leg data"
 // @Success 201 {object} dto.OptionLegResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/option-legs [post]
+// @Router /api/v1/strategies/{strategy_id}/option-legs [post]
 func (h *OptionLegHandler) CreateOptionLeg(c *gin.Context) {
+	strategyIDParam := c.Param("strategy_id")
+	strategyID, err := uuid.Parse(strategyIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid strategy ID"})
+		return
+	}
+
 	var req dto.CreateOptionLegRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	response, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), &req)
+	response, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), strategyID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -116,13 +116,12 @@ func (s *strategyService) CreateStrategy(ctx context.Context, req *dto.CreateStr
 	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
 		var optionLegResponses []*dto.OptionLegResponse
 		for i, legReq := range req.OptionLegs {
-			// Set strategy ID and leg sequence if not provided
-			legReq.StrategyID = strategy.ID
+			// Set leg sequence if not provided
 			if legReq.LegSequence == 0 {
 				legReq.LegSequence = i + 1
 			}
 
-			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, &legReq)
+			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, strategy.ID, &legReq)
 			if err != nil {
 				// If option leg creation fails, we should consider whether to delete the strategy
 				// For now, we'll return an error but keep the strategy
@@ -308,13 +307,12 @@ func (s *strategyService) UpdateStrategy(ctx context.Context, req *dto.UpdateStr
 		// Create new option legs
 		var optionLegResponses []*dto.OptionLegResponse
 		for i, legReq := range req.OptionLegs {
-			// Set strategy ID and leg sequence if not provided
-			legReq.StrategyID = req.ID
+			// Set leg sequence if not provided
 			if legReq.LegSequence == 0 {
 				legReq.LegSequence = i + 1
 			}
 
-			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, &legReq)
+			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, req.ID, &legReq)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create option leg: %w", err)
 			}

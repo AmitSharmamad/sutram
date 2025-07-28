@@ -6,7 +6,6 @@ import (
 
 	"algo/internal/modules/strategy/application/dto"
 	"algo/internal/modules/strategy/application/service"
-	"algo/internal/modules/strategy/domain/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,24 +24,32 @@ func NewOptionLegHandler(optionLegService service.OptionLegService) *OptionLegHa
 }
 
 // CreateOptionLeg creates a new option leg
-// @Summary Create option leg
+// @Summary Create a new option leg
 // @Description Create a new option leg for a strategy
 // @Tags option-legs
 // @Accept json
 // @Produce json
+// @Param strategy_id path string true "Strategy ID"
 // @Param option_leg body dto.CreateOptionLegRequest true "Option leg data"
 // @Success 201 {object} dto.OptionLegResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/v1/option-legs [post]
+// @Router /api/v1/strategies/{strategy_id}/option-legs [post]
 func (h *OptionLegHandler) CreateOptionLeg(c *gin.Context) {
+	strategyIDParam := c.Param("strategy_id")
+	strategyID, err := uuid.Parse(strategyIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid strategy ID"})
+		return
+	}
+
 	var req dto.CreateOptionLegRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	response, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), &req)
+	response, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), strategyID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -51,9 +58,9 @@ func (h *OptionLegHandler) CreateOptionLeg(c *gin.Context) {
 	c.JSON(http.StatusCreated, response)
 }
 
-// GetOptionLeg retrieves an option leg by ID
-// @Summary Get option leg
-// @Description Get an option leg by its ID
+// GetOptionLegByID retrieves an option leg by its ID
+// @Summary Get option leg by ID
+// @Description Get option leg by ID
 // @Tags option-legs
 // @Produce json
 // @Param id path string true "Option leg ID"
@@ -62,7 +69,7 @@ func (h *OptionLegHandler) CreateOptionLeg(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/option-legs/{id} [get]
-func (h *OptionLegHandler) GetOptionLeg(c *gin.Context) {
+func (h *OptionLegHandler) GetOptionLegByID(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -72,11 +79,7 @@ func (h *OptionLegHandler) GetOptionLeg(c *gin.Context) {
 
 	response, err := h.optionLegService.GetOptionLegByID(c.Request.Context(), id)
 	if err != nil {
-		if err == service.ErrOptionLegNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Option leg not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -110,7 +113,7 @@ func (h *OptionLegHandler) GetOptionLegsByStrategy(c *gin.Context) {
 	c.JSON(http.StatusOK, responses)
 }
 
-// UpdateOptionLeg updates an existing option leg
+// UpdateOptionLeg updates an option leg
 // @Summary Update option leg
 // @Description Update an existing option leg
 // @Tags option-legs
@@ -139,10 +142,6 @@ func (h *OptionLegHandler) UpdateOptionLeg(c *gin.Context) {
 
 	response, err := h.optionLegService.UpdateOptionLeg(c.Request.Context(), id, &req)
 	if err != nil {
-		if err == service.ErrOptionLegNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Option leg not found"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -152,10 +151,11 @@ func (h *OptionLegHandler) UpdateOptionLeg(c *gin.Context) {
 
 // DeleteOptionLeg deletes an option leg
 // @Summary Delete option leg
-// @Description Delete an option leg by its ID
+// @Description Delete an option leg by ID
 // @Tags option-legs
+// @Produce json
 // @Param id path string true "Option leg ID"
-// @Success 204
+// @Success 204 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
@@ -168,29 +168,25 @@ func (h *OptionLegHandler) DeleteOptionLeg(c *gin.Context) {
 		return
 	}
 
-	err = h.optionLegService.DeleteOptionLeg(c.Request.Context(), id)
-	if err != nil {
-		if err == service.ErrOptionLegNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Option leg not found"})
-			return
-		}
+	if err := h.optionLegService.DeleteOptionLeg(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusNoContent, gin.H{"message": "Option leg deleted successfully"})
 }
 
-// DeleteOptionLegsByStrategy deletes all option legs for a strategy
-// @Summary Delete option legs by strategy
+// DeleteAllOptionLegsByStrategy deletes all option legs for a strategy
+// @Summary Delete all option legs by strategy
 // @Description Delete all option legs for a specific strategy
 // @Tags option-legs
+// @Produce json
 // @Param strategy_id path string true "Strategy ID"
-// @Success 204
+// @Success 204 {object} map[string]interface{}
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/strategies/{strategy_id}/option-legs [delete]
-func (h *OptionLegHandler) DeleteOptionLegsByStrategy(c *gin.Context) {
+func (h *OptionLegHandler) DeleteAllOptionLegsByStrategy(c *gin.Context) {
 	strategyIDParam := c.Param("strategy_id")
 	strategyID, err := uuid.Parse(strategyIDParam)
 	if err != nil {
@@ -198,26 +194,30 @@ func (h *OptionLegHandler) DeleteOptionLegsByStrategy(c *gin.Context) {
 		return
 	}
 
-	err = h.optionLegService.DeleteOptionLegsByStrategyID(c.Request.Context(), strategyID)
-	if err != nil {
+	if err := h.optionLegService.DeleteOptionLegsByStrategyID(c.Request.Context(), strategyID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusNoContent, gin.H{"message": "All option legs deleted successfully"})
 }
 
-// GetOptionLegsByIndex retrieves option legs by index/underlying
+// GetOptionLegsByIndex retrieves option legs by index
 // @Summary Get option legs by index
-// @Description Get option legs for a specific index/underlying
+// @Description Get all option legs for a specific index
 // @Tags option-legs
 // @Produce json
-// @Param index path string true "Index/Underlying name"
+// @Param index path string true "Index name"
 // @Success 200 {array} dto.OptionLegResponse
+// @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/option-legs/index/{index} [get]
 func (h *OptionLegHandler) GetOptionLegsByIndex(c *gin.Context) {
 	index := c.Param("index")
+	if index == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Index parameter is required"})
+		return
+	}
 
 	responses, err := h.optionLegService.GetOptionLegsByIndex(c.Request.Context(), index)
 	if err != nil {
@@ -228,82 +228,47 @@ func (h *OptionLegHandler) GetOptionLegsByIndex(c *gin.Context) {
 	c.JSON(http.StatusOK, responses)
 }
 
-// SearchOptionLegs searches for option legs with filtering
+// SearchOptionLegs searches option legs with filters
 // @Summary Search option legs
-// @Description Search option legs with various filter criteria
+// @Description Search option legs with various filters
 // @Tags option-legs
 // @Produce json
 // @Param strategy_id query string false "Strategy ID"
-// @Param select_index query string false "Index/Underlying"
-// @Param segment query string false "Segment" Enums(F&O, EQ)
-// @Param option_type query string false "Option type" Enums(CALL, PUT)
-// @Param action_type query string false "Action type" Enums(BUY, SELL)
-// @Param expiry_type query string false "Expiry type" Enums(Weekly, Monthly, Quarterly)
+// @Param select_index query string false "Select index"
+// @Param segment query string false "Segment"
+// @Param option_type query string false "Option type"
+// @Param action_type query string false "Action type"
+// @Param expiry_type query string false "Expiry type"
 // @Param page query int false "Page number" default(1)
-// @Param per_page query int false "Items per page" default(20)
-// @Success 200 {object} map[string]interface{}
+// @Param per_page query int false "Items per page" default(10)
+// @Success 200 {array} dto.OptionLegResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /api/v1/option-legs/search [get]
 func (h *OptionLegHandler) SearchOptionLegs(c *gin.Context) {
-	filter := &dto.OptionLegFilter{
-		Page:    1,
-		PerPage: 20,
-	}
+	var filter dto.OptionLegFilter
 
 	// Parse query parameters
-	if strategyIDParam := c.Query("strategy_id"); strategyIDParam != "" {
-		strategyID, err := uuid.Parse(strategyIDParam)
+	if strategyID := c.Query("strategy_id"); strategyID != "" {
+		id, err := uuid.Parse(strategyID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid strategy ID"})
 			return
 		}
-		filter.StrategyID = &strategyID
+		filter.StrategyID = &id
 	}
 
 	if selectIndex := c.Query("select_index"); selectIndex != "" {
 		filter.SelectIndex = &selectIndex
 	}
 
-	if segmentParam := c.Query("segment"); segmentParam != "" {
-		segment := model.Segment(segmentParam)
-		filter.Segment = &segment
-	}
+	// Parse pagination parameters
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "10"))
+	filter.Page = page
+	filter.PerPage = perPage
 
-	if optionTypeParam := c.Query("option_type"); optionTypeParam != "" {
-		optionType := model.OptionType(optionTypeParam)
-		filter.OptionType = &optionType
-	}
-
-	if actionTypeParam := c.Query("action_type"); actionTypeParam != "" {
-		actionType := model.TransactionType(actionTypeParam)
-		filter.ActionType = &actionType
-	}
-
-	if expiryTypeParam := c.Query("expiry_type"); expiryTypeParam != "" {
-		expiryType := model.ExpiryType(expiryTypeParam)
-		filter.ExpiryType = &expiryType
-	}
-
-	if pageParam := c.Query("page"); pageParam != "" {
-		page, err := strconv.Atoi(pageParam)
-		if err != nil || page < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page number"})
-			return
-		}
-		filter.Page = page
-	}
-
-	if perPageParam := c.Query("per_page"); perPageParam != "" {
-		perPage, err := strconv.Atoi(perPageParam)
-		if err != nil || perPage < 1 || perPage > 100 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid per_page value (1-100)"})
-			return
-		}
-		filter.PerPage = perPage
-	}
-
-	responses, total, err := h.optionLegService.SearchOptionLegs(c.Request.Context(), filter)
+	responses, total, err := h.optionLegService.SearchOptionLegs(c.Request.Context(), &filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

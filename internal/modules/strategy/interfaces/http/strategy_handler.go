@@ -105,13 +105,12 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
 		var optionLegResponses []*dto.OptionLegResponse
 		for i, legReq := range req.OptionLegs {
-			// Set strategy ID and leg sequence if not provided
-			legReq.StrategyID = strategy.ID
+			// Set leg sequence if not provided
 			if legReq.LegSequence == 0 {
 				legReq.LegSequence = i + 1
 			}
 
-			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), &legReq)
+			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), strategy.ID, &legReq)
 			if err != nil {
 				// If option leg creation fails, we should consider whether to delete the strategy
 				// For now, we'll return an error but keep the strategy
@@ -328,13 +327,12 @@ func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 		// Create new option legs
 		var optionLegResponses []*dto.OptionLegResponse
 		for i, legReq := range req.OptionLegs {
-			// Set strategy ID and leg sequence if not provided
-			legReq.StrategyID = id
+			// Set leg sequence if not provided
 			if legReq.LegSequence == 0 {
 				legReq.LegSequence = i + 1
 			}
 
-			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), &legReq)
+			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), id, &legReq)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"success": false,
