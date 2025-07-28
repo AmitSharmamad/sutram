@@ -10,13 +10,12 @@ import (
 
 // CreateOptionLegRequest represents the request to create an option leg
 type CreateOptionLegRequest struct {
-	StrategyID   uuid.UUID             `json:"strategy_id" validate:"required"`
 	LegSequence  int                   `json:"leg_sequence" validate:"required,gt=0"`
 	SelectIndex  string                `json:"select_index" validate:"required"`
 	Segment      model.Segment         `json:"segment" validate:"required,oneof=F&O EQ"`
 	OptionType   *model.OptionType     `json:"option_type,omitempty" validate:"omitempty,oneof=CALL PUT"`
 	ActionType   model.TransactionType `json:"action_type" validate:"required,oneof=BUY SELL"`
-	StrikeType   model.StrikePriceType `json:"strike_type" validate:"required,oneof=ATM ITM OTM Custom"`
+	StrikeType   model.StrikePriceType `json:"strike_type" validate:"required,oneof=OTM20 OTM19 OTM18 OTM17 OTM16 OTM15 OTM14 OTM13 OTM12 OTM11 OTM10 OTM9 OTM8 OTM7 OTM6 OTM5 OTM4 OTM3 OTM2 OTM1 ATM ITM1 ITM2 ITM3 ITM4 ITM5 ITM6 ITM7 ITM8 ITM9 ITM10 ITM11 ITM12 ITM13 ITM14 ITM15 ITM16 ITM17 ITM18 ITM19 ITM20"`
 	StrikePrice  *float64              `json:"strike_price,omitempty"`
 	StrikeOffset *int                  `json:"strike_offset,omitempty"`
 	TotalLot     int                   `json:"total_lot" validate:"required,gt=0"`
@@ -36,7 +35,7 @@ type UpdateOptionLegRequest struct {
 	Segment      *model.Segment         `json:"segment,omitempty" validate:"omitempty,oneof=F&O EQ"`
 	OptionType   *model.OptionType      `json:"option_type,omitempty" validate:"omitempty,oneof=CALL PUT"`
 	ActionType   *model.TransactionType `json:"action_type,omitempty" validate:"omitempty,oneof=BUY SELL"`
-	StrikeType   *model.StrikePriceType `json:"strike_type,omitempty" validate:"omitempty,oneof=ATM ITM OTM Custom"`
+	StrikeType   *model.StrikePriceType `json:"strike_type,omitempty" validate:"omitempty,oneof=OTM20 OTM19 OTM18 OTM17 OTM16 OTM15 OTM14 OTM13 OTM12 OTM11 OTM10 OTM9 OTM8 OTM7 OTM6 OTM5 OTM4 OTM3 OTM2 OTM1 ATM ITM1 ITM2 ITM3 ITM4 ITM5 ITM6 ITM7 ITM8 ITM9 ITM10 ITM11 ITM12 ITM13 ITM14 ITM15 ITM16 ITM17 ITM18 ITM19 ITM20"`
 	StrikePrice  *float64               `json:"strike_price,omitempty"`
 	StrikeOffset *int                   `json:"strike_offset,omitempty"`
 	TotalLot     *int                   `json:"total_lot,omitempty" validate:"omitempty,gt=0"`
@@ -87,9 +86,9 @@ type OptionLegFilter struct {
 }
 
 // ToModel converts CreateOptionLegRequest to domain model
-func (req *CreateOptionLegRequest) ToModel() *model.OptionLeg {
+func (req *CreateOptionLegRequest) ToModel(strategyID uuid.UUID) *model.OptionLeg {
 	optionLeg := model.NewOptionLeg(
-		req.StrategyID,
+		strategyID,
 		req.LegSequence,
 		req.SelectIndex,
 		req.Segment,
