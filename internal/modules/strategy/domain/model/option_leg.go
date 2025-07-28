@@ -6,7 +6,36 @@ import (
 	"github.com/google/uuid"
 )
 
-// InstrumentType enum
+// Type aliases to match the SQL schema enums
+type StrikeType = StrikePriceType
+
+// ExpiryType enum - matches expiry_type in SQL
+type ExpiryType string
+
+const (
+	ExpiryTypeWeekly    ExpiryType = "WEEKLY"
+	ExpiryTypeMonthly   ExpiryType = "MONTHLY"
+	ExpiryTypeQuarterly ExpiryType = "QUARTERLY"
+)
+
+// ExpiryCycle enum - matches expiry_cycle in SQL
+type ExpiryCycle string
+
+const (
+	ExpiryCycleCurrent ExpiryCycle = "CURRENT"
+	ExpiryCycleNext    ExpiryCycle = "NEXT"
+	ExpiryCycleNext2   ExpiryCycle = "NEXT2"
+)
+
+// OrderType enum - matches order_type in SQL
+type OrderType string
+
+const (
+	OrderTypeMarket OrderType = "MARKET"
+	OrderTypeLimit  OrderType = "LIMIT"
+)
+
+// InstrumentType enum - matches instrument_type in SQL
 type InstrumentType string
 
 const (
@@ -24,18 +53,15 @@ type OptionLeg struct {
 	Segment            Segment         `json:"segment" db:"segment"`
 	OptionType         *OptionType     `json:"option_type,omitempty" db:"option_type"`
 	ActionType         TransactionType `json:"action_type" db:"action_type"`
-	StrikeType         StrikePriceType `json:"strike_type" db:"strike_type"`
+	StrikeType         StrikeType      `json:"strike_type" db:"strike_type"`
 	StrikePrice        *float64        `json:"strike_price,omitempty" db:"strike_price"`
-	StrikeOffset       *int            `json:"strike_offset,omitempty" db:"strike_offset"`
 	TotalLot           int             `json:"total_lot" db:"total_lot"`
 	LotSize            *int            `json:"lot_size,omitempty" db:"lot_size"`
-	TotalQuantity      *int            `json:"total_quantity,omitempty" db:"total_quantity"`
 	OrderType          OrderType       `json:"order_type" db:"order_type"`
 	TickOffset         *float64        `json:"tick_offset,omitempty" db:"tick_offset"`
 	ExpiryType         ExpiryType      `json:"expiry_type" db:"expiry_type"`
 	ExpiryCycle        ExpiryCycle     `json:"expiry_cycle" db:"expiry_cycle"`
 	ExpiryDate         *time.Time      `json:"expiry_date,omitempty" db:"expiry_date"`
-	DaysToExpiry       *int            `json:"days_to_expiry,omitempty" db:"days_to_expiry"`
 	Exchange           Exchange        `json:"exchange" db:"exchange"`
 	Asset              Asset           `json:"asset" db:"asset"`
 	ExchangeSecurityID *int            `json:"exchange_security_id,omitempty" db:"exchange_security_id"`
@@ -112,34 +138,8 @@ const (
 	StrikePriceTypeITM20 StrikePriceType = "ITM20"
 )
 
-// OrderType enum
-type OrderType string
-
-const (
-	OrderTypeMarket OrderType = "MARKET"
-	OrderTypeLimit  OrderType = "LIMIT"
-)
-
-// ExpiryType enum
-type ExpiryType string
-
-const (
-	ExpiryTypeWeekly    ExpiryType = "Weekly"
-	ExpiryTypeMonthly   ExpiryType = "Monthly"
-	ExpiryTypeQuarterly ExpiryType = "Quarterly"
-)
-
-// ExpiryCycle enum
-type ExpiryCycle string
-
-const (
-	ExpiryCycleCurrent ExpiryCycle = "CURRENT"
-	ExpiryCycleNext    ExpiryCycle = "NEXT"
-	ExpiryCycleNext2   ExpiryCycle = "NEXT2"
-)
-
 // NewOptionLeg creates a new option leg
-func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikeType StrikePriceType, expiryType ExpiryType, expiryCycle ExpiryCycle) *OptionLeg {
+func NewOptionLeg(strategyID uuid.UUID, legSequence int, selectIndex string, segment Segment, actionType TransactionType, strikeType StrikeType, expiryType ExpiryType, expiryCycle ExpiryCycle) *OptionLeg {
 	return &OptionLeg{
 		ID:             uuid.New(),
 		StrategyID:     strategyID,

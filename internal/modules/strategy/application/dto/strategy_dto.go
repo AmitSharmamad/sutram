@@ -519,7 +519,7 @@ func (req *UpdateStrategyRequest) ToDomain() *model.Strategy {
 // Validate validates the CreateStrategyRequest
 func (req *CreateStrategyRequest) Validate() error {
 	if err := validate.Struct(req); err != nil {
-	return err
+		return err
 	}
 	return nil
 }

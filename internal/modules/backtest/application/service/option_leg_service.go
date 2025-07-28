@@ -177,9 +177,6 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	if req.StrikePrice != nil {
 		optionLeg.StrikePrice = req.StrikePrice
 	}
-	if req.StrikeOffset != nil {
-		optionLeg.StrikeOffset = req.StrikeOffset
-	}
 	if req.TotalLot != nil {
 		optionLeg.TotalLot = *req.TotalLot
 	}
@@ -203,6 +200,18 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 	}
 	if req.DaysToExpiry != nil {
 		optionLeg.DaysToExpiry = req.DaysToExpiry
+	}
+	if req.Exchange != nil {
+		optionLeg.Exchange = *req.Exchange
+	}
+	if req.Asset != nil {
+		optionLeg.Asset = *req.Asset
+	}
+	if req.ExchangeSecurityID != nil {
+		optionLeg.ExchangeSecurityID = req.ExchangeSecurityID
+	}
+	if req.InstrumentType != nil {
+		optionLeg.InstrumentType = *req.InstrumentType
 	}
 
 	// Recalculate total quantity if lot size or total lot changed
