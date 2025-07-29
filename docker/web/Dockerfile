@@ -15,8 +15,14 @@ COPY bin/web ./web
 COPY bin/db-migrate ./db-migrate
 COPY bin/ch-migrate ./ch-migrate
 
+# Copy startup script
+COPY docker/web/startup.sh ./startup.sh
+
 # Change ownership
-RUN chown sutram:sutram /app/web /app/db-migrate /app/ch-migrate
+RUN chown sutram:sutram /app/web /app/db-migrate /app/ch-migrate /app/startup.sh
+
+# Make startup script executable
+RUN chmod +x /app/startup.sh
 
 # Switch to non-root user
 USER sutram
@@ -28,5 +34,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Run the application
-CMD ["./web"]
+# Run the startup script (migrations + web server)
+CMD ["./startup.sh"]
