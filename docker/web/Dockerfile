@@ -10,11 +10,13 @@ RUN adduser -D -s /bin/sh sutram
 # Set working directory
 WORKDIR /app
 
-# Copy the pre-built binary from the host
+# Copy the pre-built binaries from the host
 COPY bin/web ./web
+COPY bin/db-migrate ./db-migrate
+COPY bin/ch-migrate ./ch-migrate
 
 # Change ownership
-RUN chown sutram:sutram /app/web
+RUN chown sutram:sutram /app/web /app/db-migrate /app/ch-migrate
 
 # Switch to non-root user
 USER sutram
