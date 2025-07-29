@@ -205,7 +205,6 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !If [IsProd, 2, 1]
       LaunchType: FARGATE
-      ForceNewDeployment: true
       LoadBalancers:
         - ContainerName: web
           ContainerPort: !Ref WebPort
