@@ -43,7 +43,6 @@ type OptionLeg struct {
 	ActionType         TransactionType `json:"action_type" db:"action_type"`
 	StrikeType         StrikePriceType `json:"strike_type" db:"strike_type"`
 	StrikePrice        *float64        `json:"strike_price,omitempty" db:"strike_price"`
-	StrikeOffset       *int            `json:"strike_offset,omitempty" db:"strike_offset"`
 	TotalLot           int             `json:"total_lot" db:"total_lot"`
 	LotSize            *int            `json:"lot_size,omitempty" db:"lot_size"`
 	TotalQuantity      *int            `json:"total_quantity,omitempty" db:"total_quantity"`
@@ -89,10 +88,52 @@ const (
 type StrikePriceType string
 
 const (
-	StrikePriceTypeATM    StrikePriceType = "ATM"
-	StrikePriceTypeITM    StrikePriceType = "ITM"
-	StrikePriceTypeOTM    StrikePriceType = "OTM"
-	StrikePriceTypeCustom StrikePriceType = "Custom"
+	// Out of the money strikes
+	StrikePriceTypeOTM20 StrikePriceType = "OTM20"
+	StrikePriceTypeOTM19 StrikePriceType = "OTM19"
+	StrikePriceTypeOTM18 StrikePriceType = "OTM18"
+	StrikePriceTypeOTM17 StrikePriceType = "OTM17"
+	StrikePriceTypeOTM16 StrikePriceType = "OTM16"
+	StrikePriceTypeOTM15 StrikePriceType = "OTM15"
+	StrikePriceTypeOTM14 StrikePriceType = "OTM14"
+	StrikePriceTypeOTM13 StrikePriceType = "OTM13"
+	StrikePriceTypeOTM12 StrikePriceType = "OTM12"
+	StrikePriceTypeOTM11 StrikePriceType = "OTM11"
+	StrikePriceTypeOTM10 StrikePriceType = "OTM10"
+	StrikePriceTypeOTM9  StrikePriceType = "OTM9"
+	StrikePriceTypeOTM8  StrikePriceType = "OTM8"
+	StrikePriceTypeOTM7  StrikePriceType = "OTM7"
+	StrikePriceTypeOTM6  StrikePriceType = "OTM6"
+	StrikePriceTypeOTM5  StrikePriceType = "OTM5"
+	StrikePriceTypeOTM4  StrikePriceType = "OTM4"
+	StrikePriceTypeOTM3  StrikePriceType = "OTM3"
+	StrikePriceTypeOTM2  StrikePriceType = "OTM2"
+	StrikePriceTypeOTM1  StrikePriceType = "OTM1"
+
+	// At the money
+	StrikePriceTypeATM StrikePriceType = "ATM"
+
+	// In the money strikes
+	StrikePriceTypeITM1  StrikePriceType = "ITM1"
+	StrikePriceTypeITM2  StrikePriceType = "ITM2"
+	StrikePriceTypeITM3  StrikePriceType = "ITM3"
+	StrikePriceTypeITM4  StrikePriceType = "ITM4"
+	StrikePriceTypeITM5  StrikePriceType = "ITM5"
+	StrikePriceTypeITM6  StrikePriceType = "ITM6"
+	StrikePriceTypeITM7  StrikePriceType = "ITM7"
+	StrikePriceTypeITM8  StrikePriceType = "ITM8"
+	StrikePriceTypeITM9  StrikePriceType = "ITM9"
+	StrikePriceTypeITM10 StrikePriceType = "ITM10"
+	StrikePriceTypeITM11 StrikePriceType = "ITM11"
+	StrikePriceTypeITM12 StrikePriceType = "ITM12"
+	StrikePriceTypeITM13 StrikePriceType = "ITM13"
+	StrikePriceTypeITM14 StrikePriceType = "ITM14"
+	StrikePriceTypeITM15 StrikePriceType = "ITM15"
+	StrikePriceTypeITM16 StrikePriceType = "ITM16"
+	StrikePriceTypeITM17 StrikePriceType = "ITM17"
+	StrikePriceTypeITM18 StrikePriceType = "ITM18"
+	StrikePriceTypeITM19 StrikePriceType = "ITM19"
+	StrikePriceTypeITM20 StrikePriceType = "ITM20"
 )
 
 // OrderType enum

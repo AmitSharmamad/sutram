@@ -67,15 +67,17 @@ type StrategyService interface {
 
 // strategyService implements the StrategyService interface
 type strategyService struct {
-	strategyRepo   repository.StrategyRepository
-	deploymentRepo deploymentRepository.DeploymentRepository
+	strategyRepo     repository.StrategyRepository
+	deploymentRepo   deploymentRepository.DeploymentRepository
+	optionLegService OptionLegService
 }
 
 // NewStrategyService creates a new strategy service
-func NewStrategyService(strategyRepo repository.StrategyRepository, deploymentRepo deploymentRepository.DeploymentRepository) StrategyService {
+func NewStrategyService(strategyRepo repository.StrategyRepository, deploymentRepo deploymentRepository.DeploymentRepository, optionLegService OptionLegService) StrategyService {
 	return &strategyService{
-		strategyRepo:   strategyRepo,
-		deploymentRepo: deploymentRepo,
+		strategyRepo:     strategyRepo,
+		deploymentRepo:   deploymentRepo,
+		optionLegService: optionLegService,
 	}
 }
 
@@ -107,8 +109,31 @@ func (s *strategyService) CreateStrategy(ctx context.Context, req *dto.CreateStr
 		return nil, ErrStrategyCreateFailed
 	}
 
+	// Create option legs if segment is F&O and option legs are provided
+	response := dto.FromDomain(strategy)
+	// Always include option legs field (empty array for non-F&O segments)
+	response.OptionLegs = []*dto.OptionLegResponse{}
+	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
+		var optionLegResponses []*dto.OptionLegResponse
+		for i, legReq := range req.OptionLegs {
+			// Set leg sequence if not provided
+			if legReq.LegSequence == 0 {
+				legReq.LegSequence = i + 1
+			}
+
+			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, strategy.ID, &legReq)
+			if err != nil {
+				// If option leg creation fails, we should consider whether to delete the strategy
+				// For now, we'll return an error but keep the strategy
+				return nil, fmt.Errorf("failed to create option leg: %w", err)
+			}
+			optionLegResponses = append(optionLegResponses, optionLeg)
+		}
+		response.OptionLegs = optionLegResponses
+	}
+
 	// Convert domain model to response DTO
-	return dto.FromDomain(strategy), nil
+	return response, nil
 }
 
 // GetStrategyByID retrieves a strategy by its ID
@@ -129,7 +154,18 @@ func (s *strategyService) GetStrategyByID(ctx context.Context, id uuid.UUID, use
 		return nil, fmt.Errorf("failed to check deployments: %w", err)
 	}
 
-	return dto.FromDomainWithReadonly(strategy, hasDeployments), nil
+	response := dto.FromDomainWithReadonly(strategy, hasDeployments)
+
+	// Always include option legs field (empty array for non-F&O segments)
+	response.OptionLegs = []*dto.OptionLegResponse{}
+	if strategy.Segment == "F&O" {
+		optionLegs, err := s.optionLegService.GetOptionLegsByStrategyID(ctx, id)
+		if err == nil {
+			response.OptionLegs = optionLegs
+		}
+	}
+
+	return response, nil
 }
 
 // GetUserStrategies retrieves all strategies for a user
@@ -146,7 +182,18 @@ func (s *strategyService) GetUserStrategies(ctx context.Context, userID uuid.UUI
 		if err != nil {
 			return nil, fmt.Errorf("failed to check deployments for strategy %s: %w", strategy.ID, err)
 		}
-		strategyResponses = append(strategyResponses, dto.FromDomainWithReadonly(strategy, hasDeployments))
+		response := dto.FromDomainWithReadonly(strategy, hasDeployments)
+
+		// Always include option legs field (empty array for non-F&O segments)
+		response.OptionLegs = []*dto.OptionLegResponse{}
+		if strategy.Segment == "F&O" {
+			optionLegs, err := s.optionLegService.GetOptionLegsByStrategyID(ctx, strategy.ID)
+			if err == nil {
+				response.OptionLegs = optionLegs
+			}
+		}
+
+		strategyResponses = append(strategyResponses, response)
 	}
 
 	return strategyResponses, nil
@@ -173,7 +220,18 @@ func (s *strategyService) GetDefaultStrategies(ctx context.Context) ([]*dto.Stra
 		if err != nil {
 			return nil, fmt.Errorf("failed to check deployments for strategy %s: %w", strategy.ID, err)
 		}
-		strategyResponses = append(strategyResponses, dto.FromDomainWithReadonly(strategy, hasDeployments))
+		response := dto.FromDomainWithReadonly(strategy, hasDeployments)
+
+		// Always include option legs field (empty array for non-F&O segments)
+		response.OptionLegs = []*dto.OptionLegResponse{}
+		if strategy.Segment == "F&O" {
+			optionLegs, err := s.optionLegService.GetOptionLegsByStrategyID(ctx, strategy.ID)
+			if err == nil {
+				response.OptionLegs = optionLegs
+			}
+		}
+
+		strategyResponses = append(strategyResponses, response)
 	}
 
 	return strategyResponses, nil
@@ -235,8 +293,42 @@ func (s *strategyService) UpdateStrategy(ctx context.Context, req *dto.UpdateStr
 		return nil, ErrStrategyUpdateFailed
 	}
 
+	// Handle option legs update if segment is F&O
+	response := dto.FromDomainWithReadonly(updatedStrategy, false)
+	// Always include option legs field (empty array for non-F&O segments)
+	response.OptionLegs = []*dto.OptionLegResponse{}
+	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
+		// First, delete existing option legs for this strategy
+		err := s.optionLegService.DeleteOptionLegsByStrategyID(ctx, req.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete existing option legs: %w", err)
+		}
+
+		// Create new option legs
+		var optionLegResponses []*dto.OptionLegResponse
+		for i, legReq := range req.OptionLegs {
+			// Set leg sequence if not provided
+			if legReq.LegSequence == 0 {
+				legReq.LegSequence = i + 1
+			}
+
+			optionLeg, err := s.optionLegService.CreateOptionLeg(ctx, req.ID, &legReq)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create option leg: %w", err)
+			}
+			optionLegResponses = append(optionLegResponses, optionLeg)
+		}
+		response.OptionLegs = optionLegResponses
+	} else if req.Segment == "F&O" {
+		// If F&O segment but no option legs provided, get existing ones
+		existingLegs, err := s.optionLegService.GetOptionLegsByStrategyID(ctx, req.ID)
+		if err == nil {
+			response.OptionLegs = existingLegs
+		}
+	}
+
 	// Note: Since we already checked that no deployments exist, readonly should be false
-	return dto.FromDomainWithReadonly(updatedStrategy, false), nil
+	return response, nil
 }
 
 // DeleteStrategy deletes a strategy

@@ -14,13 +14,15 @@ import (
 
 // StrategyHandler handles HTTP requests for strategies
 type StrategyHandler struct {
-	strategyService service.StrategyService
+	strategyService  service.StrategyService
+	optionLegService service.OptionLegService
 }
 
 // NewStrategyHandler creates a new strategy handler
-func NewStrategyHandler(strategyService service.StrategyService) *StrategyHandler {
+func NewStrategyHandler(strategyService service.StrategyService, optionLegService service.OptionLegService) *StrategyHandler {
 	return &StrategyHandler{
-		strategyService: strategyService,
+		strategyService:  strategyService,
+		optionLegService: optionLegService,
 	}
 }
 
@@ -153,6 +155,14 @@ func (h *StrategyHandler) GetStrategyByID(c *gin.Context) {
 		return
 	}
 
+	// Include option legs if segment is F&O
+	if strategy.Segment == "F&O" {
+		optionLegs, err := h.optionLegService.GetOptionLegsByStrategyID(c.Request.Context(), id)
+		if err == nil {
+			strategy.OptionLegs = optionLegs
+		}
+	}
+
 	// Return strategy
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -185,6 +195,16 @@ func (h *StrategyHandler) GetUserStrategies(c *gin.Context) {
 	// Ensure we return an empty array instead of null if strategies is nil
 	if strategies == nil {
 		strategies = []*dto.StrategyResponse{}
+	}
+
+	// Include option legs for F&O strategies
+	for _, strategy := range strategies {
+		if strategy.Segment == "F&O" {
+			optionLegs, err := h.optionLegService.GetOptionLegsByStrategyID(c.Request.Context(), strategy.ID)
+			if err == nil {
+				strategy.OptionLegs = optionLegs
+			}
+		}
 	}
 
 	// Return strategies
@@ -266,6 +286,45 @@ func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 			})
 		}
 		return
+	}
+
+	// Handle option legs update if segment is F&O
+	if req.Segment == "F&O" && len(req.OptionLegs) > 0 {
+		// First, delete existing option legs for this strategy
+		err := h.optionLegService.DeleteOptionLegsByStrategyID(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Failed to delete existing option legs: " + err.Error(),
+			})
+			return
+		}
+
+		// Create new option legs
+		var optionLegResponses []*dto.OptionLegResponse
+		for i, legReq := range req.OptionLegs {
+			// Set leg sequence if not provided
+			if legReq.LegSequence == 0 {
+				legReq.LegSequence = i + 1
+			}
+
+			optionLeg, err := h.optionLegService.CreateOptionLeg(c.Request.Context(), id, &legReq)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"error":   "Failed to create option leg: " + err.Error(),
+				})
+				return
+			}
+			optionLegResponses = append(optionLegResponses, optionLeg)
+		}
+		strategy.OptionLegs = optionLegResponses
+	} else if req.Segment == "F&O" {
+		// If F&O segment but no option legs provided, get existing ones
+		existingLegs, err := h.optionLegService.GetOptionLegsByStrategyID(c.Request.Context(), id)
+		if err == nil {
+			strategy.OptionLegs = existingLegs
+		}
 	}
 
 	// Return updated strategy
