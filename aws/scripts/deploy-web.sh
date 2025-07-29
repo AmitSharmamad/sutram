@@ -58,9 +58,22 @@ deploy_stack "$STACK_NAME" \
 
 # Force ECS service update to ensure new deployment
 SERVICE_NAME="${PROJECT_NAME}-${ENVIRONMENT}-web"
-CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-ecs"
+CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-cluster"
 
-print_info "Forcing ECS service update for $SERVICE_NAME..."
+print_info "Forcing ECS service update for $SERVICE_NAME on cluster $CLUSTER_NAME..."
+
+# Verify cluster exists first
+if ! aws ecs describe-clusters --clusters "$CLUSTER_NAME" --query 'clusters[0].status' --output text --no-cli-pager | grep -q ACTIVE; then
+    print_error "ECS cluster $CLUSTER_NAME not found or not active. Please check cluster name."
+    exit 1
+fi
+
+# Verify service exists
+if ! aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME" --query 'services[0].status' --output text --no-cli-pager | grep -q ACTIVE; then
+    print_error "ECS service $SERVICE_NAME not found or not active in cluster $CLUSTER_NAME."
+    exit 1
+fi
+
 aws ecs update-service \
     --cluster "$CLUSTER_NAME" \
     --service "$SERVICE_NAME" \
