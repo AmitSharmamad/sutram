@@ -56,6 +56,22 @@ deploy_stack "$STACK_NAME" \
     "GoogleOAuthClientSecret=$GOOGLE_OAUTH_CLIENT_SECRET" \
     "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL"
 
+# Force ECS service update to ensure new deployment
+SERVICE_NAME="${PROJECT_NAME}-${ENVIRONMENT}-web"
+CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-ecs"
+
+print_info "Forcing ECS service update for $SERVICE_NAME..."
+aws ecs update-service \
+    --cluster "$CLUSTER_NAME" \
+    --service "$SERVICE_NAME" \
+    --force-new-deployment \
+    --no-cli-pager > /dev/null
+
+print_info "Waiting for service to stabilize..."
+aws ecs wait services-stable \
+    --cluster "$CLUSTER_NAME" \
+    --services "$SERVICE_NAME"
+
 # Get load balancer URL
 ALB_DNS=$(get_stack_output "$STACK_NAME" "LoadBalancerDNS")
 print_success "Web service deployment completed for $ENVIRONMENT environment"
