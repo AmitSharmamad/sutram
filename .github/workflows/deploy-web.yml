@@ -55,10 +55,74 @@ jobs:
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Generate Wire Code and Build Binary
+      - name: Generate Wire Code and Build Binaries
         run: |
           wire cmd/web/wire.go
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/web cmd/web/wire_gen.go cmd/web/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/db-migrate cmd/db-migrate/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/ch-migrate cmd/ch-migrate/main.go
+
+      - name: Run PostgreSQL Migrations
+        run: |
+          echo "Running PostgreSQL migrations before deployment..."
+          
+          # Get database connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="dev"
+          
+          DB_USERNAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseUsername'].OutputValue" \
+            --output text)
+          
+          DB_PASSWORD=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePassword'].OutputValue" \
+            --output text)
+          
+          DB_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue" \
+            --output text)
+          
+          DB_PORT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePort'].OutputValue" \
+            --output text)
+          
+          DB_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseName'].OutputValue" \
+            --output text)
+          
+          # Construct DATABASE_URL
+          export DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}?sslmode=require"
+          
+          # Run migrations
+          ./bin/db-migrate -action=up
+          
+          echo "PostgreSQL migrations completed successfully"
+
+      - name: Run ClickHouse Migrations
+        run: |
+          echo "Running ClickHouse migrations before deployment..."
+          
+          # Get ClickHouse connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="dev"
+          
+          CH_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-clickhouse" \
+            --query "Stacks[0].Outputs[?OutputKey=='ClickHouseEndpoint'].OutputValue" \
+            --output text)
+          
+          # Construct CH_URL (using the same format as the service)
+          export CH_URL="clickhouse://sutram_user:REDACTED_PASSWORD@${CH_ENDPOINT}:9000/sutram"
+          
+          # Run migrations
+          ./bin/ch-migrate -action=up
+          
+          echo "ClickHouse migrations completed successfully"
 
       - name: Build and Push Web Docker Image
         env:
@@ -119,10 +183,74 @@ jobs:
       - name: Install Wire
         run: go install github.com/google/wire/cmd/wire@latest
 
-      - name: Generate Wire Code and Build Binary
+      - name: Generate Wire Code and Build Binaries
         run: |
           wire cmd/web/wire.go
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/web cmd/web/wire_gen.go cmd/web/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/db-migrate cmd/db-migrate/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o bin/ch-migrate cmd/ch-migrate/main.go
+
+      - name: Run PostgreSQL Migrations
+        run: |
+          echo "Running PostgreSQL migrations before deployment..."
+          
+          # Get database connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="prod"
+          
+          DB_USERNAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseUsername'].OutputValue" \
+            --output text)
+          
+          DB_PASSWORD=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePassword'].OutputValue" \
+            --output text)
+          
+          DB_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue" \
+            --output text)
+          
+          DB_PORT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabasePort'].OutputValue" \
+            --output text)
+          
+          DB_NAME=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-postgres" \
+            --query "Stacks[0].Outputs[?OutputKey=='DatabaseName'].OutputValue" \
+            --output text)
+          
+          # Construct DATABASE_URL
+          export DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}?sslmode=require"
+          
+          # Run migrations
+          ./bin/db-migrate -action=up
+          
+          echo "PostgreSQL migrations completed successfully"
+
+      - name: Run ClickHouse Migrations
+        run: |
+          echo "Running ClickHouse migrations before deployment..."
+          
+          # Get ClickHouse connection details from CloudFormation
+          PROJECT_NAME="sutram"
+          ENVIRONMENT="prod"
+          
+          CH_ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "${PROJECT_NAME}-${ENVIRONMENT}-clickhouse" \
+            --query "Stacks[0].Outputs[?OutputKey=='ClickHouseEndpoint'].OutputValue" \
+            --output text)
+          
+          # Construct CH_URL (using the same format as the service)
+          export CH_URL="clickhouse://sutram_user:REDACTED_PASSWORD@${CH_ENDPOINT}:9000/sutram"
+          
+          # Run migrations
+          ./bin/ch-migrate -action=up
+          
+          echo "ClickHouse migrations completed successfully"
 
       - name: Build and Push Web Docker Image
         env:
