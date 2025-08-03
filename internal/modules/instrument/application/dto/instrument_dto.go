@@ -117,11 +117,14 @@ type GetInstrumentsByTimeRangeRequest struct {
 
 // InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters
 type InstrumentMasterFilterDTO struct {
-	Exchange string        `form:"exchange"`
-	Segment  model.Segment `form:"segment"`
-	Query    string        `form:"query"`
-	Page     int           `form:"page,default=1"`
-	PageSize int           `form:"pageSize,default=10"`
+	Exchange       string                   `form:"exchange"`
+	Segment        model.Segment            `form:"segment"`
+	Market         model.Market             `form:"market"`
+	InstrumentType model.InstrumentCategory `form:"instrumentType"`
+	Contract       model.Contract           `form:"contract"`
+	Query          string                   `form:"query"`
+	Page           int                      `form:"page,default=1"`
+	PageSize       int                      `form:"pageSize,default=10"`
 }
 
 // PaginatedResponse represents a paginated API response
@@ -145,4 +148,88 @@ type ApiResponse struct {
 type GetInstrumentsByExchangeSecurityIDRequest struct {
 	Page     int `form:"page" json:"page"`
 	PageSize int `form:"page_size" json:"page_size"`
+}
+
+// DatabaseFilter represents the resolved database filter criteria
+type DatabaseFilter struct {
+	Exchange       string               `json:"exchange,omitempty"`
+	Segment        model.Segment        `json:"segment,omitempty"`
+	InstrumentType model.InstrumentType `json:"instrument_type,omitempty"`
+	Query          string               `json:"query,omitempty"`
+	Page           int                  `json:"page"`
+	PageSize       int                  `json:"page_size"`
+}
+
+// ConvertToDatabase converts the filter DTO to database filter criteria
+func (f *InstrumentMasterFilterDTO) ConvertToDatabase() *DatabaseFilter {
+	dbFilter := &DatabaseFilter{
+		Exchange: f.Exchange, // Use the exchange from the filter or default to NSE if not provided
+		Query:    f.Query,
+		Page:     f.Page,
+		PageSize: f.PageSize,
+	}
+
+	// If no exchange is specified, default to NSE for the mapping logic
+	exchange := f.Exchange
+	if exchange == "" {
+		exchange = "NSE"
+	}
+	dbFilter.Exchange = exchange
+
+	// Apply conversion logic based on the mapping table
+	switch {
+	// EQ + NSE + Stock + Spot -> Equities + Stocks (Cash Market)
+	case f.Market == model.MarketEQ && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractSpot:
+		dbFilter.Segment = model.SegmentEquities
+		dbFilter.InstrumentType = model.InstrumentTypeStockCash
+
+	// EQ + NSE + Index -> NA (no specific instrument type filtering for index in EQ)
+	case f.Market == model.MarketEQ && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex:
+		dbFilter.Segment = model.SegmentEquities
+		// No specific instrument type filter for EQ Index
+
+	// F&O + NSE + Stock + Spot -> Indices + Index Spot
+	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractSpot:
+		dbFilter.Segment = model.SegmentIndices
+		dbFilter.InstrumentType = model.InstrumentTypeIndexSpot
+
+	// F&O + NSE + Stock + Futures -> Derivatives + Stock Futures
+	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractFutures:
+		dbFilter.Segment = model.SegmentDerivatives
+		dbFilter.InstrumentType = model.InstrumentTypeStockFutures
+
+	// F&O + NSE + Index + Futures -> Derivatives + Index Futures
+	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex && f.Contract == model.ContractFutures:
+		dbFilter.Segment = model.SegmentDerivatives
+		dbFilter.InstrumentType = model.InstrumentTypeIndexFutures
+
+	// F&O + NSE + Stock + Options -> Derivatives + Stock Options
+	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractOptions:
+		dbFilter.Segment = model.SegmentDerivatives
+		dbFilter.InstrumentType = model.InstrumentTypeStockOptions
+
+	// F&O + NSE + Index + Options -> Derivatives + Index Options
+	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex && f.Contract == model.ContractOptions:
+		dbFilter.Segment = model.SegmentDerivatives
+		dbFilter.InstrumentType = model.InstrumentTypeIndexOptions
+
+	// F&O + MCX + Stock + Futures -> Commodities + Commodity Futures
+	case f.Market == model.MarketFO && exchange == "MCX" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractFutures:
+		dbFilter.Segment = model.SegmentCommodities
+		dbFilter.InstrumentType = model.InstrumentTypeCommodityFutures
+
+	// F&O + MCX + Stock + Options -> Commodities + Commodity Options
+	case f.Market == model.MarketFO && exchange == "MCX" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractOptions:
+		dbFilter.Segment = model.SegmentCommodities
+		dbFilter.InstrumentType = model.InstrumentTypeCommodityOptions
+
+	default:
+		// Handle partial filters or use individual field mappings
+		if f.Segment != "" {
+			dbFilter.Segment = f.Segment
+		}
+		// For other cases, we might need to add more specific logic or leave fields empty
+	}
+
+	return dbFilter
 }
