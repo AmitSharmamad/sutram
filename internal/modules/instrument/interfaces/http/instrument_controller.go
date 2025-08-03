@@ -553,7 +553,7 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	if !req.StartDate.IsZero() {
 		instrumentMaster.StartDate = req.StartDate
 	}
-	if !req.Expiry.IsZero() {
+	if req.Expiry != nil {
 		instrumentMaster.Expiry = req.Expiry
 	}
 	if req.ExmExchID != 0 {

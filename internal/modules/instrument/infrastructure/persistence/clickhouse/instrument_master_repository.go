@@ -14,24 +14,24 @@ import (
 
 // InstrumentMasterRow represents the database row structure
 type InstrumentMasterRow struct {
-	ExchangeSecurityID int32     `db:"exchange_security_id"`
-	Exchange           string    `db:"exchange"`
-	Segment            string    `db:"segment"`
-	Symbol             string    `db:"symbol"`
-	Name               string    `db:"instrument"`
-	StartDate          time.Time `db:"start_date"`
-	Expiry             time.Time `db:"expiry"`
-	ExmExchID          int32     `db:"exm_exch_id"`
-	SmstSecurityID     int32     `db:"smst_security_id"`
-	InstrumentName     string    `db:"instrument_name"`
-	TradingSymbol      string    `db:"trading_symbol"`
-	LotUnits           int32     `db:"lot_units"`
-	StrikePrice        float64   `db:"strike_price"`
-	OptionType         string    `db:"option_type"`
-	TickSize           float64   `db:"tick_size"`
-	ExpiryFlag         string    `db:"expiry_flag"`
-	ExchInstrumentType string    `db:"exch_instrument_type"`
-	SymbolName         string    `db:"symbol_name"`
+	ExchangeSecurityID int32      `db:"exchange_security_id"`
+	Exchange           string     `db:"exchange"`
+	Segment            string     `db:"segment"`
+	Symbol             string     `db:"symbol"`
+	Name               string     `db:"instrument"`
+	StartDate          time.Time  `db:"start_date"`
+	Expiry             *time.Time `db:"expiry"`
+	ExmExchID          int32      `db:"exm_exch_id"`
+	SmstSecurityID     int32      `db:"smst_security_id"`
+	InstrumentName     string     `db:"instrument_name"`
+	TradingSymbol      string     `db:"trading_symbol"`
+	LotUnits           int32      `db:"lot_units"`
+	StrikePrice        float64    `db:"strike_price"`
+	OptionType         string     `db:"option_type"`
+	TickSize           float64    `db:"tick_size"`
+	ExpiryFlag         string     `db:"expiry_flag"`
+	ExchInstrumentType string     `db:"exch_instrument_type"`
+	SymbolName         string     `db:"symbol_name"`
 }
 
 // toModel converts a database row to the domain model
