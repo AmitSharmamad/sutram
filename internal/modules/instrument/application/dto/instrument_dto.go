@@ -24,7 +24,7 @@ type InstrumentMasterDTO struct {
 	Symbol             string               `json:"symbol"`
 	Name               string               `json:"name"`
 	StartDate          time.Time            `json:"start_date"`
-	Expiry             time.Time            `json:"expiry,omitempty"`
+	Expiry             *time.Time           `json:"expiry,omitempty"`
 	ExmExchID          int32                `json:"exm_exch_id"`
 	SmstSecurityID     int32                `json:"smst_security_id"`
 	InstrumentName     string               `json:"instrument_name"`
@@ -72,7 +72,7 @@ type CreateInstrumentMasterRequest struct {
 	Symbol             string               `json:"symbol" binding:"required"`
 	Name               string               `json:"name" binding:"required"`
 	StartDate          time.Time            `json:"start_date" binding:"required"`
-	Expiry             time.Time            `json:"expiry,omitempty"`
+	Expiry             *time.Time           `json:"expiry,omitempty"`
 	ExmExchID          int32                `json:"exm_exch_id"`
 	SmstSecurityID     int32                `json:"smst_security_id"`
 	InstrumentName     string               `json:"instrument_name"`
@@ -93,7 +93,7 @@ type UpdateInstrumentMasterRequest struct {
 	Symbol             string               `json:"symbol"`
 	Name               string               `json:"name"`
 	StartDate          time.Time            `json:"start_date"`
-	Expiry             time.Time            `json:"expiry,omitempty"`
+	Expiry             *time.Time           `json:"expiry,omitempty"`
 	ExmExchID          int32                `json:"exm_exch_id"`
 	SmstSecurityID     int32                `json:"smst_security_id"`
 	InstrumentName     string               `json:"instrument_name"`

@@ -27,7 +27,7 @@ type InstrumentMaster struct {
 	Symbol             string         `json:"symbol" db:"symbol"`
 	Name               string         `json:"name" db:"instrument"` // Named instrument in DB
 	StartDate          time.Time      `json:"start_date" db:"start_date"`
-	Expiry             time.Time      `json:"expiry" db:"expiry"`
+	Expiry             *time.Time     `json:"expiry,omitempty" db:"expiry"`
 	ExmExchID          int32          `json:"exm_exch_id" db:"exm_exch_id"`
 	SmstSecurityID     int32          `json:"smst_security_id" db:"smst_security_id"`
 	InstrumentName     string         `json:"instrument_name" db:"instrument_name"`

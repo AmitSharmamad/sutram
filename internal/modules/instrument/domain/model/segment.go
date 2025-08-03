@@ -15,12 +15,13 @@ const (
 	SegmentDerivatives Segment = "Derivatives"
 	SegmentCommodities Segment = "Commodities"
 	SegmentCurrencies  Segment = "Currencies"
+	SegmentIndices     Segment = "Indices"
 )
 
 // IsValid checks if the segment value is valid
 func (s Segment) IsValid() bool {
 	switch s {
-	case SegmentEquities, SegmentDerivatives, SegmentCommodities, SegmentCurrencies:
+	case SegmentEquities, SegmentDerivatives, SegmentCommodities, SegmentCurrencies, SegmentIndices:
 		return true
 	default:
 		return false
