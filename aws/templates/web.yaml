@@ -38,8 +38,35 @@ Parameters:
     Type: String
     Default: ""
     Description: Google OAuth Redirect URL (will be auto-generated if empty)
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 Public Hosted Zone ID for domain validation
+  ExistingCertificateArn:
+    Type: String
+    Default: ""
+    Description: Existing SSL Certificate ARN in ap-south-1 region (leave empty to create new)
+  BaseDomainName:
+    Type: String
+    Default: sutram.co
+    Description: Base domain name
 
 Resources:
+  # SSL Certificate for HTTPS (conditional - only create if not using existing)
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificate
+    Properties:
+      DomainName: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
+      SubjectAlternativeNames:
+        - !If [IsProd, !Sub "*.${BaseDomainName}", !Sub "*.dev.${BaseDomainName}"]
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
+          HostedZoneId: !Ref PublicHostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-web-ssl-cert"
+
   # Application Load Balancer
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -93,13 +120,29 @@ Resources:
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
 
-  # Listener
-  Listener:
+  # HTTPS Listener (primary) - force replacement with new name
+  HTTPSListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+
+  # HTTP to HTTPS Redirect Listener
+  HTTPRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
@@ -182,7 +225,7 @@ Resources:
               Value: !If 
                 - UseCustomRedirectURL
                 - !Ref GoogleOAuthRedirectURL
-                - !Sub "http://${ApplicationLoadBalancer.DNSName}/api/auth/oauth/google/callback"
+                - !Sub "https://${WebDNSRecord}/api/auth/oauth/google/callback"
             - Name: WEB_HTTP_PORT
               Value: !Ref WebPort
             - Name: GIN_MODE
@@ -197,7 +240,9 @@ Resources:
   # ECS Service
   Service:
     Type: AWS::ECS::Service
-    DependsOn: Listener
+    DependsOn: 
+      - HTTPSListener
+      - HTTPRedirectListener
     Properties:
       ServiceName: !Sub "${ProjectName}-${Environment}-web"
       Cluster:
@@ -218,13 +263,12 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Private Record for Web Service
+  # Route53 Public Record for Web Service
   WebDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId:
-        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName
@@ -233,6 +277,7 @@ Resources:
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
   UseCustomRedirectURL: !Not [!Equals [!Ref GoogleOAuthRedirectURL, ""]]
+  CreateNewCertificate: !Equals [!Ref ExistingCertificateArn, ""]
 
 Outputs:
   LoadBalancerDNS:
@@ -243,16 +288,22 @@ Outputs:
 
   LoadBalancerURL:
     Description: Application Load Balancer URL
-    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+    Value: !Sub "https://${WebDNSRecord}"
 
   ServiceDomain:
-    Description: Custom private domain for Web Service (VPC-only)
-    Value: !If [IsProd, "web.sutram.co", "web.dev.sutram.co"]
+    Description: Custom domain for Web Service
+    Value: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-web-domain"
 
   ServiceURL:
-    Description: Custom private URL for Web Service (VPC-only)
-    Value: !If [IsProd, "https://web.sutram.co", "https://web.dev.sutram.co"]
+    Description: Custom URL for Web Service
+    Value: !If [IsProd, !Sub "https://web.${BaseDomainName}", !Sub "https://web.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-web-url"
+
+  SSLCertificateArn:
+    Description: SSL Certificate ARN
+    Value: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-web-ssl-cert-arn"

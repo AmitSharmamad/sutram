@@ -48,7 +48,9 @@ deploy_stack "$STACK_NAME" \
     "DBAllocatedStorage=$DB_ALLOCATED_STORAGE" \
     "DBName=$DB_NAME" \
     "DBUsername=$DB_USERNAME" \
-    "DBPassword=$DB_PASSWORD"
+    "DBPassword=$DB_PASSWORD" \
+    "BaseDomainName=${BASE_DOMAIN_NAME}" \
+    "PublicHostedZoneId=$PUBLIC_HOSTED_ZONE_ID"
 
 # Get database endpoint
 DB_ENDPOINT=$(get_stack_output "$STACK_NAME" "DatabaseEndpoint")

@@ -49,6 +49,9 @@ deploy_stack "$STACK_NAME" \
     "CPU=$CPU" \
     "Memory=$MEMORY" \
     "DeploymentPort=$DEPLOYMENT_PORT" \
-    "ImageTag=$IMAGE_TAG"
+    "ImageTag=$IMAGE_TAG" \
+    "BaseDomainName=${BASE_DOMAIN_NAME}" \
+    "PublicHostedZoneId=$PUBLIC_HOSTED_ZONE_ID" \
+    "ExistingCertificateArn=${EXISTING_CERTIFICATE_ARN:-}"
 
 print_success "Deployment service deployment completed for $ENVIRONMENT environment"

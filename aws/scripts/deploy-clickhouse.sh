@@ -52,6 +52,8 @@ deploy_stack "$STACK_NAME" \
     "Environment=$ENVIRONMENT" \
     "ProjectName=$PROJECT_NAME" \
     "CPU=$CPU" \
-    "Memory=$MEMORY"
+    "Memory=$MEMORY" \
+    "BaseDomainName=${BASE_DOMAIN_NAME}" \
+    "PublicHostedZoneId=$PUBLIC_HOSTED_ZONE_ID"
 
 print_success "ClickHouse deployment completed for $ENVIRONMENT environment"

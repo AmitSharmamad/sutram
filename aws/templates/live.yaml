@@ -21,40 +21,80 @@ Parameters:
   ImageTag:
     Type: String
     Default: latest
+  BaseDomainName:
+    Type: String
+    Default: sutram.co
+    Description: Base domain name
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 Public Hosted Zone ID for domain validation
+  ExistingCertificateArn:
+    Type: String
+    Default: ""
+    Description: Existing SSL Certificate ARN in ap-south-1 region (leave empty to create new)
 
 Resources:
-  # Application Load Balancer for Live Service
+  # SSL Certificate for HTTPS (conditional - only create if not using existing)
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificate
+    Properties:
+      DomainName: !If [IsProd, !Sub "live.${BaseDomainName}", !Sub "live.dev.${BaseDomainName}"]
+      SubjectAlternativeNames:
+        - !If [IsProd, !Sub "*.${BaseDomainName}", !Sub "*.dev.${BaseDomainName}"]
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !If [IsProd, !Sub "live.${BaseDomainName}", !Sub "live.dev.${BaseDomainName}"]
+          HostedZoneId: !Ref PublicHostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-live-ssl-cert"
+
+  # Internal Application Load Balancer for Live Service (internal-only)
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Sub "${ProjectName}-${Environment}-live-alb"
-      Scheme: internet-facing
+      Scheme: internal
       Type: application
       SecurityGroups:
         - !Ref ALBSecurityGroup
       Subnets:
-        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-1-id"
-        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-2-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-1-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-live-alb"
 
-  # Security Group for ALB
+  # Security Group for ALB (internal access only)
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Live Service Load Balancer
+      GroupDescription: Security group for Live Service Load Balancer (internal)
       VpcId:
         Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
       SecurityGroupIngress:
+        # Allow HTTP from VPC
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/16
+        # Allow HTTPS from VPC
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/16
+        # Allow access from Web service security group
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-live-alb-sg"
@@ -73,16 +113,56 @@ Resources:
       HealthCheckPath: /health
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+  # HTTP to HTTPS Redirect Listener
+  HTTPRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
 
-  # Listener for ALB
+  # HTTPS Listener (primary)
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+
+  # HTTPS Listener (primary)
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+
+  # HTTP to HTTPS Redirect Listener
+  HTTPRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
@@ -199,13 +279,12 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Private Record for Live Service
+  # Route53 Public Record for Live Service (internal ALB with public DNS)
   LiveDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId:
-        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !If [IsProd, !Sub "live.${BaseDomainName}", !Sub "live.dev.${BaseDomainName}"]
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName
@@ -213,6 +292,7 @@ Resources:
 
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
+  CreateNewCertificate: !Equals [!Ref ExistingCertificateArn, ""]
 
 Outputs:
   ServiceName:
@@ -235,16 +315,22 @@ Outputs:
 
   LoadBalancerURL:
     Description: Live Application Load Balancer URL
-    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+    Value: !Sub "https://${LiveDNSRecord}"
 
   ServiceDomain:
-    Description: Custom private domain for Live Service (VPC-only)
-    Value: !If [IsProd, "live.sutram.co", "live.dev.sutram.co"]
+    Description: Custom domain for Live Service (internal ALB)
+    Value: !If [IsProd, !Sub "live.${BaseDomainName}", !Sub "live.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-live-domain"
 
   ServiceURL:
-    Description: Custom private URL for Live Service (VPC-only)
-    Value: !If [IsProd, "https://live.sutram.co", "https://live.dev.sutram.co"]
+    Description: Custom URL for Live Service (internal ALB)
+    Value: !If [IsProd, !Sub "https://live.${BaseDomainName}", !Sub "https://live.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-live-url"
+
+  SSLCertificateArn:
+    Description: SSL Certificate ARN
+    Value: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-live-ssl-cert-arn"
