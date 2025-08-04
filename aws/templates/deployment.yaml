@@ -21,33 +21,83 @@ Parameters:
   ImageTag:
     Type: String
     Default: latest
+  BaseDomainName:
+    Type: String
+    Default: sutram.co
+    Description: Base domain name
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 Public Hosted Zone ID for domain validation
+  ExistingCertificateArn:
+    Type: String
+    Default: ""
+    Description: Existing SSL Certificate ARN in ap-south-1 region (leave empty to create new)
 
 Resources:
-  # Application Load Balancer
+  # SSL Certificate for HTTPS (conditional - only create if not using existing)
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificate
+    Properties:
+      DomainName: !If [IsProd, !Sub "deploy.${BaseDomainName}", !Sub "deploy.dev.${BaseDomainName}"]
+      SubjectAlternativeNames:
+        - !If [IsProd, !Sub "*.${BaseDomainName}", !Sub "*.dev.${BaseDomainName}"]
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !If [IsProd, !Sub "deploy.${BaseDomainName}", !Sub "deploy.dev.${BaseDomainName}"]
+          HostedZoneId: !Ref PublicHostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-deployment-ssl-cert"
+
+  # Internal Application Load Balancer (internal-only)
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Sub "${ProjectName}-${Environment}-deployment-alb"
-      Scheme: internet-facing
+      Scheme: internal
       Type: application
       SecurityGroups:
         - !Ref ALBSecurityGroup
       Subnets:
-        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-1-id"
-        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-public-subnet-2-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-1-id"
+        - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-deployment-alb"
 
-  # Security Group for ALB
+  # Security Group for ALB (internal access only)
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Deployment ALB
+      GroupDescription: Security group for Deployment ALB (internal)
       VpcId:
         Fn::ImportValue: !Sub "${ProjectName}-${Environment}-vpc-id"
       SecurityGroupIngress:
+        # Allow HTTP from VPC
         - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/16
+        # Allow HTTPS from VPC
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.0.0/16
+        # Allow access from other ECS services
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${ProjectName}-${Environment}-ecs-sg-id"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-deployment-alb-sg"
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
@@ -76,13 +126,29 @@ Resources:
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
 
-  # Listener
-  Listener:
+  # HTTPS Listener (primary)
+  HTTPSListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !If [CreateNewCertificate, !Ref SSLCertificate, !Ref ExistingCertificateArn]
+
+  # HTTP to HTTPS Redirect Listener
+  HTTPRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
@@ -193,7 +259,7 @@ Resources:
   # ECS Service
   Service:
     Type: AWS::ECS::Service
-    DependsOn: Listener
+    DependsOn: HTTPSListener
     Properties:
       ServiceName: !Sub "${ProjectName}-${Environment}-deployment"
       Cluster:
@@ -215,13 +281,12 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Private Record for Deployment Service
+  # Route53 Record for Deployment Service (internal)
   DeploymentDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId:
-        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !If [IsProd, "deployment.sutram.co", "deployment.dev.sutram.co"]
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !If [IsProd, !Sub "deploy.${BaseDomainName}", !Sub "deploy.dev.${BaseDomainName}"]
       Type: A
       AliasTarget:
         DNSName: !GetAtt ApplicationLoadBalancer.DNSName
@@ -229,6 +294,13 @@ Resources:
 
 Conditions:
   IsProd: !Equals [!Ref Environment, prod]
+  CreateNewCertificate: !Equals [!Ref ExistingCertificateArn, ""]
+            - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
+          AssignPublicIp: DISABLED
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+  CreateNewCertificate: !Equals [!Ref ExistingCertificateArn, ""]
 
 Outputs:
   LoadBalancerDNS:
@@ -239,17 +311,17 @@ Outputs:
 
   LoadBalancerURL:
     Description: Deployment Application Load Balancer URL
-    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+    Value: !Sub "https://${DeploymentDNSRecord}"
 
   ServiceDomain:
-    Description: Custom private domain for Deployment Service (VPC-only)
-    Value: !If [IsProd, "deployment.sutram.co", "deployment.dev.sutram.co"]
+    Description: Custom domain for Deployment Service (internal)
+    Value: !If [IsProd, !Sub "deploy.${BaseDomainName}", !Sub "deploy.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-deployment-domain"
 
   ServiceURL:
-    Description: Custom private URL for Deployment Service (VPC-only)
-    Value: !If [IsProd, "https://deployment.sutram.co", "https://deployment.dev.sutram.co"]
+    Description: Custom URL for Deployment Service (internal)
+    Value: !If [IsProd, !Sub "https://deploy.${BaseDomainName}", !Sub "https://deploy.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-deployment-url"
 
