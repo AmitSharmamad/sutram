@@ -76,12 +76,14 @@ func (m *Module) initialize() {
 	userRepo := postgres.NewUserRepository(m.db)
 	roleRepo := postgres.NewRoleRepository(m.db)
 	waitlistRepo := postgres.NewWaitlistRepository(sqlxDB)
+	surveyRepo := postgres.NewSurveyRepository(sqlxDB)
 	usageLimitRepo := postgres.NewUsageLimitRepository(m.db)
 	usageLogRepo := postgres.NewUsageLogRepository(m.db)
 
 	// Create services
 	userService := service.NewUserService(userRepo, roleRepo, usageLimitRepo, usageLogRepo)
-	waitlistService := service.NewWaitlistService(waitlistRepo)
+	surveyService := service.NewSurveyService(surveyRepo)
+	waitlistService := service.NewWaitlistService(waitlistRepo, surveyRepo)
 	usageLimitService := service.NewUsageLimitService(usageLimitRepo, usageLogRepo)
 	jwtService := auth.NewJWTService(m.jwtSecret, 24*time.Hour) // 24-hour token validity
 	authService := service.NewAuthService(userService, jwtService)
@@ -89,6 +91,7 @@ func (m *Module) initialize() {
 	// Create controller (dashboard service will be set later)
 	m.controller = http.NewUserController(authService, userService, nil)
 	m.controller.SetWaitlistService(waitlistService)
+	m.controller.SetSurveyService(surveyService)
 	m.controller.SetUsageLimitService(usageLimitService)
 }
 
@@ -123,9 +126,12 @@ func (m *Module) SetDashboardService(dashboardService *service.DashboardService)
 
 	// Recreate waitlist service
 	waitlistRepo := postgres.NewWaitlistRepository(sqlxDB)
-	waitlistService := service.NewWaitlistService(waitlistRepo)
+	surveyRepo := postgres.NewSurveyRepository(sqlxDB)
+	waitlistService := service.NewWaitlistService(waitlistRepo, surveyRepo)
+	surveyService := service.NewSurveyService(surveyRepo)
 
 	m.controller = http.NewUserController(authService, userService, dashboardService)
 	m.controller.SetWaitlistService(waitlistService)
+	m.controller.SetSurveyService(surveyService)
 	m.controller.SetUsageLimitService(usageLimitService)
 }

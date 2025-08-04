@@ -1,8 +1,161 @@
 package model
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 )
+
+// Market represents the trading market types
+type Market string
+
+const (
+	MarketEQ Market = "EQ"  // Equity market
+	MarketFO Market = "F&O" // Futures & Options market
+)
+
+// IsValid checks if the market value is valid
+func (m Market) IsValid() bool {
+	switch m {
+	case MarketEQ, MarketFO:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns the string representation of the market
+func (m Market) String() string {
+	return string(m)
+}
+
+// ParseMarket parses a string into a Market enum
+func ParseMarket(s string) (Market, bool) {
+	market := Market(s)
+	return market, market.IsValid()
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (m *Market) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	parsed, valid := ParseMarket(str)
+	if !valid {
+		return fmt.Errorf("invalid market value: %s", str)
+	}
+
+	*m = parsed
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (m Market) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
+}
+
+// InstrumentCategory represents the basic instrument categories for filtering
+type InstrumentCategory string
+
+const (
+	InstrumentCategoryStock InstrumentCategory = "Stock"
+	InstrumentCategoryIndex InstrumentCategory = "Index"
+)
+
+// IsValid checks if the instrument category value is valid
+func (ic InstrumentCategory) IsValid() bool {
+	switch ic {
+	case InstrumentCategoryStock, InstrumentCategoryIndex:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns the string representation of the instrument category
+func (ic InstrumentCategory) String() string {
+	return string(ic)
+}
+
+// ParseInstrumentCategory parses a string into an InstrumentCategory enum
+func ParseInstrumentCategory(s string) (InstrumentCategory, bool) {
+	category := InstrumentCategory(s)
+	return category, category.IsValid()
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (ic *InstrumentCategory) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	parsed, valid := ParseInstrumentCategory(str)
+	if !valid {
+		return fmt.Errorf("invalid instrument category value: %s", str)
+	}
+
+	*ic = parsed
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (ic InstrumentCategory) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ic.String())
+}
+
+// Contract represents the contract types for filtering
+type Contract string
+
+const (
+	ContractSpot    Contract = "Spot"
+	ContractFutures Contract = "Futures"
+	ContractOptions Contract = "Options"
+)
+
+// IsValid checks if the contract value is valid
+func (c Contract) IsValid() bool {
+	switch c {
+	case ContractSpot, ContractFutures, ContractOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+// String returns the string representation of the contract
+func (c Contract) String() string {
+	return string(c)
+}
+
+// ParseContract parses a string into a Contract enum
+func ParseContract(s string) (Contract, bool) {
+	contract := Contract(s)
+	return contract, contract.IsValid()
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (c *Contract) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	parsed, valid := ParseContract(str)
+	if !valid {
+		return fmt.Errorf("invalid contract value: %s", str)
+	}
+
+	*c = parsed
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface
+func (c Contract) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.String())
+}
 
 // Instrument represents a financial instrument with time series data
 type Instrument struct {
@@ -27,7 +180,7 @@ type InstrumentMaster struct {
 	Symbol             string         `json:"symbol" db:"symbol"`
 	Name               string         `json:"name" db:"instrument"` // Named instrument in DB
 	StartDate          time.Time      `json:"start_date" db:"start_date"`
-	Expiry             time.Time      `json:"expiry" db:"expiry"`
+	Expiry             *time.Time     `json:"expiry,omitempty" db:"expiry"`
 	ExmExchID          int32          `json:"exm_exch_id" db:"exm_exch_id"`
 	SmstSecurityID     int32          `json:"smst_security_id" db:"smst_security_id"`
 	InstrumentName     string         `json:"instrument_name" db:"instrument_name"`

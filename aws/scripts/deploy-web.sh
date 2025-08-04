@@ -27,6 +27,11 @@ fi
 ENV_FILE="$SCRIPT_DIR/../config/${ENVIRONMENT}.env"
 load_env "$ENV_FILE"
 
+# Set default values for optional OAuth parameters
+GOOGLE_OAUTH_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-REDACTED_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com}"
+GOOGLE_OAUTH_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-REDACTED_GOOGLE_OAUTH_CLIENT_SECRET}"
+GOOGLE_OAUTH_REDIRECT_URL="${GOOGLE_OAUTH_REDIRECT_URL:-}"
+
 # Check AWS CLI
 check_aws
 
@@ -41,6 +46,17 @@ if ! stack_exists "$CLICKHOUSE_STACK_NAME"; then
 fi
 
 print_info "Deploying Web service for environment: $ENVIRONMENT with image tag: $IMAGE_TAG"
+
+# Validate required parameters
+if [[ -z "$PUBLIC_HOSTED_ZONE_ID" ]]; then
+    print_error "PUBLIC_HOSTED_ZONE_ID is required but not set"
+    exit 1
+fi
+
+if [[ -z "$BASE_DOMAIN_NAME" ]]; then
+    print_error "BASE_DOMAIN_NAME is required but not set"
+    exit 1
+fi
 
 # Deploy Web service stack
 deploy_stack "$STACK_NAME" \

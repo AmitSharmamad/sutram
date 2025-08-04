@@ -18,6 +18,7 @@ type UserController struct {
 	userService       *service.UserService
 	dashboardService  *service.DashboardService
 	waitlistService   *service.WaitlistService
+	surveyService     *service.SurveyService
 	usageLimitService service.UsageLimitService
 }
 
@@ -28,6 +29,7 @@ func NewUserController(authService *service.AuthService, userService *service.Us
 		userService:       userService,
 		dashboardService:  dashboardService,
 		waitlistService:   nil, // Will be set via SetWaitlistService
+		surveyService:     nil, // Will be set via SetSurveyService
 		usageLimitService: nil, // Will be set via SetUsageLimitService
 	}
 }
@@ -910,6 +912,11 @@ func (c *UserController) SetWaitlistService(waitlistService *service.WaitlistSer
 	c.waitlistService = waitlistService
 }
 
+// SetSurveyService sets the survey service
+func (c *UserController) SetSurveyService(surveyService *service.SurveyService) {
+	c.surveyService = surveyService
+}
+
 // SetUsageLimitService sets the usage limit service
 func (c *UserController) SetUsageLimitService(usageLimitService service.UsageLimitService) {
 	c.usageLimitService = usageLimitService
@@ -931,8 +938,14 @@ func (c *UserController) JoinWaitlist(ctx *gin.Context) {
 		return
 	}
 
-	// Join waitlist
-	waitlist, err := c.waitlistService.JoinWaitlist(ctx.Request.Context(), req.Email)
+	// Convert string enums to domain types
+	natureOfWork := model.NatureOfWork(req.NatureOfWork)
+	tradingType := model.TradingType(req.TradingType)
+	experienceLevel := model.ExperienceLevel(req.ExperienceLevel)
+	workType := model.WorkType(req.WorkType)
+
+	// Join waitlist with survey data
+	waitlist, err := c.waitlistService.JoinWaitlist(ctx.Request.Context(), req.Email, natureOfWork, tradingType, experienceLevel, workType, req.Age)
 	if err != nil {
 		if err == service.ErrEmailAlreadyInWaitlist {
 			ctx.JSON(http.StatusConflict, dto.ApiResponse{
@@ -1051,5 +1064,159 @@ func (c *UserController) GetAllWaitlistEntries(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, dto.ApiResponse{
 		Success: true,
 		Data:    dto.ToWaitlistResponses(entries),
+	})
+}
+
+// CreateSurvey handles creating a survey
+func (c *UserController) CreateSurvey(ctx *gin.Context) {
+	var req dto.CreateSurveyRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	// Convert string enums to domain types
+	natureOfWork := model.NatureOfWork(req.NatureOfWork)
+	tradingType := model.TradingType(req.TradingType)
+	experienceLevel := model.ExperienceLevel(req.ExperienceLevel)
+	workType := model.WorkType(req.WorkType)
+
+	// Create survey
+	survey, err := c.surveyService.CreateSurvey(ctx.Request.Context(), req.Email, natureOfWork, tradingType, experienceLevel, workType, req.Age)
+	if err != nil {
+		if err == service.ErrSurveyAlreadyExists {
+			ctx.JSON(http.StatusConflict, dto.ApiResponse{
+				Success: false,
+				Error:   "Survey already exists for this email",
+			})
+			return
+		}
+		if err == service.ErrSurveyInvalidEmail {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid email format",
+			})
+			return
+		}
+		if err == service.ErrSurveyInvalidAge {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid age",
+			})
+			return
+		}
+		if err == service.ErrSurveyInvalidData {
+			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
+				Success: false,
+				Error:   "Invalid survey data",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to create survey: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, dto.ApiResponse{
+		Success: true,
+		Message: "Survey created successfully",
+		Data:    dto.ToSurveyResponse(survey),
+	})
+}
+
+// GetAllSurveys returns all survey entries (admin only)
+func (c *UserController) GetAllSurveys(ctx *gin.Context) {
+	// Get the token from header
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "No token provided",
+		})
+		return
+	}
+
+	// Check if user has admin role
+	hasAdminRole, err := c.authService.HasRole(tokenString, "admin")
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid token: " + err.Error(),
+		})
+		return
+	}
+
+	if !hasAdminRole {
+		ctx.JSON(http.StatusForbidden, dto.ApiResponse{
+			Success: false,
+			Error:   "Permission denied: Admin role required",
+		})
+		return
+	}
+
+	// Get all survey entries
+	surveys, err := c.surveyService.GetAllSurveys(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get surveys: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    dto.ToSurveyResponses(surveys),
+	})
+}
+
+// GetSurveyCount returns the total number of survey entries (admin only)
+func (c *UserController) GetSurveyCount(ctx *gin.Context) {
+	// Get the token from header
+	tokenString := extractToken(ctx)
+	if tokenString == "" {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "No token provided",
+		})
+		return
+	}
+
+	// Check if user has admin role
+	hasAdminRole, err := c.authService.HasRole(tokenString, "admin")
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, dto.ApiResponse{
+			Success: false,
+			Error:   "Invalid token: " + err.Error(),
+		})
+		return
+	}
+
+	if !hasAdminRole {
+		ctx.JSON(http.StatusForbidden, dto.ApiResponse{
+			Success: false,
+			Error:   "Permission denied: Admin role required",
+		})
+		return
+	}
+
+	// Get survey count
+	count, err := c.surveyService.GetSurveyCount(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
+			Success: false,
+			Error:   "Failed to get survey count: " + err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, dto.ApiResponse{
+		Success: true,
+		Data:    dto.SurveyCountResponse{Count: count},
 	})
 }

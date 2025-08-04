@@ -17,6 +17,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 	router.POST("/logout", controller.Logout)         // Add logout endpoint to clear token cookie
 	router.GET("/user/me", controller.CheckMe)        // Public endpoint to check login status
 	router.POST("/waitlist", controller.JoinWaitlist) // Public endpoint to join waitlist
+	router.POST("/survey", controller.CreateSurvey)   // Public endpoint to create survey
 
 	// Authenticated routes
 	auth := router.Group("/user")
@@ -44,5 +45,7 @@ func RegisterRoutes(router *gin.RouterGroup, controller *UserController) {
 		admin.PUT("/:id/deactivate", controller.DeactivateUser)
 		admin.GET("/waitlist", controller.GetAllWaitlistEntries)
 		admin.GET("/waitlist/count", controller.GetWaitlistCount)
+		admin.GET("/surveys", controller.GetAllSurveys)
+		admin.GET("/surveys/count", controller.GetSurveyCount)
 	}
 }
