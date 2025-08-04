@@ -54,7 +54,10 @@ deploy_stack "$STACK_NAME" \
     "ForceUpdate=$FORCE_UPDATE" \
     "GoogleOAuthClientId=$GOOGLE_OAUTH_CLIENT_ID" \
     "GoogleOAuthClientSecret=$GOOGLE_OAUTH_CLIENT_SECRET" \
-    "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL"
+    "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL" \
+    "PublicHostedZoneId=$PUBLIC_HOSTED_ZONE_ID" \
+    "BaseDomainName=${BASE_DOMAIN_NAME}" \
+    "ExistingCertificateArn=${EXISTING_CERTIFICATE_ARN:-}"
 
 # Force ECS service update to ensure new deployment
 SERVICE_NAME="${PROJECT_NAME}-${ENVIRONMENT}-web"
@@ -85,7 +88,7 @@ aws ecs wait services-stable \
     --cluster "$CLUSTER_NAME" \
     --services "$SERVICE_NAME"
 
-# Get load balancer URL
-ALB_DNS=$(get_stack_output "$STACK_NAME" "LoadBalancerDNS")
+# Get service URL
+SERVICE_URL=$(get_stack_output "$STACK_NAME" "ServiceURL")
 print_success "Web service deployment completed for $ENVIRONMENT environment"
-print_info "Load Balancer URL: http://$ALB_DNS"
+print_info "Service URL: $SERVICE_URL"
