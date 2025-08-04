@@ -15,6 +15,13 @@ Parameters:
   Memory:
     Type: Number
     Default: 512
+  BaseDomainName:
+    Type: String
+    Default: sutram.co
+    Description: Base domain name
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 Public Hosted Zone ID for domain validation
 
 Resources:
   # EFS File System for ClickHouse data
@@ -181,13 +188,12 @@ Resources:
             - Fn::ImportValue: !Sub "${ProjectName}-${Environment}-private-subnet-2-id"
           AssignPublicIp: DISABLED
 
-  # Route53 Private Record for ClickHouse Service
+  # Route53 Record for ClickHouse Service (internal CNAME)
   ClickHouseDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId:
-        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !If [IsProd, !Sub "ch.${BaseDomainName}", !Sub "ch.dev.${BaseDomainName}"]
       Type: CNAME
       TTL: 300
       ResourceRecords:
@@ -222,13 +228,13 @@ Outputs:
       Name: !Sub "${ProjectName}-${Environment}-clickhouse-endpoint"
 
   ServiceDomain:
-    Description: Custom private domain for ClickHouse Service (VPC-only)
-    Value: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+    Description: Custom domain for ClickHouse Service (internal)
+    Value: !If [IsProd, !Sub "ch.${BaseDomainName}", !Sub "ch.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-ch-domain"
 
   ClickHouseCustomEndpoint:
-    Description: ClickHouse Service Custom Private Endpoint (VPC-only)
-    Value: !If [IsProd, "ch.sutram.co", "ch.dev.sutram.co"]
+    Description: ClickHouse Service Custom Endpoint (internal)
+    Value: !If [IsProd, !Sub "ch.${BaseDomainName}", !Sub "ch.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-clickhouse-custom-endpoint"

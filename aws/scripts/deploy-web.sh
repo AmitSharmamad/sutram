@@ -54,9 +54,41 @@ deploy_stack "$STACK_NAME" \
     "ForceUpdate=$FORCE_UPDATE" \
     "GoogleOAuthClientId=$GOOGLE_OAUTH_CLIENT_ID" \
     "GoogleOAuthClientSecret=$GOOGLE_OAUTH_CLIENT_SECRET" \
-    "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL"
+    "GoogleOAuthRedirectURL=$GOOGLE_OAUTH_REDIRECT_URL" \
+    "PublicHostedZoneId=$PUBLIC_HOSTED_ZONE_ID" \
+    "BaseDomainName=${BASE_DOMAIN_NAME}" \
+    "ExistingCertificateArn=${EXISTING_CERTIFICATE_ARN:-}"
 
-# Get load balancer URL
-ALB_DNS=$(get_stack_output "$STACK_NAME" "LoadBalancerDNS")
+# Force ECS service update to ensure new deployment
+SERVICE_NAME="${PROJECT_NAME}-${ENVIRONMENT}-web"
+CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-cluster"
+
+print_info "Forcing ECS service update for $SERVICE_NAME on cluster $CLUSTER_NAME..."
+
+# Verify cluster exists first
+if ! aws ecs describe-clusters --clusters "$CLUSTER_NAME" --query 'clusters[0].status' --output text --no-cli-pager | grep -q ACTIVE; then
+    print_error "ECS cluster $CLUSTER_NAME not found or not active. Please check cluster name."
+    exit 1
+fi
+
+# Verify service exists
+if ! aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME" --query 'services[0].status' --output text --no-cli-pager | grep -q ACTIVE; then
+    print_error "ECS service $SERVICE_NAME not found or not active in cluster $CLUSTER_NAME."
+    exit 1
+fi
+
+aws ecs update-service \
+    --cluster "$CLUSTER_NAME" \
+    --service "$SERVICE_NAME" \
+    --force-new-deployment \
+    --no-cli-pager > /dev/null
+
+print_info "Waiting for service to stabilize..."
+aws ecs wait services-stable \
+    --cluster "$CLUSTER_NAME" \
+    --services "$SERVICE_NAME"
+
+# Get service URL
+SERVICE_URL=$(get_stack_output "$STACK_NAME" "ServiceURL")
 print_success "Web service deployment completed for $ENVIRONMENT environment"
-print_info "Load Balancer URL: http://$ALB_DNS"
+print_info "Service URL: $SERVICE_URL"

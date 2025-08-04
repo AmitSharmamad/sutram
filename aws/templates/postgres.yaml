@@ -28,6 +28,13 @@ Parameters:
     Type: String
     NoEcho: true
     Default: change_me_dev
+  BaseDomainName:
+    Type: String
+    Default: sutram.co
+    Description: Base domain name
+  PublicHostedZoneId:
+    Type: String
+    Description: Route53 Public Hosted Zone ID for domain validation
 
 Resources:
   # DB Subnet Group
@@ -130,13 +137,12 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-postgres"
 
-  # Route53 Private Record for PostgreSQL Service
+  # Route53 Record for PostgreSQL Service (internal CNAME)
   PostgreSQLDNSRecord:
     Type: AWS::Route53::RecordSet
     Properties:
-      HostedZoneId:
-        Fn::ImportValue: !Sub "${ProjectName}-${Environment}-hosted-zone-id"
-      Name: !If [IsProd, "pg.sutram.co", "pg.dev.sutram.co"]
+      HostedZoneId: !Ref PublicHostedZoneId
+      Name: !If [IsProd, !Sub "pg.${BaseDomainName}", !Sub "pg.dev.${BaseDomainName}"]
       Type: CNAME
       TTL: 300
       ResourceRecords:
@@ -183,16 +189,16 @@ Outputs:
       Name: !Sub "${ProjectName}-${Environment}-db-password"
 
   ServiceDomain:
-    Description: Custom private domain for PostgreSQL Service (VPC-only)
-    Value: !If [IsProd, "pg.sutram.co", "pg.dev.sutram.co"]
+    Description: Custom domain for PostgreSQL Service (internal)
+    Value: !If [IsProd, !Sub "pg.${BaseDomainName}", !Sub "pg.dev.${BaseDomainName}"]
     Export:
       Name: !Sub "${ProjectName}-${Environment}-pg-domain"
 
   DatabaseURL:
-    Description: PostgreSQL connection URL with custom private domain (VPC-only)
+    Description: PostgreSQL connection URL with custom domain (internal)
     Value: !If 
       - IsProd
-      - !Sub "postgresql://${DBUsername}:${DBPassword}@pg.sutram.co:${Database.Endpoint.Port}/${DBName}"
-      - !Sub "postgresql://${DBUsername}:${DBPassword}@pg.dev.sutram.co:${Database.Endpoint.Port}/${DBName}"
+      - !Sub "postgresql://${DBUsername}:${DBPassword}@pg.${BaseDomainName}:${Database.Endpoint.Port}/${DBName}"
+      - !Sub "postgresql://${DBUsername}:${DBPassword}@pg.dev.${BaseDomainName}:${Database.Endpoint.Port}/${DBName}"
     Export:
       Name: !Sub "${ProjectName}-${Environment}-db-custom-url"
