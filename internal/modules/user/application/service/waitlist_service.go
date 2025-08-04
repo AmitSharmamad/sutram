@@ -20,20 +20,27 @@ var (
 // WaitlistService handles waitlist-related business logic
 type WaitlistService struct {
 	waitlistRepo repository.WaitlistRepository
+	surveyRepo   repository.SurveyRepository
 }
 
 // NewWaitlistService creates a new waitlist service
-func NewWaitlistService(waitlistRepo repository.WaitlistRepository) *WaitlistService {
+func NewWaitlistService(waitlistRepo repository.WaitlistRepository, surveyRepo repository.SurveyRepository) *WaitlistService {
 	return &WaitlistService{
 		waitlistRepo: waitlistRepo,
+		surveyRepo:   surveyRepo,
 	}
 }
 
-// JoinWaitlist adds a new email to the waitlist
-func (s *WaitlistService) JoinWaitlist(ctx context.Context, email string) (*model.Waitlist, error) {
+// JoinWaitlist adds a new email to the waitlist with survey data
+func (s *WaitlistService) JoinWaitlist(ctx context.Context, email string, natureOfWork model.NatureOfWork, tradingType model.TradingType, experienceLevel model.ExperienceLevel, workType model.WorkType, age int) (*model.Waitlist, error) {
 	// Validate email format
 	if !isValidEmail(email) {
 		return nil, ErrInvalidEmail
+	}
+
+	// Validate age
+	if age <= 0 || age > 120 {
+		return nil, errors.New("age must be between 1 and 120")
 	}
 
 	// Normalize email (lowercase and trim)
@@ -48,8 +55,15 @@ func (s *WaitlistService) JoinWaitlist(ctx context.Context, email string) (*mode
 		return nil, ErrEmailAlreadyInWaitlist
 	}
 
-	// Create new waitlist entry
-	waitlist := model.NewWaitlist(email)
+	// Create survey entry first
+	survey := model.NewSurvey(email, natureOfWork, tradingType, experienceLevel, workType, age)
+	err = s.surveyRepo.Create(ctx, survey)
+	if err != nil {
+		return nil, fmt.Errorf("error creating survey entry: %w", err)
+	}
+
+	// Create waitlist entry with survey reference
+	waitlist := model.NewWaitlist(email, &survey.ID)
 
 	// Save to database
 	err = s.waitlistRepo.Create(ctx, waitlist)

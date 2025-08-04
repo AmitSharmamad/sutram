@@ -24,12 +24,12 @@ func NewWaitlistRepository(db *sqlx.DB) repository.WaitlistRepository {
 // Create creates a new waitlist entry
 func (r *WaitlistRepository) Create(ctx context.Context, waitlist *model.Waitlist) error {
 	query := `
-		INSERT INTO waitlist (email, created_at, updated_at)
-		VALUES ($1, $2, $3)
+		INSERT INTO waitlist (email, survey_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id
 	`
 
-	err := r.db.QueryRowContext(ctx, query, waitlist.Email, waitlist.CreatedAt, waitlist.UpdatedAt).Scan(&waitlist.ID)
+	err := r.db.QueryRowContext(ctx, query, waitlist.Email, waitlist.SurveyID, waitlist.CreatedAt, waitlist.UpdatedAt).Scan(&waitlist.ID)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func (r *WaitlistRepository) Create(ctx context.Context, waitlist *model.Waitlis
 // FindByEmail finds a waitlist entry by email
 func (r *WaitlistRepository) FindByEmail(ctx context.Context, email string) (*model.Waitlist, error) {
 	query := `
-		SELECT id, email, created_at, updated_at
+		SELECT id, email, survey_id, created_at, updated_at
 		FROM waitlist
 		WHERE email = $1
 	`
@@ -60,7 +60,7 @@ func (r *WaitlistRepository) FindByEmail(ctx context.Context, email string) (*mo
 // FindAll retrieves all waitlist entries
 func (r *WaitlistRepository) FindAll(ctx context.Context) ([]model.Waitlist, error) {
 	query := `
-		SELECT id, email, created_at, updated_at
+		SELECT id, email, survey_id, created_at, updated_at
 		FROM waitlist
 		ORDER BY created_at DESC
 	`
