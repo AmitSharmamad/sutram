@@ -41,6 +41,7 @@ Parameters:
   PublicHostedZoneId:
     Type: String
     Description: Route53 Public Hosted Zone ID for domain validation
+    Default: ""
   ExistingCertificateArn:
     Type: String
     Default: ""
@@ -60,9 +61,11 @@ Resources:
       SubjectAlternativeNames:
         - !If [IsProd, !Sub "*.${BaseDomainName}", !Sub "*.dev.${BaseDomainName}"]
       ValidationMethod: DNS
-      DomainValidationOptions:
-        - DomainName: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
-          HostedZoneId: !Ref PublicHostedZoneId
+      DomainValidationOptions: !If
+        - HasHostedZone
+        - - DomainName: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
+            HostedZoneId: !Ref PublicHostedZoneId
+        - !Ref "AWS::NoValue"
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${Environment}-web-ssl-cert"
@@ -225,7 +228,10 @@ Resources:
               Value: !If 
                 - UseCustomRedirectURL
                 - !Ref GoogleOAuthRedirectURL
-                - !Sub "https://${WebDNSRecord}/api/auth/oauth/google/callback"
+                - !If
+                  - HasHostedZone
+                  - !Sub "https://${WebDNSRecord}/api/auth/oauth/google/callback"
+                  - !Sub "https://${ApplicationLoadBalancer.DNSName}/api/auth/oauth/google/callback"
             - Name: WEB_HTTP_PORT
               Value: !Ref WebPort
             - Name: GIN_MODE
@@ -266,6 +272,7 @@ Resources:
   # Route53 Public Record for Web Service
   WebDNSRecord:
     Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
     Properties:
       HostedZoneId: !Ref PublicHostedZoneId
       Name: !If [IsProd, !Sub "web.${BaseDomainName}", !Sub "web.dev.${BaseDomainName}"]
@@ -278,6 +285,7 @@ Conditions:
   IsProd: !Equals [!Ref Environment, prod]
   UseCustomRedirectURL: !Not [!Equals [!Ref GoogleOAuthRedirectURL, ""]]
   CreateNewCertificate: !Equals [!Ref ExistingCertificateArn, ""]
+  HasHostedZone: !Not [!Equals [!Ref PublicHostedZoneId, ""]]
 
 Outputs:
   LoadBalancerDNS:
@@ -288,7 +296,10 @@ Outputs:
 
   LoadBalancerURL:
     Description: Application Load Balancer URL
-    Value: !Sub "https://${WebDNSRecord}"
+    Value: !If 
+      - HasHostedZone
+      - !Sub "https://${WebDNSRecord}"
+      - !Sub "https://${ApplicationLoadBalancer.DNSName}"
 
   ServiceDomain:
     Description: Custom domain for Web Service
