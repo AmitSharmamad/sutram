@@ -352,3 +352,32 @@ func (s *InstrumentService) GetInstrumentMastersByExchangeSecurityIDs(ctx contex
 	}
 	return instrumentMasters, nil
 }
+
+// ResolveOptionsContractsFromMaster resolves options contracts from instrument_master using provided filters
+func (s *InstrumentService) ResolveOptionsContractsFromMaster(
+	ctx context.Context,
+	strikePrice float64,
+	optionType string,
+	expiry time.Time,
+	parentSecurityID *int32,
+) (*model.InstrumentMaster, error) {
+	parentSecurityIDValue := int64(*parentSecurityID)
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, parentSecurityIDValue)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instrument master by exchange security ID: %w", err)
+	}
+	instrumentMasterSymbol := instrumentMaster.TradingSymbol
+	instrumentExchange := instrumentMaster.Exchange
+
+	instruments, err := s.instrumentMasterRepo.FindOptionsContracts(
+		ctx, strikePrice, optionType, instrumentExchange, instrumentMasterSymbol, expiry,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving options contracts from master: %w", err)
+	}
+	if len(instruments) == 1 {
+		return instruments[0], nil
+	} else {
+		return nil, ErrInstrumentNotFound
+	}
+}

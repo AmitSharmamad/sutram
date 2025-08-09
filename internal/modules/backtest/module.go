@@ -89,12 +89,16 @@ func (m *Module) initialize() {
 	// Get instrument service
 	instrumentService := m.instrumentModule.GetInstrumentService()
 
-	// Create backtest engine service - fix the type mismatch
-	// Either by changing how we pass the backtestService or adjusting the signature of NewBacktestEngine
+	// Create option leg repository and service
+	optionLegRepo := postgres.NewOptionLegRepository(m.db)
+	optionLegService := service.NewOptionLegService(optionLegRepo, instrumentService)
+
+	// Create backtest engine service with optionLegService
 	engineService := service.NewBacktestEngine(
-		&backtestService, // Change to pointer if NewBacktestEngine expects a pointer
+		&backtestService,
 		strategyService,
 		instrumentService,
+		optionLegService,
 		runGroupRepo,
 		runRepo,
 		positionRepo,

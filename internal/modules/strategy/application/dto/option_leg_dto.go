@@ -8,6 +8,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// ExpiryTypeShortCodeMap provides short codes for expiry types
+var ExpiryTypeShortCodeMap = map[string]string{
+	"Weekly":  "W",
+	"Monthly": "M",
+}
+
 // CreateOptionLegRequest represents the request to create an option leg
 type CreateOptionLegRequest struct {
 	LegSequence        int                   `json:"leg_sequence" validate:"required,gt=0"`
@@ -26,7 +32,7 @@ type CreateOptionLegRequest struct {
 	ExpiryDate         *time.Time            `json:"expiry_date,omitempty"`
 	Exchange           model.Exchange        `json:"exchange" validate:"required,oneof=NSE BSE MCX"`
 	Asset              model.Asset           `json:"asset" validate:"required,oneof=INDEX STOCK"`
-	ExchangeSecurityID *int                  `json:"exchange_security_id,omitempty"`
+	ExchangeSecurityID *int32                `json:"exchange_security_id,omitempty"`
 	InstrumentType     model.InstrumentType  `json:"instrument_type" validate:"required,oneof=OPTIONS FUTURES EQUITY"`
 }
 
@@ -48,7 +54,7 @@ type UpdateOptionLegRequest struct {
 	ExpiryDate         *time.Time             `json:"expiry_date,omitempty"`
 	Exchange           *model.Exchange        `json:"exchange,omitempty" validate:"omitempty,oneof=NSE BSE MCX"`
 	Asset              *model.Asset           `json:"asset,omitempty" validate:"omitempty,oneof=INDEX STOCK"`
-	ExchangeSecurityID *int                   `json:"exchange_security_id,omitempty"`
+	ExchangeSecurityID *int32                 `json:"exchange_security_id,omitempty"`
 	InstrumentType     *model.InstrumentType  `json:"instrument_type,omitempty" validate:"omitempty,oneof=OPTIONS FUTURES EQUITY"`
 }
 
@@ -72,7 +78,7 @@ type OptionLegResponse struct {
 	ExpiryDate         *time.Time            `json:"expiry_date,omitempty"`
 	Exchange           model.Exchange        `json:"exchange"`
 	Asset              model.Asset           `json:"asset"`
-	ExchangeSecurityID *int                  `json:"exchange_security_id,omitempty"`
+	ExchangeSecurityID *int32                `json:"exchange_security_id,omitempty"`
 	InstrumentType     model.InstrumentType  `json:"instrument_type"`
 	CreatedAt          time.Time             `json:"created_at"`
 	UpdatedAt          time.Time             `json:"updated_at"`
@@ -112,7 +118,12 @@ func (req *CreateOptionLegRequest) ToModel(strategyID uuid.UUID) *model.OptionLe
 	optionLeg.ExpiryDate = req.ExpiryDate
 	optionLeg.Exchange = req.Exchange
 	optionLeg.Asset = req.Asset
-	optionLeg.ExchangeSecurityID = req.ExchangeSecurityID
+	if req.ExchangeSecurityID != nil {
+		exchangeSecurityID := int(*req.ExchangeSecurityID)
+		optionLeg.ExchangeSecurityID = &exchangeSecurityID
+	} else {
+		optionLeg.ExchangeSecurityID = nil
+	}
 	optionLeg.InstrumentType = req.InstrumentType
 
 	return optionLeg
@@ -120,6 +131,12 @@ func (req *CreateOptionLegRequest) ToModel(strategyID uuid.UUID) *model.OptionLe
 
 // ToResponse converts domain model to OptionLegResponse
 func ToResponse(optionLeg *model.OptionLeg) *OptionLegResponse {
+	var exchangeSecurityID *int32
+	if optionLeg.ExchangeSecurityID != nil {
+		exchangeSecurityIDInt32 := int32(*optionLeg.ExchangeSecurityID)
+		exchangeSecurityID = &exchangeSecurityIDInt32
+	}
+
 	return &OptionLegResponse{
 		ID:                 optionLeg.ID,
 		StrategyID:         optionLeg.StrategyID,
@@ -139,7 +156,7 @@ func ToResponse(optionLeg *model.OptionLeg) *OptionLegResponse {
 		ExpiryDate:         optionLeg.ExpiryDate,
 		Exchange:           optionLeg.Exchange,
 		Asset:              optionLeg.Asset,
-		ExchangeSecurityID: optionLeg.ExchangeSecurityID,
+		ExchangeSecurityID: exchangeSecurityID,
 		InstrumentType:     optionLeg.InstrumentType,
 		CreatedAt:          optionLeg.CreatedAt,
 		UpdatedAt:          optionLeg.UpdatedAt,

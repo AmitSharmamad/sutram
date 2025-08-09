@@ -11,7 +11,7 @@ import (
 	"algo/internal/modules/backtest/application/dto"
 	"algo/internal/modules/backtest/domain/model"
 	"algo/internal/modules/backtest/domain/repository"
-	"algo/internal/modules/instrument/application/service"
+	instService "algo/internal/modules/instrument/application/service"
 	instrumentModel "algo/internal/modules/instrument/domain/model"
 
 	"github.com/google/uuid"
@@ -64,11 +64,11 @@ type OptionLegService interface {
 // optionLegService implements the OptionLegService interface
 type optionLegService struct {
 	optionLegRepo     repository.OptionLegRepository
-	instrumentService service.InstrumentService
+	instrumentService *instService.InstrumentService
 }
 
 // NewOptionLegService creates a new option leg service
-func NewOptionLegService(optionLegRepo repository.OptionLegRepository, instrumentService service.InstrumentService) OptionLegService {
+func NewOptionLegService(optionLegRepo repository.OptionLegRepository, instrumentService *instService.InstrumentService) OptionLegService {
 	return &optionLegService{
 		optionLegRepo:     optionLegRepo,
 		instrumentService: instrumentService,

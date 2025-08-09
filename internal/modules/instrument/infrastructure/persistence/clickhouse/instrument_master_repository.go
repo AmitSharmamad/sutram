@@ -543,3 +543,60 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityIDs(ctx context.Conte
 
 	return instrumentMasters, nil
 }
+
+// FindOptionsContracts resolves options contracts from \
+// instrument_master table using provided filters
+func (r *InstrumentMasterRepository) FindOptionsContracts(
+	ctx context.Context,
+	strikePrice float64,
+	optionType string,
+	exchange string,
+	symbol string,
+	expiryDate time.Time,
+) ([]*model.InstrumentMaster, error) {
+	query := `
+	       SELECT
+		       exchange_security_id,
+		       exchange,
+		       segment,
+		       symbol,
+		       instrument,
+		       start_date,
+		       expiry,
+		       exm_exch_id,
+		       smst_security_id,
+		       instrument_name,
+		       trading_symbol,
+		       lot_units,
+		       strike_price,
+		       option_type,
+		       tick_size,
+		       expiry_flag,
+		       exch_instrument_type,
+		       symbol_name
+	       FROM sutram.instrument_master
+	       WHERE strike_price = ?
+		 AND option_type = ?
+		 AND exchange = ?
+		 AND toMonth(expiry) = ?
+		 AND symbol like ?
+	       ORDER BY expiry DESC, strike_price ASC
+       `
+
+	month := int(expiryDate.Month())
+	symbolLike := fmt.Sprintf("%s%%", symbol)
+
+	var instruments []*model.InstrumentMaster
+	err := r.db.SelectContext(ctx, &instruments, query,
+		strikePrice,
+		optionType,
+		exchange,
+		month,
+		symbolLike,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error querying options contracts: %w", err)
+	}
+
+	return instruments, nil
+}

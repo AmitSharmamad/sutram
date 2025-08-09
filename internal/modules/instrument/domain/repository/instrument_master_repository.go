@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"algo/internal/modules/instrument/domain/model"
 )
@@ -38,4 +39,13 @@ type InstrumentMasterRepository interface {
 	// FindByExchangeSecurityIDs finds multiple instrument masters by their exchange security IDs
 	// FindByExchangeSecurityIDs finds multiple instrument masters by their exchange security IDs
 	FindByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int64) ([]*model.InstrumentMaster, error)
+
+	FindOptionsContracts(
+		ctx context.Context,
+		strikePrice float64,
+		optionType string,
+		exchange string,
+		symbol string,
+		expiryDate time.Time,
+	) ([]*model.InstrumentMaster, error)
 }

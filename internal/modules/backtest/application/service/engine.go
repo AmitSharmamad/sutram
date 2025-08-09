@@ -48,6 +48,7 @@ type BacktestEngine struct {
 	backtestService   *BacktestService
 	strategyService   strategyService.StrategyService
 	instrumentService *instrumentService.InstrumentService
+	optionLegService  OptionLegService
 	runGroupRepo      backtestRepo.RunGroupRepository
 	runRepo           backtestRepo.RunRepository
 	positionRepo      backtestRepo.PositionRepository
@@ -63,6 +64,7 @@ func NewBacktestEngine(
 	backtestService *BacktestService,
 	strategyService strategyService.StrategyService,
 	instrumentService *instrumentService.InstrumentService,
+	optionLegService OptionLegService,
 	runGroupRepo backtestRepo.RunGroupRepository,
 	runRepo backtestRepo.RunRepository,
 	positionRepo backtestRepo.PositionRepository,
@@ -72,6 +74,7 @@ func NewBacktestEngine(
 		backtestService:   backtestService,
 		strategyService:   strategyService,
 		instrumentService: instrumentService,
+		optionLegService:  optionLegService,
 		runGroupRepo:      runGroupRepo,
 		runRepo:           runRepo,
 		positionRepo:      positionRepo,
@@ -87,6 +90,11 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Temporary Placement
+	if strategyResp.Segment == strategyModel.Segment("F&O") {
+		e.simpleBackTestFlow(ctx, strategyID, userID)
 	}
 
 	// Create a run group in memory
@@ -1334,4 +1342,808 @@ func (e *BacktestEngine) handleMISSquareOff(
 // GetInstrumentService returns the instrumentService
 func (e *BacktestEngine) GetInstrumentService() *instrumentService.InstrumentService {
 	return e.instrumentService
+}
+
+// getLegSpotData retrieves spot data for all option legs in a strategy
+func (e *BacktestEngine) getLegSpotData(
+	ctx context.Context,
+	strategyResp *strategyDto.StrategyResponse,
+) (map[uuid.UUID][]*instrumentModel.Instrument, error) {
+	legSpotData := make(map[uuid.UUID][]*instrumentModel.Instrument)
+	for _, leg := range strategyResp.OptionLegs {
+		legInstrumentSpotData, err := e.instrumentService.GetInstrumentsByTimeRange(
+			ctx,
+			*leg.ExchangeSecurityID,
+			*strategyResp.StartDate,
+			*strategyResp.EndDate,
+			string(strategyResp.ChartTimeframe),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get leg instrument data: %w", err)
+		}
+		legSpotData[leg.ID] = legInstrumentSpotData
+	}
+	return legSpotData, nil
+}
+
+// EnterFnOPosition resolves the option contract for all legs and enters FnO positions
+func (e *BacktestEngine) EnterFnOPosition(
+	ctx context.Context,
+	legSpotData map[uuid.UUID][]*instrumentModel.Instrument,
+	spotTimestamp time.Time,
+	strategyResp *strategyDto.StrategyResponse,
+) error {
+	// for each of the legs, resolve the contract
+	for _, leg := range strategyResp.OptionLegs {
+		// get the spot for the leg.exchange_security_id
+		var legSpotPrice *float64
+		if legSpotRecords, ok := legSpotData[leg.ID]; ok {
+			for _, legSpotRecord := range legSpotRecords {
+				if legSpotRecord.Timestamp.Equal(spotTimestamp) {
+					// get the legSpot.Close
+					legSpotPrice = &legSpotRecord.Close
+					break
+				}
+			}
+		}
+
+		// Use legSpotPrice for processing (placeholder to avoid unused variable error)
+		if legSpotPrice != nil {
+			// Determine strike offset (use TickOffset if available, otherwise default to 50)
+			strikeOffset := 100.0 // Default value
+
+			// Resolve the strike price based on strike type and option type
+			strikePrice, err := e.resolveStrikePriceByType(
+				string(leg.StrikeType),
+				string(*leg.OptionType),
+				*legSpotPrice,
+				strikeOffset,
+			)
+			if err != nil {
+				// Handle error appropriately - for now, log and continue
+				continue
+			}
+
+			// TODO: Use the resolved strikePrice for further processing
+			_ = strikePrice
+
+			// Resolve options contracts from master using the calculated strike price
+			optionContract, err := e.instrumentService.ResolveOptionsContractsFromMaster(
+				ctx,
+				strikePrice,
+				string(*leg.OptionType), // Convert OptionType enum to string
+				spotTimestamp,           // Use current timestamp as expiry (or calculate proper expiry)
+				leg.ExchangeSecurityID,  // Parent security ID
+			)
+			if err != nil {
+				// Handle error appropriately - for now, log and continue
+				continue
+			}
+
+			// TODO: Use the resolved optionContract for further processing
+			_ = optionContract
+			// take the position in this optionContract based on leg
+		}
+	}
+
+	return nil
+}
+
+// executeTimeBasedStrategy executes a time-based strategy by iterating through dates and checking entry/exit times
+func (e *BacktestEngine) executeTimeBasedStrategy(
+	ctx context.Context,
+	strategyResp *strategyDto.StrategyResponse,
+) error {
+	// getLegSpotData
+	legSpotData, err := e.getLegSpotData(ctx, strategyResp)
+	if err != nil {
+		return err
+	}
+
+	// Get the ingredients: 'entry_time', 'exit_time'
+	entry_time := strategyResp.EntryStartTime
+	entryTimeAsTime := timeUtil.TimeOnlyToTime(entry_time)
+
+	exitTime := strategyResp.EntryEndTime
+	exitTimeAsTime := timeUtil.TimeOnlyToTime(exitTime)
+
+	// Iterate from start date to end date in 1-minute timeframe from 9:15 to 3:29
+	currentDate := *strategyResp.StartDate
+	endDate := *strategyResp.EndDate
+
+	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
+		// Skip weekends (Saturday = 6, Sunday = 0)
+		if currentDate.Weekday() == time.Saturday || currentDate.Weekday() == time.Sunday {
+			currentDate = currentDate.AddDate(0, 0, 1)
+			continue
+		}
+
+		// Start time: 9:15 AM
+		startTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 9, 15, 0, 0, currentDate.Location())
+		// End time: 3:29 PM
+		endTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 15, 29, 0, 0, currentDate.Location())
+
+		// Iterate in 1-minute intervals
+		for currentTime := startTime; currentTime.Before(endTime) || currentTime.Equal(endTime); currentTime = currentTime.Add(time.Minute) {
+			// Entry check
+			if currentTime.Hour() == entryTimeAsTime.Hour() && currentTime.Minute() == entryTimeAsTime.Minute() {
+				// resolve the contract for all legs
+				err := e.EnterFnOPosition(ctx, legSpotData, currentTime, strategyResp)
+				if err != nil {
+					// Handle error appropriately - for now, log and continue
+					continue
+				}
+			}
+
+			// Exit check
+			if currentTime.Hour() == exitTimeAsTime.Hour() && currentTime.Minute() == exitTimeAsTime.Minute() {
+				// Exit all the legs
+			}
+		}
+
+		// Move to next day
+		currentDate = currentDate.AddDate(0, 0, 1)
+	}
+
+	// Take the position based on what's there in each of the legs
+	return nil
+}
+
+// executeConditionalStrategy executes a conditional strategy by evaluating entry/exit expressions against market data
+func (e *BacktestEngine) executeConditionalStrategy(
+	ctx context.Context,
+	strategyResp *strategyDto.StrategyResponse,
+) error {
+	// getLegSpotData
+	legSpotData, err := e.getLegSpotData(ctx, strategyResp)
+	if err != nil {
+		return err
+	}
+
+	// Get the main instrument data for conditional evaluation
+	if len(strategyResp.Instruments) == 0 {
+		return fmt.Errorf("no instruments found in strategy")
+	}
+
+	instrumentID := strategyResp.Instruments[0]
+	instrumentSpotData, err := e.instrumentService.GetInstrumentsByTimeRange(
+		ctx,
+		int32(instrumentID),
+		*strategyResp.StartDate,
+		*strategyResp.EndDate,
+		string(strategyResp.ChartTimeframe),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get main instrument data: %w", err)
+	}
+
+	// Initialize evaluation context
+	evalContext := parser.NewEvaluationContext(nil)
+	evalContext.Strategy = strategyResp
+	evalContext.Data = e.toDataContext(instrumentSpotData)
+
+	// Extract indicators from both entry and exit expressions
+	entryIndicators, err := parser.ExtractIndicators(strategyResp.EntryExpression)
+	if err != nil {
+		return fmt.Errorf("error extracting indicators from entry expression: %w", err)
+	}
+
+	var exitIndicators []parser.IndicatorInfo
+	if strategyResp.ExitExpression != "" {
+		exitIndicators, err = parser.ExtractIndicators(strategyResp.ExitExpression)
+		if err != nil {
+			return fmt.Errorf("error extracting indicators from exit expression: %w", err)
+		}
+	}
+
+	// Combine all indicators (entry + exit)
+	allIndicators := append(entryIndicators, exitIndicators...)
+
+	indicatorArrayMap := make(map[string][]parser.IndicatorValues)
+	length := 0
+
+	// Iterate through all indicators and calculate their values
+	for _, indicator := range allIndicators {
+		calculator := parser.GetIndFactory(indicator.Name)
+		uniqueString, err := calculator.GenerateIndicatorKey(indicator.Arguments, evalContext)
+		if err != nil {
+			return fmt.Errorf("error generating unique key for indicator: %w", err)
+		}
+
+		// Skip if already calculated (avoid duplicates between entry and exit)
+		if _, exists := indicatorArrayMap[uniqueString]; exists {
+			continue
+		}
+
+		indicatorArrayMap[uniqueString] = calculator.CalculateAll(indicator.Arguments, evalContext, *strategyResp.StartDate)
+		if len(indicatorArrayMap[uniqueString]) > length {
+			length = len(indicatorArrayMap[uniqueString])
+		}
+	}
+
+	// Get timestamps from indicator arrays to iterate over
+	var timestamps []time.Time
+	timestampSet := make(map[time.Time]bool)
+
+	// Collect all unique timestamps from indicator arrays
+	for _, values := range indicatorArrayMap {
+		for _, val := range values {
+			if !timestampSet[val.Timestamp] {
+				timestamps = append(timestamps, val.Timestamp)
+				timestampSet[val.Timestamp] = true
+			}
+		}
+	}
+
+	// Sort timestamps
+	// (Assuming timestamps are already in chronological order from data source)
+
+	// Track open positions
+	var openPositions []*model.Position
+
+	// Iterate through each timestamp and evaluate conditions
+	for i, timestamp := range timestamps {
+		// Skip weekends (Saturday = 6, Sunday = 0)
+		if timestamp.Weekday() == time.Saturday || timestamp.Weekday() == time.Sunday {
+			continue
+		}
+
+		// Skip if timestamp is outside strategy date range
+		if timestamp.Before(*strategyResp.StartDate) || timestamp.After(*strategyResp.EndDate) {
+			continue
+		}
+
+		// Check entry conditions if we don't have open positions
+		if len(openPositions) == 0 {
+			entryResult, err := parser.EvaluateIndicatorExpression(
+				strategyResp.EntryExpression,
+				indicatorArrayMap,
+				timestamp,
+				nil,
+				i,
+			)
+			if err != nil {
+				// Log error and continue
+				continue
+			}
+
+			if entryResult {
+				// Enter position - resolve contracts for all legs
+				err := e.EnterFnOPosition(ctx, legSpotData, timestamp, strategyResp)
+				if err != nil {
+					// Handle error appropriately - for now, log and continue
+					continue
+				}
+
+				// Create a position record (simplified)
+				position := &model.Position{
+					ID:               uuid.New(),
+					RunID:            uuid.New(), // In actual implementation, this should come from a run
+					State:            model.NotEntered,
+					Direction:        model.Long, // This should be determined by strategy logic
+					EntryPriceSignal: 0.0,        // This should be determined from current price
+					EntryTimeSignal:  timestamp,
+					EntrySignal:      strategyResp.EntryExpression,
+					PositionSize:     1.0, // This should be calculated based on strategy
+					CreatedAt:        time.Now(),
+					UpdatedAt:        time.Now(),
+				}
+				openPositions = append(openPositions, position)
+			}
+		}
+
+		// Check exit conditions if we have open positions
+		if len(openPositions) > 0 && strategyResp.ExitExpression != "" {
+			exitResult, err := parser.EvaluateIndicatorExpression(
+				strategyResp.ExitExpression,
+				indicatorArrayMap,
+				timestamp,
+				nil,
+				i,
+			)
+			if err != nil {
+				// Log error and continue
+				continue
+			}
+
+			if exitResult {
+				// Exit all positions
+				openPositions = nil // Clear all positions
+			}
+		}
+	}
+
+	return nil
+}
+
+func (e *BacktestEngine) simpleBackTestFlow(
+	ctx context.Context,
+	strategyID uuid.UUID,
+	userID uuid.UUID,
+) (interface{}, error) {
+	// 0 Get the necessary ingredients
+
+	// 0.1 Get the strategy data along with legs
+	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if strategyResp.Segment != strategyModel.Segment("F&O") {
+		return nil, fmt.Errorf("Not a F&O strategy")
+	}
+
+	if strategyResp.StrategyType == strategyModel.Conditional {
+		// Backtest conditional strategy
+		err := e.executeConditionalStrategy(ctx, strategyResp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute conditional strategy: %w", err)
+		}
+	} else if strategyResp.StrategyType == strategyModel.TimeBased {
+		// Backtest time-based strategy
+		err := e.executeTimeBasedStrategy(ctx, strategyResp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute time-based strategy: %w", err)
+		}
+	}
+
+	return strategyResp, nil
+}
+
+// executeFOBacktestInMemory runs a multi-leg options backtest for a strategy, following the pseudocode in backtest-fno.md
+func (e *BacktestEngine) executeFOBacktestInMemory(
+	strategy *strategyDto.StrategyResponse,
+	indexData []*instrumentModel.Instrument, // Spot/index OHLC data
+	optionChainData map[string][]*instrumentModel.Instrument, // Option chain by strike+type
+	run *model.Run,
+) ([]*model.Position, *model.RunMetrics) {
+	// Start tracking execution time
+	functionStartTime := time.Now()
+
+	var (
+		openPositions  []*model.Position // All legs
+		positionStatus string
+		entryLegs      []struct {
+			Contract *instrumentModel.Instrument
+			Leg      *strategyDto.OptionLegResponse
+		}
+		exitReason string
+		totalPnL   float64
+		capital    = strategy.Capital
+	)
+
+	// 1. ENTRY FLOW: Loop through indexData (spot/index OHLC)
+	for _, indexOHLC := range indexData {
+		now := indexOHLC.Timestamp
+
+		// Check entry window
+		if !e.marketHoursUtil.IsWithinEntryTimeWindow(now, strategy, run.InstrumentMaster.Exchange) {
+			continue
+		}
+
+		// Evaluate entry condition (on index/spot)
+		evalContext := parser.NewEvaluationContext(nil)
+		evalContext.Strategy = strategy
+		evalContext.Data = e.toDataContext([]*instrumentModel.Instrument{indexOHLC})
+		entryOk := parser.Execute(strategy.EntryExpression, evalContext)
+		if !entryOk {
+			continue
+		}
+
+		// Resolve contracts for each leg
+		entryLegs = nil
+		for _, leg := range strategy.OptionLegs {
+			// Determine strike price
+			strike := 0.0
+			if leg.StrikePrice != nil {
+				strike = *leg.StrikePrice
+			} else if string(leg.StrikeType) == "ATM" {
+				strike = e.resolveATMStrike(indexOHLC.Close, optionChainData)
+			}
+			// Find contract in optionChainData
+			contracts := optionChainData[string(*leg.OptionType)]
+			var contract *instrumentModel.Instrument
+			for _, c := range contracts {
+				// Instrument does not have StrikePrice, so use Close as a proxy for now
+				if c.Close == strike {
+					contract = c
+					break
+				}
+			}
+			if contract == nil {
+				continue // skip this leg if contract not found
+			}
+			entryLegs = append(entryLegs, struct {
+				Contract *instrumentModel.Instrument
+				Leg      *strategyDto.OptionLegResponse
+			}{contract, leg})
+		}
+		if len(entryLegs) == 0 {
+			continue
+		}
+
+		// Execute trades for all legs
+		for _, leg := range entryLegs {
+			pos := model.NewPosition(
+				run.ID,
+				model.Long, // Only buy for now
+				leg.Contract.Close,
+				now,
+				"ENTRY",
+				float64(leg.Leg.TotalLot),
+			)
+			pos.State = model.Entered
+			pos.EntryPriceOrder = &leg.Contract.Close
+			pos.EntryTimeOrder = &now
+			pos.EntrySignal = "ENTRY"
+			// Option meta (store as needed in custom fields or use EntrySignal/ExitSignal for debugging)
+			openPositions = append(openPositions, pos)
+		}
+		positionStatus = "ENTERED"
+		break // Only one multi-leg position at a time
+	}
+
+	// 2. EXIT FLOW: Monitor exit conditions if position is entered
+	if positionStatus == "ENTERED" && len(openPositions) > 0 {
+		for _, indexOHLC := range indexData {
+			now := indexOHLC.Timestamp
+
+			// Get premium data for all entered positions (legs)
+			legPremiums := make([]float64, len(openPositions))
+			for i, pos := range openPositions {
+				// Find premium for this contract at current time
+				var premium float64
+				// We don't have OptionType/StrikePrice fields, so match by EntryPriceOrder and time
+				for _, cList := range optionChainData {
+					for _, c := range cList {
+						if pos.EntryPriceOrder != nil && c.Timestamp.Equal(now) && c.Close == *pos.EntryPriceOrder {
+							premium = c.Close
+							break
+						}
+					}
+				}
+				legPremiums[i] = premium
+			}
+
+			// Calculate cumulative P&L across all legs
+			totalPnL = 0
+			for i, pos := range openPositions {
+				entry := 0.0
+				if pos.EntryPriceOrder != nil {
+					entry = *pos.EntryPriceOrder
+				}
+				pnl := (legPremiums[i] - entry) * pos.PositionSize
+				totalPnL += pnl
+			}
+
+			// Check exit conditions (priority order)
+			exitTriggered := false
+			// 1. Strategy-based exit on spot
+			evalContext := parser.NewEvaluationContext(nil)
+			evalContext.Strategy = strategy
+			evalContext.Data = e.toDataContext([]*instrumentModel.Instrument{indexOHLC})
+			if parser.Execute(strategy.ExitExpression, evalContext) {
+				exitTriggered = true
+				exitReason = string(model.ExitReasonSignal)
+			} else if strategy.TargetProfit > 0 && totalPnL >= strategy.TargetProfit {
+				exitTriggered = true
+				exitReason = string(model.ExitReasonTargetProfit)
+			} else if strategy.StopLoss > 0 && totalPnL <= -strategy.StopLoss {
+				exitTriggered = true
+				exitReason = string(model.ExitReasonStopLoss)
+			} else if strategy.TrailingStopLoss > 0 && e.checkTrailingStopLoss(totalPnL, strategy) {
+				exitTriggered = true
+				exitReason = string(model.ExitReasonTrailingStopLoss)
+			} else if strategy.TradeType != nil && *strategy.TradeType == strategyModel.TradeType("MIS") && e.marketHoursUtil.IsMISEndOfDayHit(now, run.InstrumentMaster.Exchange) {
+				exitTriggered = true
+				exitReason = string(model.ExitReasonMISSquareOff)
+			}
+
+			if exitTriggered {
+				// Close all legs
+				for i, pos := range openPositions {
+					pos.Exit(
+						legPremiums[i],
+						now,
+						legPremiums[i],
+						now,
+						"EXIT",
+						exitReason,
+						0,
+						nil,
+					)
+				}
+				positionStatus = "EXITED"
+				break
+			}
+		}
+	}
+
+	// 3. Metrics calculation and return
+	closedPositions := make([]*model.Position, 0)
+	for _, pos := range openPositions {
+		if pos.State == model.Exited {
+			closedPositions = append(closedPositions, pos)
+		}
+	}
+	metrics := e.calculateMetrics(closedPositions, 0, *capital, run)
+
+	functionEndTime := time.Now()
+	println("\tFO Backtest in-memory calculation completed:",
+		len(closedPositions), "positions generated,",
+		"\n\t\tStart:", functionStartTime.Format(time.RFC3339),
+		"\n\t\tEnd:", functionEndTime.Format(time.RFC3339),
+		"\n\t\tDuration:", functionEndTime.Sub(functionStartTime).String())
+
+	return closedPositions, metrics
+}
+
+// resolveStrikePriceByType resolves the actual strike price based on the strike type and option type
+// Supports strike types like: ATM, ITM1, ITM2, ITM3, OTM1, OTM2, OTM3, etc.
+func (e *BacktestEngine) resolveStrikePriceByType(
+	strikeType string,
+	optionType string,
+	spotPrice float64,
+	strikeOffset float64,
+) (float64, error) {
+	if strikeOffset <= 0 {
+		strikeOffset = 50 // Default strike offset
+	}
+
+	// Handle ATM (At-The-Money)
+	if strikeType == "ATM" {
+		return e.NearestStrikeByOffset(spotPrice, strikeOffset), nil
+	}
+
+	// Parse strike type to extract ITM/OTM and the level (1, 2, 3, etc.)
+	var isITM bool
+	var level int
+	var err error
+
+	if len(strikeType) >= 4 {
+		prefix := strikeType[:3]
+		levelStr := strikeType[3:]
+
+		switch prefix {
+		case "ITM":
+			isITM = true
+		case "OTM":
+			isITM = false
+		default:
+			return 0, fmt.Errorf("unsupported strike type prefix: %s", prefix)
+		}
+
+		// Parse the level number
+		if levelStr == "" {
+			level = 1 // Default to level 1 if no number specified
+		} else {
+			level, err = strconv.Atoi(levelStr)
+			if err != nil {
+				return 0, fmt.Errorf("invalid strike level: %s", levelStr)
+			}
+		}
+	} else {
+		return 0, fmt.Errorf("invalid strike type format: %s", strikeType)
+	}
+
+	// Calculate the strike based on ITM/OTM, level, and option type
+	var targetStrike float64
+
+	if optionType == "CE" || optionType == "CALL" {
+		// For Call options:
+		// ITM: strike < spot (lower strikes are more ITM)
+		// OTM: strike > spot (higher strikes are more OTM)
+		if isITM {
+			targetStrike = spotPrice - (float64(level) * strikeOffset)
+		} else {
+			targetStrike = spotPrice + (float64(level) * strikeOffset)
+		}
+	} else if optionType == "PE" || optionType == "PUT" {
+		// For Put options:
+		// ITM: strike > spot (higher strikes are more ITM)
+		// OTM: strike < spot (lower strikes are more OTM)
+		if isITM {
+			targetStrike = spotPrice + (float64(level) * strikeOffset)
+		} else {
+			targetStrike = spotPrice - (float64(level) * strikeOffset)
+		}
+	} else {
+		return 0, fmt.Errorf("unsupported option type: %s", optionType)
+	}
+
+	// Round to nearest strike using the offset
+	finalStrike := e.NearestStrikeByOffset(targetStrike, strikeOffset)
+
+	return finalStrike, nil
+}
+
+// NearestStrikeByOffset returns the nearest strike price for a given currentPrice and offset.
+// For example, currentPrice=22540, offset=100 => 22500; currentPrice=22540, offset=50 => 22550
+func (e *BacktestEngine) NearestStrikeByOffset(currentPrice float64, offset float64) float64 {
+	if offset <= 0 {
+		return currentPrice
+	}
+	remainder := math.Mod(currentPrice, offset)
+	if remainder < offset/2 {
+		return currentPrice - remainder
+	}
+	return currentPrice - remainder + offset
+}
+
+// resolveATMStrike returns the nearest ATM strike from option chain data
+func (e *BacktestEngine) resolveATMStrike(spot float64, optionChainData map[string][]*instrumentModel.Instrument) float64 {
+	// Find the closest strike in the option chain (assume CE chain exists)
+	minDiff := 1e9
+	atm := 0.0
+	for _, contracts := range optionChainData {
+		for _, c := range contracts {
+			diff := math.Abs(c.Close - spot)
+			if diff < minDiff {
+				minDiff = diff
+				atm = c.Close
+			}
+		}
+	}
+	return atm
+}
+
+// checkTrailingStopLoss checks if trailing stop loss is hit (stub, expand as needed)
+func (e *BacktestEngine) checkTrailingStopLoss(totalPnL float64, strategy *strategyDto.StrategyResponse) bool {
+	// Implement trailing logic as per strategy.TrailingStopLossParams
+	// For now, just a stub
+	return false
+}
+
+// calculateStrikePriceForLeg calculates the strike price for a leg based on its configuration
+func (e *BacktestEngine) calculateStrikePriceForLeg(leg *strategyDto.OptionLegResponse, spotPrice float64) (float64, error) {
+	// If strike price is explicitly set, use it
+	if leg.StrikePrice != nil {
+		return *leg.StrikePrice, nil
+	}
+
+	// Calculate based on strike type
+	switch string(leg.StrikeType) {
+	case "ATM":
+		// For ATM, use nearest strike based on common offsets (50, 100, etc.)
+		return e.NearestStrikeByOffset(spotPrice, 50), nil // Default offset of 50
+	case "ITM":
+		// In-the-money: for CE, strike < spot; for PE, strike > spot
+		offset := 100.0 // Default offset
+		if leg.OptionType != nil && string(*leg.OptionType) == "CE" {
+			return e.NearestStrikeByOffset(spotPrice-offset, 50), nil
+		}
+		return e.NearestStrikeByOffset(spotPrice+offset, 50), nil
+	case "OTM":
+		// Out-of-the-money: for CE, strike > spot; for PE, strike < spot
+		offset := 100.0 // Default offset
+		if leg.OptionType != nil && string(*leg.OptionType) == "CE" {
+			return e.NearestStrikeByOffset(spotPrice+offset, 50), nil
+		}
+		return e.NearestStrikeByOffset(spotPrice-offset, 50), nil
+	case "FIXED":
+		// Fixed strike should have been provided in StrikePrice field
+		if leg.StrikePrice != nil {
+			return *leg.StrikePrice, nil
+		}
+		return 0, fmt.Errorf("fixed strike type specified but no strike price provided")
+	default:
+		return 0, fmt.Errorf("unsupported strike type: %s", leg.StrikeType)
+	}
+}
+
+// calculateExpiryDateForLeg calculates the expiry date for a leg based on its configuration
+func (e *BacktestEngine) calculateExpiryDateForLeg(leg *strategyDto.OptionLegResponse, currentTime time.Time) (time.Time, error) {
+	// If expiry date is explicitly set, use it
+	if leg.ExpiryDate != nil {
+		return *leg.ExpiryDate, nil
+	}
+
+	// Calculate based on expiry type and cycle
+	now := currentTime
+
+	switch leg.ExpiryType {
+	case "WEEKLY":
+		return e.calculateWeeklyExpiry(now, leg.ExpiryCycle)
+	case "MONTHLY":
+		return e.calculateMonthlyExpiry(now, leg.ExpiryCycle)
+	case "QUARTERLY":
+		return e.calculateQuarterlyExpiry(now, leg.ExpiryCycle)
+	default:
+		return time.Time{}, fmt.Errorf("unsupported expiry type: %s", leg.ExpiryType)
+	}
+}
+
+// calculateWeeklyExpiry calculates weekly expiry based on cycle
+func (e *BacktestEngine) calculateWeeklyExpiry(currentTime time.Time, cycle strategyModel.ExpiryCycle) (time.Time, error) {
+	// Find the next Thursday (weekly expiry day)
+	daysUntilThursday := (int(time.Thursday) - int(currentTime.Weekday()) + 7) % 7
+	if daysUntilThursday == 0 && currentTime.Hour() >= 15 { // After 3:30 PM on Thursday
+		daysUntilThursday = 7
+	}
+
+	nextThursday := currentTime.AddDate(0, 0, daysUntilThursday)
+
+	switch cycle {
+	case "CURRENT":
+		return nextThursday, nil
+	case "NEXT":
+		return nextThursday.AddDate(0, 0, 7), nil
+	case "NEXT2":
+		return nextThursday.AddDate(0, 0, 14), nil
+	default:
+		return time.Time{}, fmt.Errorf("unsupported expiry cycle: %s", cycle)
+	}
+}
+
+// calculateMonthlyExpiry calculates monthly expiry (last Thursday of the month)
+func (e *BacktestEngine) calculateMonthlyExpiry(currentTime time.Time, cycle strategyModel.ExpiryCycle) (time.Time, error) {
+	var targetMonth time.Time
+
+	switch cycle {
+	case "CURRENT":
+		targetMonth = currentTime
+	case "NEXT":
+		targetMonth = currentTime.AddDate(0, 1, 0)
+	case "NEXT2":
+		targetMonth = currentTime.AddDate(0, 2, 0)
+	default:
+		return time.Time{}, fmt.Errorf("unsupported expiry cycle: %s", cycle)
+	}
+
+	// Find last Thursday of the target month
+	lastDay := time.Date(targetMonth.Year(), targetMonth.Month()+1, 0, 15, 30, 0, 0, targetMonth.Location())
+	daysBack := (int(lastDay.Weekday()) - int(time.Thursday) + 7) % 7
+	lastThursday := lastDay.AddDate(0, 0, -daysBack)
+
+	return lastThursday, nil
+}
+
+// calculateQuarterlyExpiry calculates quarterly expiry (last Thursday of March, June, September, December)
+func (e *BacktestEngine) calculateQuarterlyExpiry(currentTime time.Time, cycle strategyModel.ExpiryCycle) (time.Time, error) {
+	quarterMonths := []time.Month{time.March, time.June, time.September, time.December}
+	currentQuarter := -1
+
+	// Find current quarter
+	for i, month := range quarterMonths {
+		if currentTime.Month() <= month {
+			currentQuarter = i
+			break
+		}
+	}
+
+	if currentQuarter == -1 {
+		currentQuarter = 0 // December passed, next is March
+	}
+
+	var targetMonth time.Month
+	var targetYear int = currentTime.Year()
+
+	switch cycle {
+	case "CURRENT":
+		targetMonth = quarterMonths[currentQuarter]
+		if currentTime.Month() > targetMonth {
+			targetYear++
+			targetMonth = quarterMonths[0] // March of next year
+		}
+	case "NEXT":
+		nextQuarter := (currentQuarter + 1) % 4
+		targetMonth = quarterMonths[nextQuarter]
+		if nextQuarter <= currentQuarter {
+			targetYear++
+		}
+	case "NEXT2":
+		next2Quarter := (currentQuarter + 2) % 4
+		targetMonth = quarterMonths[next2Quarter]
+		if next2Quarter <= currentQuarter {
+			targetYear++
+		}
+	default:
+		return time.Time{}, fmt.Errorf("unsupported expiry cycle: %s", cycle)
+	}
+
+	// Find last Thursday of the target month
+	lastDay := time.Date(targetYear, targetMonth+1, 0, 15, 30, 0, 0, currentTime.Location())
+	daysBack := (int(lastDay.Weekday()) - int(time.Thursday) + 7) % 7
+	lastThursday := lastDay.AddDate(0, 0, -daysBack)
+
+	return lastThursday, nil
 }

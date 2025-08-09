@@ -190,7 +190,8 @@ func (s *optionLegService) UpdateOptionLeg(ctx context.Context, id uuid.UUID, re
 		optionLeg.Asset = *req.Asset
 	}
 	if req.ExchangeSecurityID != nil {
-		optionLeg.ExchangeSecurityID = req.ExchangeSecurityID
+		exchangeSecurityID := int(*req.ExchangeSecurityID)
+		optionLeg.ExchangeSecurityID = &exchangeSecurityID
 	}
 	if req.InstrumentType != nil {
 		optionLeg.InstrumentType = *req.InstrumentType
