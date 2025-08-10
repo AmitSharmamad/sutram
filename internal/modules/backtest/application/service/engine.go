@@ -1372,6 +1372,7 @@ func (e *BacktestEngine) EnterFnOPosition(
 	legSpotData map[uuid.UUID][]*instrumentModel.Instrument,
 	spotTimestamp time.Time,
 	strategyResp *strategyDto.StrategyResponse,
+	run *model.Run,
 ) error {
 	// for each of the legs, resolve the contract
 	for _, leg := range strategyResp.OptionLegs {
@@ -1389,40 +1390,69 @@ func (e *BacktestEngine) EnterFnOPosition(
 
 		// Use legSpotPrice for processing (placeholder to avoid unused variable error)
 		if legSpotPrice != nil {
-			// Determine strike offset (use TickOffset if available, otherwise default to 50)
-			strikeOffset := 100.0 // Default value
-
-			// Resolve the strike price based on strike type and option type
-			strikePrice, err := e.resolveStrikePriceByType(
-				string(leg.StrikeType),
-				string(*leg.OptionType),
-				*legSpotPrice,
-				strikeOffset,
-			)
+			// Resolve option contract for this leg
+			optionContract, err := e.resolveOptionContract(ctx, leg, *legSpotPrice, spotTimestamp)
 			if err != nil {
 				// Handle error appropriately - for now, log and continue
 				continue
 			}
 
-			// TODO: Use the resolved strikePrice for further processing
-			_ = strikePrice
+			// Take position in the above resolved optionContract based on leg
+			if optionContract != nil {
+				// For option contracts, we need to fetch the actual option data to get the premium
+				// For now, we'll use a default premium price until we get actual option data
+				premiumPrice := 120.0 // This should be fetched from actual option data
 
-			// Resolve options contracts from master using the calculated strike price
-			optionContract, err := e.instrumentService.ResolveOptionsContractsFromMaster(
-				ctx,
-				strikePrice,
-				string(*leg.OptionType), // Convert OptionType enum to string
-				spotTimestamp,           // Use current timestamp as expiry (or calculate proper expiry)
-				leg.ExchangeSecurityID,  // Parent security ID
-			)
-			if err != nil {
-				// Handle error appropriately - for now, log and continue
-				continue
+				// Calculate the total quantity based on leg configuration
+				lotSize := 1
+				if leg.LotSize != nil {
+					lotSize = *leg.LotSize
+				}
+				totalQuantity := float64(leg.TotalLot * lotSize)
+
+				// Determine the direction based on leg action type (BUY/SELL)
+				var direction model.Direction
+				if leg.ActionType == "BUY" {
+					direction = model.Long
+				} else {
+					direction = model.Short
+				}
+
+				// Create a new position for this option leg
+				strikeDisplay := *legSpotPrice // Default to spot price if no strike available
+				if optionContract != nil {
+					// Use contract's strike if available, otherwise use leg spot price
+					strikeDisplay = *legSpotPrice // This would be replaced with actual strike from contract
+				}
+
+				position := model.NewPosition(
+					run.ID,
+					direction,
+					premiumPrice,
+					spotTimestamp,
+					fmt.Sprintf("Option Leg: %s %s %.2f Strike", string(*leg.OptionType), string(leg.ActionType), strikeDisplay),
+					totalQuantity,
+				)
+
+				// Simulate order execution with the premium price
+				entryFees := 0.0 // Calculate actual fees based on brokerage
+				position.Enter(premiumPrice, spotTimestamp, entryFees, nil)
+
+				// Store the option contract ExchangeSecurityID in the entry signal for reference
+				position.EntrySignal = fmt.Sprintf("Option Contract ID: %d, %s",
+					optionContract.ExchangeSecurityID, position.EntrySignal)
+
+				// Store position in run for later processing
+				if run.Positions == nil {
+					run.Positions = make([]*model.Position, 0)
+				}
+				run.Positions = append(run.Positions, position)
+
+				fmt.Printf("Created position for leg %s: %s %s %.0f lots at premium %.2f\n",
+					leg.ID, string(*leg.OptionType), string(leg.ActionType),
+					totalQuantity/float64(lotSize), premiumPrice)
 			}
 
-			// TODO: Use the resolved optionContract for further processing
-			_ = optionContract
-			// take the position in this optionContract based on leg
 		}
 	}
 
@@ -1433,23 +1463,38 @@ func (e *BacktestEngine) EnterFnOPosition(
 func (e *BacktestEngine) executeTimeBasedStrategy(
 	ctx context.Context,
 	strategyResp *strategyDto.StrategyResponse,
-) error {
+	runGroup *model.RunGroup,
+) ([]*model.Run, error) {
 	// getLegSpotData
 	legSpotData, err := e.getLegSpotData(ctx, strategyResp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get the ingredients: 'entry_time', 'exit_time'
+	// NOTE: fix the below issue, it has to EntryTime and ExitTime
 	entry_time := strategyResp.EntryStartTime
 	entryTimeAsTime := timeUtil.TimeOnlyToTime(entry_time)
 
 	exitTime := strategyResp.EntryEndTime
 	exitTimeAsTime := timeUtil.TimeOnlyToTime(exitTime)
 
+	// Track the current active run and its positions
+	var activeRun *model.Run = nil
+
+	// Track all closed runs instead of persisting to database
+	var closedRuns []*model.Run
+
 	// Iterate from start date to end date in 1-minute timeframe from 9:15 to 3:29
 	currentDate := *strategyResp.StartDate
 	endDate := *strategyResp.EndDate
+
+	// Create IST timezone (UTC+5:30)
+	ist, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		// Fallback to fixed offset if location loading fails
+		ist = time.FixedZone("IST", 5*60*60+30*60)
+	}
 
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		// Skip weekends (Saturday = 6, Sunday = 0)
@@ -1458,26 +1503,62 @@ func (e *BacktestEngine) executeTimeBasedStrategy(
 			continue
 		}
 
-		// Start time: 9:15 AM
-		startTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 9, 15, 0, 0, currentDate.Location())
-		// End time: 3:29 PM
-		endTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 15, 29, 0, 0, currentDate.Location())
+		// Start time: 9:15 AM IST
+		startTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 9, 15, 0, 0, ist)
+		// End time: 3:29 PM IST
+		endTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 15, 29, 0, 0, ist)
 
 		// Iterate in 1-minute intervals
 		for currentTime := startTime; currentTime.Before(endTime) || currentTime.Equal(endTime); currentTime = currentTime.Add(time.Minute) {
-			// Entry check
-			if currentTime.Hour() == entryTimeAsTime.Hour() && currentTime.Minute() == entryTimeAsTime.Minute() {
+			// *************************Remove This**************************
+			entryTimeAsHour := entryTimeAsTime.Hour()
+			entryTimeAsMinute := entryTimeAsTime.Minute()
+
+			exitTimeAsHour := exitTimeAsTime.Hour()
+			exitTimeAsMinute := exitTimeAsTime.Minute()
+
+			currentTimeAsHour := currentTime.Hour()
+			currentTimeAsMinute := currentTime.Minute()
+
+			fmt.Print(exitTimeAsHour, ":", exitTimeAsMinute, " - ", entryTimeAsHour, ":", entryTimeAsMinute, " - ", currentTimeAsHour, ":", currentTimeAsMinute, "\n")
+			// *************************Remove This**************************
+
+			// Entry check - only if no active run exists
+			if activeRun == nil && currentTime.Hour() == entryTimeAsTime.Hour() && currentTime.Minute() == entryTimeAsTime.Minute() {
 				// resolve the contract for all legs
-				err := e.EnterFnOPosition(ctx, legSpotData, currentTime, strategyResp)
+				// Create a run object for this entry
+				activeRun = model.NewRun(
+					runGroup.ID,
+					strategyResp.ID,
+					"NSE", // Default exchange, should be determined from strategy or instruments
+					0,     // InstrumentID will be set based on the option contracts
+					model.Backtest,
+					1, // Default quantity, should be determined from strategy
+					currentTime,
+					currentTime.Add(24*time.Hour), // End time, adjust as needed
+					nil,                           // InstrumentMaster will be set in EnterFnOPosition
+				)
+
+				// Pass the run object to EnterFnOPosition to create and enter all positions
+				err := e.EnterFnOPosition(ctx, legSpotData, currentTime, strategyResp, activeRun)
 				if err != nil {
 					// Handle error appropriately - for now, log and continue
+					println("Error entering FnO position:", err.Error())
+					activeRun = nil // Reset run on error
 					continue
 				}
+
+				// Log successful entry
+				println("Created new run with", len(activeRun.Positions), "positions at", currentTime.Format(time.RFC3339))
 			}
 
-			// Exit check
-			if currentTime.Hour() == exitTimeAsTime.Hour() && currentTime.Minute() == exitTimeAsTime.Minute() {
-				// Exit all the legs
+			// Exit check - only if we have an active run with positions
+			if activeRun != nil && len(activeRun.Positions) > 0 && currentTime.Hour() == exitTimeAsTime.Hour() && currentTime.Minute() == exitTimeAsTime.Minute() {
+				// Exit all positions using the new function
+				e.ExitFnOPosition(activeRun, currentTime, &closedRuns)
+
+				// Reset active run after adding to closed runs
+				activeRun = nil
 			}
 		}
 
@@ -1485,24 +1566,69 @@ func (e *BacktestEngine) executeTimeBasedStrategy(
 		currentDate = currentDate.AddDate(0, 0, 1)
 	}
 
-	// Take the position based on what's there in each of the legs
-	return nil
+	// Handle any remaining open run at the end of backtest period
+	if activeRun != nil && len(activeRun.Positions) > 0 {
+		// Force exit all remaining positions at market close
+		lastTimestamp := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 15, 30, 0, 0, ist)
+
+		for _, position := range activeRun.Positions {
+			if position.State == model.Entered {
+				exitPrice := *position.EntryPriceOrder // Simplified
+				exitFees := 0.0
+
+				position.Exit(
+					exitPrice,
+					lastTimestamp,
+					exitPrice,
+					lastTimestamp,
+					"END_OF_BACKTEST_EXIT",
+					string(model.ExitReasonSignal),
+					exitFees,
+					nil,
+				)
+			}
+		}
+
+		// Mark run as ended and persist
+		activeRun.EndedTime = &lastTimestamp
+		activeRun.State = model.Ended
+
+		// Skip metrics calculation for now
+
+		// Add final completed run to closedRuns list instead of persisting
+		closedRuns = append(closedRuns, activeRun)
+		println("Added final run with ID:", activeRun.ID.String(), "to closed runs list")
+		println("Total closed runs:", len(closedRuns))
+
+		activeRun = nil
+	}
+
+	// Log final summary of completed runs
+	println("Time-based strategy execution completed.")
+	println("Total closed runs collected:", len(closedRuns))
+	for i, run := range closedRuns {
+		println(fmt.Sprintf("Run %d: ID=%s, Positions=%d, State=%s",
+			i+1, run.ID.String(), len(run.Positions), string(run.State)))
+	}
+
+	return closedRuns, nil
 }
 
 // executeConditionalStrategy executes a conditional strategy by evaluating entry/exit expressions against market data
 func (e *BacktestEngine) executeConditionalStrategy(
 	ctx context.Context,
 	strategyResp *strategyDto.StrategyResponse,
-) error {
+	runGroup *model.RunGroup,
+) ([]*model.Run, error) {
 	// getLegSpotData
 	legSpotData, err := e.getLegSpotData(ctx, strategyResp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get the main instrument data for conditional evaluation
 	if len(strategyResp.Instruments) == 0 {
-		return fmt.Errorf("no instruments found in strategy")
+		return nil, fmt.Errorf("no instruments found in strategy")
 	}
 
 	instrumentID := strategyResp.Instruments[0]
@@ -1514,7 +1640,7 @@ func (e *BacktestEngine) executeConditionalStrategy(
 		string(strategyResp.ChartTimeframe),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to get main instrument data: %w", err)
+		return nil, fmt.Errorf("failed to get main instrument data: %w", err)
 	}
 
 	// Initialize evaluation context
@@ -1525,14 +1651,14 @@ func (e *BacktestEngine) executeConditionalStrategy(
 	// Extract indicators from both entry and exit expressions
 	entryIndicators, err := parser.ExtractIndicators(strategyResp.EntryExpression)
 	if err != nil {
-		return fmt.Errorf("error extracting indicators from entry expression: %w", err)
+		return nil, fmt.Errorf("error extracting indicators from entry expression: %w", err)
 	}
 
 	var exitIndicators []parser.IndicatorInfo
 	if strategyResp.ExitExpression != "" {
 		exitIndicators, err = parser.ExtractIndicators(strategyResp.ExitExpression)
 		if err != nil {
-			return fmt.Errorf("error extracting indicators from exit expression: %w", err)
+			return nil, fmt.Errorf("error extracting indicators from exit expression: %w", err)
 		}
 	}
 
@@ -1547,7 +1673,7 @@ func (e *BacktestEngine) executeConditionalStrategy(
 		calculator := parser.GetIndFactory(indicator.Name)
 		uniqueString, err := calculator.GenerateIndicatorKey(indicator.Arguments, evalContext)
 		if err != nil {
-			return fmt.Errorf("error generating unique key for indicator: %w", err)
+			return nil, fmt.Errorf("error generating unique key for indicator: %w", err)
 		}
 
 		// Skip if already calculated (avoid duplicates between entry and exit)
@@ -1608,8 +1734,21 @@ func (e *BacktestEngine) executeConditionalStrategy(
 			}
 
 			if entryResult {
+				// Create a run object for this entry
+				run := model.NewRun(
+					runGroup.ID,
+					strategyResp.ID,
+					"NSE", // Default exchange, should be determined from strategy or instruments
+					0,     // InstrumentID will be set based on the option contracts
+					model.Backtest,
+					1, // Default quantity, should be determined from strategy
+					timestamp,
+					timestamp.Add(24*time.Hour), // End time, adjust as needed
+					nil,                         // InstrumentMaster will be set in EnterFnOPosition
+				)
+
 				// Enter position - resolve contracts for all legs
-				err := e.EnterFnOPosition(ctx, legSpotData, timestamp, strategyResp)
+				err := e.EnterFnOPosition(ctx, legSpotData, timestamp, strategyResp, run)
 				if err != nil {
 					// Handle error appropriately - for now, log and continue
 					continue
@@ -1618,7 +1757,7 @@ func (e *BacktestEngine) executeConditionalStrategy(
 				// Create a position record (simplified)
 				position := &model.Position{
 					ID:               uuid.New(),
-					RunID:            uuid.New(), // In actual implementation, this should come from a run
+					RunID:            run.ID, // Use the actual run ID
 					State:            model.NotEntered,
 					Direction:        model.Long, // This should be determined by strategy logic
 					EntryPriceSignal: 0.0,        // This should be determined from current price
@@ -1653,7 +1792,8 @@ func (e *BacktestEngine) executeConditionalStrategy(
 		}
 	}
 
-	return nil
+	// For conditional strategy, return empty runs list as it's not implemented yet
+	return []*model.Run{}, nil
 }
 
 func (e *BacktestEngine) simpleBackTestFlow(
@@ -1661,7 +1801,7 @@ func (e *BacktestEngine) simpleBackTestFlow(
 	strategyID uuid.UUID,
 	userID uuid.UUID,
 ) (interface{}, error) {
-	// 0 Get the necessary ingredients
+	// 0.0 Get the necessary ingredients
 
 	// 0.1 Get the strategy data along with legs
 	strategyResp, err := e.strategyService.GetStrategyByID(ctx, strategyID, userID)
@@ -1672,18 +1812,52 @@ func (e *BacktestEngine) simpleBackTestFlow(
 		return nil, fmt.Errorf("Not a F&O strategy")
 	}
 
+	// 0.2 Create a run group in memory
+	runGroup := model.NewRunGroup(strategyID)
+	var closedRuns []*model.Run
+
 	if strategyResp.StrategyType == strategyModel.Conditional {
 		// Backtest conditional strategy
-		err := e.executeConditionalStrategy(ctx, strategyResp)
+		runs, err := e.executeConditionalStrategy(ctx, strategyResp, runGroup)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute conditional strategy: %w", err)
 		}
+		closedRuns = runs
 	} else if strategyResp.StrategyType == strategyModel.TimeBased {
 		// Backtest time-based strategy
-		err := e.executeTimeBasedStrategy(ctx, strategyResp)
+		runs, err := e.executeTimeBasedStrategy(ctx, strategyResp, runGroup)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute time-based strategy: %w", err)
 		}
+		closedRuns = runs
+	}
+
+	// Persist the run group record
+	if err := e.runGroupRepo.Create(ctx, runGroup); err != nil {
+		return nil, err
+	}
+
+	// Persist the run records
+	if len(closedRuns) > 0 {
+		if err := e.runRepo.BulkCreate(ctx, closedRuns); err != nil {
+			return nil, fmt.Errorf("failed to persist run records: %w", err)
+		}
+		println("Successfully persisted", len(closedRuns), "run records")
+	}
+
+	// Persist the position records
+	allPositions := make([]*model.Position, 0)
+	for _, run := range closedRuns {
+		if len(run.Positions) > 0 {
+			allPositions = append(allPositions, run.Positions...)
+		}
+	}
+
+	if len(allPositions) > 0 {
+		if err := e.positionRepo.BulkCreate(ctx, allPositions); err != nil {
+			return nil, fmt.Errorf("failed to persist position records: %w", err)
+		}
+		println("Successfully persisted", len(allPositions), "position records")
 	}
 
 	return strategyResp, nil
@@ -2146,4 +2320,100 @@ func (e *BacktestEngine) calculateQuarterlyExpiry(currentTime time.Time, cycle s
 	lastThursday := lastDay.AddDate(0, 0, -daysBack)
 
 	return lastThursday, nil
+}
+
+// ExitFnOPosition exits all positions in the active run at the specified time
+func (e *BacktestEngine) ExitFnOPosition(
+	activeRun *model.Run,
+	currentTime time.Time,
+	closedRuns *[]*model.Run,
+) {
+	// Exit all positions in the active run
+	for _, position := range activeRun.Positions {
+		if position.State == model.Entered {
+			// Get current premium price for exit (using entry price for now, should be fetched from market data)
+			exitPrice := *position.EntryPriceOrder // Simplified - should get current market premium
+			exitFees := 0.0
+
+			// Exit the position
+			position.Exit(
+				exitPrice,
+				currentTime,
+				exitPrice,
+				currentTime,
+				"TIME_BASED_EXIT",              // Exit signal
+				string(model.ExitReasonSignal), // Exit reason
+				exitFees,
+				nil,
+			)
+
+			println("Exited position for leg at", currentTime.Format(time.RFC3339), "- P&L:", *position.NetProfitLoss)
+		}
+	}
+
+	// Mark run as ended
+	runEndTime := currentTime
+	activeRun.EndedTime = &runEndTime
+	activeRun.State = model.Ended
+
+	// Skip metrics calculation for now
+
+	// Add completed run to closedRuns list instead of persisting
+	*closedRuns = append(*closedRuns, activeRun)
+	println("Added completed run with ID:", activeRun.ID.String(), "to closed runs list")
+	println("Total closed runs:", len(*closedRuns))
+}
+
+// resolveOptionContract resolves the option contract for a given leg with spot price and timestamp
+func (e *BacktestEngine) resolveOptionContract(
+	ctx context.Context,
+	leg *strategyDto.OptionLegResponse,
+	legSpotPrice float64,
+	spotTimestamp time.Time,
+) (*instrumentModel.InstrumentMaster, error) {
+	// Determine strike offset (use TickOffset if available, otherwise default to 50)
+	strikeOffset := 100.0 // Default value
+
+	// if leg.InstrumentType == strategyModel.InstrumentType("FUTURES") {
+	// 	// Logic to resolve futures contract
+	// } else if leg.InstrumentType == strategyModel.InstrumentType("OPTIONS") {
+	// 	// Logic to resolve options contract
+	// }
+
+	// Resolve the strike price based on strike type and option type
+	strikePrice, err := e.resolveStrikePriceByType(
+		string(leg.StrikeType),
+		string(*leg.OptionType),
+		legSpotPrice,
+		strikeOffset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve strike price: %w", err)
+	}
+
+	// Resolve options contracts from master using the calculated strike price
+	var parentSecurityID *int32
+	if leg.ExchangeSecurityID != nil {
+		id := int32(*leg.ExchangeSecurityID)
+		parentSecurityID = &id
+	}
+
+	// Calculate the actual expiry date based on ExpiryType and ExpiryCycle
+	expiryDate, err := e.calculateExpiryDateForLeg(leg, spotTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate expiry date: %w", err)
+	}
+
+	optionContract, err := e.instrumentService.ResolveOptionsContractsFromMaster(
+		ctx,
+		strikePrice,
+		string(*leg.OptionType), // Convert OptionType enum to string
+		expiryDate,              // Use calculated expiry date
+		parentSecurityID,        // Parent security ID
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve option contract: %w", err)
+	}
+
+	return optionContract, nil
 }

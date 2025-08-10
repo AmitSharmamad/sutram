@@ -41,7 +41,7 @@ func (row *InstrumentMasterRow) toModel() (*model.InstrumentMaster, error) {
 		return nil, fmt.Errorf("invalid segment value: %s", row.Segment)
 	}
 
-	instrumentType, instrumentTypeValid := model.ParseInstrumentType(row.ExchInstrumentType)
+	instrumentType, instrumentTypeValid := model.ParseInstrumentType(row.Name)
 	if !instrumentTypeValid {
 		return nil, fmt.Errorf("invalid instrument type value: %s", row.ExchInstrumentType)
 	}
@@ -280,9 +280,9 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 	if !instrumentMaster.Segment.IsValid() {
 		return fmt.Errorf("invalid segment: %s", instrumentMaster.Segment)
 	}
-	if !instrumentMaster.ExchInstrumentType.IsValid() {
-		return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
-	}
+	// if !instrumentMaster.ExchInstrumentType.IsValid() {
+	// 	return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
+	// }
 
 	query := `
 		INSERT INTO instrument_master (
@@ -343,9 +343,9 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 	if !instrumentMaster.Segment.IsValid() {
 		return fmt.Errorf("invalid segment: %s", instrumentMaster.Segment)
 	}
-	if !instrumentMaster.ExchInstrumentType.IsValid() {
-		return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
-	}
+	// if !instrumentMaster.ExchInstrumentType.IsValid() {
+	// 	return fmt.Errorf("invalid instrument type: %s", instrumentMaster.ExchInstrumentType)
+	// }
 
 	// Note: ClickHouse typically doesn't support direct updates as in traditional RDBMS
 	// This is a simplified version assuming you're using ALTER TABLE UPDATE syntax

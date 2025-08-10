@@ -361,6 +361,18 @@ func (s *InstrumentService) ResolveOptionsContractsFromMaster(
 	expiry time.Time,
 	parentSecurityID *int32,
 ) (*model.InstrumentMaster, error) {
+
+	// NOTE: below code is dummy, remove it once the development is done
+	instrumentExchangeDummy, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, 71950)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instrument exchange dummy: %w", err)
+	}
+
+	if instrumentExchangeDummy != nil {
+		return instrumentExchangeDummy, nil
+	}
+
+	// NOTE: Actual code starts from here
 	parentSecurityIDValue := int64(*parentSecurityID)
 	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, parentSecurityIDValue)
 	if err != nil {
