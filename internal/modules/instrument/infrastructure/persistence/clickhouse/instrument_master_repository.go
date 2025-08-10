@@ -14,24 +14,26 @@ import (
 
 // InstrumentMasterRow represents the database row structure
 type InstrumentMasterRow struct {
-	ExchangeSecurityID int32      `db:"exchange_security_id"`
-	Exchange           string     `db:"exchange"`
-	Segment            string     `db:"segment"`
-	Symbol             string     `db:"symbol"`
-	Name               string     `db:"instrument"`
-	StartDate          time.Time  `db:"start_date"`
-	Expiry             *time.Time `db:"expiry"`
-	ExmExchID          int32      `db:"exm_exch_id"`
-	SmstSecurityID     int32      `db:"smst_security_id"`
-	InstrumentName     string     `db:"instrument_name"`
-	TradingSymbol      string     `db:"trading_symbol"`
-	LotUnits           int32      `db:"lot_units"`
-	StrikePrice        float64    `db:"strike_price"`
-	OptionType         string     `db:"option_type"`
-	TickSize           float64    `db:"tick_size"`
-	ExpiryFlag         string     `db:"expiry_flag"`
-	ExchInstrumentType string     `db:"exch_instrument_type"`
-	SymbolName         string     `db:"symbol_name"`
+	ExchangeSecurityID   int32      `db:"exchange_security_id"`
+	Exchange             string     `db:"exchange"`
+	Segment              string     `db:"segment"`
+	Symbol               string     `db:"symbol"`
+	Name                 string     `db:"instrument"`
+	StartDate            time.Time  `db:"start_date"`
+	Expiry               *time.Time `db:"expiry"`
+	ExmExchID            int32      `db:"exm_exch_id"`
+	SmstSecurityID       int32      `db:"smst_security_id"`
+	InstrumentName       string     `db:"instrument_name"`
+	TradingSymbol        string     `db:"trading_symbol"`
+	LotUnits             int32      `db:"lot_units"`
+	StrikePrice          float64    `db:"strike_price"`
+	OptionType           string     `db:"option_type"`
+	TickSize             float64    `db:"tick_size"`
+	ExpiryFlag           string     `db:"expiry_flag"`
+	ExchInstrumentType   string     `db:"exch_instrument_type"`
+	SymbolName           string     `db:"symbol_name"`
+	UnderlyingSecurityID int32      `db:"underlying_security_id"`
+	UnderlyingSymbol     string     `db:"underlying_symbol"`
 }
 
 // toModel converts a database row to the domain model
@@ -47,24 +49,26 @@ func (row *InstrumentMasterRow) toModel() (*model.InstrumentMaster, error) {
 	}
 
 	return &model.InstrumentMaster{
-		ExchangeSecurityID: row.ExchangeSecurityID,
-		Exchange:           row.Exchange,
-		Segment:            segment,
-		Symbol:             row.Symbol,
-		Name:               row.Name,
-		StartDate:          row.StartDate,
-		Expiry:             row.Expiry,
-		ExmExchID:          row.ExmExchID,
-		SmstSecurityID:     row.SmstSecurityID,
-		InstrumentName:     row.InstrumentName,
-		TradingSymbol:      row.TradingSymbol,
-		LotUnits:           row.LotUnits,
-		StrikePrice:        row.StrikePrice,
-		OptionType:         row.OptionType,
-		TickSize:           row.TickSize,
-		ExpiryFlag:         row.ExpiryFlag,
-		ExchInstrumentType: instrumentType,
-		SymbolName:         row.SymbolName,
+		ExchangeSecurityID:   row.ExchangeSecurityID,
+		Exchange:             row.Exchange,
+		Segment:              segment,
+		Symbol:               row.Symbol,
+		Name:                 row.Name,
+		StartDate:            row.StartDate,
+		Expiry:               row.Expiry,
+		ExmExchID:            row.ExmExchID,
+		SmstSecurityID:       row.SmstSecurityID,
+		InstrumentName:       row.InstrumentName,
+		TradingSymbol:        row.TradingSymbol,
+		LotUnits:             row.LotUnits,
+		StrikePrice:          row.StrikePrice,
+		OptionType:           row.OptionType,
+		TickSize:             row.TickSize,
+		ExpiryFlag:           row.ExpiryFlag,
+		ExchInstrumentType:   instrumentType,
+		SymbolName:           row.SymbolName,
+		UnderlyingSecurityID: row.UnderlyingSecurityID,
+		UnderlyingSymbol:     row.UnderlyingSymbol,
 	}, nil
 }
 
@@ -114,7 +118,9 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityID(ctx context.Contex
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		WHERE exchange_security_id = ?
 		LIMIT 1
@@ -150,7 +156,9 @@ func (r *InstrumentMasterRepository) FindBySymbol(ctx context.Context, symbol st
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		WHERE symbol = ?
 		LIMIT 1
@@ -186,7 +194,9 @@ func (r *InstrumentMasterRepository) FindByExchange(ctx context.Context, exchang
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		WHERE exchange = ?
 	`
@@ -226,7 +236,9 @@ func (r *InstrumentMasterRepository) FindBySegment(ctx context.Context, segment 
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		WHERE segment = ?
 	`
@@ -261,7 +273,9 @@ func (r *InstrumentMasterRepository) FindAll(ctx context.Context) ([]*model.Inst
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 	`
 
@@ -303,8 +317,10 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(
@@ -328,6 +344,8 @@ func (r *InstrumentMasterRepository) Create(ctx context.Context, instrumentMaste
 		instrumentMaster.ExpiryFlag,
 		instrumentMaster.ExchInstrumentType.String(),
 		instrumentMaster.SymbolName,
+		instrumentMaster.UnderlyingSecurityID,
+		instrumentMaster.UnderlyingSymbol,
 	)
 
 	if err != nil {
@@ -367,7 +385,9 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 			tick_size = ?,
 			expiry_flag = ?,
 			exch_instrument_type = ?,
-			symbol_name = ?
+			symbol_name = ?,
+			underlying_security_id = ?,
+			underlying_symbol = ?
 		WHERE exchange_security_id = ?
 	`
 
@@ -391,6 +411,8 @@ func (r *InstrumentMasterRepository) Update(ctx context.Context, instrumentMaste
 		instrumentMaster.ExpiryFlag,
 		instrumentMaster.ExchInstrumentType.String(),
 		instrumentMaster.SymbolName,
+		instrumentMaster.UnderlyingSecurityID,
+		instrumentMaster.UnderlyingSymbol,
 		instrumentMaster.ExchangeSecurityID,
 	)
 
@@ -464,7 +486,9 @@ func (r *InstrumentMasterRepository) FindWithFilters(ctx context.Context, exchan
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		%s
 		LIMIT ? OFFSET ?
@@ -530,7 +554,9 @@ func (r *InstrumentMasterRepository) FindByExchangeSecurityIDs(ctx context.Conte
 			tick_size,
 			expiry_flag,
 			exch_instrument_type,
-			symbol_name
+			symbol_name,
+			underlying_security_id,
+			underlying_symbol
 		FROM sutram.instrument_master
 		WHERE exchange_security_id IN (%s)
 	`, strings.Join(placeholders, ","))
@@ -553,6 +579,7 @@ func (r *InstrumentMasterRepository) FindOptionsContracts(
 	exchange string,
 	symbol string,
 	expiryDate time.Time,
+	underlyingSecurityID int32,
 ) ([]*model.InstrumentMaster, error) {
 	query := `
 	       SELECT
@@ -573,13 +600,16 @@ func (r *InstrumentMasterRepository) FindOptionsContracts(
 		       tick_size,
 		       expiry_flag,
 		       exch_instrument_type,
-		       symbol_name
+		       symbol_name,
+		       underlying_security_id,
+		       underlying_symbol
 	       FROM sutram.instrument_master
 	       WHERE strike_price = ?
 		 AND option_type = ?
 		 AND exchange = ?
 		 AND toMonth(expiry) = ?
 		 AND symbol like ?
+		 AND underlying_security_id = ?
 	       ORDER BY expiry DESC, strike_price ASC
        `
 
@@ -593,9 +623,64 @@ func (r *InstrumentMasterRepository) FindOptionsContracts(
 		exchange,
 		month,
 		symbolLike,
+		underlyingSecurityID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error querying options contracts: %w", err)
+	}
+
+	return instruments, nil
+}
+
+// FindFuturesContracts resolves futures contracts from
+// instrument_master table using provided filters
+func (r *InstrumentMasterRepository) FindFuturesContracts(
+	ctx context.Context,
+	exchange string,
+	expiryDate time.Time,
+	underlyingSecurityID int32,
+) ([]*model.InstrumentMaster, error) {
+	query := `
+	       SELECT
+		       exchange_security_id,
+		       exchange,
+		       segment,
+		       symbol,
+		       instrument,
+		       start_date,
+		       expiry,
+		       exm_exch_id,
+		       smst_security_id,
+		       instrument_name,
+		       trading_symbol,
+		       lot_units,
+		       strike_price,
+		       option_type,
+		       tick_size,
+		       expiry_flag,
+		       exch_instrument_type,
+		       symbol_name,
+		       underlying_security_id,
+		       underlying_symbol
+	       FROM sutram.instrument_master
+	       WHERE segment = 'Derivatives'
+		 AND instrument like '%%Futures%'
+	     AND exchange = ?
+		 AND toMonth(expiry) = ?
+		 AND underlying_security_id = ?
+	       ORDER BY expiry DESC
+       `
+
+	month := int(expiryDate.Month())
+
+	var instruments []*model.InstrumentMaster
+	err := r.db.SelectContext(ctx, &instruments, query,
+		exchange,
+		month,
+		underlyingSecurityID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error querying futures contracts: %w", err)
 	}
 
 	return instruments, nil

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -1391,7 +1392,7 @@ func (e *BacktestEngine) EnterFnOPosition(
 		// Use legSpotPrice for processing (placeholder to avoid unused variable error)
 		if legSpotPrice != nil {
 			// Resolve option contract for this leg
-			optionContract, err := e.resolveOptionContract(ctx, leg, *legSpotPrice, spotTimestamp)
+			optionContract, err := e.resolveFnOContract(ctx, leg, *legSpotPrice, spotTimestamp)
 			if err != nil {
 				// Handle error appropriately - for now, log and continue
 				continue
@@ -1420,10 +1421,8 @@ func (e *BacktestEngine) EnterFnOPosition(
 
 				// Create a new position for this option leg
 				strikeDisplay := *legSpotPrice // Default to spot price if no strike available
-				if optionContract != nil {
-					// Use contract's strike if available, otherwise use leg spot price
-					strikeDisplay = *legSpotPrice // This would be replaced with actual strike from contract
-				}
+				// Use contract's strike if available, otherwise use leg spot price
+				// strikeDisplay would be replaced with actual strike from contract when available
 
 				position := model.NewPosition(
 					run.ID,
@@ -1497,8 +1496,8 @@ func (e *BacktestEngine) executeTimeBasedStrategy(
 	}
 
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
-		// Skip weekends (Saturday = 6, Sunday = 0)
-		if currentDate.Weekday() == time.Saturday || currentDate.Weekday() == time.Sunday {
+		// Skip if the current weekday is not allowed (includes weekends and strategy-specific trading days)
+		if !e.isAllowedTradingDay(currentDate.Weekday(), strategyResp.TradingDays) {
 			currentDate = currentDate.AddDate(0, 0, 1)
 			continue
 		}
@@ -1709,8 +1708,8 @@ func (e *BacktestEngine) executeConditionalStrategy(
 
 	// Iterate through each timestamp and evaluate conditions
 	for i, timestamp := range timestamps {
-		// Skip weekends (Saturday = 6, Sunday = 0)
-		if timestamp.Weekday() == time.Saturday || timestamp.Weekday() == time.Sunday {
+		// Skip if the current weekday is not allowed (includes weekends and strategy-specific trading days)
+		if !e.isAllowedTradingDay(timestamp.Weekday(), strategyResp.TradingDays) {
 			continue
 		}
 
@@ -2364,8 +2363,8 @@ func (e *BacktestEngine) ExitFnOPosition(
 	println("Total closed runs:", len(*closedRuns))
 }
 
-// resolveOptionContract resolves the option contract for a given leg with spot price and timestamp
-func (e *BacktestEngine) resolveOptionContract(
+// resolveFnOContract resolves the option contract for a given leg with spot price and timestamp
+func (e *BacktestEngine) resolveFnOContract(
 	ctx context.Context,
 	leg *strategyDto.OptionLegResponse,
 	legSpotPrice float64,
@@ -2374,11 +2373,21 @@ func (e *BacktestEngine) resolveOptionContract(
 	// Determine strike offset (use TickOffset if available, otherwise default to 50)
 	strikeOffset := 100.0 // Default value
 
-	// if leg.InstrumentType == strategyModel.InstrumentType("FUTURES") {
-	// 	// Logic to resolve futures contract
-	// } else if leg.InstrumentType == strategyModel.InstrumentType("OPTIONS") {
-	// 	// Logic to resolve options contract
-	// }
+	if leg.InstrumentType == strategyModel.InstrumentType("FUTURES") {
+		// Logic to resolve futures contract
+		futuresContract, err := e.instrumentService.ResolveFuturesContractsFromMaster(
+			ctx,
+			strings.TrimSpace(string(leg.Exchange)),
+			*leg.ExpiryDate,
+			leg.ExchangeSecurityID,
+		)
+		if err != nil {
+			// Handle error appropriately - for now, log and continue
+			fmt.Printf("Error resolving futures contract: %v\n", err)
+		}
+		// Use futuresContract here if needed
+		_ = futuresContract // Temporary to avoid unused variable error
+	}
 
 	// Resolve the strike price based on strike type and option type
 	strikePrice, err := e.resolveStrikePriceByType(
@@ -2416,4 +2425,39 @@ func (e *BacktestEngine) resolveOptionContract(
 	}
 
 	return optionContract, nil
+}
+
+// isAllowedTradingDay checks if a given weekday is allowed according to the strategy's trading days configuration
+func (e *BacktestEngine) isAllowedTradingDay(weekday time.Weekday, tradingDays strategyModel.TradingDayArray) bool {
+	// If no trading days are specified, allow all weekdays (Monday to Friday)
+	if len(tradingDays) == 0 {
+		return weekday >= time.Monday && weekday <= time.Friday
+	}
+
+	// Map time.Weekday to TradingDay string
+	var dayStr strategyModel.TradingDay
+	switch weekday {
+	case time.Monday:
+		dayStr = strategyModel.Monday
+	case time.Tuesday:
+		dayStr = strategyModel.Tuesday
+	case time.Wednesday:
+		dayStr = strategyModel.Wednesday
+	case time.Thursday:
+		dayStr = strategyModel.Thursday
+	case time.Friday:
+		dayStr = strategyModel.Friday
+	default:
+		// Weekends are never allowed
+		return false
+	}
+
+	// Check if the current weekday is in the allowed trading days
+	for _, allowedDay := range tradingDays {
+		if allowedDay == dayStr {
+			return true
+		}
+	}
+
+	return false
 }

@@ -47,5 +47,13 @@ type InstrumentMasterRepository interface {
 		exchange string,
 		symbol string,
 		expiryDate time.Time,
+		underlyingSecurityID int32,
+	) ([]*model.InstrumentMaster, error)
+
+	FindFuturesContracts(
+		ctx context.Context,
+		exchange string,
+		expiryDate time.Time,
+		underlyingSecurityID int32,
 	) ([]*model.InstrumentMaster, error)
 }

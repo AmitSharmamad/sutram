@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS sutram.instrument_master (
     tick_size Float64,
     expiry_flag String,
     exch_instrument_type String,
-    symbol_name String
+    symbol_name String,
+    underlying_security_id Int32,
+    underlying_symbol String,
 ) ENGINE = MergeTree()
 ORDER BY (exchange, segment);

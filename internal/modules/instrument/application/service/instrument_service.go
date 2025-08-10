@@ -382,10 +382,32 @@ func (s *InstrumentService) ResolveOptionsContractsFromMaster(
 	instrumentExchange := instrumentMaster.Exchange
 
 	instruments, err := s.instrumentMasterRepo.FindOptionsContracts(
-		ctx, strikePrice, optionType, instrumentExchange, instrumentMasterSymbol, expiry,
+		ctx, strikePrice, optionType, instrumentExchange, instrumentMasterSymbol, expiry, *parentSecurityID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving options contracts from master: %w", err)
+	}
+	if len(instruments) == 1 {
+		return instruments[0], nil
+	} else {
+		return nil, ErrInstrumentNotFound
+	}
+}
+
+// ResolveFuturesContractsFromMaster resolves futures contracts from instrument_master using provided filters
+func (s *InstrumentService) ResolveFuturesContractsFromMaster(
+	ctx context.Context,
+	exchange string,
+	expiry time.Time,
+	parentSecurityID *int32,
+) (*model.InstrumentMaster, error) {
+
+	// NOTE: Actual code starts from here
+	instruments, err := s.instrumentMasterRepo.FindFuturesContracts(
+		ctx, exchange, expiry, *parentSecurityID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving futures contracts from master: %w", err)
 	}
 	if len(instruments) == 1 {
 		return instruments[0], nil
