@@ -1,4 +1,4 @@
-.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate build-client client build-test-client test-client test-simulator test-live deployment web live
+.PHONY: build run clean test-coverage test coverage docker-build docker-run db-start db-stop build-live run-live build-migrate migrate migrate-instrument-sample migrate-instrument-test migrate-instrument-full migrate-instrument-append migrate-help build-client client build-test-client test-client test-simulator test-live deployment web live
 
 # Clean build artifacts
 clean:
@@ -79,6 +79,19 @@ migrate:
 	@go build -o bin/migrate cmd/migrate/main.go
 	@echo "Running the data migration tool..."
 	@./bin/migrate
+
+# Instrument Master Migration Commands
+migrate-instrument-full:
+	@echo "Building and running full instrument master migration..."
+	@go build -o bin/migrate cmd/migrate/main.go
+	@echo "Running full instrument master migration..."
+	@./bin/migrate -type=instrument-master -csv=data/api-scrip-master-detailed_AUG11.csv -truncate=true
+
+migrate-instrument-append:
+	@echo "Building and appending instrument master data (no truncate)..."
+	@go build -o bin/migrate cmd/migrate/main.go
+	@echo "Appending instrument master data..."
+	@./bin/migrate -type=instrument-master -csv=data/api-scrip-master-detailed_AUG11.csv
 
 # ---------------------------------------------------------- #
 

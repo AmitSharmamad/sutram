@@ -1,0 +1,88 @@
+{
+  "column_mapping": {
+    "SECURITY_ID": "exchange_security_id",
+    "EXCH_ID": "exchange",
+    "SEGMENT": "segment",
+    "SYMBOL_NAME": "symbol",
+    "INSTRUMENT": "instrument",
+    "DISPLAY_NAME": "instrument_name",
+    "ISIN": "isin",
+    "UNDERLYING_SECURITY_ID": "underlying_security_id",
+    "UNDERLYING_SYMBOL": "underlying_symbol",
+    "SM_EXPIRY_DATE": "expiry",
+    "EXPIRY_FLAG": "expiry_flag",
+    "LOT_SIZE": "lot_units",
+    "TICK_SIZE": "tick_size",
+    "STRIKE_PRICE": "strike_price",
+    "OPTION_TYPE": "option_type",
+    "INSTRUMENT_TYPE": "instrument_type",
+    "BRACKET_FLAG": "bracket_flag",
+    "COVER_FLAG": "cover_flag",
+    "ASM_GSM_FLAG": "asm_gsm_flag",
+    "BUY_SELL_INDICATOR": "buy_sell_indicator",
+    "BUY_CO_MIN_MARGIN_PER": "buy_co_min_margin_per",
+    "SELL_CO_MIN_MARGIN_PER": "sell_co_min_margin_per",
+    "BUY_CO_SL_RANGE_MAX_PERC": "buy_co_sl_range_max_perc",
+    "SELL_CO_SL_RANGE_MIN_PERC": "sell_co_sl_range_min_perc",
+    "BUY_BO_MIN_MARGIN_PER": "buy_bo_min_margin_per",
+    "BUY_BO_SL_RANGE_MAX_PERC": "buy_bo_sl_range_max_perc",
+    "SELL_BO_SL_MIN_RANGE": "sell_bo_sl_min_range",
+    "BUY_BO_PROFIT_RANGE_MAX_PERC": "buy_bo_profit_range_max_perc",
+    "SELL_BO_PROFIT_RANGE_MAX_PERC": "sell_bo_profit_range_max_perc",
+    "MTF_LEVERAGE": "mtf_leverage"
+  },
+  "enum_mappings": {
+    "exchange": {
+      "NSE": "NSE",
+      "BSE": "BSE",
+      "MCX": "MCX"
+    },
+    "segment": {
+      "E": "EQUITY",
+      "D": "DERIVATIVE",
+      "M": "COMMODITY",
+      "C": "CURRENCY",
+      "I": "INDEX"
+    },
+    "instrument": {
+      "EQUITY": "EQUITY_CASH",
+      "FUTSTK": "STOCK_FUTURES",
+      "OPTSTK": "STOCK_OPTIONS",
+      "INDEX": "INDEX",
+      "FUTIDX": "INDEX_FUTURES",
+      "OPTIDX": "INDEX_OPTIONS",
+      "FUTCOM": "COMMODITY_FUTURES",
+      "OPTFUT": "COMMODITY_OPTIONS",
+      "FUTCUR": "CURRENCY_FUTURES",
+      "OPTCUR": "CURRENCY_OPTIONS"
+    },
+    "bracket_flag": {
+      "N": "N",
+      "Y": "Y"
+    },
+    "cover_flag": {
+      "N": "N",
+      "Y": "Y"
+    },
+    "asm_gsm_flag": {
+      "N": "N",
+      "R": "R",
+      "Y": "Y"
+    }
+  },
+  "sutram_columns_not_in_dhan": [
+    "created_at",
+    "updated_at"
+  ],
+  "dhan_columns_not_in_sutram": [
+    "SERIES",
+    "ASM_GSM_CATEGORY",
+    "SELL_CO_SL_RANGE_MAX_PERC",
+    "BUY_CO_SL_RANGE_MIN_PERC",
+    "SELL_BO_MIN_MARGIN_PER",
+    "SELL_BO_SL_RANGE_MAX_PERC",
+    "BUY_BO_SL_RANGE_MIN_PERC",
+    "BUY_BO_PROFIT_RANGE_MIN_PERC",
+    "SELL_BO_PROFIT_RANGE_MIN_PERC"
+  ]
+}
