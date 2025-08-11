@@ -149,7 +149,7 @@ func (c *InstrumentController) GetInstrumentByExchangeSecurityID(ctx *gin.Contex
 func (c *InstrumentController) GetInstrumentMasterByExchangeSecurityID(ctx *gin.Context) {
 	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("exchange_security_id")
-	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
@@ -159,7 +159,7 @@ func (c *InstrumentController) GetInstrumentMasterByExchangeSecurityID(ctx *gin.
 	}
 
 	// Get the instrument master
-	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), exchangeSecurityID)
+	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -288,12 +288,12 @@ func (c *InstrumentController) GetInstrumentMastersByExchangeSecurityIDs(ctx *gi
 		return
 	}
 
-	// Split the comma-separated IDs and parse them to int64
+	// Split the comma-separated IDs and parse them to int32
 	idStrings := strings.Split(idsParam, ",")
-	exchangeSecurityIDs := make([]int64, 0, len(idStrings))
+	exchangeSecurityIDs := make([]int32, 0, len(idStrings))
 
 	for _, idStr := range idStrings {
-		exchangeSecurityID, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 64)
+		exchangeSecurityID, err := strconv.ParseInt(strings.TrimSpace(idStr), 10, 32)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 				Success: false,
@@ -301,7 +301,7 @@ func (c *InstrumentController) GetInstrumentMastersByExchangeSecurityIDs(ctx *gi
 			})
 			return
 		}
-		exchangeSecurityIDs = append(exchangeSecurityIDs, exchangeSecurityID)
+		exchangeSecurityIDs = append(exchangeSecurityIDs, int32(exchangeSecurityID))
 	}
 
 	// Get instrument masters
@@ -466,25 +466,55 @@ func (c *InstrumentController) CreateInstrumentMaster(ctx *gin.Context) {
 
 	// Create instrument master from request
 	instrumentMaster := &model.InstrumentMaster{
-		Exchange:             req.Exchange,
-		Segment:              req.Segment,
-		Symbol:               req.Symbol,
-		Name:                 req.Name,
-		StartDate:            req.StartDate,
-		Expiry:               req.Expiry,
-		ExmExchID:            req.ExmExchID,
-		SmstSecurityID:       req.SmstSecurityID,
-		InstrumentName:       req.InstrumentName,
-		TradingSymbol:        req.TradingSymbol,
-		LotUnits:             req.LotUnits,
-		StrikePrice:          req.StrikePrice,
-		OptionType:           req.OptionType,
-		TickSize:             req.TickSize,
-		ExpiryFlag:           req.ExpiryFlag,
-		ExchInstrumentType:   req.ExchInstrumentType,
-		SymbolName:           req.SymbolName,
+		// Core Identification Columns
+		ExchangeSecurityID: req.ExchangeSecurityID,
+		Exchange:           req.Exchange,
+		Segment:            req.Segment,
+		Symbol:             req.Symbol,
+		Instrument:         req.Instrument,
+
+		// Trading Symbols and Names
+		InstrumentName: req.InstrumentName,
+
+		// ISIN and Security Identifiers
+		ISIN:                 req.ISIN,
 		UnderlyingSecurityID: req.UnderlyingSecurityID,
 		UnderlyingSymbol:     req.UnderlyingSymbol,
+
+		// Date and Expiry Information
+		Expiry:     req.Expiry,
+		ExpiryFlag: req.ExpiryFlag,
+
+		// Trading Parameters
+		LotUnits:       req.LotUnits,
+		TickSize:       req.TickSize,
+		StrikePrice:    req.StrikePrice,
+		OptionType:     req.OptionType,
+		InstrumentType: req.InstrumentType,
+
+		// Order Type Availability Flags
+		BracketFlag: req.BracketFlag,
+		CoverFlag:   req.CoverFlag,
+
+		// Surveillance and Trading Permissions
+		AsmGsmFlag:       req.AsmGsmFlag,
+		BuySellIndicator: req.BuySellIndicator,
+
+		// Cover Order Margin Parameters
+		BuyCoMinMarginPer:    req.BuyCoMinMarginPer,
+		SellCoMinMarginPer:   req.SellCoMinMarginPer,
+		BuyCoSlRangeMaxPerc:  req.BuyCoSlRangeMaxPerc,
+		SellCoSlRangeMinPerc: req.SellCoSlRangeMinPerc,
+
+		// Bracket Order Parameters
+		BuyBoMinMarginPer:        req.BuyBoMinMarginPer,
+		BuyBoSlRangeMaxPerc:      req.BuyBoSlRangeMaxPerc,
+		SellBoSlMinRange:         req.SellBoSlMinRange,
+		BuyBoProfitRangeMaxPerc:  req.BuyBoProfitRangeMaxPerc,
+		SellBoProfitRangeMaxPerc: req.SellBoProfitRangeMaxPerc,
+
+		// Margin Trading Facility
+		MtfLeverage: req.MtfLeverage,
 	}
 
 	// Create the instrument master
@@ -511,7 +541,7 @@ func (c *InstrumentController) CreateInstrumentMaster(ctx *gin.Context) {
 func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("exchange_security_id")
-	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
@@ -530,7 +560,7 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	}
 
 	// Get existing instrument master
-	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), exchangeSecurityID)
+	instrumentMaster, err := c.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, dto.ApiResponse{
 			Success: false,
@@ -549,53 +579,83 @@ func (c *InstrumentController) UpdateInstrumentMaster(ctx *gin.Context) {
 	if req.Symbol != "" {
 		instrumentMaster.Symbol = req.Symbol
 	}
-	if req.Name != "" {
-		instrumentMaster.Name = req.Name
-	}
-	if !req.StartDate.IsZero() {
-		instrumentMaster.StartDate = req.StartDate
-	}
-	if req.Expiry != nil {
-		instrumentMaster.Expiry = req.Expiry
-	}
-	if req.ExmExchID != 0 {
-		instrumentMaster.ExmExchID = req.ExmExchID
-	}
-	if req.SmstSecurityID != 0 {
-		instrumentMaster.SmstSecurityID = req.SmstSecurityID
+	if req.Instrument != "" {
+		instrumentMaster.Instrument = req.Instrument
 	}
 	if req.InstrumentName != "" {
 		instrumentMaster.InstrumentName = req.InstrumentName
 	}
-	if req.TradingSymbol != "" {
-		instrumentMaster.TradingSymbol = req.TradingSymbol
+	if req.ISIN != "" {
+		instrumentMaster.ISIN = req.ISIN
+	}
+	if req.UnderlyingSecurityID != nil {
+		instrumentMaster.UnderlyingSecurityID = req.UnderlyingSecurityID
+	}
+	if req.UnderlyingSymbol != nil {
+		instrumentMaster.UnderlyingSymbol = req.UnderlyingSymbol
+	}
+	if !req.Expiry.IsZero() {
+		instrumentMaster.Expiry = req.Expiry
+	}
+	if req.ExpiryFlag != nil {
+		instrumentMaster.ExpiryFlag = req.ExpiryFlag
 	}
 	if req.LotUnits != 0 {
 		instrumentMaster.LotUnits = req.LotUnits
 	}
-	if req.StrikePrice != 0 {
-		instrumentMaster.StrikePrice = req.StrikePrice
-	}
-	if req.OptionType != "" {
-		instrumentMaster.OptionType = req.OptionType
-	}
 	if req.TickSize != 0 {
 		instrumentMaster.TickSize = req.TickSize
 	}
-	if req.ExpiryFlag != "" {
-		instrumentMaster.ExpiryFlag = req.ExpiryFlag
+	if req.StrikePrice != nil {
+		instrumentMaster.StrikePrice = req.StrikePrice
 	}
-	if req.ExchInstrumentType != "" {
-		instrumentMaster.ExchInstrumentType = req.ExchInstrumentType
+	if req.OptionType != nil {
+		instrumentMaster.OptionType = req.OptionType
 	}
-	if req.SymbolName != "" {
-		instrumentMaster.SymbolName = req.SymbolName
+	if req.InstrumentType != "" {
+		instrumentMaster.InstrumentType = req.InstrumentType
 	}
-	if req.UnderlyingSecurityID != 0 {
-		instrumentMaster.UnderlyingSecurityID = req.UnderlyingSecurityID
+	if req.BracketFlag != "" {
+		instrumentMaster.BracketFlag = req.BracketFlag
 	}
-	if req.UnderlyingSymbol != "" {
-		instrumentMaster.UnderlyingSymbol = req.UnderlyingSymbol
+	if req.CoverFlag != "" {
+		instrumentMaster.CoverFlag = req.CoverFlag
+	}
+	if req.AsmGsmFlag != "" {
+		instrumentMaster.AsmGsmFlag = req.AsmGsmFlag
+	}
+	if req.BuySellIndicator != "" {
+		instrumentMaster.BuySellIndicator = req.BuySellIndicator
+	}
+	if req.BuyCoMinMarginPer != nil {
+		instrumentMaster.BuyCoMinMarginPer = req.BuyCoMinMarginPer
+	}
+	if req.SellCoMinMarginPer != nil {
+		instrumentMaster.SellCoMinMarginPer = req.SellCoMinMarginPer
+	}
+	if req.BuyCoSlRangeMaxPerc != nil {
+		instrumentMaster.BuyCoSlRangeMaxPerc = req.BuyCoSlRangeMaxPerc
+	}
+	if req.SellCoSlRangeMinPerc != nil {
+		instrumentMaster.SellCoSlRangeMinPerc = req.SellCoSlRangeMinPerc
+	}
+	if req.BuyBoMinMarginPer != nil {
+		instrumentMaster.BuyBoMinMarginPer = req.BuyBoMinMarginPer
+	}
+	if req.BuyBoSlRangeMaxPerc != nil {
+		instrumentMaster.BuyBoSlRangeMaxPerc = req.BuyBoSlRangeMaxPerc
+	}
+	if req.SellBoSlMinRange != nil {
+		instrumentMaster.SellBoSlMinRange = req.SellBoSlMinRange
+	}
+	if req.BuyBoProfitRangeMaxPerc != nil {
+		instrumentMaster.BuyBoProfitRangeMaxPerc = req.BuyBoProfitRangeMaxPerc
+	}
+	if req.SellBoProfitRangeMaxPerc != nil {
+		instrumentMaster.SellBoProfitRangeMaxPerc = req.SellBoProfitRangeMaxPerc
+	}
+	if req.MtfLeverage != nil {
+		instrumentMaster.MtfLeverage = req.MtfLeverage
 	}
 
 	// Update the instrument master
@@ -651,7 +711,7 @@ func (c *InstrumentController) DeleteInstrument(ctx *gin.Context) {
 func (c *InstrumentController) DeleteInstrumentMaster(ctx *gin.Context) {
 	// Get exchange security ID from URL parameter
 	idParam := ctx.Param("exchange_security_id")
-	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 64)
+	exchangeSecurityID, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, dto.ApiResponse{
 			Success: false,
@@ -661,7 +721,7 @@ func (c *InstrumentController) DeleteInstrumentMaster(ctx *gin.Context) {
 	}
 
 	// Delete the instrument master
-	err = c.instrumentService.DeleteInstrumentMaster(ctx.Request.Context(), exchangeSecurityID)
+	err = c.instrumentService.DeleteInstrumentMaster(ctx.Request.Context(), int32(exchangeSecurityID))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, dto.ApiResponse{
 			Success: false,
@@ -700,25 +760,58 @@ func masterModelToDTO(master *model.InstrumentMaster) *dto.InstrumentMasterDTO {
 	}
 
 	return &dto.InstrumentMasterDTO{
-		ExchangeSecurityID:   master.ExchangeSecurityID,
-		Exchange:             master.Exchange,
-		Segment:              master.Segment,
-		Symbol:               master.Symbol,
-		Name:                 master.Name,
-		StartDate:            master.StartDate,
-		Expiry:               master.Expiry,
-		ExmExchID:            master.ExmExchID,
-		SmstSecurityID:       master.SmstSecurityID,
-		InstrumentName:       master.InstrumentName,
-		TradingSymbol:        master.TradingSymbol,
-		LotUnits:             master.LotUnits,
-		StrikePrice:          master.StrikePrice,
-		OptionType:           master.OptionType,
-		TickSize:             master.TickSize,
-		ExpiryFlag:           master.ExpiryFlag,
-		ExchInstrumentType:   master.ExchInstrumentType,
-		SymbolName:           master.SymbolName,
+		// Core Identification Columns
+		ExchangeSecurityID: master.ExchangeSecurityID,
+		Exchange:           master.Exchange,
+		Segment:            master.Segment,
+		Symbol:             master.Symbol,
+		Instrument:         master.Instrument,
+
+		// Trading Symbols and Names
+		InstrumentName: master.InstrumentName,
+
+		// ISIN and Security Identifiers
+		ISIN:                 master.ISIN,
 		UnderlyingSecurityID: master.UnderlyingSecurityID,
 		UnderlyingSymbol:     master.UnderlyingSymbol,
+
+		// Date and Expiry Information
+		Expiry:     master.Expiry,
+		ExpiryFlag: master.ExpiryFlag,
+
+		// Trading Parameters
+		LotUnits:       master.LotUnits,
+		TickSize:       master.TickSize,
+		StrikePrice:    master.StrikePrice,
+		OptionType:     master.OptionType,
+		InstrumentType: master.InstrumentType,
+
+		// Order Type Availability Flags
+		BracketFlag: master.BracketFlag,
+		CoverFlag:   master.CoverFlag,
+
+		// Surveillance and Trading Permissions
+		AsmGsmFlag:       master.AsmGsmFlag,
+		BuySellIndicator: master.BuySellIndicator,
+
+		// Cover Order Margin Parameters
+		BuyCoMinMarginPer:    master.BuyCoMinMarginPer,
+		SellCoMinMarginPer:   master.SellCoMinMarginPer,
+		BuyCoSlRangeMaxPerc:  master.BuyCoSlRangeMaxPerc,
+		SellCoSlRangeMinPerc: master.SellCoSlRangeMinPerc,
+
+		// Bracket Order Parameters
+		BuyBoMinMarginPer:        master.BuyBoMinMarginPer,
+		BuyBoSlRangeMaxPerc:      master.BuyBoSlRangeMaxPerc,
+		SellBoSlMinRange:         master.SellBoSlMinRange,
+		BuyBoProfitRangeMaxPerc:  master.BuyBoProfitRangeMaxPerc,
+		SellBoProfitRangeMaxPerc: master.SellBoProfitRangeMaxPerc,
+
+		// Margin Trading Facility
+		MtfLeverage: master.MtfLeverage,
+
+		// Metadata
+		CreatedAt: master.CreatedAt,
+		UpdatedAt: master.UpdatedAt,
 	}
 }

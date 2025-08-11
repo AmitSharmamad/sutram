@@ -252,7 +252,7 @@ func (s *deploymentService) CreateDeployment(ctx context.Context, req *dto.Creat
 	}
 
 	// Get instrument master data for this deployment
-	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 	if err == nil && instrumentMaster != nil {
 		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 	}
@@ -333,7 +333,7 @@ func (s *deploymentService) GetDeploymentByID(ctx context.Context, id uuid.UUID,
 	}
 
 	// Get instrument master data for this deployment
-	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 	if err == nil && instrumentMaster != nil {
 		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 	}
@@ -369,7 +369,7 @@ func (s *deploymentService) GetUserDeployments(ctx context.Context, userID uuid.
 		}
 
 		// Get instrument master data for this deployment
-		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 		if err == nil && instrumentMaster != nil {
 			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
@@ -402,7 +402,7 @@ func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, us
 			}
 
 			// Get instrument master data for this deployment
-			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 			if err == nil && instrumentMaster != nil {
 				response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 			}
@@ -459,7 +459,7 @@ func (s *deploymentService) GetUserDeploymentsWithFilter(ctx context.Context, us
 		}
 
 		// Get instrument master data for this deployment
-		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 		if err == nil && instrumentMaster != nil {
 			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
@@ -506,7 +506,7 @@ func (s *deploymentService) GetDeploymentsByStrategyID(ctx context.Context, stra
 		}
 
 		// Get instrument master data for this deployment
-		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 		if err == nil && instrumentMaster != nil {
 			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
@@ -555,7 +555,7 @@ func (s *deploymentService) UpdateDeployment(ctx context.Context, req *dto.Updat
 	}
 
 	// Get instrument master data for this deployment
-	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 	if err == nil && instrumentMaster != nil {
 		response.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 	}
@@ -832,7 +832,7 @@ func (s *deploymentService) SearchDeployments(ctx context.Context, filter *dto.D
 		}
 
 		// Get instrument master data for this deployment
-		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+		instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 		if err == nil && instrumentMaster != nil {
 			response[i].InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 		}
@@ -2257,7 +2257,7 @@ func (s *deploymentService) GetDeploymentStatus(ctx context.Context, strategyID 
 
 			// Get instrument master data for this deployment
 
-			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(deployment.InstrumentID))
+			instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int32(deployment.InstrumentID))
 			if err == nil && instrumentMaster != nil {
 				instrumentStatus.Deployment.InstrumentMaster = instrumentMasterToDTO(instrumentMaster)
 			}
@@ -2602,22 +2602,16 @@ func instrumentMasterToDTO(master *instrumentModel.InstrumentMaster) *instrument
 		Exchange:             master.Exchange,
 		Segment:              master.Segment,
 		Symbol:               master.Symbol,
-		Name:                 master.Name,
-		StartDate:            master.StartDate,
-		Expiry:               master.Expiry,
-		ExmExchID:            master.ExmExchID,
-		SmstSecurityID:       master.SmstSecurityID,
 		InstrumentName:       master.InstrumentName,
-		TradingSymbol:        master.TradingSymbol,
 		LotUnits:             master.LotUnits,
 		StrikePrice:          master.StrikePrice,
 		OptionType:           master.OptionType,
 		TickSize:             master.TickSize,
-		ExpiryFlag:           master.ExpiryFlag,
-		ExchInstrumentType:   master.ExchInstrumentType,
-		SymbolName:           master.SymbolName,
+		InstrumentType:       master.InstrumentType,
 		UnderlyingSecurityID: master.UnderlyingSecurityID,
 		UnderlyingSymbol:     master.UnderlyingSymbol,
+		CreatedAt:            master.CreatedAt,
+		UpdatedAt:            master.UpdatedAt,
 	}
 }
 

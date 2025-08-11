@@ -18,26 +18,59 @@ type InstrumentDTO struct {
 
 // InstrumentMasterDTO represents instrument master data for API responses
 type InstrumentMasterDTO struct {
-	ExchangeSecurityID   int32                `json:"exchange_security_id"`
-	Exchange             string               `json:"exchange"`
-	Segment              model.Segment        `json:"segment"`
-	Symbol               string               `json:"symbol"`
-	Name                 string               `json:"name"`
-	StartDate            time.Time            `json:"start_date"`
-	Expiry               *time.Time           `json:"expiry,omitempty"`
-	ExmExchID            int32                `json:"exm_exch_id"`
-	SmstSecurityID       int32                `json:"smst_security_id"`
-	InstrumentName       string               `json:"instrument_name"`
-	TradingSymbol        string               `json:"trading_symbol"`
-	LotUnits             int32                `json:"lot_units"`
-	StrikePrice          float64              `json:"strike_price"`
-	OptionType           string               `json:"option_type"`
-	TickSize             float64              `json:"tick_size"`
-	ExpiryFlag           string               `json:"expiry_flag"`
-	ExchInstrumentType   model.InstrumentType `json:"exch_instrument_type"`
-	SymbolName           string               `json:"symbol_name"`
-	UnderlyingSecurityID int32                `json:"underlying_security_id"`
-	UnderlyingSymbol     string               `json:"underlying_symbol"`
+	// Core Identification Columns
+	ExchangeSecurityID int32  `json:"exchange_security_id"`
+	Exchange           string `json:"exchange"`
+	Segment            string `json:"segment"`
+	Symbol             string `json:"symbol"`
+	Instrument         string `json:"instrument"`
+
+	// Trading Symbols and Names
+	InstrumentName string `json:"instrument_name"`
+
+	// ISIN and Security Identifiers
+	ISIN                 string  `json:"isin"`
+	UnderlyingSecurityID *int32  `json:"underlying_security_id,omitempty"`
+	UnderlyingSymbol     *string `json:"underlying_symbol,omitempty"`
+
+	// Date and Expiry Information
+	Expiry     time.Time `json:"expiry"`
+	ExpiryFlag *string   `json:"expiry_flag,omitempty"`
+
+	// Trading Parameters
+	LotUnits       int32    `json:"lot_units"`
+	TickSize       float64  `json:"tick_size"`
+	StrikePrice    *float64 `json:"strike_price,omitempty"`
+	OptionType     *string  `json:"option_type,omitempty"`
+	InstrumentType string   `json:"instrument_type"`
+
+	// Order Type Availability Flags
+	BracketFlag string `json:"bracket_flag"`
+	CoverFlag   string `json:"cover_flag"`
+
+	// Surveillance and Trading Permissions
+	AsmGsmFlag       string `json:"asm_gsm_flag"`
+	BuySellIndicator string `json:"buy_sell_indicator"`
+
+	// Cover Order Margin Parameters
+	BuyCoMinMarginPer    *float64 `json:"buy_co_min_margin_per,omitempty"`
+	SellCoMinMarginPer   *float64 `json:"sell_co_min_margin_per,omitempty"`
+	BuyCoSlRangeMaxPerc  *float64 `json:"buy_co_sl_range_max_perc,omitempty"`
+	SellCoSlRangeMinPerc *float64 `json:"sell_co_sl_range_min_perc,omitempty"`
+
+	// Bracket Order Parameters
+	BuyBoMinMarginPer        *float64 `json:"buy_bo_min_margin_per,omitempty"`
+	BuyBoSlRangeMaxPerc      *float64 `json:"buy_bo_sl_range_max_perc,omitempty"`
+	SellBoSlMinRange         *float64 `json:"sell_bo_sl_min_range,omitempty"`
+	BuyBoProfitRangeMaxPerc  *float64 `json:"buy_bo_profit_range_max_perc,omitempty"`
+	SellBoProfitRangeMaxPerc *float64 `json:"sell_bo_profit_range_max_perc,omitempty"`
+
+	// Margin Trading Facility
+	MtfLeverage *float64 `json:"mtf_leverage,omitempty"`
+
+	// Metadata
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // InstrumentWithMetadataDTO combines instrument data with its metadata
@@ -69,48 +102,107 @@ type UpdateInstrumentRequest struct {
 
 // CreateInstrumentMasterRequest represents request to create an instrument master
 type CreateInstrumentMasterRequest struct {
-	Exchange             string               `json:"exchange" binding:"required"`
-	Segment              model.Segment        `json:"segment" binding:"required"`
-	Symbol               string               `json:"symbol" binding:"required"`
-	Name                 string               `json:"name" binding:"required"`
-	StartDate            time.Time            `json:"start_date" binding:"required"`
-	Expiry               *time.Time           `json:"expiry,omitempty"`
-	ExmExchID            int32                `json:"exm_exch_id"`
-	SmstSecurityID       int32                `json:"smst_security_id"`
-	InstrumentName       string               `json:"instrument_name"`
-	TradingSymbol        string               `json:"trading_symbol"`
-	LotUnits             int32                `json:"lot_units"`
-	StrikePrice          float64              `json:"strike_price"`
-	OptionType           string               `json:"option_type"`
-	TickSize             float64              `json:"tick_size"`
-	ExpiryFlag           string               `json:"expiry_flag"`
-	ExchInstrumentType   model.InstrumentType `json:"exch_instrument_type"`
-	SymbolName           string               `json:"symbol_name"`
-	UnderlyingSecurityID int32                `json:"underlying_security_id"`
-	UnderlyingSymbol     string               `json:"underlying_symbol"`
+	// Core Identification Columns
+	ExchangeSecurityID int32  `json:"exchange_security_id" binding:"required"`
+	Exchange           string `json:"exchange" binding:"required"`
+	Segment            string `json:"segment" binding:"required"`
+	Symbol             string `json:"symbol" binding:"required"`
+	Instrument         string `json:"instrument" binding:"required"`
+
+	// Trading Symbols and Names
+	InstrumentName string `json:"instrument_name"`
+
+	// ISIN and Security Identifiers
+	ISIN                 string  `json:"isin"`
+	UnderlyingSecurityID *int32  `json:"underlying_security_id,omitempty"`
+	UnderlyingSymbol     *string `json:"underlying_symbol,omitempty"`
+
+	// Date and Expiry Information
+	Expiry     time.Time `json:"expiry" binding:"required"`
+	ExpiryFlag *string   `json:"expiry_flag,omitempty"`
+
+	// Trading Parameters
+	LotUnits       int32    `json:"lot_units" binding:"required"`
+	TickSize       float64  `json:"tick_size" binding:"required"`
+	StrikePrice    *float64 `json:"strike_price,omitempty"`
+	OptionType     *string  `json:"option_type,omitempty"`
+	InstrumentType string   `json:"instrument_type" binding:"required"`
+
+	// Order Type Availability Flags
+	BracketFlag string `json:"bracket_flag"`
+	CoverFlag   string `json:"cover_flag"`
+
+	// Surveillance and Trading Permissions
+	AsmGsmFlag       string `json:"asm_gsm_flag"`
+	BuySellIndicator string `json:"buy_sell_indicator"`
+
+	// Cover Order Margin Parameters
+	BuyCoMinMarginPer    *float64 `json:"buy_co_min_margin_per,omitempty"`
+	SellCoMinMarginPer   *float64 `json:"sell_co_min_margin_per,omitempty"`
+	BuyCoSlRangeMaxPerc  *float64 `json:"buy_co_sl_range_max_perc,omitempty"`
+	SellCoSlRangeMinPerc *float64 `json:"sell_co_sl_range_min_perc,omitempty"`
+
+	// Bracket Order Parameters
+	BuyBoMinMarginPer        *float64 `json:"buy_bo_min_margin_per,omitempty"`
+	BuyBoSlRangeMaxPerc      *float64 `json:"buy_bo_sl_range_max_perc,omitempty"`
+	SellBoSlMinRange         *float64 `json:"sell_bo_sl_min_range,omitempty"`
+	BuyBoProfitRangeMaxPerc  *float64 `json:"buy_bo_profit_range_max_perc,omitempty"`
+	SellBoProfitRangeMaxPerc *float64 `json:"sell_bo_profit_range_max_perc,omitempty"`
+
+	// Margin Trading Facility
+	MtfLeverage *float64 `json:"mtf_leverage,omitempty"`
 }
 
 // UpdateInstrumentMasterRequest represents request to update an instrument master
 type UpdateInstrumentMasterRequest struct {
-	Exchange             string               `json:"exchange"`
-	Segment              model.Segment        `json:"segment"`
-	Symbol               string               `json:"symbol"`
-	Name                 string               `json:"name"`
-	StartDate            time.Time            `json:"start_date"`
-	Expiry               *time.Time           `json:"expiry,omitempty"`
-	ExmExchID            int32                `json:"exm_exch_id"`
-	SmstSecurityID       int32                `json:"smst_security_id"`
-	InstrumentName       string               `json:"instrument_name"`
-	TradingSymbol        string               `json:"trading_symbol"`
-	LotUnits             int32                `json:"lot_units"`
-	StrikePrice          float64              `json:"strike_price"`
-	OptionType           string               `json:"option_type"`
-	TickSize             float64              `json:"tick_size"`
-	ExpiryFlag           string               `json:"expiry_flag"`
-	ExchInstrumentType   model.InstrumentType `json:"exch_instrument_type"`
-	SymbolName           string               `json:"symbol_name"`
-	UnderlyingSecurityID int32                `json:"underlying_security_id"`
-	UnderlyingSymbol     string               `json:"underlying_symbol"`
+	// Core Identification Columns
+	Exchange   string `json:"exchange"`
+	Segment    string `json:"segment"`
+	Symbol     string `json:"symbol"`
+	Instrument string `json:"instrument"`
+
+	// Trading Symbols and Names
+	InstrumentName string `json:"instrument_name"`
+
+	// ISIN and Security Identifiers
+	ISIN                 string  `json:"isin"`
+	UnderlyingSecurityID *int32  `json:"underlying_security_id,omitempty"`
+	UnderlyingSymbol     *string `json:"underlying_symbol,omitempty"`
+
+	// Date and Expiry Information
+	Expiry     time.Time `json:"expiry"`
+	ExpiryFlag *string   `json:"expiry_flag,omitempty"`
+
+	// Trading Parameters
+	LotUnits       int32    `json:"lot_units"`
+	TickSize       float64  `json:"tick_size"`
+	StrikePrice    *float64 `json:"strike_price,omitempty"`
+	OptionType     *string  `json:"option_type,omitempty"`
+	InstrumentType string   `json:"instrument_type"`
+
+	// Order Type Availability Flags
+	BracketFlag string `json:"bracket_flag"`
+	CoverFlag   string `json:"cover_flag"`
+
+	// Surveillance and Trading Permissions
+	AsmGsmFlag       string `json:"asm_gsm_flag"`
+	BuySellIndicator string `json:"buy_sell_indicator"`
+
+	// Cover Order Margin Parameters
+	BuyCoMinMarginPer    *float64 `json:"buy_co_min_margin_per,omitempty"`
+	SellCoMinMarginPer   *float64 `json:"sell_co_min_margin_per,omitempty"`
+	BuyCoSlRangeMaxPerc  *float64 `json:"buy_co_sl_range_max_perc,omitempty"`
+	SellCoSlRangeMinPerc *float64 `json:"sell_co_sl_range_min_perc,omitempty"`
+
+	// Bracket Order Parameters
+	BuyBoMinMarginPer        *float64 `json:"buy_bo_min_margin_per,omitempty"`
+	BuyBoSlRangeMaxPerc      *float64 `json:"buy_bo_sl_range_max_perc,omitempty"`
+	SellBoSlMinRange         *float64 `json:"sell_bo_sl_min_range,omitempty"`
+	BuyBoProfitRangeMaxPerc  *float64 `json:"buy_bo_profit_range_max_perc,omitempty"`
+	SellBoProfitRangeMaxPerc *float64 `json:"sell_bo_profit_range_max_perc,omitempty"`
+
+	// Margin Trading Facility
+	MtfLeverage *float64 `json:"mtf_leverage,omitempty"`
 }
 
 // GetInstrumentsByTimeRangeRequest represents a request to fetch instruments by time range
@@ -124,7 +216,7 @@ type GetInstrumentsByTimeRangeRequest struct {
 // InstrumentMasterFilterDTO represents filtering and pagination options for instrument masters
 type InstrumentMasterFilterDTO struct {
 	Exchange       string                   `form:"exchange"`
-	Segment        model.Segment            `form:"segment"`
+	Segment        string                   `form:"segment"`
 	Market         model.Market             `form:"market"`
 	InstrumentType model.InstrumentCategory `form:"instrumentType"`
 	Contract       model.Contract           `form:"contract"`
@@ -158,12 +250,12 @@ type GetInstrumentsByExchangeSecurityIDRequest struct {
 
 // DatabaseFilter represents the resolved database filter criteria
 type DatabaseFilter struct {
-	Exchange       string               `json:"exchange,omitempty"`
-	Segment        model.Segment        `json:"segment,omitempty"`
-	InstrumentType model.InstrumentType `json:"instrument_type,omitempty"`
-	Query          string               `json:"query,omitempty"`
-	Page           int                  `json:"page"`
-	PageSize       int                  `json:"page_size"`
+	Exchange       string `json:"exchange,omitempty"`
+	Segment        string `json:"segment,omitempty"`
+	InstrumentType string `json:"instrument_type,omitempty"`
+	Query          string `json:"query,omitempty"`
+	Page           int    `json:"page"`
+	PageSize       int    `json:"page_size"`
 }
 
 // ConvertToDatabase converts the filter DTO to database filter criteria
@@ -186,48 +278,48 @@ func (f *InstrumentMasterFilterDTO) ConvertToDatabase() *DatabaseFilter {
 	switch {
 	// EQ + NSE + Stock + Spot -> Equities + Stocks (Cash Market)
 	case f.Market == model.MarketEQ && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractSpot:
-		dbFilter.Segment = model.SegmentEquities
-		dbFilter.InstrumentType = model.InstrumentTypeStockCash
+		dbFilter.Segment = "Equities"
+		dbFilter.InstrumentType = "Stocks (Cash Market)"
 
 	// EQ + NSE + Index -> NA (no specific instrument type filtering for index in EQ)
 	case f.Market == model.MarketEQ && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex:
-		dbFilter.Segment = model.SegmentEquities
+		dbFilter.Segment = "Equities"
 		// No specific instrument type filter for EQ Index
 
 	// F&O + NSE + Stock + Spot -> Indices + Index Spot
 	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractSpot:
-		dbFilter.Segment = model.SegmentIndices
-		dbFilter.InstrumentType = model.InstrumentTypeIndexSpot
+		dbFilter.Segment = "Indices"
+		dbFilter.InstrumentType = "Index Spot"
 
 	// F&O + NSE + Stock + Futures -> Derivatives + Stock Futures
 	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractFutures:
-		dbFilter.Segment = model.SegmentDerivatives
-		dbFilter.InstrumentType = model.InstrumentTypeStockFutures
+		dbFilter.Segment = "Derivatives"
+		dbFilter.InstrumentType = "Stock Futures"
 
 	// F&O + NSE + Index + Futures -> Derivatives + Index Futures
 	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex && f.Contract == model.ContractFutures:
-		dbFilter.Segment = model.SegmentDerivatives
-		dbFilter.InstrumentType = model.InstrumentTypeIndexFutures
+		dbFilter.Segment = "Derivatives"
+		dbFilter.InstrumentType = "Index Futures"
 
 	// F&O + NSE + Stock + Options -> Derivatives + Stock Options
 	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractOptions:
-		dbFilter.Segment = model.SegmentDerivatives
-		dbFilter.InstrumentType = model.InstrumentTypeStockOptions
+		dbFilter.Segment = "Derivatives"
+		dbFilter.InstrumentType = "Stock Options"
 
 	// F&O + NSE + Index + Options -> Derivatives + Index Options
 	case f.Market == model.MarketFO && exchange == "NSE" && f.InstrumentType == model.InstrumentCategoryIndex && f.Contract == model.ContractOptions:
-		dbFilter.Segment = model.SegmentDerivatives
-		dbFilter.InstrumentType = model.InstrumentTypeIndexOptions
+		dbFilter.Segment = "Derivatives"
+		dbFilter.InstrumentType = "Index Options"
 
 	// F&O + MCX + Stock + Futures -> Commodities + Commodity Futures
 	case f.Market == model.MarketFO && exchange == "MCX" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractFutures:
-		dbFilter.Segment = model.SegmentCommodities
-		dbFilter.InstrumentType = model.InstrumentTypeCommodityFutures
+		dbFilter.Segment = "Commodities"
+		dbFilter.InstrumentType = "Commodity Futures"
 
 	// F&O + MCX + Stock + Options -> Commodities + Commodity Options
 	case f.Market == model.MarketFO && exchange == "MCX" && f.InstrumentType == model.InstrumentCategoryStock && f.Contract == model.ContractOptions:
-		dbFilter.Segment = model.SegmentCommodities
-		dbFilter.InstrumentType = model.InstrumentTypeCommodityOptions
+		dbFilter.Segment = "Commodities"
+		dbFilter.InstrumentType = "Commodity Options"
 
 	default:
 		// Handle partial filters or use individual field mappings

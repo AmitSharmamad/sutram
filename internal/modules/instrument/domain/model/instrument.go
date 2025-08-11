@@ -174,26 +174,59 @@ type StockData []Instrument
 
 // InstrumentMaster represents the master instrument record with metadata
 type InstrumentMaster struct {
-	ExchangeSecurityID   int32          `json:"exchange_security_id" db:"exchange_security_id"`
-	Exchange             string         `json:"exchange" db:"exchange"`
-	Segment              Segment        `json:"segment" db:"segment"`
-	Symbol               string         `json:"symbol" db:"symbol"`
-	Name                 string         `json:"name" db:"instrument"` // Named instrument in DB
-	StartDate            time.Time      `json:"start_date" db:"start_date"`
-	Expiry               *time.Time     `json:"expiry,omitempty" db:"expiry"`
-	ExmExchID            int32          `json:"exm_exch_id" db:"exm_exch_id"`
-	SmstSecurityID       int32          `json:"smst_security_id" db:"smst_security_id"`
-	InstrumentName       string         `json:"instrument_name" db:"instrument_name"`
-	TradingSymbol        string         `json:"trading_symbol" db:"trading_symbol"`
-	LotUnits             int32          `json:"lot_units" db:"lot_units"`
-	StrikePrice          float64        `json:"strike_price" db:"strike_price"`
-	OptionType           string         `json:"option_type" db:"option_type"`
-	TickSize             float64        `json:"tick_size" db:"tick_size"`
-	ExpiryFlag           string         `json:"expiry_flag" db:"expiry_flag"`
-	ExchInstrumentType   InstrumentType `json:"exch_instrument_type" db:"exch_instrument_type"`
-	SymbolName           string         `json:"symbol_name" db:"symbol_name"`
-	UnderlyingSecurityID int32          `json:"underlying_security_id" db:"underlying_security_id"`
-	UnderlyingSymbol     string         `json:"underlying_symbol" db:"underlying_symbol"`
+	// Core Identification Columns
+	ExchangeSecurityID int32  `json:"exchange_security_id" db:"exchange_security_id"`
+	Exchange           string `json:"exchange" db:"exchange"`
+	Segment            string `json:"segment" db:"segment"`
+	Symbol             string `json:"symbol" db:"symbol"`
+	Instrument         string `json:"instrument" db:"instrument"`
+
+	// Trading Symbols and Names
+	InstrumentName string `json:"instrument_name" db:"instrument_name"`
+
+	// ISIN and Security Identifiers
+	ISIN                 string  `json:"isin" db:"isin"`
+	UnderlyingSecurityID *int32  `json:"underlying_security_id,omitempty" db:"underlying_security_id"`
+	UnderlyingSymbol     *string `json:"underlying_symbol,omitempty" db:"underlying_symbol"`
+
+	// Date and Expiry Information
+	Expiry     time.Time `json:"expiry" db:"expiry"`
+	ExpiryFlag *string   `json:"expiry_flag,omitempty" db:"expiry_flag"`
+
+	// Trading Parameters
+	LotUnits       int32    `json:"lot_units" db:"lot_units"`
+	TickSize       float64  `json:"tick_size" db:"tick_size"`
+	StrikePrice    *float64 `json:"strike_price,omitempty" db:"strike_price"`
+	OptionType     *string  `json:"option_type,omitempty" db:"option_type"`
+	InstrumentType string   `json:"instrument_type" db:"instrument_type"`
+
+	// Order Type Availability Flags
+	BracketFlag string `json:"bracket_flag" db:"bracket_flag"`
+	CoverFlag   string `json:"cover_flag" db:"cover_flag"`
+
+	// Surveillance and Trading Permissions
+	AsmGsmFlag       string `json:"asm_gsm_flag" db:"asm_gsm_flag"`
+	BuySellIndicator string `json:"buy_sell_indicator" db:"buy_sell_indicator"`
+
+	// Cover Order Margin Parameters
+	BuyCoMinMarginPer    *float64 `json:"buy_co_min_margin_per,omitempty" db:"buy_co_min_margin_per"`
+	SellCoMinMarginPer   *float64 `json:"sell_co_min_margin_per,omitempty" db:"sell_co_min_margin_per"`
+	BuyCoSlRangeMaxPerc  *float64 `json:"buy_co_sl_range_max_perc,omitempty" db:"buy_co_sl_range_max_perc"`
+	SellCoSlRangeMinPerc *float64 `json:"sell_co_sl_range_min_perc,omitempty" db:"sell_co_sl_range_min_perc"`
+
+	// Bracket Order Parameters
+	BuyBoMinMarginPer        *float64 `json:"buy_bo_min_margin_per,omitempty" db:"buy_bo_min_margin_per"`
+	BuyBoSlRangeMaxPerc      *float64 `json:"buy_bo_sl_range_max_perc,omitempty" db:"buy_bo_sl_range_max_perc"`
+	SellBoSlMinRange         *float64 `json:"sell_bo_sl_min_range,omitempty" db:"sell_bo_sl_min_range"`
+	BuyBoProfitRangeMaxPerc  *float64 `json:"buy_bo_profit_range_max_perc,omitempty" db:"buy_bo_profit_range_max_perc"`
+	SellBoProfitRangeMaxPerc *float64 `json:"sell_bo_profit_range_max_perc,omitempty" db:"sell_bo_profit_range_max_perc"`
+
+	// Margin Trading Facility
+	MtfLeverage *float64 `json:"mtf_leverage,omitempty" db:"mtf_leverage"`
+
+	// Metadata
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // InstrumentWithMetadata represents an instrument with its metadata

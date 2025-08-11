@@ -12,7 +12,6 @@ import (
 	"algo/internal/modules/backtest/domain/model"
 	"algo/internal/modules/backtest/domain/repository"
 	instService "algo/internal/modules/instrument/application/service"
-	instrumentModel "algo/internal/modules/instrument/domain/model"
 
 	"github.com/google/uuid"
 )
@@ -379,7 +378,7 @@ func (s *optionLegService) ResolveExchangeSecurityID(ctx context.Context, legID 
 		optionTypeStr)
 
 	// Step 4: Query instrument master table using the trading symbol
-	instrumentMasters, _, err := s.instrumentService.GetInstrumentMastersWithFilters(ctx, "", instrumentModel.SegmentDerivatives, tradingSymbol, 1, 1)
+	instrumentMasters, _, err := s.instrumentService.GetInstrumentMastersWithFilters(ctx, "", "Derivatives", tradingSymbol, 1, 1)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query instrument master: %w", err)
 	}

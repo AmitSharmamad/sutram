@@ -110,7 +110,7 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 		// TODO: Move this outside of the loop
 		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
 			ctx,
-			int64(instrumentID),
+			instrumentID,
 		)
 		if err != nil {
 			// Log error and continue with other instruments
@@ -156,7 +156,7 @@ func (e *BacktestEngine) Start(ctx context.Context, strategyID uuid.UUID, userID
 		wg.Add(1)
 
 		// Execute run asynchronously as goroutine
-		go e.executeRunBacktest(ctx, run, int64(instrumentID), strategyResp, &wg)
+		go e.executeRunBacktest(ctx, run, int32(instrumentID), strategyResp, &wg)
 	}
 
 	// Wait for all backtest runs to complete
@@ -303,14 +303,14 @@ func (e *BacktestEngine) getMaxLookback(expression string) int64 {
 }
 
 // executeRunBacktest runs a backtest for a single instrument run
-func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run, instrumentID int64, strategy *strategyDto.StrategyResponse, wg *sync.WaitGroup) {
+func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run, instrumentID int32, strategy *strategyDto.StrategyResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	startTime := time.Now()
 
 	instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
 		ctx,
-		int64(instrumentID),
+		instrumentID,
 	)
 	if err != nil {
 		println("Error getting instrument master for exchange security ID:", instrumentID, "Error:", err.Error())
@@ -418,7 +418,7 @@ func (e *BacktestEngine) executeRunBacktest(ctx context.Context, run *model.Run,
 	executionDuration := endTime.Sub(startTime)
 
 	// Format: InstrumentID (Symbol): Start -> End (Duration)
-	instrumentIDStr := strconv.FormatInt(instrumentID, 10)
+	instrumentIDStr := strconv.FormatInt(int64(instrumentID), 10)
 	symbolStr := instrumentMaster.Symbol
 	if symbolStr == "" {
 		symbolStr = "Unknown"
@@ -957,7 +957,7 @@ func (e *BacktestEngine) GetIndicatorData(ctx context.Context, strategyID uuid.U
 		// Get instrument master for metadata
 		instrumentMaster, err := e.instrumentService.GetInstrumentMasterByExchangeSecurityID(
 			ctx,
-			int64(instrumentID),
+			instrumentID,
 		)
 		if err != nil {
 			continue // Skip this instrument if we can't get master data

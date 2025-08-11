@@ -71,7 +71,7 @@ func (s *InstrumentService) GetInstrumentsByExchangeSecurityIDPaginated(ctx cont
 }
 
 // GetInstrumentMasterByExchangeSecurityID gets an instrument master by exchange security ID
-func (s *InstrumentService) GetInstrumentMasterByExchangeSecurityID(ctx context.Context, exchangeSecurityID int64) (*model.InstrumentMaster, error) {
+func (s *InstrumentService) GetInstrumentMasterByExchangeSecurityID(ctx context.Context, exchangeSecurityID int32) (*model.InstrumentMaster, error) {
 	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instrument master by exchange security ID: %w", err)
@@ -123,7 +123,7 @@ func (s *InstrumentService) GetAllInstrumentMasters(ctx context.Context) ([]*mod
 }
 
 // GetInstrumentMastersWithFilters gets instrument masters with filtering and pagination
-func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange string, segment model.Segment, query string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
+func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context, exchange string, segment string, query string, page, pageSize int) ([]*model.InstrumentMaster, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -134,13 +134,7 @@ func (s *InstrumentService) GetInstrumentMastersWithFilters(ctx context.Context,
 	offset := (page - 1) * pageSize
 	limit := pageSize
 
-	// Convert segment enum to string for repository call
-	segmentStr := ""
-	if segment != "" && segment.IsValid() {
-		segmentStr = segment.String()
-	}
-
-	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segmentStr, query, offset, limit)
+	instrumentMasters, totalCount, err := s.instrumentMasterRepo.FindWithFilters(ctx, exchange, segment, query, offset, limit)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error finding instrument masters with filters: %w", err)
 	}
@@ -196,13 +190,8 @@ func (s *InstrumentService) UpdateInstrument(ctx context.Context, instrument *mo
 
 // CreateInstrumentMaster creates a new instrument master
 func (s *InstrumentService) CreateInstrumentMaster(ctx context.Context, master *model.InstrumentMaster) error {
-	// Validate enums before creation
-	if !master.Segment.IsValid() {
-		return fmt.Errorf("invalid segment: %s", master.Segment)
-	}
-	if !master.ExchInstrumentType.IsValid() {
-		return fmt.Errorf("invalid instrument type: %s", master.ExchInstrumentType)
-	}
+	// Remove segment validation since it's now a string
+	// Remove instrument type validation as well since the field structure changed
 
 	if err := s.instrumentMasterRepo.Create(ctx, master); err != nil {
 		return fmt.Errorf("error creating instrument master: %w", err)
@@ -213,15 +202,13 @@ func (s *InstrumentService) CreateInstrumentMaster(ctx context.Context, master *
 // UpdateInstrumentMaster updates an instrument master
 func (s *InstrumentService) UpdateInstrumentMaster(ctx context.Context, master *model.InstrumentMaster) error {
 	// Validate enums before update
-	if !master.Segment.IsValid() {
-		return fmt.Errorf("invalid segment: %s", master.Segment)
-	}
-	if !master.ExchInstrumentType.IsValid() {
-		return fmt.Errorf("invalid instrument type: %s", master.ExchInstrumentType)
-	}
+	// Remove segment validation since it's now a string
+	// if !master.ExchInstrumentType.IsValid() {
+	// 	return fmt.Errorf("invalid instrument type: %s", master.ExchInstrumentType)
+	// }
 
 	// Check if instrument master exists by exchange security ID
-	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, int64(master.ExchangeSecurityID))
+	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, master.ExchangeSecurityID)
 	if err != nil {
 		return fmt.Errorf("error finding instrument master: %w", err)
 	}
@@ -253,7 +240,7 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, exchangeSecuri
 }
 
 // DeleteInstrumentMaster deletes an instrument master by exchange security ID
-func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, exchangeSecurityID int64) error {
+func (s *InstrumentService) DeleteInstrumentMaster(ctx context.Context, exchangeSecurityID int32) error {
 	// Check if instrument master exists
 	existing, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, exchangeSecurityID)
 	if err != nil {
@@ -345,7 +332,7 @@ func (s *InstrumentService) GetInstrumentsByExchangeSecurityIDWithLookback(
 }
 
 // GetInstrumentMastersByExchangeSecurityIDs gets multiple instrument masters by their exchange security IDs
-func (s *InstrumentService) GetInstrumentMastersByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int64) ([]*model.InstrumentMaster, error) {
+func (s *InstrumentService) GetInstrumentMastersByExchangeSecurityIDs(ctx context.Context, exchangeSecurityIDs []int32) ([]*model.InstrumentMaster, error) {
 	instrumentMasters, err := s.instrumentMasterRepo.FindByExchangeSecurityIDs(ctx, exchangeSecurityIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instrument masters by exchange security IDs: %w", err)
@@ -373,12 +360,12 @@ func (s *InstrumentService) ResolveOptionsContractsFromMaster(
 	}
 
 	// NOTE: Actual code starts from here
-	parentSecurityIDValue := int64(*parentSecurityID)
+	parentSecurityIDValue := int32(*parentSecurityID)
 	instrumentMaster, err := s.instrumentMasterRepo.FindByExchangeSecurityID(ctx, parentSecurityIDValue)
 	if err != nil {
 		return nil, fmt.Errorf("error finding instrument master by exchange security ID: %w", err)
 	}
-	instrumentMasterSymbol := instrumentMaster.TradingSymbol
+	instrumentMasterSymbol := instrumentMaster.Symbol
 	instrumentExchange := instrumentMaster.Exchange
 
 	instruments, err := s.instrumentMasterRepo.FindOptionsContracts(

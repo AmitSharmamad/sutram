@@ -49,21 +49,18 @@ func NewDashboardService(
 
 // getInstrumentName retrieves the actual instrument name from the instrument master table
 func (s *DashboardService) getInstrumentName(ctx context.Context, instrumentID int) string {
-	instrumentMaster, err := s.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx, int64(instrumentID))
+	instrumentMaster, err := s.instrumentService.GetInstrumentMasterByExchangeSecurityID(ctx, int32(instrumentID))
 	if err != nil {
 		// Fallback to placeholder if lookup fails
 		return fmt.Sprintf("Instrument-%d", instrumentID)
 	}
 
-	// Prefer TradingSymbol for display, fallback to InstrumentName or Name
-	if instrumentMaster.TradingSymbol != "" {
-		return instrumentMaster.TradingSymbol
+	// Prefer Symbol for display, fallback to InstrumentName
+	if instrumentMaster.Symbol != "" {
+		return instrumentMaster.Symbol
 	}
 	if instrumentMaster.InstrumentName != "" {
 		return instrumentMaster.InstrumentName
-	}
-	if instrumentMaster.Name != "" {
-		return instrumentMaster.Name
 	}
 
 	// Final fallback
