@@ -101,6 +101,50 @@ func (s *InstrumentService) GetInstrumentsByTimeRange(ctx context.Context, excha
 	return instruments, nil
 }
 
+// GetInstrumentsByTimePoints gets instruments by exchange security ID for specific time points within a date range
+// This function allows you to get aggregated OHLCV data for specific times of the day across multiple days.
+//
+// Parameters:
+// - exchangeSecurityID: The security ID to query
+// - start, end: Date range to query within
+// - timeFrame: Aggregation interval ('1s', '1m', '3m', '5m', '10m', '15m', '30m', '1h', '3h', '1d', '1M')
+// - timePoints: Array of specific times in HH:MM:SS format (e.g., ["09:30:00", "15:00:00", "12:00:00"])
+//
+// Example usage:
+// timePoints := []string{"09:30:00", "15:00:00", "12:00:00"}
+// instruments, err := service.GetInstrumentsByTimePoints(ctx, 12345, startDate, endDate, "1m", timePoints)
+// This returns 1-minute aggregated data only for 9:30 AM, 3:00 PM, and 12:00 PM for each day in the range
+func (s *InstrumentService) GetInstrumentsByTimePoints(ctx context.Context, exchangeSecurityID int32, start, end time.Time, timeFrame string, timePoints []string) ([]*model.Instrument, error) {
+	// Validate time range
+	if start.After(end) {
+		return nil, ErrInvalidTimeRange
+	}
+
+	// Default to '1m' if timeFrame is empty
+	if timeFrame == "" {
+		timeFrame = "1m"
+	}
+
+	// Validate timePoints array
+	if len(timePoints) == 0 {
+		return []*model.Instrument{}, nil
+	}
+
+	// Validate time format for each time point
+	for _, timePoint := range timePoints {
+		if _, err := time.Parse("15:04:05", timePoint); err != nil {
+			return nil, fmt.Errorf("invalid time format '%s': expected HH:MM:SS format", timePoint)
+		}
+	}
+
+	instruments, err := s.instrumentRepo.FindByExchangeSecurityIDAndTimePoints(ctx, exchangeSecurityID, start, end, timeFrame, timePoints)
+	if err != nil {
+		return nil, fmt.Errorf("error finding instruments by time points: %w", err)
+	}
+
+	return instruments, nil
+}
+
 // GetInstrumentMasterBySymbol gets an instrument master by symbol
 func (s *InstrumentService) GetInstrumentMasterBySymbol(ctx context.Context, symbol string) (*model.InstrumentMaster, error) {
 	instrumentMaster, err := s.instrumentMasterRepo.FindBySymbol(ctx, symbol)

@@ -1350,20 +1350,33 @@ func (e *BacktestEngine) getLegSpotData(
 	ctx context.Context,
 	strategyResp *strategyDto.StrategyResponse,
 ) (map[uuid.UUID][]*instrumentModel.Instrument, error) {
+	// Build time points array from strategy entry and exit times
+
+	var timePoints []string
+	if strategyResp.EntryStartTime != nil {
+		timePoints = append(timePoints, strategyResp.EntryStartTime.String())
+	}
+	if strategyResp.EntryEndTime != nil {
+		timePoints = append(timePoints, strategyResp.EntryEndTime.String())
+	}
+
 	legSpotData := make(map[uuid.UUID][]*instrumentModel.Instrument)
+
 	for _, leg := range strategyResp.OptionLegs {
-		legInstrumentSpotData, err := e.instrumentService.GetInstrumentsByTimeRange(
+		legInstrumentSpotData, err := e.instrumentService.GetInstrumentsByTimePoints(
 			ctx,
 			*leg.ExchangeSecurityID,
 			*strategyResp.StartDate,
 			*strategyResp.EndDate,
 			string(strategyResp.ChartTimeframe),
+			timePoints,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get leg instrument data: %w", err)
 		}
 		legSpotData[leg.ID] = legInstrumentSpotData
 	}
+
 	return legSpotData, nil
 }
 
